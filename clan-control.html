@@ -2268,13 +2268,14 @@
 
                     const partyHtml = partyPlayers.length > 0 ? partyPlayers.map(p => {
                         const inRoster = roster.find(r => r.name.toLowerCase() === p.name.toLowerCase());
-                        const badge = !inRoster
-                            ? `<span title="Не в ростере" style="color:#f87171;font-size:11px;margin-left:5px">⚠️</span>`
-                            : (inRoster.pac === 'СОЛО'
-                                ? `<span style="font-size:9px;color:#64748b;background:#1e2530;padding:1px 5px;border-radius:3px;margin-left:5px">соло</span>`
-                                : '');
+                        const notInRoster = !inRoster;
+                        const pacLabel = inRoster && inRoster.pac === 'СОЛО' ? 'соло' : (inRoster ? inRoster.pac : '');
+                        const badgeHtml = notInRoster
+                            ? `<span title="Не в ростере — нажми ✏️ чтобы исправить ник" style="color:#f87171;font-size:10px;margin-left:4px">⚠️ не в ростере</span>`
+                            : (inRoster.pac === 'СОЛО' ? `<span style="font-size:9px;color:#64748b;background:#1e2530;padding:1px 5px;border-radius:3px;margin-left:5px">соло</span>` : '');
+                        const editBtn = `<button onclick="kmRenamePlayer('${dateStr}','${p.name.replace(/'/g,"\\'")}',this)" title="Исправить ник" style="background:none;border:none;color:#475569;cursor:pointer;font-size:11px;padding:0 4px;line-height:1;margin-left:4px" onmouseover="this.style.color='#6366f1'" onmouseout="this.style.color='#475569'">✏️</button>`;
                         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:#0b0e14;border-radius:6px;margin-bottom:4px;font-size:12px">
-                            <span style="font-weight:600;display:flex;align-items:center">${p.name}${badge}</span>
+                            <span style="font-weight:600;display:flex;align-items:center">${p.name}${badgeHtml}${editBtn}</span>
                             <span style="display:flex;gap:12px">
                                 <span style="color:#f59e0b">⚔️ ${p.kills||0}</span>
                                 <span style="color:#ef4444">💀 ${p.deaths||0}</span>
@@ -2283,6 +2284,17 @@
                             </span>
                         </div>`;
                     }).join('') : `<div style="font-size:11px;color:#475569;padding:6px 12px;font-style:italic">— список игроков появится после нового анализа скринов</div>`;
+
+                    // Считаем суммарную стату из участников (не из cmdChannel — там суммарная группы)
+                    const sumKills   = partyPlayers.reduce((s,p)=>s+(p.kills||0),0);
+                    const sumDeaths  = partyPlayers.reduce((s,p)=>s+(p.deaths||0),0);
+                    const sumPvp     = partyPlayers.reduce((s,p)=>s+(p.pvp_dmg||0),0);
+                    const sumPve     = partyPlayers.reduce((s,p)=>s+(p.pve_dmg||0),0);
+                    // Если участников нет — fallback на cmdChannel
+                    const dispKills   = partyPlayers.length > 0 ? sumKills   : (cc.kills||0);
+                    const dispDeaths  = partyPlayers.length > 0 ? sumDeaths  : (cc.deaths||0);
+                    const dispPvp     = partyPlayers.length > 0 ? sumPvp     : (cc.pvp_dmg||0);
+                    const dispPve     = partyPlayers.length > 0 ? sumPve     : (cc.pve_dmg||0);
 
                     return `<div style="border:1px solid #1e2530;border-radius:10px;margin-bottom:6px;overflow:hidden">
                         <div onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='block'?'none':'block';this.querySelector('.arr').textContent=b.style.display==='block'?'▲':'▼'"
@@ -2293,10 +2305,10 @@
                                 <span style="font-size:10px;color:#64748b">👥 ${cc.members||0}</span>
                             </div>
                             <div style="display:flex;gap:12px;font-size:12px;align-items:center">
-                                <span style="color:#f59e0b">⚔️ ${cc.kills||0}</span>
-                                <span style="color:#ef4444">💀 ${cc.deaths||0}</span>
-                                <span style="color:#818cf8">🗡️ ${(cc.pvp_dmg||0).toLocaleString()}</span>
-                                <span style="color:#22c55e">🐉 ${(cc.pve_dmg||0).toLocaleString()}</span>
+                                <span style="color:#f59e0b">⚔️ ${dispKills}</span>
+                                <span style="color:#ef4444">💀 ${dispDeaths}</span>
+                                <span style="color:#818cf8">🗡️ ${dispPvp.toLocaleString()}</span>
+                                <span style="color:#22c55e">🐉 ${dispPve.toLocaleString()}</span>
                                 <span class="arr" style="color:#475569;font-size:10px;margin-left:4px">▼</span>
                             </div>
                         </div>
@@ -2347,6 +2359,52 @@
                     <p class="text-lg font-medium">История пуста</p>
                     <p class="text-sm mt-2">Отмечай события в Календаре КМ — они появятся здесь</p>
                 </div>`;
+        }
+
+        // Переименование игрока в Истории КМ — синхронизируется с ростером
+        function kmRenamePlayer(dateStr, oldName, btnEl) {
+            showPrompt('Исправить ник', oldName, function(newName) {
+                if (!newName || newName === oldName) return;
+                // 1. Переименовываем во ВСЕХ снапшотах (screenPlayersMap + players)
+                Object.values(appliedStatsByDate).forEach(function(snap) {
+                    // players
+                    (snap.players || []).forEach(function(p) {
+                        if (p.name && p.name.toLowerCase() === oldName.toLowerCase()) p.name = newName;
+                        if (p._rawName && p._rawName.toLowerCase() === oldName.toLowerCase()) p._rawName = newName;
+                    });
+                    // screenPlayersMap
+                    Object.values(snap.screenPlayersMap || {}).forEach(function(arr) {
+                        arr.forEach(function(p) {
+                            if (p.name && p.name.toLowerCase() === oldName.toLowerCase()) p.name = newName;
+                        });
+                    });
+                    // packLeaders
+                    Object.keys(snap.packLeaders || {}).forEach(function(k) {
+                        if (snap.packLeaders[k].toLowerCase() === oldName.toLowerCase()) snap.packLeaders[k] = newName;
+                    });
+                    // commandChannel
+                    (snap.commandChannel || []).forEach(function(cc) {
+                        if (cc.leader && cc.leader.toLowerCase() === oldName.toLowerCase()) cc.leader = newName;
+                    });
+                });
+                // 2. Переименовываем в ростере
+                var rp = roster.find(function(r){ return r.name.toLowerCase() === oldName.toLowerCase(); });
+                if (rp) {
+                    rp.name = newName;
+                } else {
+                    // Игрока нет — создаём с данными из снапшота
+                    var snap = appliedStatsByDate[dateStr];
+                    var sp = snap && snap.players && snap.players.find(function(p){ return p.name === newName; });
+                    roster.push({ id: Date.now()+Math.random(), name: newName, rank: 'ИГРОК', profa: '—', pac: 'СОЛО', attendance: 0,
+                        kills: sp ? (sp.kills||0) : 0, deaths: sp ? (sp.deaths||0) : 0,
+                        pvp_dmg: sp ? (sp.pvp_dmg||0) : 0, pve_dmg: sp ? (sp.pve_dmg||0) : 0 });
+                }
+                // 3. Сохраняем алиас чтобы при следующем анализе автоматически применялся
+                saveAlias(oldName, newName);
+                saveToStorage();
+                renderKmHistory();
+                if (document.getElementById('page-roster').classList.contains('active')) renderRoster();
+            });
         }
 
         function openCalendarDay(dateStr) {
