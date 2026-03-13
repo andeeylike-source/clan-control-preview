@@ -325,7 +325,10 @@
         <!-- РОСТЕР -->
         <section id="page-roster" class="page-section">
             <div class="flex justify-between items-center mb-8">
-                <h1 class="text-3xl font-bold">Ростер клана</h1>
+                <div>
+                    <h1 class="text-3xl font-bold">Ростер клана</h1>
+                    <div id="rosterStats" class="text-slate-500 text-sm mt-1"></div>
+                </div>
                 <div class="flex gap-4">
                     <button onclick="confirmReset()" class="px-4 py-2 border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-800">Сбросить КМ</button>
                     <button onclick="openPlayerModal()" class="btn-primary">+ Игрок</button>
@@ -995,6 +998,17 @@
                 let vB = b[currentSort.field];
                 return currentSort.direction === 'asc' ? (vA > vB ? 1 : -1) : (vA < vB ? 1 : -1);
             });
+
+            body.innerHTML = sorted.map(p => `
+
+            // Обновляем счётчик
+            const statsEl = document.getElementById('rosterStats');
+            if (statsEl) {
+                const total = roster.length;
+                const newCount = roster.filter(p => p.isNew).length;
+                const packs = [...new Set(roster.filter(p => p.pac !== 'СОЛО').map(p => p.pac))].length;
+                statsEl.innerHTML = `👥 Всего: <b style="color:#e2e8f0">${total}</b> игроков · Паков: <b style="color:#e2e8f0">${packs}</b>${newCount > 0 ? ` · <span style="color:#10b981">NEW: ${newCount}</span>` : ''}`;
+            }
 
             body.innerHTML = sorted.map(p => `
                 <tr class="hover:bg-[#1a1f29] transition-colors group">
