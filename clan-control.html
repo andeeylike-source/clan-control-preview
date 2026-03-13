@@ -61,6 +61,7 @@
         .badge-игрок { background: #475569; color: #fff; }
 
         .pac-tag { background: #1e2530; padding: 4px 12px; border-radius: 6px; font-size: 11px; color: #94a3b8; border: 1px solid #2d3748; text-transform: uppercase; }
+        *:hover > .km-edit-btn, span:hover .km-edit-btn { opacity: 1 !important; }
 
         .btn-primary { background-color: #6366f1; color: #ffffff; padding: 10px 20px; border-radius: 10px; font-weight: 600; transition: all 0.2s; border: none; cursor: pointer; }
         .btn-primary:hover { background-color: #4f46e5; }
@@ -2027,7 +2028,7 @@
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
                         <div style="display:flex;align-items:center;gap:6px">
                             <span style="font-size:9px;background:${badgeBg};color:${badgeColor};font-weight:900;padding:1px 5px;border-radius:3px;text-transform:uppercase">${badgeText}</span>
-                            <input value="${p.name}" onchange="saveAlias(dayLastParsed[${i}]._rawName||dayLastParsed[${i}].name, this.value); dayLastParsed[${i}].name=this.value" style="background:#0b0e14;border:1px solid #2d3748;border-radius:6px;padding:3px 8px;color:white;font-weight:700;font-size:13px;width:140px">
+                            <input value="${p.name}" oninput="dayLastParsed[${i}]._rawName=dayLastParsed[${i}]._rawName||dayLastParsed[${i}].name; dayLastParsed[${i}].name=this.value" onblur="saveAlias(dayLastParsed[${i}]._rawName||dayLastParsed[${i}].name, this.value)" onclick="let v=this.value,l=v.length;this.setSelectionRange(l,l)" style="background:#0b0e14;border:1px solid #2d3748;border-radius:6px;padding:3px 8px;color:white;font-weight:700;font-size:13px;width:140px">
                         </div>
                         <button onclick="dayLastParsed.splice(${i},1);renderDayAnalyzedPlayers(dayLastParsed)" style="color:#64748b;background:none;border:none;cursor:pointer;font-size:12px">✕</button>
                     </div>
@@ -2090,16 +2091,37 @@
             // ===== ПЕРЕСЧИТЫВАЕМ СТАТИСТИКУ РОСТЕРА ИЗ ВСЕХ СНАПШОТОВ =====
             // Сначала сбрасываем
             roster.forEach(p => { p.kills = 0; p.deaths = 0; p.pvp_dmg = 0; p.pve_dmg = 0; });
-            // Сохраняем текущий снапшот
+            // Сохраняем текущий снапшот — объединяем с предыдущим через MAX
+            const prevSnap = appliedStatsByDate[dateStr];
+            let mergedPlayers = dayLastParsed.map(p => ({...p}));
+            if (prevSnap && prevSnap.players) {
+                // Для каждого игрока в новом снапшоте — берём max с предыдущим
+                mergedPlayers = mergedPlayers.map(p => {
+                    const old = prevSnap.players.find(o => o.name.toLowerCase() === p.name.toLowerCase());
+                    if (!old) return p;
+                    return {
+                        ...p,
+                        kills:   Math.max(p.kills   || 0, old.kills   || 0),
+                        deaths:  Math.max(p.deaths  || 0, old.deaths  || 0),
+                        pvp_dmg: Math.max(p.pvp_dmg || 0, old.pvp_dmg || 0),
+                        pve_dmg: Math.max(p.pve_dmg || 0, old.pve_dmg || 0),
+                    };
+                });
+                // Игроки из предыдущего снапшота которых нет в новом — сохраняем
+                prevSnap.players.forEach(old => {
+                    const exists = mergedPlayers.find(p => p.name.toLowerCase() === old.name.toLowerCase());
+                    if (!exists) mergedPlayers.push({...old});
+                });
+            }
             appliedStatsByDate[dateStr] = {
-                players: dayLastParsed.map(p => ({...p})),
+                players: mergedPlayers,
                 raidTotal: dayExpectedTotal,
                 commandChannel: dayCommandChannel || [],
                 packLeaders: dayPackLeaders || {},
                 screenPlayersMap: dayScreenPlayersMap || {},
                 appliedAt: new Date().toISOString()
             };
-            // Суммируем по всем датам
+            // Суммируем по всем датам (каждая дата уже содержит max значения)
             Object.values(appliedStatsByDate).forEach(snap => {
                 snap.players.forEach(p => {
                     const r = roster.find(r => r.name.toLowerCase() === p.name.toLowerCase());
@@ -2177,10 +2199,11 @@
             const el = document.getElementById('kmHistoryContent');
             if (!el) return;
 
-            // Собираем все даты у которых есть подтверждённые события
-            const allDates = Object.keys(eventStatuses)
-                .map(k => k.split('|')[0])
-                .filter((v,i,a) => a.indexOf(v) === i)
+            // Собираем все даты: из отмеченных событий И из применённых снапшотов
+            const datesFromEvents = Object.keys(eventStatuses).map(k => k.split('|')[0]);
+            const datesFromSnaps = Object.keys(appliedStatsByDate);
+            const allDates = [...new Set([...datesFromEvents, ...datesFromSnaps])]
+                .filter(Boolean)
                 .sort((a,b) => b.localeCompare(a));
 
             if (allDates.length === 0) {
@@ -2200,11 +2223,13 @@
                 // События дня
                 const events = getAllEventsForDate(dateStr);
                 const doneEvents = events.filter(e => eventStatuses[dateStr + '|' + e.key]);
-                if (doneEvents.length === 0) return '';
-                const eventLabel = doneEvents.map(e => {
-                    const ov = eventOverrides[dateStr + '|override|' + e.key];
-                    return ov ? ov.title : e.title;
-                }).join(' · ');
+                if (doneEvents.length === 0 && !appliedStatsByDate[dateStr]) return '';
+                const eventLabel = doneEvents.length > 0
+                    ? doneEvents.map(e => {
+                        const ov = eventOverrides[dateStr + '|override|' + e.key];
+                        return ov ? ov.title : e.title;
+                    }).join(' · ')
+                    : (appliedStatsByDate[dateStr] ? 'КМ' : '');
 
                 // Данные из применённой статистики за этот день
                 const dayData = appliedStatsByDate[dateStr];
@@ -2296,7 +2321,7 @@
                         const badgeHtml = notInRoster
                             ? `<span title="Не в ростере — нажми ✏️ чтобы исправить ник" style="color:#f87171;font-size:10px;margin-left:4px">⚠️ не в ростере</span>`
                             : (inRoster.pac === 'СОЛО' ? `<span style="font-size:9px;color:#64748b;background:#1e2530;padding:1px 5px;border-radius:3px;margin-left:5px">соло</span>` : '');
-                        const editBtn = `<button onclick="kmRenamePlayer('${dateStr}','${p.name.replace(/'/g,"\\'")}',this)" title="Исправить ник" style="background:none;border:none;color:#475569;cursor:pointer;font-size:11px;padding:0 4px;line-height:1;margin-left:4px" onmouseover="this.style.color='#6366f1'" onmouseout="this.style.color='#475569'">✏️</button>`;
+                        const editBtn = `<button onclick="kmRenamePlayer('${dateStr}','${p.name.replace(/'/g,"\\'")}',this)" title="Исправить ник" style="background:none;border:none;color:#475569;cursor:pointer;font-size:11px;padding:0 4px;line-height:1;margin-left:4px;opacity:0;transition:opacity .15s" class="km-edit-btn">✏️</button>`;
                         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:#0b0e14;border-radius:6px;margin-bottom:4px;font-size:12px">
                             <span style="font-weight:600;display:flex;align-items:center">${p.name}${badgeHtml}${editBtn}</span>
                             <span style="display:flex;gap:12px">
