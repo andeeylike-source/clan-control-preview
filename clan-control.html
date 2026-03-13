@@ -908,11 +908,11 @@
             }
 
             // Кнопка добавить ручное событие — всегда внизу
-            container.innerHTML += `
-                <div style="margin-top:8px">
-                    <button onclick="addManualEventToDay('${dateStr}')" style="background:none;border:1px dashed #2d3748;color:#64748b;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;width:100%;transition:all .2s" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#64748b'">+ Добавить событие</button>
-                </div>
-            `;
+            const addBtn = document.createElement('div');
+            addBtn.style.marginTop = '8px';
+            addBtn.innerHTML = `<button style="background:none;border:1px dashed #2d3748;color:#64748b;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;width:100%;transition:all .2s" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#64748b'">+ Добавить событие</button>`;
+            addBtn.querySelector('button').onclick = () => addManualEventToDay(dateStr);
+            container.appendChild(addBtn);
         }
 
         function addManualEventToDay(dateStr) {
