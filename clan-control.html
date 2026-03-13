@@ -1495,7 +1495,7 @@
         function getGeminiKeys() {
             try {
                 const keys = JSON.parse(localStorage.getItem('clanControl_geminiKeys') || '[]');
-                return keys.filter(k => k && k.trim().startsWith('AIza'));
+                return keys.filter(k => k && k.trim().length > 10);
             } catch(e) { return []; }
         }
 
@@ -2187,7 +2187,7 @@
             let pastedKey = '';
             try {
                 const text = await navigator.clipboard.readText();
-                if (text && text.trim().startsWith('AIza')) pastedKey = text.trim();
+                if (text && text.trim().length > 10) pastedKey = text.trim();
             } catch(e) {}
 
             const keys = getGeminiKeys();
@@ -2215,7 +2215,7 @@
 
         function saveApiKeys() {
             const inputs = document.querySelectorAll('#apiKeysList input');
-            const keys = Array.from(inputs).map(i => i.value.trim()).filter(k => k.startsWith('AIza'));
+            const keys = Array.from(inputs).map(i => i.value.trim()).filter(k => k.length > 10);
             saveGeminiKeys(keys);
             renderApiKeys();
             const st = document.getElementById('apiKeyStatus');
