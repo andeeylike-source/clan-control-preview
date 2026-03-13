@@ -372,6 +372,7 @@
                         <button onclick="clearPeriod('roster')" style="background:none;border:none;color:#475569;cursor:pointer;font-size:10px" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#475569'">✕</button>
                     </div>
                     <button onclick="removeDuplicates()" class="px-4 py-2 border border-red-900 text-red-400 rounded-lg text-sm font-medium hover:bg-red-900/20">Дубли</button>
+                    <button onclick="clearAllNew()" class="px-4 py-2 border border-slate-600 text-slate-400 rounded-lg text-sm font-medium hover:bg-slate-800">Снять NEW</button>
                     <button onclick="resetAllStats()" class="px-4 py-2 border border-red-900 text-red-500 rounded-lg text-sm font-medium hover:bg-red-900/20">Сброс статы</button>
                     <button onclick="openPlayerModal()" class="btn-primary">+ Игрок</button>
                 </div>
@@ -622,6 +623,16 @@
         </div>
     </div>
 
+    <!-- МИНИБАР (виден когда модалка свёрнута) -->
+    <div id="dayMinibar" style="display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1f29;border:1px solid #6366f1;border-radius:12px;padding:10px 20px;z-index:200;display:none;align-items:center;gap:14px;box-shadow:0 4px 24px rgba(0,0,0,0.5);cursor:pointer;min-width:280px" onclick="expandDayModal()">
+        <div style="width:10px;height:10px;border-radius:50%;background:#6366f1;animation:blink 1.2s ease-in-out infinite;flex-shrink:0"></div>
+        <div style="flex:1">
+            <div id="minibarText" style="font-size:12px;font-weight:700;color:#a5b4fc">⏳ Анализирую...</div>
+            <div id="minibarSub" style="font-size:10px;color:#475569;margin-top:1px">Нажми чтобы развернуть</div>
+        </div>
+        <div style="font-size:16px;color:#475569">▲</div>
+    </div>
+
     <!-- МОДАЛКА ДНЯ (СОБЫТИЯ + КМ СТАТИСТИКА) -->
     <div id="dayModal" class="modal-overlay">
         <div class="event-modal-card">
@@ -630,6 +641,7 @@
                     <h3 id="dayModalTitle" class="text-xl font-bold"></h3>
                     <p id="dayModalSubtitle" class="text-slate-500 text-xs mt-1"></p>
                 </div>
+                <button onclick="minimizeDayModal()" class="text-slate-500 hover:text-white text-xl leading-none" title="Свернуть">—</button>
                 <button onclick="closeDayModal()" class="text-slate-500 hover:text-white text-xl leading-none">✕</button>
             </div>
 
@@ -1123,6 +1135,18 @@
             }, 900);
         }
 
+        function minimizeDayModal() {
+            document.getElementById('dayModal').style.display = 'none';
+            const bar = document.getElementById('dayMinibar');
+            bar.style.display = 'flex';
+            document.getElementById('minibarSub').innerText = 'Нажми чтобы развернуть';
+        }
+
+        function expandDayModal() {
+            document.getElementById('dayMinibar').style.display = 'none';
+            document.getElementById('dayModal').style.display = 'flex';
+        }
+
         function closeDayModal() {
             document.getElementById('dayModal').style.display = 'none';
             activeDayDate = null;
@@ -1280,13 +1304,26 @@
             };
             if(id) {
                 const idx = roster.findIndex(p => p.id == id);
+                // Снимаем NEW если назначили пак
+                const wasNew = roster[idx].isNew;
                 roster[idx] = { ...roster[idx], ...data };
+                if (wasNew && data.pac && data.pac !== 'СОЛО') roster[idx].isNew = false;
             } else {
                 roster.push({ id: Date.now(), ...data, attendance: 0 });
             }
             closePlayerModal();
             saveToStorage();
             renderRoster();
+        }
+
+        function clearAllNew() {
+            const count = roster.filter(p => p.isNew).length;
+            if (!count) { showConfirm('✅ Нет игроков с NEW', 'Все уже подтверждены.', ()=>{}, false); return; }
+            showConfirm(`Снять NEW у ${count} игроков?`, 'Они перестанут отображаться как новые.', () => {
+                roster.forEach(p => { p.isNew = false; });
+                saveToStorage();
+                renderRoster();
+            }, false);
         }
 
         function removeDuplicates() {
@@ -2077,6 +2114,11 @@
             document.getElementById('dayAnalyzeResults').style.display = 'none';
             setDayStatus('loading', `⏳ Анализирую ${shots.length} скриншотов...`);
 
+            // Сворачиваем модалку в минибар на время анализа
+            minimizeDayModal();
+            document.getElementById('minibarText').innerText = `⏳ Анализирую 0 из ${shots.length}...`;
+            document.getElementById('minibarSub').innerText = 'Нажми чтобы развернуть';
+
             const allPlayers = {};
             let firstError = null;
             const skippedScreenshots = [];
@@ -2126,6 +2168,7 @@
                     // Пауза между запросами чтобы не превышать rate limit
                     if (i > 0) await new Promise(r => setTimeout(r, 2000));
                     setDayStatus('loading', `⏳ Обрабатываю ${i + 1} из ${shots.length}...`);
+                    document.getElementById('minibarText').innerText = `⏳ Обрабатываю ${i + 1} из ${shots.length}...`;
 
                     const response = await fetch(
                         'https://openrouter.ai/api/v1/chat/completions',
@@ -2270,10 +2313,25 @@
 
             // Применяем сохранённые алиасы
             dayLastParsed = dayLastParsed.map(p => ({ ...p, _rawName: p.name, name: resolveAlias(p.name) }));
+
+            // Авто-нормализация: если нормализованный ключ совпадает с игроком в ростере —
+            // автоматически берём имя из ростера и сохраняем алиас (без вопросов)
+            dayLastParsed = dayLastParsed.map(p => {
+                const normP = normalizeNick(p.name);
+                const rosterMatch = roster.find(r => normalizeNick(r.name) === normP && r.name !== p.name);
+                if (rosterMatch) {
+                    // Сохраняем алиас чтобы в следующий раз не спрашивать
+                    if (p._rawName) nickAliases[p._rawName.toLowerCase()] = rosterMatch.name;
+                    nickAliases[p.name.toLowerCase()] = rosterMatch.name;
+                    return { ...p, name: rosterMatch.name };
+                }
+                return p;
+            });
+
             // Объединяем дублей после резолва алиасов
             const merged = {};
             dayLastParsed.forEach(p => {
-                const k = p.name.toLowerCase();
+                const k = normalizeNick(p.name);
                 if (merged[k]) {
                     merged[k].kills   += p.kills;   merged[k].deaths  += p.deaths;
                     merged[k].pvp_dmg += p.pvp_dmg; merged[k].pve_dmg += p.pve_dmg;
@@ -2302,6 +2360,10 @@
                     statusMsg += ` | Пропущено скриншотов: ${skippedScreenshots.length} — №${skippedScreenshots.map(s => s.num + ' (' + s.reason + ')').join(', №')}`;
                 }
                 setDayStatus(skippedScreenshots.length > 0 || (expectedTotal && expectedTotal > dayLastParsed.length) ? 'warning' : 'success', statusMsg);
+
+                // Авторазворот — показываем результат
+                expandDayModal();
+                document.getElementById('minibarText').innerText = `✅ ${dayLastParsed.length} игроков`;
             });
         }
 
@@ -2371,9 +2433,12 @@
                         profa: '—',
                         pac: 'СОЛО',
                         attendance: 0,
-                        isNew: true
+                        isNew: true  // реально новый — не было в ростере
                     });
                     newCount++;
+                } else {
+                    // Уже есть в ростере — снимаем NEW если вдруг стоит
+                    existing.isNew = false;
                 }
             });
 
@@ -2426,17 +2491,18 @@
                 renderDayScreenshotPreviews(activeDayDate);
             }
 
-            // Снимаем NEW у игроков которые уже встречались более чем в одном снапшоте
+            // Снимаем NEW только если игрок встречался в снапшотах ДРУГИХ дней (не текущего)
             const allSnapDates = Object.keys(appliedStatsByDate);
-            if (allSnapDates.length > 1) {
+            const otherDates = allSnapDates.filter(d => d !== dateStr);
+            if (otherDates.length >= 1) {
                 roster.forEach(p => {
                     if (!p.isNew) return;
                     const key = normalizeNick(p.name);
-                    const datesPresent = allSnapDates.filter(d =>
+                    const inOtherSnap = otherDates.some(d =>
                         appliedStatsByDate[d].players &&
                         appliedStatsByDate[d].players.some(sp => normalizeNick(sp.name) === key)
                     );
-                    if (datesPresent.length >= 2) p.isNew = false;
+                    if (inOtherSnap) p.isNew = false;
                 });
             }
 
