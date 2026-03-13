@@ -546,6 +546,30 @@
         </div>
     </div>
 
+    <!-- МОДАЛКА ДОБАВЛЕНИЯ СОБЫТИЯ -->
+    <div id="addEventModal" class="modal-overlay">
+        <div class="card" style="width:420px">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-xl font-bold">➕ Добавить событие</h3>
+                <button onclick="closeAddEventModal()" class="text-slate-500 hover:text-white text-xl leading-none">✕</button>
+            </div>
+            <p class="text-xs font-bold uppercase text-slate-500 mb-3 tracking-widest">Выбери событие</p>
+            <div id="eventPresetGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px"></div>
+            <div id="customNameWrap" style="display:none;margin-bottom:16px">
+                <input id="customEventName" type="text" class="input-dark" placeholder="Введи название...">
+            </div>
+            <p class="text-xs font-bold uppercase text-slate-500 mb-3 tracking-widest">Время (необязательно)</p>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:24px">
+                <input id="eventTimeInput" type="time" class="input-dark" style="width:140px;cursor:pointer">
+                <button onclick="document.getElementById('eventTimeInput').value=''" style="background:#1e2530;border:none;color:#64748b;padding:10px 14px;border-radius:8px;cursor:pointer;font-size:12px">Очистить</button>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeAddEventModal()" class="px-6 py-2 bg-slate-800 rounded-lg text-sm font-medium hover:bg-slate-700">Отмена</button>
+                <button onclick="confirmAddEvent()" class="btn-primary">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
     <!-- МОДАЛКА ДНЯ (СОБЫТИЯ + КМ СТАТИСТИКА) -->
     <div id="dayModal" class="modal-overlay">
         <div class="event-modal-card">
@@ -675,10 +699,21 @@
             document.getElementById('promptModal').style.display = 'flex';
             setTimeout(() => input.focus(), 50);
         }
-        function closePrompt() { document.getElementById('promptModal').style.display = 'none'; promptCallback = null; }
+        function closePrompt() {
+            document.getElementById('promptModal').style.display = 'none';
+            promptCallback = null;
+            // Если dayModal был скрыт ради promptModal — вернуть его
+            const dayModal = document.getElementById('dayModal');
+            if (activeDayDate && dayModal.style.display !== 'flex') {
+                dayModal.style.display = 'flex';
+            }
+        }
         document.getElementById('promptBtn').onclick = () => {
-            if (promptCallback) promptCallback(document.getElementById('promptInput').value.trim());
-            closePrompt();
+            const cb = promptCallback;
+            const val = document.getElementById('promptInput').value.trim();
+            promptCallback = null;
+            document.getElementById('promptModal').style.display = 'none';
+            if (cb) cb(val);
         };
         document.getElementById('promptInput').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') document.getElementById('promptBtn').click();
@@ -898,6 +933,7 @@
                         </div>
                         <div class="flex items-center gap-2 ml-2">
                             <button onclick="openEditEventModal('${dateStr}', '${ev.key}')" class="text-slate-500 hover:text-indigo-400 text-xs" title="Редактировать">✏️</button>
+                            ${!ev.isAuto ? `<button onclick="deleteManualEvent(${ev.id}, '${dateStr}')" style="background:none;border:none;color:#475569;cursor:pointer;font-size:14px;padding:2px 4px;border-radius:4px;transition:color .15s" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#475569'" title="Удалить">✕</button>` : ''}
                             <button class="toggle-done-btn${checkClass}" onclick="toggleEventDone('${dateStr}', '${ev.key}')" title="${isDone ? 'Снять отметку' : 'Подтвердить КМ'}">
                                 ${isDone ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}
                             </button>
@@ -915,17 +951,66 @@
             container.appendChild(addBtn);
         }
 
+        const EVENT_PRESETS = ['Антарас','Валакас','Баюм','Ант Квин','Коре','Орфен','ТВ','Осада','Фарм','Другое'];
+        let addEventTargetDate = null;
+        let selectedPreset = null;
+
         function addManualEventToDay(dateStr) {
-            showPrompt('Название события', 'Например: Антарас, Баюм, Осада...', (title) => {
-                if (!title) return;
-                showPrompt('Время (необязательно)', 'Например: 20:00', (time) => {
-                    const id = Date.now();
-                    manualEvents.push({ id, title: title.trim(), date: dateStr, time: (time||'').trim() });
-                    saveToStorage();
-                    renderDayEventsList(dateStr);
-                    renderCalendar();
-                });
+            addEventTargetDate = dateStr;
+            selectedPreset = null;
+            document.getElementById('customNameWrap').style.display = 'none';
+            document.getElementById('customEventName').value = '';
+            document.getElementById('eventTimeInput').value = '';
+            // Render preset buttons
+            const grid = document.getElementById('eventPresetGrid');
+            grid.innerHTML = EVENT_PRESETS.map(name => `
+                <button onclick="selectEventPreset('${name}')" id="preset_${name.replace(/ /g,'_')}"
+                    style="background:#1a1f29;border:1px solid #2d3748;color:#94a3b8;border-radius:8px;padding:8px 6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;text-align:center">
+                    ${name}
+                </button>`).join('');
+            const dayModal = document.getElementById('dayModal');
+            dayModal.style.display = 'none';
+            document.getElementById('addEventModal').style.display = 'flex';
+        }
+
+        function selectEventPreset(name) {
+            selectedPreset = name;
+            // Highlight selected
+            EVENT_PRESETS.forEach(n => {
+                const btn = document.getElementById('preset_' + n.replace(/ /g,'_'));
+                if (!btn) return;
+                btn.style.background = n === name ? '#6366f1' : '#1a1f29';
+                btn.style.borderColor = n === name ? '#6366f1' : '#2d3748';
+                btn.style.color = n === name ? '#fff' : '#94a3b8';
             });
+            document.getElementById('customNameWrap').style.display = name === 'Другое' ? 'block' : 'none';
+            if (name === 'Другое') setTimeout(() => document.getElementById('customEventName').focus(), 50);
+        }
+
+        function closeAddEventModal() {
+            document.getElementById('addEventModal').style.display = 'none';
+            if (activeDayDate) document.getElementById('dayModal').style.display = 'flex';
+        }
+
+        function confirmAddEvent() {
+            if (!selectedPreset) { alert('Выбери событие'); return; }
+            let title = selectedPreset === 'Другое' ? document.getElementById('customEventName').value.trim() : selectedPreset;
+            if (!title) { alert('Введи название'); return; }
+            const time = document.getElementById('eventTimeInput').value || '';
+            const id = Date.now();
+            manualEvents.push({ id, title, date: addEventTargetDate, time });
+            saveToStorage();
+            document.getElementById('addEventModal').style.display = 'none';
+            document.getElementById('dayModal').style.display = 'flex';
+            renderDayEventsList(addEventTargetDate);
+            renderCalendar();
+        }
+
+        function deleteManualEvent(id, dateStr) {
+            manualEvents = manualEvents.filter(e => e.id !== id);
+            saveToStorage();
+            renderDayEventsList(dateStr);
+            renderCalendar();
         }
 
         function toggleEventDone(dateStr, eventKey) {
