@@ -2297,6 +2297,16 @@
                             }
                         }
                     }
+                    if (screenParty.length === 0) {
+                        // Ищем пак где лидер встречается среди любых игроков
+                        const leaderLower = cc.leader.toLowerCase();
+                        for (const [spKey, spPlayers] of Object.entries(screenPlayersMapDay)) {
+                            if (spPlayers.some(p => p.name && p.name.toLowerCase() === leaderLower)) {
+                                screenParty = spPlayers;
+                                break;
+                            }
+                        }
+                    }
                     if (screenParty.length === 0 && packName) {
                         // Нечёткий поиск по имени пака (игнорируем пробелы и регистр)
                         const packNorm = packName.toLowerCase().replace(/\s+/g,'');
@@ -2310,7 +2320,7 @@
                     const rosterParty = packName
                         ? dayPlayers.filter(p => {
                             const rp = roster.find(r => r.name.toLowerCase() === p.name.toLowerCase());
-                            return rp && rp.pac === packName;
+                            return rp && rp.pac && rp.pac.toLowerCase() === packName.toLowerCase();
                           })
                         : [];
                     const partyPlayers = screenParty.length > 0 ? screenParty
