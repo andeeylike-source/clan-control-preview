@@ -2016,7 +2016,9 @@
             similarNickQueue = [];
             for (const p of players) {
                 const resolved = resolveAlias(p.name);
-                const exact = roster.find(r => r.name.toLowerCase() === resolved.toLowerCase());
+                const normResolved = normalizeNick(resolved);
+                // Точное совпадение по нормализованному ключу — уже знаем этого игрока
+                const exact = roster.find(r => normalizeNick(r.name) === normResolved);
                 if (!exact) {
                     const similar = findSimilarNick(resolved);
                     if (similar) similarNickQueue.push({ player: p, similar, resolved });
@@ -2472,23 +2474,145 @@
             roster.forEach(p => {
                 const key = normalizeNick(p.name);
                 if (!groups[key]) groups[key] = [];
-                groups[key].push(p.name);
+                groups[key].push(p);
             });
-            const dupes = Object.entries(groups).filter(([,names]) => names.length > 1);
+            const dupes = Object.entries(groups).filter(([,players]) => players.length > 1);
+
+            const overlay = document.createElement('div');
+            overlay.id = 'dupesOverlay';
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+
             if (dupes.length === 0) {
-                alert('Скрытых дублей не найдено.\n\nВсе нормализованные ключи уникальны.');
+                overlay.innerHTML = `
+                    <div style="background:#12171f;border:1px solid #1e2530;border-radius:16px;padding:32px;width:420px;text-align:center">
+                        <div style="font-size:36px;margin-bottom:12px">✅</div>
+                        <div style="font-size:16px;font-weight:800;margin-bottom:8px">Скрытых дублей нет</div>
+                        <div style="font-size:13px;color:#64748b;margin-bottom:24px">Все нормализованные ключи уникальны</div>
+                        <button onclick="document.getElementById('dupesOverlay').remove()" style="background:#6366f1;color:white;border:none;border-radius:10px;padding:10px 28px;font-weight:700;cursor:pointer">Закрыть</button>
+                    </div>`;
+                document.body.appendChild(overlay);
                 return;
             }
-            let msg = `Найдено ${dupes.length} групп скрытых дублей:\n\n`;
-            dupes.forEach(([key, names]) => {
-                msg += `Ключ: "${key}"\n`;
-                names.forEach(n => {
-                    const bytes = [...n].map(c => c.charCodeAt(0)).join(',');
-                    msg += `  → "${n}" [${bytes}]\n`;
-                });
-                msg += '\n';
+
+            const groupsHtml = dupes.map(([key, players]) => {
+                const playersHtml = players.map(p => {
+                    const bytes = [...p.name].map(c => c.charCodeAt(0)).join(', ');
+                    const rp = roster.find(r => r.id === p.id);
+                    return `
+                        <div style="background:#0b0e14;border:1px solid #2d3748;border-radius:8px;padding:10px 14px;margin-bottom:6px">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <div>
+                                    <span style="font-weight:800;font-size:14px">${p.name}</span>
+                                    <span style="font-size:10px;color:#475569;margin-left:8px">${p.pac || 'СОЛО'}</span>
+                                </div>
+                                <button onclick="keepOnlyThis('${p.id}', '${key}')"
+                                    style="background:#22c55e22;border:1px solid #22c55e44;color:#4ade80;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer">
+                                    ✓ Оставить
+                                </button>
+                            </div>
+                            <div style="font-size:10px;color:#475569;margin-top:4px;font-family:monospace">[${bytes}]</div>
+                            <div style="font-size:11px;color:#64748b;margin-top:3px">
+                                ⚔️ ${p.kills||0} · 💀 ${p.deaths||0} · 🗡️ ${p.pvp_dmg||0} · 🐉 ${p.pve_dmg||0}
+                            </div>
+                        </div>`;
+                }).join('');
+
+                return `
+                    <div style="background:#1a1f29;border:1px solid #1e2530;border-radius:12px;padding:16px;margin-bottom:12px">
+                        <div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:10px">
+                            Нормализованный ключ: <span style="color:#a78bfa;font-family:monospace">${key}</span>
+                        </div>
+                        ${playersHtml}
+                        <button onclick="mergeAll('${key}')"
+                            style="width:100%;margin-top:8px;background:#6366f122;border:1px solid #6366f144;color:#a5b4fc;border-radius:8px;padding:7px;font-size:12px;font-weight:700;cursor:pointer">
+                            🔀 Слить все (взять max по стате, оставить первого)
+                        </button>
+                    </div>`;
+            }).join('');
+
+            overlay.innerHTML = `
+                <div style="background:#12171f;border:1px solid #1e2530;border-radius:16px;padding:28px;width:520px;max-height:80vh;overflow-y:auto">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+                        <div>
+                            <div style="font-size:18px;font-weight:800">🔬 Скрытые дубли</div>
+                            <div style="font-size:12px;color:#f87171;margin-top:2px">Найдено ${dupes.length} группы с одинаковым нормализованным ником</div>
+                        </div>
+                        <button onclick="document.getElementById('dupesOverlay').remove()" style="background:none;border:none;color:#475569;cursor:pointer;font-size:20px">✕</button>
+                    </div>
+                    ${groupsHtml}
+                    <button onclick="mergeAllDupes()" style="width:100%;background:#ef444422;border:1px solid #ef444444;color:#f87171;border-radius:10px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;margin-top:4px">
+                        🗑️ Слить все группы автоматически
+                    </button>
+                </div>`;
+
+            document.body.appendChild(overlay);
+        }
+
+        function keepOnlyThis(keepId, normKey) {
+            // Удаляем всех с этим normKey кроме keepId, объединив статистику
+            const group = roster.filter(p => normalizeNick(p.name) === normKey);
+            const keeper = group.find(p => String(p.id) === String(keepId));
+            if (!keeper) return;
+            group.forEach(p => {
+                if (String(p.id) === String(keepId)) return;
+                keeper.kills   = Math.max(keeper.kills   || 0, p.kills   || 0);
+                keeper.deaths  = Math.max(keeper.deaths  || 0, p.deaths  || 0);
+                keeper.pvp_dmg = Math.max(keeper.pvp_dmg || 0, p.pvp_dmg || 0);
+                keeper.pve_dmg = Math.max(keeper.pve_dmg || 0, p.pve_dmg || 0);
+                keeper.attendance = Math.max(keeper.attendance || 0, p.attendance || 0);
             });
-            alert(msg);
+            roster = roster.filter(p => normalizeNick(p.name) !== normKey || String(p.id) === String(keepId));
+            saveToStorage();
+            renderRoster();
+            document.getElementById('dupesOverlay')?.remove();
+            debugDuplicates(); // перерисовать если остались ещё дубли
+        }
+
+        function mergeAll(normKey) {
+            const group = roster.filter(p => normalizeNick(p.name) === normKey);
+            if (group.length < 2) return;
+            const keeper = group[0];
+            group.slice(1).forEach(p => {
+                keeper.kills   = Math.max(keeper.kills   || 0, p.kills   || 0);
+                keeper.deaths  = Math.max(keeper.deaths  || 0, p.deaths  || 0);
+                keeper.pvp_dmg = Math.max(keeper.pvp_dmg || 0, p.pvp_dmg || 0);
+                keeper.pve_dmg = Math.max(keeper.pve_dmg || 0, p.pve_dmg || 0);
+                keeper.attendance = Math.max(keeper.attendance || 0, p.attendance || 0);
+            });
+            roster = roster.filter(p => normalizeNick(p.name) !== normKey || p.id === keeper.id);
+            saveToStorage();
+            renderRoster();
+            document.getElementById('dupesOverlay')?.remove();
+            debugDuplicates();
+        }
+
+        function mergeAllDupes() {
+            const groups = {};
+            roster.forEach(p => {
+                const key = normalizeNick(p.name);
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(p);
+            });
+            Object.entries(groups).filter(([,g]) => g.length > 1).forEach(([, group]) => {
+                const keeper = group[0];
+                group.slice(1).forEach(p => {
+                    keeper.kills   = Math.max(keeper.kills   || 0, p.kills   || 0);
+                    keeper.deaths  = Math.max(keeper.deaths  || 0, p.deaths  || 0);
+                    keeper.pvp_dmg = Math.max(keeper.pvp_dmg || 0, p.pvp_dmg || 0);
+                    keeper.pve_dmg = Math.max(keeper.pve_dmg || 0, p.pve_dmg || 0);
+                    keeper.attendance = Math.max(keeper.attendance || 0, p.attendance || 0);
+                });
+            });
+            const seen = new Set();
+            roster = roster.filter(p => {
+                const k = normalizeNick(p.name);
+                if (seen.has(k)) return false;
+                seen.add(k);
+                return true;
+            });
+            saveToStorage();
+            renderRoster();
+            document.getElementById('dupesOverlay')?.remove();
         }
 
         function debugSnapshotData() {
