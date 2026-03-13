@@ -429,7 +429,7 @@
         <section id="page-screenshots" class="page-section">
             <div class="flex justify-between items-center mb-8">
                 <h1 class="text-3xl font-bold">📋 История КМ</h1>
-                <p class="text-slate-500 text-sm">Статистика по дням после анализа скриншотов</p>
+                <button onclick="debugSnapshotData()" style="background:#1e2530;border:1px solid #2d3748;color:#f59e0b;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer" title="Показать данные снапшота в консоли">🔍 Диагностика</button>
             </div>
             <div id="kmHistoryContent"></div>
         </section>
@@ -2147,6 +2147,25 @@
 
         function renderScreenshotArchive() { renderKmHistory(); }
 
+        function debugSnapshotData() {
+            var dates = Object.keys(appliedStatsByDate);
+            if (dates.length === 0) { alert("No snapshots"); return; }
+            var info = "Snapshots:\n\n";
+            dates.forEach(function(d) {
+                var s = appliedStatsByDate[d];
+                info += d + ":\n";
+                info += "  players: " + (s.players ? s.players.length : 0) + "\n";
+                var hasStats = s.players && s.players.some(function(p){ return (p.kills||0)+(p.deaths||0)+(p.pvp_dmg||0)+(p.pve_dmg||0) > 0; });
+                info += "  has stats: " + (hasStats ? "YES" : "NO (zeros)") + "\n";
+                info += "  cmdChannel: " + (s.commandChannel ? s.commandChannel.length : 0) + "\n";
+                info += "  screenPlayersMap keys: " + Object.keys(s.screenPlayersMap||{}).length + "\n";
+                if (s.players && s.players.length > 0) { info += "  p[0]: " + JSON.stringify(s.players[0]) + "\n"; }
+                info += "\n";
+            });
+            info += "Roster with stats: " + roster.filter(function(p){ return (p.kills||0)+(p.deaths||0)>0; }).length;
+            console.log(info); alert(info);
+        }
+
         function renderKmHistory() {
             const el = document.getElementById('kmHistoryContent');
             if (!el) return;
@@ -2182,7 +2201,18 @@
 
                 // Данные из применённой статистики за этот день
                 const dayData = appliedStatsByDate[dateStr];
-                const dayPlayers = dayData ? dayData.players : [];
+                // Берём игроков из снапшота, обогащаем данными из ростера если в снапшоте нули
+                let dayPlayers = dayData ? (dayData.players || []) : [];
+                if (dayPlayers.length > 0) {
+                    const hasStats = dayPlayers.some(p => (p.kills||0)+(p.deaths||0)+(p.pvp_dmg||0)+(p.pve_dmg||0) > 0);
+                    if (!hasStats) {
+                        // Снапшот старый — берём статистику из ростера по именам
+                        dayPlayers = dayPlayers.map(p => {
+                            const r = roster.find(r => r.name.toLowerCase() === p.name.toLowerCase());
+                            return r ? { ...p, kills: r.kills||0, deaths: r.deaths||0, pvp_dmg: r.pvp_dmg||0, pve_dmg: r.pve_dmg||0 } : p;
+                        });
+                    }
+                }
                 const raidTotal = dayData ? dayData.raidTotal : null;
                 const cmdChannel = dayData ? (dayData.commandChannel || []) : [];
                 const packLeadersMap = dayData ? (dayData.packLeaders || {}) : {};
@@ -2202,13 +2232,16 @@
                 const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
 
                 const topPreviewHtml = topKills.length > 0 ? `
-                    <div id="${topPreviewId}" style="display:none;flex-wrap:wrap;gap:6px;margin-top:8px">
+                    <div id="${topPreviewId}" style="display:none;margin-top:8px">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:6px">🏆 Топ убийств</div>
+                        <div style="display:flex;flex-wrap:wrap;gap:6px">
                         ${topKills.map((p,i) => `<div style="background:#1a1f29;border:1px solid #1e2530;border-radius:8px;padding:5px 10px;font-size:12px;display:flex;align-items:center;gap:6px">
                             <span>${medals[i]}</span>
                             <span style="font-weight:700">${p.name}</span>
                             <span style="color:#f59e0b">⚔️${p.kills||0}</span>
                             <span style="color:#ef4444">💀${p.deaths||0}</span>
                         </div>`).join('')}
+                        </div>
                     </div>` : '';
 
                 const leadersHtml = hasCommandChannel ? cmdChannel.map((cc) => {
