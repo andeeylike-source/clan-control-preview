@@ -434,7 +434,7 @@
             <h1 class="text-3xl font-bold mb-8">⚙️ Настройки</h1>
             <div class="card mb-6">
                 <h2 class="text-lg font-bold mb-2">🔑 API ключи</h2>
-                <p class="text-slate-500 text-sm mb-6">Ключи хранятся только в твоём браузере — не в коде и не на GitHub. Получить ключ: <a href="https://openrouter.ai/keys" target="_blank" style="color:#6366f1">openrouter.ai/keys</a> (бесплатно, модель gemini-2.0-flash-exp)</p>
+                <p class="text-slate-500 text-sm mb-6">Ключи хранятся только в твоём браузере — не в коде и не на GitHub. Получить ключ: <a href="https://openrouter.ai/keys" target="_blank" style="color:#6366f1">openrouter.ai/keys</a> (бесплатно, модель gemini-2.0-flash-lite)</p>
                 <div id="apiKeysList" class="space-y-3 mb-4"></div>
                 <button onclick="addApiKeyField()" style="background:none;border:1px dashed #2d3748;color:#64748b;border-radius:10px;padding:10px;width:100%;cursor:pointer;font-size:13px;transition:all .2s" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#64748b'">+ Добавить ключ</button>
                 <div class="flex gap-3 mt-4">
@@ -1707,7 +1707,7 @@
                                 'X-Title': 'Clan Control'
                             },
                             body: JSON.stringify({
-                                model: 'google/gemini-2.0-flash-exp:free',
+                                model: 'google/gemini-2.0-flash-lite-001',
                                 messages: [{
                                     role: 'user',
                                     content: [
@@ -2246,7 +2246,7 @@
                         'X-Title': 'Clan Control'
                     },
                     body: JSON.stringify({
-                        model: 'google/gemini-2.0-flash-exp:free',
+                        model: 'google/gemini-2.0-flash-lite-001',
                         messages: [{ role: 'user', content: 'say ok' }]
                     })
                 });
