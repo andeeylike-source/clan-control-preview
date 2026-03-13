@@ -326,14 +326,21 @@
 
         <!-- РОСТЕР -->
         <section id="page-roster" class="page-section">
-            <div class="flex justify-between items-center mb-8">
+            <div class="flex justify-between items-center mb-4">
                 <div>
                     <h1 class="text-3xl font-bold">Ростер клана</h1>
                     <div id="rosterStats" class="text-slate-500 text-sm mt-1"></div>
                 </div>
-                <div class="flex gap-4">
-                    <button onclick="confirmReset()" class="px-4 py-2 border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-800">Сбросить КМ</button>
-                    <button onclick="resetAllStats()" class="px-4 py-2 border border-red-900 text-red-500 rounded-lg text-sm font-medium hover:bg-red-900/20">Сбросить статистику</button>
+                <div class="flex gap-3 items-center flex-wrap justify-end">
+                    <div style="display:flex;align-items:center;gap:6px;background:#12171f;border:1px solid #1e2530;border-radius:10px;padding:6px 12px">
+                        <span style="font-size:11px;color:#64748b">Период КМ%:</span>
+                        <input type="date" id="rosterFrom" onchange="rosterDateFrom=this.value;renderRoster()" style="background:#0b0e14;border:1px solid #2d3748;border-radius:6px;padding:3px 6px;color:#e2e8f0;font-size:11px">
+                        <span style="color:#475569;font-size:11px">—</span>
+                        <input type="date" id="rosterTo" onchange="rosterDateTo=this.value;renderRoster()" style="background:#0b0e14;border:1px solid #2d3748;border-radius:6px;padding:3px 6px;color:#e2e8f0;font-size:11px">
+                        <button onclick="rosterDateFrom='';rosterDateTo='';document.getElementById('rosterFrom').value='';document.getElementById('rosterTo').value='';renderRoster()" style="background:none;border:none;color:#475569;cursor:pointer;font-size:10px" onmouseover="this.style.color='#6366f1'" onmouseout="this.style.color='#475569'">✕</button>
+                    </div>
+                    <button onclick="removeDuplicates()" class="px-4 py-2 border border-red-900 text-red-400 rounded-lg text-sm font-medium hover:bg-red-900/20">Дубли</button>
+                    <button onclick="resetAllStats()" class="px-4 py-2 border border-red-900 text-red-500 rounded-lg text-sm font-medium hover:bg-red-900/20">Сброс статы</button>
                     <button onclick="openPlayerModal()" class="btn-primary">+ Игрок</button>
                 </div>
             </div>
@@ -372,8 +379,17 @@
 
         <!-- СТАТИСТИКА -->
         <section id="page-stats" class="page-section">
-            <h1 class="text-3xl font-bold mb-2">Статистика КМ</h1>
-            <p class="text-slate-500 text-sm mb-8">На основе загруженных скриншотов из раздела Скриншоты КМ</p>
+            <div class="flex justify-between items-center mb-2">
+                <h1 class="text-3xl font-bold">Статистика КМ</h1>
+                <div style="display:flex;align-items:center;gap:8px;background:#12171f;border:1px solid #1e2530;border-radius:10px;padding:8px 14px">
+                    <span style="font-size:12px;color:#64748b">Период:</span>
+                    <input type="date" id="statsFrom" onchange="statsDateFrom=this.value;renderStats()" style="background:#0b0e14;border:1px solid #2d3748;border-radius:6px;padding:4px 8px;color:#e2e8f0;font-size:12px">
+                    <span style="color:#475569;font-size:12px">—</span>
+                    <input type="date" id="statsTo" onchange="statsDateTo=this.value;renderStats()" style="background:#0b0e14;border:1px solid #2d3748;border-radius:6px;padding:4px 8px;color:#e2e8f0;font-size:12px">
+                    <button onclick="statsDateFrom='';statsDateTo='';document.getElementById('statsFrom').value='';document.getElementById('statsTo').value='';renderStats()" style="background:none;border:none;color:#475569;cursor:pointer;font-size:11px;padding:2px 6px;border-radius:4px" onmouseover="this.style.color='#6366f1'" onmouseout="this.style.color='#475569'">Сбросить</button>
+                </div>
+            </div>
+            <p id="statsPeriodLabel" class="text-slate-500 text-sm mb-6"></p>
             <div id="statsContent"></div>
         </section>
 
@@ -1087,14 +1103,40 @@
             const body = document.getElementById('rosterBody');
             const searchQuery = document.getElementById('rosterSearchInput').value.toLowerCase().trim();
             const rankPriority = { "КЛ": 1, "ПЛ": 2, "ИГРОК": 3 };
-            
+
+            // Считаем КМ% из истории за выбранный период
+            const allDates = Object.keys(appliedStatsByDate).filter(d => {
+                if (rosterDateFrom && d < rosterDateFrom) return false;
+                if (rosterDateTo   && d > rosterDateTo)   return false;
+                return true;
+            });
+            const totalDates = allDates.length;
+
             let filtered = roster.filter(p => p.name.toLowerCase().includes(searchQuery));
+
+            // Добавляем КМ% к каждому игроку
+            filtered = filtered.map(p => {
+                let attendance = 0;
+                if (totalDates > 0) {
+                    const key = normalizeNick(p.name);
+                    const present = allDates.filter(d => {
+                        const snap = appliedStatsByDate[d];
+                        return snap && snap.players && snap.players.some(sp => normalizeNick(sp.name) === key);
+                    }).length;
+                    attendance = Math.round(present / totalDates * 100);
+                }
+                return { ...p, attendance };
+            });
+
             let sorted = [...filtered].sort((a, b) => {
                 if (currentSort.field === 'name') {
                     const pA = rankPriority[a.rank] || 99;
                     const pB = rankPriority[b.rank] || 99;
                     if (pA !== pB) return pA - pB;
                     return currentSort.direction === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+                }
+                if (currentSort.field === 'attendance') {
+                    return currentSort.direction === 'asc' ? a.attendance - b.attendance : b.attendance - a.attendance;
                 }
                 let vA = a[currentSort.field];
                 let vB = b[currentSort.field];
@@ -1107,7 +1149,10 @@
                 const total = roster.length;
                 const newCount = roster.filter(p => p.isNew).length;
                 const packsCount = [...new Set(roster.filter(p => p.pac !== 'СОЛО').map(p => p.pac))].length;
-                statsEl.innerHTML = `👥 Всего: <b style="color:#e2e8f0">${total}</b> игроков · Паков: <b style="color:#e2e8f0">${packsCount}</b>${newCount > 0 ? ` · <span style="color:#10b981">NEW: ${newCount}</span>` : ''}`;
+                const periodLabel = (rosterDateFrom || rosterDateTo)
+                    ? ` · <span style="color:#6366f1">КМ% за: ${rosterDateFrom||'начало'}–${rosterDateTo||'сейчас'}</span>`
+                    : (totalDates > 0 ? ` · КМ дней: ${totalDates}` : '');
+                statsEl.innerHTML = `👥 Всего: <b style="color:#e2e8f0">${total}</b> · Паков: <b style="color:#e2e8f0">${packsCount}</b>${newCount > 0 ? ` · <span style="color:#10b981">NEW: ${newCount}</span>` : ''}${periodLabel}`;
             }
 
             body.innerHTML = sorted.map(p => `
@@ -1118,7 +1163,7 @@
                     </td>
                     <td class="text-slate-400 text-xs">${p.profa}</td>
                     <td><span class="pac-tag">${p.pac}</span></td>
-                    <td class="${p.attendance < 50 ? 'text-red-400' : 'text-emerald-400'} font-bold">${p.attendance}%</td>
+                    <td class="${p.attendance < 50 ? 'text-red-400' : p.attendance < 70 ? 'text-yellow-400' : 'text-emerald-400'} font-bold">${totalDates > 0 ? p.attendance + '%' : '—'}</td>
                     <td class="text-right">
                         <div class="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onclick="editPlayer(${p.id})" class="text-orange-400" title="Редактировать">✏️</button>
@@ -1172,8 +1217,9 @@
                 <tr class="hover:bg-[#1a1f29]">
                     <td class="font-bold text-slate-200">${p.name}</td>
                     <td class="text-slate-400 text-xs">${p.profa}</td>
-                    <td class="text-right">
+                    <td class="text-right flex gap-3 justify-end">
                         <button onclick="restoreFromArchive(${p.id})" class="text-emerald-500 font-bold hover:underline">Восстановить</button>
+                        <button onclick="deleteFromArchive(${p.id})" class="text-red-500 font-bold hover:underline">Удалить</button>
                     </td>
                 </tr>
             `).join('');
@@ -1210,6 +1256,59 @@
             renderRoster();
         }
 
+        function removeDuplicates() {
+            const seen = {}; // key → index in newRoster
+            const newRoster = [];
+            let mergeCount = 0;
+
+            roster.forEach(p => {
+                const key = normalizeNick(p.name);
+                if (seen[key] === undefined) {
+                    seen[key] = newRoster.length;
+                    newRoster.push({...p});
+                } else {
+                    // Дубль — объединяем статистику с оригиналом (берём max по каждому полю)
+                    const orig = newRoster[seen[key]];
+                    orig.kills   = Math.max(orig.kills   || 0, p.kills   || 0);
+                    orig.deaths  = Math.max(orig.deaths  || 0, p.deaths  || 0);
+                    orig.pvp_dmg = Math.max(orig.pvp_dmg || 0, p.pvp_dmg || 0);
+                    orig.pve_dmg = Math.max(orig.pve_dmg || 0, p.pve_dmg || 0);
+                    orig.attendance = Math.max(orig.attendance || 0, p.attendance || 0);
+                    mergeCount++;
+                }
+            });
+
+            if (mergeCount === 0) {
+                showConfirm('✅ Дублей нет', 'Все ники уникальны.', () => {}, false);
+                return;
+            }
+            showConfirm(
+                `🗑️ Удалить ${mergeCount} дублей?`,
+                `Статистика дублей будет объединена с оригиналами (берётся максимум по каждому полю). Данные не потеряются.`,
+                () => {
+                    roster = newRoster;
+                    saveToStorage();
+                    renderRoster();
+                },
+                true
+            );
+        }
+
+        function deleteFromArchive(id) {
+            const player = archive.find(p => p.id === id);
+            if (!player) return;
+            showConfirm(
+                '⚠️ Удалить навсегда?',
+                `Игрок "${player.name}" будет удалён без возможности восстановления.`,
+                () => {
+                    archive = archive.filter(p => p.id !== id);
+                    saveToStorage();
+                    renderArchive();
+                },
+                true
+            );
+        }
+
         function confirmReset() {
             showConfirm("Сброс активности", "Обнулить посещаемость всех игроков до 0%?", () => {
                 roster = roster.map(p => ({ ...p, attendance: 0 }));
@@ -1220,10 +1319,10 @@
 
         function resetAllStats() {
             showConfirm("⚠️ Сбросить всю статистику КМ?",
-                "Убийства, смерти, PvP и PvE урон всех игроков будут обнулены. История КМ сохранится.",
+                "Вся история КМ и статистика будут удалены. Ростер (игроки, паки) сохранится.",
                 () => {
-                    roster = roster.map(p => ({ ...p, kills: 0, deaths: 0, pvp_dmg: 0, pve_dmg: 0 }));
                     appliedStatsByDate = {};
+                    roster = roster.map(p => ({ ...p, kills: 0, deaths: 0, pvp_dmg: 0, pve_dmg: 0 }));
                     saveToStorage();
                     renderRoster();
                     if (document.getElementById('page-stats').classList.contains('active')) renderStats();
@@ -1376,23 +1475,47 @@
         // ===== СТАТИСТИКА =====
         function renderStats() {
             const el = document.getElementById('statsContent');
-            const players = roster.filter(p => (p.kills||0)+(p.deaths||0)+(p.pvp_dmg||0)+(p.pve_dmg||0) > 0);
+            const labelEl = document.getElementById('statsPeriodLabel');
+
+            // Считаем из снапшотов за выбранный период
+            const statsMap = calcStatsForPeriod(statsDateFrom, statsDateTo);
+            const allDates = Object.keys(appliedStatsByDate).filter(d => {
+                if (statsDateFrom && d < statsDateFrom) return false;
+                if (statsDateTo   && d > statsDateTo)   return false;
+                return true;
+            }).sort();
+
+            // Метка периода
+            if (labelEl) {
+                if (statsDateFrom || statsDateTo) {
+                    labelEl.textContent = `Период: ${statsDateFrom||'начало'} — ${statsDateTo||'сегодня'} · КМ дней: ${allDates.length}`;
+                } else {
+                    labelEl.textContent = `Все время · КМ дней: ${allDates.length}`;
+                }
+            }
+
+            // Присоединяем данные ростера (пак, ранг)
+            const players = Object.values(statsMap).map(s => {
+                const rp = roster.find(r => normalizeNick(r.name) === normalizeNick(s.name));
+                return {
+                    ...s,
+                    pac: rp ? rp.pac : 'СОЛО',
+                    rank: rp ? rp.rank : 'ИГРОК',
+                    isNew: rp ? rp.isNew : false,
+                    kda: (s.kills / Math.max(s.deaths, 1)).toFixed(2)
+                };
+            });
 
             if (players.length === 0) {
                 el.innerHTML = `<div class="card text-center py-16 text-slate-600">
                     <div class="text-4xl mb-4">📭</div>
-                    <p class="text-lg font-medium">Статистика пока пуста</p>
-                    <p class="text-sm mt-2">Загрузи скриншоты КМ в разделе Скриншоты КМ</p>
+                    <p class="text-lg font-medium">Статистика пуста за выбранный период</p>
+                    <p class="text-sm mt-2">Загрузи скриншоты КМ или измени период</p>
                 </div>`;
                 return;
             }
 
-            const withKda = players.map(p => ({
-                ...p,
-                kda: ((p.kills||0) / Math.max(p.deaths||1, 1)).toFixed(2)
-            }));
-
-            const topKda    = [...withKda].sort((a,b) => b.kda - a.kda).slice(0,5);
+            const topKda    = [...players].sort((a,b) => b.kda - a.kda).slice(0,5);
             const topKills  = [...players].sort((a,b) => (b.kills||0)-(a.kills||0)).slice(0,5);
             const topPvp    = [...players].sort((a,b) => (b.pvp_dmg||0)-(a.pvp_dmg||0)).slice(0,5);
             const topDeaths = [...players].sort((a,b) => (b.deaths||0)-(a.deaths||0)).slice(0,5);
@@ -1417,10 +1540,10 @@
                 </div>`;
             }
 
-            // Статистика по пакам (только игроки в паках, не СОЛО)
+            // Статистика по пакам
             const packStats = {};
             packs.forEach(pk => {
-                const members = roster.filter(p => p.pac === pk.name);
+                const members = players.filter(p => p.pac === pk.name);
                 if (members.length === 0) return;
                 packStats[pk.name] = {
                     name: pk.name,
@@ -1434,7 +1557,6 @@
             });
             const packList = Object.values(packStats).filter(pk => pk.kills+pk.deaths+pk.pvp_dmg > 0);
 
-            // Summary
             const totalKills  = players.reduce((s,p)=>s+(p.kills||0),0);
             const totalDeaths = players.reduce((s,p)=>s+(p.deaths||0),0);
             const totalPvp    = players.reduce((s,p)=>s+(p.pvp_dmg||0),0);
@@ -1484,12 +1606,13 @@
                     ${topCard('💀 Топ смертей', '#ef4444', topDeaths, 'deaths', false)}
                 </div>
                 <div style="background:#12171f;border:1px solid #1e2530;border-radius:12px;padding:20px">
-                    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#64748b;margin-bottom:14px">📋 Личная статистика игроков</div>
+                    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#64748b;margin-bottom:14px">📋 Личная статистика</div>
                     <div style="overflow-x:auto">
                     <table style="width:100%;border-collapse:collapse">
                         <thead><tr>
                             <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('name')">Ник</th>
                             <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid #1e2530">Пак</th>
+                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:center;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('attendance')">КМ%</th>
                             <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:center;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('kda')">KDA</th>
                             <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:center;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('kills')">Убийства</th>
                             <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:center;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('deaths')">Смерти</th>
@@ -1500,29 +1623,111 @@
                     </table>
                     </div>
                 </div>`;
-            renderStatsTable('kills', 'desc');
+            renderStatsTable(statsSort.field, statsSort.dir, players);
         }
 
         let statsSort = { field: 'kills', dir: 'desc' };
+
+        // ===== ПЕРИОД ФИЛЬТРАЦИИ =====
+        let statsDateFrom = '';
+        let statsDateTo   = '';
+        let rosterDateFrom = '';
+        let rosterDateTo   = '';
+
+        // ===== ЯДРО: считаем статистику из снапшотов за период =====
+        function calcStatsForPeriod(dateFrom, dateTo) {
+            // Возвращает { [normName]: {name, kills, deaths, pvp_dmg, pve_dmg, datesPresent: Set} }
+            const result = {};
+
+            Object.entries(appliedStatsByDate).forEach(([dateStr, snap]) => {
+                if (dateFrom && dateStr < dateFrom) return;
+                if (dateTo   && dateStr > dateTo)   return;
+                (snap.players || []).forEach(p => {
+                    if (!p.name) return;
+                    const key = normalizeNick(p.name);
+                    // Найдём каноничное имя из ростера
+                    const rp = roster.find(r => normalizeNick(r.name) === key);
+                    const canonName = rp ? rp.name : p.name;
+                    if (!result[key]) {
+                        result[key] = { name: canonName, kills: 0, deaths: 0, pvp_dmg: 0, pve_dmg: 0, datesPresent: new Set() };
+                    }
+                    // Для одного дня берём MAX (защита от повторного анализа одного дня)
+                    // Снапшот уже содержит merged MAX — просто суммируем по датам
+                    result[key].kills   += (p.kills   || 0);
+                    result[key].deaths  += (p.deaths  || 0);
+                    result[key].pvp_dmg += (p.pvp_dmg || 0);
+                    result[key].pve_dmg += (p.pve_dmg || 0);
+                    result[key].datesPresent.add(dateStr);
+                });
+            });
+            return result;
+        }
+
+        // Считаем КМ% из истории для игрока за период
+        function calcAttendance(playerName, dateFrom, dateTo) {
+            const allDates = Object.keys(appliedStatsByDate).filter(d => {
+                if (dateFrom && d < dateFrom) return false;
+                if (dateTo   && d > dateTo)   return false;
+                return true;
+            });
+            if (allDates.length === 0) return 0;
+            const key = normalizeNick(playerName);
+            const presentDates = allDates.filter(d => {
+                const snap = appliedStatsByDate[d];
+                return snap && snap.players && snap.players.some(p => normalizeNick(p.name) === key);
+            });
+            return Math.round((presentDates.length / allDates.length) * 100);
+        }
+
+        // Синхронизируем статистику ростера из снапшотов (вызывается после любого изменения снапшотов)
+        function syncRosterStatsFromSnapshots() {
+            roster.forEach(p => { p.kills = 0; p.deaths = 0; p.pvp_dmg = 0; p.pve_dmg = 0; });
+            const stats = calcStatsForPeriod('', '');
+            Object.values(stats).forEach(s => {
+                const rp = roster.find(r => normalizeNick(r.name) === normalizeNick(s.name));
+                if (rp) {
+                    rp.kills   = s.kills;
+                    rp.deaths  = s.deaths;
+                    rp.pvp_dmg = s.pvp_dmg;
+                    rp.pve_dmg = s.pve_dmg;
+                }
+            });
+        }
         function sortStats(field) {
             if (statsSort.field === field) statsSort.dir = statsSort.dir === 'desc' ? 'asc' : 'desc';
             else { statsSort.field = field; statsSort.dir = 'desc'; }
             renderStatsTable(statsSort.field, statsSort.dir);
         }
 
-        function renderStatsTable(field, dir) {
+        function renderStatsTable(field, dir, players) {
             const tbody = document.getElementById('statsTableBody');
             if (!tbody) return;
-            const players = roster.filter(p => (p.kills||0)+(p.deaths||0)+(p.pvp_dmg||0)+(p.pve_dmg||0) > 0)
-                .map(p => ({ ...p, kda: ((p.kills||0)/Math.max(p.deaths||1,1)).toFixed(2) }))
-                .sort((a,b) => {
-                    const va = parseFloat(a[field])||0, vb = parseFloat(b[field])||0;
-                    return dir === 'desc' ? vb-va : va-vb;
+            // Если players не передан — считаем заново
+            if (!players) {
+                const statsMap = calcStatsForPeriod(statsDateFrom, statsDateTo);
+                players = Object.values(statsMap).map(s => {
+                    const rp = roster.find(r => normalizeNick(r.name) === normalizeNick(s.name));
+                    return { ...s, pac: rp ? rp.pac : 'СОЛО', kda: (s.kills/Math.max(s.deaths,1)).toFixed(2) };
                 });
-            tbody.innerHTML = players.map(p => `
+            }
+            const allDates = Object.keys(appliedStatsByDate).filter(d => {
+                if (statsDateFrom && d < statsDateFrom) return false;
+                if (statsDateTo   && d > statsDateTo)   return false;
+                return true;
+            });
+            const sorted = [...players].map(p => ({
+                ...p,
+                attendance: allDates.length > 0 ? Math.round((p.datesPresent ? p.datesPresent.size : 0) / allDates.length * 100) : 0
+            })).sort((a,b) => {
+                const va = parseFloat(a[field])||0, vb = parseFloat(b[field])||0;
+                if (field === 'name') return dir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+                return dir === 'desc' ? vb-va : va-vb;
+            });
+            tbody.innerHTML = sorted.map(p => `
                 <tr style="border-bottom:1px solid #1e2530">
                     <td style="padding:10px 14px;font-weight:700">${p.name} ${p.isNew ? '<span style="font-size:9px;background:#22c55e;color:#000;font-weight:900;padding:1px 4px;border-radius:3px;text-transform:uppercase">NEW</span>' : ''}</td>
                     <td style="padding:10px 14px"><span style="font-size:11px;background:#1e2530;color:#94a3b8;padding:2px 8px;border-radius:4px;text-transform:uppercase">${p.pac||'СОЛО'}</span></td>
+                    <td style="padding:10px 14px;text-align:center;font-weight:700;color:${p.attendance>=70?'#22c55e':p.attendance>=40?'#f59e0b':'#ef4444'}">${p.attendance}%</td>
                     <td style="padding:10px 14px;text-align:center;color:#a78bfa;font-weight:700">${p.kda}</td>
                     <td style="padding:10px 14px;text-align:center;color:#f59e0b;font-weight:700">${p.kills||0}</td>
                     <td style="padding:10px 14px;text-align:center;color:#ef4444;font-weight:700">${p.deaths||0}</td>
@@ -2132,14 +2337,13 @@
                 }
             });
 
-            // ===== ПЕРЕСЧИТЫВАЕМ СТАТИСТИКУ РОСТЕРА ИЗ ВСЕХ СНАПШОТОВ =====
-            // Сначала сбрасываем
+            // ===== СОХРАНЯЕМ СНАПШОТ (статистика теперь считается на лету из снапшотов) =====
+            // Сначала сбрасываем старые данные в ростере (они теперь не источник правды)
             roster.forEach(p => { p.kills = 0; p.deaths = 0; p.pvp_dmg = 0; p.pve_dmg = 0; });
-            // Сохраняем текущий снапшот — объединяем с предыдущим через MAX
+            // Мёржим с предыдущим снапшотом этого дня через MAX
             const prevSnap = appliedStatsByDate[dateStr];
             let mergedPlayers = dayLastParsed.map(p => ({...p}));
             if (prevSnap && prevSnap.players) {
-                // Для каждого игрока в новом снапшоте — берём max с предыдущим
                 mergedPlayers = mergedPlayers.map(p => {
                     const old = prevSnap.players.find(o => normalizeNick(o.name) === normalizeNick(p.name));
                     if (!old) return p;
@@ -2151,13 +2355,11 @@
                         pve_dmg: Math.max(p.pve_dmg || 0, old.pve_dmg || 0),
                     };
                 });
-                // Игроки из предыдущего снапшота которых нет в новом — сохраняем
                 prevSnap.players.forEach(old => {
-                    const exists = mergedPlayers.find(p => p.name.toLowerCase() === old.name.toLowerCase());
+                    const exists = mergedPlayers.find(p => normalizeNick(p.name) === normalizeNick(old.name));
                     if (!exists) mergedPlayers.push({...old});
                 });
             }
-            // Мёржим screenPlayersMap — сохраняем паки из предыдущего анализа
             const mergedScreenMap = Object.assign({}, prevSnap ? (prevSnap.screenPlayersMap || {}) : {}, dayScreenPlayersMap || {});
 
             appliedStatsByDate[dateStr] = {
@@ -2168,18 +2370,6 @@
                 screenPlayersMap: mergedScreenMap,
                 appliedAt: new Date().toISOString()
             };
-            // Суммируем по всем датам (каждая дата уже содержит max значения)
-            Object.values(appliedStatsByDate).forEach(snap => {
-                snap.players.forEach(p => {
-                    const r = roster.find(r => normalizeNick(r.name) === normalizeNick(p.name));
-                    if (r) {
-                        r.kills   = (r.kills   || 0) + (p.kills   || 0);
-                        r.deaths  = (r.deaths  || 0) + (p.deaths  || 0);
-                        r.pvp_dmg = (r.pvp_dmg || 0) + (p.pvp_dmg || 0);
-                        r.pve_dmg = (r.pve_dmg || 0) + (p.pve_dmg || 0);
-                    }
-                });
-            });
 
             // Формируем итоговый статус
             let msg = prev ? `🔄 Перезаписано (старая стата вычтена)` : `✅ Применено`;
