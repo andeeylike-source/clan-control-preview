@@ -2117,8 +2117,7 @@
             // ===== ДОБАВЛЯЕМ НОВЫХ ИГРОКОВ В РОСТЕР (только если нет) =====
             let newCount = 0;
             dayLastParsed.forEach(p => {
-                const nameLower = p.name.toLowerCase();
-                const existing = roster.find(r => normalizeNick(r.name) === normalizeNick(name));
+                const existing = roster.find(r => normalizeNick(r.name) === normalizeNick(p.name));
                 if (!existing) {
                     roster.push({
                         id: Date.now() + Math.random(),
