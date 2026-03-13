@@ -2175,6 +2175,8 @@
             st.innerText = '✅ Счётчик сброшен — все ключи снова доступны!';
             setTimeout(() => st.style.display = 'none', 3000);
         }
+
+        async function addApiKeyField() {
             let pastedKey = '';
             try {
                 const text = await navigator.clipboard.readText();
