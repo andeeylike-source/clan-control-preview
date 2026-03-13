@@ -1823,7 +1823,7 @@
 {"pack_name":"ИМЯ ПАКА","pack_leader":"ИМЯ ЛИДЕРА","total_count":9,${isFirst ? '"raid_total":67,"command_channel":[{"leader":"ВИЗАРД","members":9,"kills":3,"deaths":60,"pvp_dmg":262,"pve_dmg":103}],' : ''}"players":[{"name":"ВИЗАРД","kills":0,"deaths":4,"pvp_dmg":3,"pve_dmg":0},{"name":"Ник","kills":0,"deaths":4,"pvp_dmg":3,"pve_dmg":0}]}
 
 Требования:
-- pack_name = заголовок окна ГРУППЫ
+- pack_name = заголовок окна ГРУППЫ точно как написано (кириллица так кириллица, без транслитерации)
 - pack_leader = имя из строки "Лидер: ИМЯ" окна ГРУППЫ
 - total_count = число из строки "Состав: N чел." окна ГРУППЫ${isFirst ? '\n- raid_total = число из строки "Состав: N груп. / N чел." окна Командного канала (второе число)\n- command_channel = все строки таблицы Командного канала (суммарная стата группы на каждого лидера)' : ''}
 - players = ВСЕ строки из таблицы "Член группы" включая лидера — берёшь их личную стату прямо из этой таблицы
@@ -2254,8 +2254,31 @@
                 const leadersHtml = hasCommandChannel ? cmdChannel.map((cc) => {
                     const packName = Object.entries(packLeadersMap).find(([,l]) => l.toLowerCase() === cc.leader.toLowerCase())?.[0];
 
-                    // Берём игроков: 1) screenPlayersMap по имени пака 2) по паку из ростера 3) пусто
-                    const screenParty = packName ? (screenPlayersMapDay[packName] || []) : [];
+                    // Берём игроков из screenPlayersMap:
+                    // 1) По точному имени пака
+                    // 2) По любому паку где лидер совпадает (на случай расхождения имён пака)
+                    // 3) По паку из ростера
+                    let screenParty = packName ? (screenPlayersMapDay[packName] || []) : [];
+                    if (screenParty.length === 0) {
+                        // Ищем пак в screenPlayersMap где первый игрок = лидер
+                        const leaderLower = cc.leader.toLowerCase();
+                        for (const [spKey, spPlayers] of Object.entries(screenPlayersMapDay)) {
+                            if (spPlayers.length > 0 && spPlayers[0].name && spPlayers[0].name.toLowerCase() === leaderLower) {
+                                screenParty = spPlayers;
+                                break;
+                            }
+                        }
+                    }
+                    if (screenParty.length === 0 && packName) {
+                        // Нечёткий поиск по имени пака (игнорируем пробелы и регистр)
+                        const packNorm = packName.toLowerCase().replace(/\s+/g,'');
+                        for (const [spKey, spPlayers] of Object.entries(screenPlayersMapDay)) {
+                            if (spKey.toLowerCase().replace(/\s+/g,'') === packNorm) {
+                                screenParty = spPlayers;
+                                break;
+                            }
+                        }
+                    }
                     const rosterParty = packName
                         ? dayPlayers.filter(p => {
                             const rp = roster.find(r => r.name.toLowerCase() === p.name.toLowerCase());
