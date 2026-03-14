@@ -1266,15 +1266,27 @@
             const playerIndex = roster.findIndex(p => p.id === id);
             if (playerIndex === -1) return;
             const player = roster[playerIndex];
-            showConfirm("Удаление в архив", `Переместить ${player.name} в архив?`, () => {
+
+            // Ищем похожий ник в ростере
+            const similar = roster.filter(r => r.id !== player.id)
+                .find(r => {
+                    const d = levenshtein(normalizeNick(r.name), normalizeNick(player.name));
+                    return d > 0 && d <= 3;
+                });
+
+            const confirmText = similar
+                ? `Переместить "${player.name}" в архив?\n\nПохоже на "${similar.name}" — добавить алиас чтобы AI больше не создавал дубль?`
+                : `Переместить "${player.name}" в архив?`;
+
+            showConfirm("Удаление в архив", confirmText, () => {
                 archive.push(player);
                 roster.splice(playerIndex, 1);
-                // Предлагаем добавить алиас — чтобы этот ник больше не добавлялся
-                const correctName = roster.find(r => r.name !== player.name &&
-                    levenshtein(normalizeNick(r.name), normalizeNick(player.name)) <= 3)?.name;
-                if (correctName) {
-                    nickAliases[player.name.toLowerCase()] = correctName;
-                    console.log(`Алиас добавлен: ${player.name} → ${correctName}`);
+                // Автоматически добавляем алиас если нашли похожий ник
+                if (similar) {
+                    nickAliases[player.name.toLowerCase()] = similar.name;
+                    // Также на случай если AI напишет с другим регистром
+                    nickAliases[player.name] = similar.name;
+                    console.log(`✅ Алиас: "${player.name}" → "${similar.name}"`);
                 }
                 saveToStorage();
                 renderRoster();
@@ -2043,7 +2055,7 @@
         }
 
         function resolveAlias(name) {
-            return nickAliases[name.toLowerCase()] || name;
+            return nickAliases[name] || nickAliases[name.toLowerCase()] || name;
         }
 
         function findSimilarNick(name) {
