@@ -337,7 +337,7 @@
         <nav>
             <div onclick="showPage('stats')" id="nav-stats" class="nav-item">📊 Статистика</div>
             <div onclick="showPage('calendar')" id="nav-calendar" class="nav-item">📅 Календарь КМ</div>
-            <div onclick="showPage('roster')" id="nav-roster" class="nav-item">👥 Ростер</div>
+            <div onclick="showPage('roster')" id="nav-roster" class="nav-item">👥 Клан</div>
             <div onclick="showPage('profile')" id="nav-profile" class="nav-item" style="display:none">👤 Профиль</div>
             <div onclick="showPage('packs')" id="nav-packs" class="nav-item active">⚔️ Рейд Паки</div>
             <div onclick="showPage('archive')" id="nav-archive" class="nav-item">🗄️ Архив</div>
@@ -375,7 +375,7 @@
         <section id="page-roster" class="page-section">
             <div class="flex justify-between items-center mb-4">
                 <div>
-                    <h1 class="text-3xl font-bold">Ростер клана</h1>
+                    <h1 class="text-3xl font-bold">Клан</h1>
                     <div id="rosterStats" class="text-slate-500 text-sm mt-1"></div>
                 </div>
                 <div class="flex gap-3 items-center flex-wrap justify-end">
@@ -397,7 +397,7 @@
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                         <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     </span>
-                    <input type="text" id="rosterSearchInput" class="input-dark pl-10" placeholder="Поиск игрока по нику..." oninput="renderRoster()">
+                    <input type="text" id="rosterSearchInput" class="input-dark pl-10" placeholder="Поиск по нику..." oninput="renderRoster()">
                 </div>
             </div>
             <div class="card overflow-x-auto">
@@ -439,6 +439,25 @@
                 </div>
             </div>
             <p id="statsPeriodLabel" class="text-slate-500 text-sm mb-6"></p>
+
+            <!-- ОТЧЁТ: НЕ ПОПАЛИ В CC -->
+            <div style="background:#12171f;border:1px solid #1e2530;border-radius:12px;padding:20px;margin-bottom:24px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+                    <div>
+                        <div style="font-size:13px;font-weight:800;color:#e2e8f0">⚠️ Не попали в CC подряд</div>
+                        <div style="font-size:11px;color:#475569;margin-top:2px">Игроки из ростера которые отсутствовали в Командном канале N+ КМ подряд</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <span style="font-size:11px;color:#64748b">Порог:</span>
+                        <div style="display:flex;gap:4px">
+                            ${[3,4,5,6,7].map(n => `<button onclick="setCcThreshold(${n})" id="ccBtn${n}" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">${n}</button>`).join('')}
+                        </div>
+                        <span style="font-size:11px;color:#64748b">КМ подряд</span>
+                    </div>
+                </div>
+                <div id="ccAbsenceReport"></div>
+            </div>
+
             <div id="statsContent"></div>
         </section>
 
@@ -548,51 +567,54 @@
                     <option value="ПЛ">ПЛ</option>
                     <option value="ИГРОК">Игрок</option>
                 </select>
-                <select id="pProfa" class="input-dark">
-                    <optgroup label="Маги">
-                        <option value="Archmage">Archmage (SS)</option>
-                        <option value="Mystic Muse (MM)">Mystic Muse (MM)</option>
-                        <option value="Storm Screamer (SH)">Storm Screamer (SH)</option>
-                        <option value="Soultaker (Necro)">Soultaker (Necro)</option>
-                        <option value="Arcana Lord (Cat)">Arcana Lord (Cat)</option>
-                        <option value="Elemental Master (Pony)">Elemental Master (Pony)</option>
-                        <option value="Spectral Master (Shadow)">Spectral Master (Shadow)</option>
+                <select id="pProfa" class="input-dark" onchange="addProfaFromSelect(this)">
+                    <option value="">+ Добавить профу...</option>
+                    <optgroup label="🔵 Маги">
+                        <option value="Archmage">🔵 Archmage (SS)</option>
+                        <option value="Mystic Muse (MM)">🔵 Mystic Muse (MM)</option>
+                        <option value="Storm Screamer (SH)">⚡ Storm Screamer (SH)</option>
+                        <option value="Soultaker (Necro)">💀 Soultaker (Necro)</option>
+                        <option value="Arcana Lord (Cat)">🐱 Arcana Lord (Cat)</option>
+                        <option value="Elemental Master (Pony)">🦄 Elemental Master (Pony)</option>
+                        <option value="Spectral Master (Shadow)">👤 Spectral Master (Shadow)</option>
                     </optgroup>
-                    <optgroup label="Поддержка (Healers/Buffers)">
-                        <option value="Cardinal (BP)">Cardinal (BP)</option>
-                        <option value="Eva's Saint (EE)">Eva's Saint (EE)</option>
-                        <option value="Shillien Saint (SE)">Shillien Saint (SE)</option>
-                        <option value="Dominator (Over)">Dominator (Over)</option>
-                        <option value="Doomcryer (WC)">Doomcryer (WC)</option>
-                        <option value="Hierophant (PP)">Hierophant (PP)</option>
-                        <option value="Sword Muse (SwM)">Sword Muse (SwM)</option>
-                        <option value="Spectral Dancer (BD)">Spectral Dancer (BD)</option>
+                    <optgroup label="💚 Поддержка (Healers/Buffers)">
+                        <option value="Cardinal (BP)">✝️ Cardinal (BP)</option>
+                        <option value="Eva's Saint (EE)">💚 Eva's Saint (EE)</option>
+                        <option value="Shillien Saint (SE)">🖤 Shillien Saint (SE)</option>
+                        <option value="Dominator (Over)">👑 Dominator (Over)</option>
+                        <option value="Doomcryer (WC)">📯 Doomcryer (WC)</option>
+                        <option value="Hierophant (PP)">🌟 Hierophant (PP)</option>
+                        <option value="Sword Muse (SwM)">🎵 Sword Muse (SwM)</option>
+                        <option value="Spectral Dancer (BD)">💃 Spectral Dancer (BD)</option>
                     </optgroup>
-                    <optgroup label="Лучники (Archers)">
-                        <option value="Sagittarius">Sagittarius (Human Archer)</option>
-                        <option value="Moonlight Sentinel">Moonlight Sentinel (Elf Archer)</option>
-                        <option value="Ghost Sentinel">Ghost Sentinel (DE Archer)</option>
+                    <optgroup label="🏹 Лучники (Archers)">
+                        <option value="Sagittarius">🏹 Sagittarius (Human Archer)</option>
+                        <option value="Moonlight Sentinel">🌙 Moonlight Sentinel (Elf Archer)</option>
+                        <option value="Ghost Sentinel">👻 Ghost Sentinel (DE Archer)</option>
                     </optgroup>
-                    <optgroup label="Кинжальщики (Daggers)">
-                        <option value="Adventurer">Adventurer (Human Dagger)</option>
-                        <option value="Wind Rider">Wind Rider (Elf Dagger)</option>
-                        <option value="Ghost Hunter">Ghost Hunter (DE Dagger)</option>
+                    <optgroup label="🗡️ Кинжальщики (Daggers)">
+                        <option value="Adventurer">🗡️ Adventurer (Human Dagger)</option>
+                        <option value="Wind Rider">💨 Wind Rider (Elf Dagger)</option>
+                        <option value="Ghost Hunter">🔪 Ghost Hunter (DE Dagger)</option>
                     </optgroup>
-                    <optgroup label="Танки (Tanks)">
-                        <option value="Phoenix Knight (Paladin)">Phoenix Knight (Paladin)</option>
-                        <option value="Hell Knight (DA)">Hell Knight (DA)</option>
-                        <option value="Eva's Templar (TK)">Eva's Templar (TK)</option>
-                        <option value="Shillien Templar (SK)">Shillien Templar (SK)</option>
+                    <optgroup label="🛡️ Танки (Tanks)">
+                        <option value="Phoenix Knight (Paladin)">🛡️ Phoenix Knight (Paladin)</option>
+                        <option value="Hell Knight (DA)">😈 Hell Knight (DA)</option>
+                        <option value="Eva's Templar (TK)">🛡️ Eva's Templar (TK)</option>
+                        <option value="Shillien Templar (SK)">⚫ Shillien Templar (SK)</option>
                     </optgroup>
-                    <optgroup label="Воины (Warriors)">
-                        <option value="Duelist (Glad)">Duelist (Glad)</option>
-                        <option value="Dreadnought (Warlord)">Dreadnought (Warlord)</option>
-                        <option value="Grand Khavatari (Tyrant)">Grand Khavatari (Tyrant)</option>
-                        <option value="Titan (Destro)">Titan (Destro)</option>
-                        <option value="Fortune Seeker (Bounty)">Fortune Seeker (Bounty Hunter)</option>
-                        <option value="Maestro (Warsmith)">Maestro (Warsmith)</option>
+                    <optgroup label="⚔️ Воины (Warriors)">
+                        <option value="Duelist (Glad)">⚔️ Duelist (Glad)</option>
+                        <option value="Dreadnought (Warlord)">🔨 Dreadnought (Warlord)</option>
+                        <option value="Grand Khavatari (Tyrant)">👊 Grand Khavatari (Tyrant)</option>
+                        <option value="Titan (Destro)">💪 Titan (Destro)</option>
+                        <option value="Fortune Seeker (Bounty)">💰 Fortune Seeker (Bounty Hunter)</option>
+                        <option value="Maestro (Warsmith)">🔧 Maestro (Warsmith)</option>
                     </optgroup>
                 </select>
+                <!-- Выбранные профы -->
+                <div id="pProfaList" style="display:flex;flex-wrap:wrap;gap:6px;min-height:24px"></div>
                 <select id="pPac" class="input-dark"></select>
                 <div class="flex justify-end gap-3 mt-6">
                     <button onclick="closePlayerModal()" class="px-6 py-2 bg-slate-800 rounded-lg">Отмена</button>
@@ -1259,7 +1281,7 @@
                         <span class="font-bold text-slate-200 player-nick-link" onclick="openPlayerProfile('${p.name}')">${p.name}</span> <span class="badge badge-${p.rank.toLowerCase()}">${p.rank}</span>
                     </td>
                     <td>${p.isNew ? '<span class="text-[9px] bg-emerald-500 text-black font-black px-1.5 py-0.5 rounded uppercase">NEW</span>' : '<span style="color:#475569;font-size:11px">—</span>'}</td>
-                    <td class="text-slate-400 text-xs">${p.profa}</td>
+                    <td class="text-slate-400 text-xs">${(p.profas && p.profas.length > 0 ? p.profas : (p.profa && p.profa !== '—' ? [p.profa] : [])).map((pf,i) => `<span style="display:inline-flex;align-items:center;gap:3px;background:#1e2530;border-radius:4px;padding:1px 6px;margin-right:3px;${i===0?'color:#a5b4fc':'color:#64748b'}">${getProfaIcon(pf)}${pf}</span>`).join('') || '<span style="color:#475569">—</span>'}</td>
                     <td><span class="pac-tag">${p.pac}</span></td>
                     <td class="${p.attendance < 50 ? 'text-red-400' : p.attendance < 70 ? 'text-yellow-400' : 'text-emerald-400'} font-bold">${totalDates > 0 ? p.attendance + '%' : '—'}</td>
                     <td class="text-right">
@@ -1286,8 +1308,10 @@
             document.getElementById('modalTitle').innerText = "Редактировать: " + p.name;
             document.getElementById('pName').value = p.name;
             document.getElementById('pRank').value = p.rank;
-            document.getElementById('pProfa').value = p.profa;
             document.getElementById('pPac').value = p.pac;
+            // Загружаем профы
+            pProfaCurrent = p.profas ? [...p.profas] : (p.profa && p.profa !== '—' ? [p.profa] : []);
+            renderPProfaList();
             document.getElementById('playerModal').style.display = 'flex';
         }
 
@@ -1352,19 +1376,51 @@
             renderRoster();
         }
 
+        // Текущие профы в модалке (массив)
+        let pProfaCurrent = [];
+
+        function renderPProfaList() {
+            const el = document.getElementById('pProfaList');
+            if (!el) return;
+            el.innerHTML = pProfaCurrent.map((pf, i) => `
+                <span style="display:inline-flex;align-items:center;gap:5px;background:#1e2530;border:1px solid #2d3748;border-radius:6px;padding:3px 10px;font-size:11px;color:#e2e8f0">
+                    ${i === 0 ? '<span style="font-size:8px;background:#6366f1;color:#fff;padding:1px 4px;border-radius:3px;font-weight:700">ОСНОВНАЯ</span>' : ''}
+                    ${pf}
+                    <button onclick="removeProfaFromList(${i})" style="background:none;border:none;color:#475569;cursor:pointer;font-size:12px;padding:0;line-height:1" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#475569'">×</button>
+                </span>`).join('');
+        }
+
+        function addProfaFromSelect(sel) {
+            const val = sel.value;
+            if (!val) return;
+            if (!pProfaCurrent.includes(val)) {
+                pProfaCurrent.push(val);
+                renderPProfaList();
+            }
+            sel.value = '';
+        }
+
+        function removeProfaFromList(idx) {
+            pProfaCurrent.splice(idx, 1);
+            renderPProfaList();
+        }
+
         function savePlayer() {
             const id = document.getElementById('editId').value;
             const name = document.getElementById('pName').value.trim();
             if(!name) return;
+            // profa = первая профа (основная), profas = весь массив
+            const profas = [...pProfaCurrent];
+            const profa = profas[0] || '—';
             const data = {
                 name,
                 rank: document.getElementById('pRank').value,
-                profa: document.getElementById('pProfa').value,
+                profa,
+                profas,
                 pac: document.getElementById('pPac').value
             };
             if(id) {
                 const idx = roster.findIndex(p => p.id == id);
-                // Снимаем NEW если назначили пак
                 const wasNew = roster[idx].isNew;
                 roster[idx] = { ...roster[idx], ...data };
                 if (wasNew && data.pac && data.pac !== 'СОЛО') roster[idx].isNew = false;
@@ -1449,7 +1505,7 @@
 
         function resetAllStats() {
             showConfirm("⚠️ Сбросить всю статистику КМ?",
-                "Вся история КМ и статистика будут удалены. Ростер (игроки, паки) сохранится.",
+                "Вся история КМ и статистика будут удалены. Клан (игроки, паки) сохранится.",
                 () => {
                     appliedStatsByDate = {};
                     roster = roster.map(p => ({ ...p, kills: 0, deaths: 0, pvp_dmg: 0, pve_dmg: 0 }));
@@ -1703,7 +1759,7 @@
 
             const radarHtml = radarSVG(
                 [aggrScore, pvpScore, pveScore, presScore, survScore],
-                ['АТАКА','PVP','PVE','ПОСЕЩ.','ЖИВУЧ.']
+                ['АТАКА','PVP','PVE','ПОСЕЩ.','CON']
             );
 
             // Кольцо присутствия
@@ -1931,7 +1987,7 @@
                         <div class="prf-section-title">Стиль игры</div>
                         ${radarHtml}
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px;text-align:left">
-                            ${[['Атака',aggrScore,'#f59e0b'],['PvP урон',pvpScore,'#818cf8'],['PvE урон',pveScore,'#22c55e'],['Присутствие',presScore,'#6366f1'],['Живучесть',survScore,'#a78bfa']].map(([lb,sc,cl])=>`
+                            ${[['Атака',aggrScore,'#f59e0b'],['PvP урон',pvpScore,'#818cf8'],['PvE урон',pveScore,'#22c55e'],['Присутствие',presScore,'#6366f1'],['CON',survScore,'#a78bfa']].map(([lb,sc,cl])=>`
                             <div style="background:#0b0e14;border-radius:6px;padding:5px 8px">
                                 <div style="font-size:9px;color:#475569;font-weight:700;text-transform:uppercase">${lb}</div>
                                 <div style="font-size:14px;font-weight:900;color:${cl}">${sc}</div>
@@ -2018,6 +2074,8 @@
             document.getElementById('pName').value = "";
             document.getElementById('pRank').value = "ИГРОК";
             document.getElementById('pPac').value = "СОЛО";
+            pProfaCurrent = [];
+            renderPProfaList();
             document.getElementById('playerModal').style.display = 'flex';
         }
 
@@ -2029,7 +2087,164 @@
         });
 
         // ===== СТАТИСТИКА =====
+        // ===== CC ABSENCE REPORT =====
+        let ccThreshold = 3;
+
+        function setCcThreshold(n) {
+            ccThreshold = n;
+            [3,4,5,6,7].forEach(i => {
+                const btn = document.getElementById('ccBtn' + i);
+                if (!btn) return;
+                btn.style.background = i === n ? '#6366f1' : '#1e2530';
+                btn.style.borderColor = i === n ? '#6366f1' : '#2d3748';
+                btn.style.color = i === n ? '#fff' : '#64748b';
+            });
+            renderCcAbsenceReport();
+        }
+
+        function renderCcAbsenceReport() {
+            const el = document.getElementById('ccAbsenceReport');
+            if (!el) return;
+
+            // Подсвечиваем активную кнопку
+            [3,4,5,6,7].forEach(i => {
+                const btn = document.getElementById('ccBtn' + i);
+                if (!btn) return;
+                btn.style.background = i === ccThreshold ? '#6366f1' : '#1e2530';
+                btn.style.borderColor = i === ccThreshold ? '#6366f1' : '#2d3748';
+                btn.style.color = i === ccThreshold ? '#fff' : '#64748b';
+            });
+
+            // Все даты КМ с данными CC, отсортированные
+            const allDates = Object.keys(appliedStatsByDate)
+                .filter(d => {
+                    if (statsDateFrom && d < statsDateFrom) return false;
+                    if (statsDateTo   && d > statsDateTo)   return false;
+                    return true;
+                })
+                .sort();
+
+            if (allDates.length === 0) {
+                el.innerHTML = '<div style="color:#475569;font-size:12px">Нет данных КМ за выбранный период</div>';
+                return;
+            }
+
+            // Для каждого игрока из ростера считаем streak пропусков CC подряд (последние N)
+            // "не попал в CC" = игрок есть в ростере, но его нет в snap.players за этот день
+            // (т.е. он вообще отсутствовал на КМ или был но не попал в скрин)
+
+            const fmtDate = ds => { const [y,m,d] = ds.split('-'); return `${d}.${m}`; };
+
+            // Строим для каждого игрока историю присутствия по датам
+            const playerHistory = {}; // normKey → [true/false per date]
+            roster.forEach(p => {
+                const key = normalizeNick(p.name);
+                playerHistory[key] = { name: p.name, pac: p.pac, rank: p.rank, dates: [] };
+            });
+
+            allDates.forEach(d => {
+                const snap = appliedStatsByDate[d];
+                const presentKeys = new Set(
+                    (snap && snap.players ? snap.players : [])
+                        .map(p => normalizeNick(resolveAlias(p.name)))
+                );
+                Object.keys(playerHistory).forEach(key => {
+                    playerHistory[key].dates.push({ date: d, present: presentKeys.has(key) });
+                });
+            });
+
+            // Для каждого порога от 3 до 7 находим игроков с таким streak
+            // Streak = N последних КМ подряд без попадания в CC
+            const thresholds = [3,4,5,6,7,8,9,10];
+            const buckets = {}; // threshold → [players]
+            thresholds.forEach(t => { buckets[t] = []; });
+
+            Object.values(playerHistory).forEach(ph => {
+                if (ph.dates.length === 0) return;
+                // Считаем текущий streak пропусков (с конца)
+                let streak = 0;
+                for (let i = ph.dates.length - 1; i >= 0; i--) {
+                    if (!ph.dates[i].present) streak++;
+                    else break;
+                }
+                if (streak >= 3) {
+                    // Кладём в минимальный подходящий bucket
+                    for (let t = streak; t >= 3; t--) {
+                        if (buckets[t]) buckets[t].push({ ...ph, streak, lastSeen: ph.dates.slice().reverse().find(d => d.present)?.date || null });
+                    }
+                }
+            });
+
+            // Показываем только bucket = ccThreshold (точное совпадение порога)
+            // Но показываем сводку по всем порогам сверху
+            const summaryHtml = thresholds.filter(t => t <= allDates.length).map(t => {
+                // Уникальные игроки с streak >= t (не дублируем)
+                const uniqueKeys = new Set();
+                const count = Object.values(playerHistory).filter(ph => {
+                    let streak = 0;
+                    for (let i = ph.dates.length - 1; i >= 0; i--) {
+                        if (!ph.dates[i].present) streak++;
+                        else break;
+                    }
+                    return streak >= t;
+                }).length;
+                if (count === 0) return '';
+                return `<div onclick="setCcThreshold(${t})" style="background:${t===ccThreshold?'#6366f122':'#0b0e14'};border:1px solid ${t===ccThreshold?'#6366f1':'#1e2530'};border-radius:8px;padding:8px 14px;cursor:pointer;transition:all .15s;text-align:center;min-width:60px">
+                    <div style="font-size:20px;font-weight:900;color:${count>0?'#ef4444':'#22c55e'}">${count}</div>
+                    <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase">${t}+ КМ</div>
+                </div>`;
+            }).filter(Boolean).join('');
+
+            // Игроки с streak >= ccThreshold
+            const absentPlayers = Object.values(playerHistory).filter(ph => {
+                let streak = 0;
+                for (let i = ph.dates.length - 1; i >= 0; i--) {
+                    if (!ph.dates[i].present) streak++;
+                    else break;
+                }
+                ph._streak = streak;
+                return streak >= ccThreshold;
+            }).sort((a,b) => b._streak - a._streak);
+
+            if (absentPlayers.length === 0 && summaryHtml === '') {
+                el.innerHTML = '<div style="color:#22c55e;font-size:12px;font-weight:700">✅ Нет игроков с пропусками ' + ccThreshold + '+ КМ подряд</div>';
+                return;
+            }
+
+            const playersHtml = absentPlayers.length === 0
+                ? `<div style="color:#22c55e;font-size:12px;font-weight:700;margin-top:12px">✅ Нет игроков с пропусками ${ccThreshold}+ КМ подряд</div>`
+                : `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+                ${absentPlayers.map(ph => {
+                    const streak = ph._streak;
+                    const color = streak >= 7 ? '#ef4444' : streak >= 5 ? '#f59e0b' : '#94a3b8';
+                    const lastSeen = ph.dates.slice().reverse().find(d => d.present);
+                    const lastSeenStr = lastSeen ? fmtDate(lastSeen.date) : 'никогда';
+                    // Последние даты как пиктограммы
+                    const last8 = ph.dates.slice(-8);
+                    const dotHtml = last8.map(d => `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${d.present?'#22c55e':'#ef4444'};margin:0 1px" title="${fmtDate(d.date)}:${d.present?'✅':'❌'}"></span>`).join('');
+                    return `<div style="background:#0b0e14;border:1px solid ${color}44;border-radius:10px;padding:10px 14px;min-width:180px;max-width:220px">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                            <span class="player-nick-link" onclick="openPlayerProfile('${ph.name}')" style="font-weight:700;font-size:13px">${ph.name}</span>
+                            <span style="font-size:18px;font-weight:900;color:${color}">${streak}</span>
+                        </div>
+                        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+                            <span class="badge badge-${ph.rank.toLowerCase()}">${ph.rank}</span>
+                            ${ph.pac !== 'СОЛО' ? `<span class="pac-tag" style="font-size:9px;padding:1px 6px">${ph.pac}</span>` : ''}
+                        </div>
+                        <div style="margin-bottom:4px">${dotHtml}</div>
+                        <div style="font-size:10px;color:#475569">Последний раз: ${lastSeenStr}</div>
+                    </div>`;
+                }).join('')}
+            </div>`;
+
+            el.innerHTML = `
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">${summaryHtml}</div>
+                ${playersHtml}
+            `;
+        }
+
         function renderStats() {
+            renderCcAbsenceReport();
             const el = document.getElementById('statsContent');
             const labelEl = document.getElementById('statsPeriodLabel');
 
@@ -2454,6 +2669,31 @@
         let nickAliases = {}; // { "бос": "6oc" } — ключи в нижнем регистре
 
         // Нормализация ников для визуального сравнения (латиница ↔ кириллица, цифры ↔ буквы)
+        // ===== ИКОНКИ ПРОФ =====
+        const PROFA_ICONS = {
+            // Маги
+            'Archmage': '🔵', 'Mystic Muse (MM)': '🔵', 'Storm Screamer (SH)': '⚡',
+            'Soultaker (Necro)': '💀', 'Arcana Lord (Cat)': '🐱', 'Elemental Master (Pony)': '🦄',
+            'Spectral Master (Shadow)': '👤',
+            // Хилеры/Баферы
+            'Cardinal (BP)': '✝️', "Eva's Saint (EE)": '💚', 'Shillien Saint (SE)': '🖤',
+            'Dominator (Over)': '👑', 'Doomcryer (WC)': '📯', 'Hierophant (PP)': '🌟',
+            'Sword Muse (SwM)': '🎵', 'Spectral Dancer (BD)': '💃',
+            // Лучники
+            'Sagittarius': '🏹', 'Moonlight Sentinel': '🌙', 'Ghost Sentinel': '👻',
+            // Кинжалы
+            'Adventurer': '🗡️', 'Wind Rider': '💨', 'Ghost Hunter': '🔪',
+            // Танки
+            'Phoenix Knight (Paladin)': '🛡️', 'Hell Knight (DA)': '😈',
+            "Eva's Templar (TK)": '🛡️', 'Shillien Templar (SK)': '⚫',
+            // Воины
+            'Duelist (Glad)': '⚔️', 'Dreadnought (Warlord)': '🔨', 'Grand Khavatari (Tyrant)': '👊',
+            'Titan (Destro)': '💪', 'Fortune Seeker (Bounty)': '💰', 'Maestro (Warsmith)': '🔧',
+        };
+        function getProfaIcon(profa) {
+            return PROFA_ICONS[profa] ? `<span style="font-size:12px">${PROFA_ICONS[profa]}</span>` : '';
+        }
+
         function normalizeNick(name) {
             let s = name;
             // Многосимвольные паттерны (порядок важен — сначала длиннее)
@@ -3831,7 +4071,7 @@
         function clearStorage() {
             showConfirm(
                 '⚠️ Сбросить данные?',
-                'Ростер (кроме КЛ Визарда), статистика и история КМ будут удалены. Паки и API ключи сохранятся.',
+                'Клан (кроме КЛ Визарда), статистика и история КМ будут удалены. Паки и API ключи сохранятся.',
                 () => {
                     const kl = roster.find(p => p.name.toUpperCase() === 'ВИЗАРД') ||
                                { id: 1, name: 'ВИЗАРД', rank: 'КЛ', profa: 'Bishop', pac: 'СОЛО' };
