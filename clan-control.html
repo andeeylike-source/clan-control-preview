@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clan Control v4</title>
+    <title>Clan Control v5</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -319,7 +319,7 @@
 
     <aside class="sidebar">
         <h2 class="text-blue-500 font-black text-xl tracking-tighter uppercase">Clan Control</h2>
-        <div style="font-size:9px;color:#475569;margin-top:-8px;margin-bottom:20px;letter-spacing:.05em">v4</div>
+        <div style="font-size:9px;color:#475569;margin-top:-8px;margin-bottom:20px;letter-spacing:.05em">v5</div>
         
         <nav>
             <div onclick="showPage('stats')" id="nav-stats" class="nav-item">📊 Статистика</div>
@@ -2347,20 +2347,21 @@
                         players.forEach(p => {
                             if (!p.name) return;
                             // Защита от перепутанных колонок AI:
-                            // Случай 1: deaths огромные (>200) а pvp_dmg = 0
-                            if ((p.deaths || 0) > 200 && (p.pvp_dmg || 0) === 0) {
-                                const tmp = p.deaths;
-                                p.deaths = p.kills || 0;
-                                p.pvp_dmg = tmp;
-                                p.kills = 0;
-                            }
-                            // Случай 2: deaths >> pvp_dmg (урон попал в смерти, pvp_dmg мал)
-                            // deaths > 100 и pvp_dmg < deaths * 0.1 — явная аномалия
-                            else if ((p.deaths || 0) > 100 && (p.pvp_dmg || 0) < (p.deaths || 0) * 0.1 && (p.pvp_dmg || 0) < 50) {
-                                const tmp = p.deaths;
-                                p.deaths = Math.min(p.kills || 0, 50); // kills тоже могут быть неверными
-                                p.pvp_dmg = tmp;
-                                p.kills = 0;
+                            // Если deaths подозрительно большие — это урон попал в смерти
+                            // Признаки: deaths > 200 ИЛИ deaths > kills * 20 (при kills > 0)
+                            const d = p.deaths || 0;
+                            const k = p.kills || 0;
+                            const isDeathsAnomaly = d > 200 || (d > 50 && k > 0 && d > k * 15);
+                            if (isDeathsAnomaly) {
+                                // Если pvp_dmg уже есть и тоже большой — deaths это дубль урона, просто обнулим
+                                if ((p.pvp_dmg || 0) > 100) {
+                                    p.deaths = Math.min(k, 100); // берём kills как приблизительные смерти
+                                } else {
+                                    // pvp_dmg = 0 или мало — deaths это и есть урон
+                                    p.pvp_dmg = d;
+                                    p.deaths = Math.min(k, 100);
+                                    p.kills = 0;
+                                }
                             }
                             const key = p.name.toLowerCase();
                             if (allPlayers[key]) {
