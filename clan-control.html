@@ -2567,6 +2567,9 @@
             };
 
             // Формируем итоговый статус
+            const newPlayers = prevSnap ? mergedPlayers
+                .filter(p => !prevSnap.players.find(o => normalizeNick(o.name) === normalizeNick(p.name)))
+                .map(p => p.name) : [];
             let msg = prevSnap ? `🔄 Перезаписано (старая стата вычтена)` : `✅ Применено`;
             if (newCount > 0) msg += ` · +${newCount} новых (NEW)`;
             if (newPlayers.length > 0) msg += ` · 🆕 Найдены пропавшие: ${newPlayers.join(', ')}`;
