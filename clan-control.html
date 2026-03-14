@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clan Control v5</title>
+    <title>Clan Control v6</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -319,7 +319,7 @@
 
     <aside class="sidebar">
         <h2 class="text-blue-500 font-black text-xl tracking-tighter uppercase">Clan Control</h2>
-        <div style="font-size:9px;color:#475569;margin-top:-8px;margin-bottom:20px;letter-spacing:.05em">v5</div>
+        <div style="font-size:9px;color:#475569;margin-top:-8px;margin-bottom:20px;letter-spacing:.05em">v6</div>
         
         <nav>
             <div onclick="showPage('stats')" id="nav-stats" class="nav-item">📊 Статистика</div>
@@ -2311,9 +2311,16 @@
                         if (parsed.command_channel) commandChannel = parsed.command_channel;
                         console.log(`Командный канал: ожидается ${expectedTotal} игроков`, commandChannel);
                     }
-                    // Сохраняем имя пака и лидера для каждого скрина
+                    // Санитизация pack_name — если похоже на фоновый текст, берём лидера
                     if (parsed.pack_name && parsed.pack_leader) {
-                        packLeaders[parsed.pack_name] = parsed.pack_leader;
+                        const pn = parsed.pack_name;
+                        // Признаки фонового текста: пробелы + длина > 8 символов, или содержит глаголы/фразы
+                        const looksLikeBackground = (pn.includes(' ') && pn.length > 8) ||
+                            /делаю|релол|продаю|куплю|лфг|лфп/i.test(pn);
+                        const cleanPackName = looksLikeBackground ? parsed.pack_leader : pn;
+                        packLeaders[cleanPackName] = parsed.pack_leader;
+                        // Сохраняем с правильным именем
+                        parsed.pack_name = cleanPackName;
                     }
                     const totalCount = parsed.total_count || players.length;
 
