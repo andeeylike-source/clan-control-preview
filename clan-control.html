@@ -4884,7 +4884,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 const roleHint = '';
 
                 // Фиксированный топ-8 для всех
-                const TOP8_FIXED = ['Ghost Sentinel','Storm Screamer (SH)','Archmage','Doomcryer (WC)','Cardinal (BP)','Sword Muse (SwM)','Spectral Dancer (BD)','Hierophant (PP)'];
+                const TOP8_FIXED = ['Ghost Sentinel','Storm Screamer (SH)','Archmage','Dominator (Over)','Cardinal (BP)','Sword Muse (SwM)','Spectral Dancer (BD)','Hierophant (PP)'];
                 const topProfas = TOP8_FIXED;
                 const btnHtml = topProfas.map((pf, bi) => {
                     const src3 = getProfaIcon(pf);
@@ -4929,14 +4929,15 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     '</div>' +
                     '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">' + btnHtml + '</div>' +
                     '<div style="position:relative;display:flex;gap:6px;align-items:center">' +
+                        '<div id="' + "profaIconWrap_" + idx + '" style="display:none;align-items:center;flex-shrink:0;margin-left:4px"></div>' +
                         '<input id="' + searchId + '" type="text" placeholder="Поиск профы..." autocomplete="off" ' +
                         'oninput="filterProfaSearch(' + idx + ',this.value)" ' +
                         'onclick="openProfaDdOnly(' + idx + ',this)" ' +
                         'data-pidx="' + idx + '" onkeydown="handleProfaKey(event,this)" ' +
-                        'style="flex:1;background:#12171f;border:1px solid #2d3748;border-radius:7px;padding:5px 10px;color:#e2e8f0;font-size:12px;outline:none;box-sizing:border-box">' +
+                        'style="flex:1;background:#12171f;border:1px solid #2d3748;border-radius:7px;padding:5px 10px 5px ' + (selected ? '36px' : '10px') + ';color:#e2e8f0;font-size:12px;outline:none;box-sizing:border-box">' +
                         '<button id="' + "profaConfirmBtn_" + idx + '" onmousedown="event.preventDefault();confirmProfa(' + idx + ')" ' +
                         'style="background:#22c55e;border:none;border-radius:7px;padding:5px 10px;color:#000;font-weight:700;font-size:13px;cursor:pointer;opacity:0.4;transition:opacity .2s;flex-shrink:0">✓</button>' +
-                        '<div id="' + ddId + '" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1f29;border:1px solid #6366f1;border-radius:8px;max-height:160px;overflow-y:auto;z-index:9999;margin-top:2px"></div>' +
+                        '<div id="' + ddId + '" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1f29;border:1px solid #6366f1;border-radius:8px;max-height:200px;overflow-y:auto;z-index:9999;margin-top:2px"></div>' +
                     '</div>' +
                     (selected ? '<div style="margin-top:6px;font-size:11px;color:#22c55e">✓ Выбрано: ' + (PROFA_NAMES[selected]||selected) + '</div>' : '') +
                 '</div>';
@@ -4953,16 +4954,43 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
         }
 
         function previewProfa(idx, profa) {
-            // Предварительный выбор — подставляет в поле, список остаётся
             pendingProfas[idx] = profa;
             const inp = document.getElementById('profaSearch_' + idx);
-            if (inp) inp.value = profa;
-            // Подсвечиваем активный пункт
+            if (inp) {
+                inp.value = profa;
+                // Показываем иконку слева в поле
+                const wrap = document.getElementById('profaIconWrap_' + idx);
+                if (wrap) {
+                    const src3 = getProfaIcon(profa);
+                    const src2 = profa === 'АВ/ПВ' ? getClass2Icon('Abyss Walker') : getClass2IconByClass3(profa);
+                    const noClass2 = (profa === 'Ghost Hunter' || profa === 'Wind Rider');
+                    let iconHtml = '';
+                    if (profa === 'АВ/ПВ' && src2) {
+                        iconHtml = '<img src="' + src2 + '" style="width:22px;height:22px;border-radius:50%">';
+                    } else if (!noClass2 && src2 && src3) {
+                        iconHtml = '<img src="' + src2 + '" style="width:18px;height:18px;border-radius:50%;opacity:0.8">'
+                                 + '<img src="' + src3 + '" style="width:22px;height:22px;border-radius:50%;margin-left:2px">';
+                    } else if (src3) {
+                        iconHtml = '<img src="' + src3 + '" style="width:22px;height:22px;border-radius:50%">';
+                    }
+                    wrap.innerHTML = iconHtml;
+                    wrap.style.display = iconHtml ? 'flex' : 'none';
+                    // Shift input text to make room for icon
+                    const iconW = (profa === 'АВ/ПВ' || noClass2) ? 30 : 48;
+                    inp.style.paddingLeft = iconHtml ? (iconW + 8) + 'px' : '10px';
+                    // Position icon inside input
+                    wrap.style.cssText = 'position:absolute;left:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:2px;pointer-events:none;z-index:1';
+                }
+            }
+            // Highlight active item in dropdown
             const dd = document.getElementById('profaDd_' + idx);
-            if (dd) dd.querySelectorAll('.pfa-dd-item').forEach(el => {
-                el.style.background = el.dataset.profa === profa ? '#6366f133' : '';
-            });
-            // Обновить кнопку галочки
+            if (dd) {
+                const items = dd.querySelectorAll('.pfa-dd-item');
+                const ddItems = window['_ddItems_' + idx] || [];
+                items.forEach((el, i) => {
+                    el.style.background = ddItems[i] === profa ? '#6366f133' : '';
+                });
+            }
             const btn = document.getElementById('profaConfirmBtn_' + idx);
             if (btn) btn.style.opacity = '1';
         }
@@ -4978,8 +5006,11 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             profaAssignSelected[player.id] = profa;
             delete pendingProfas[idx];
             document.querySelectorAll('[id^="profaDd_"]').forEach(dd => dd.style.display = 'none');
+            _ddOpenIdx = null;
             const inp = document.getElementById('profaSearch_' + idx);
-            if (inp) { inp.value = ''; inp.blur(); }
+            if (inp) { inp.value = ''; inp.style.paddingLeft = '10px'; inp.blur(); }
+            const wrap = document.getElementById('profaIconWrap_' + idx);
+            if (wrap) { wrap.innerHTML = ''; wrap.style.display = 'none'; }
             renderProfaAssignList();
         }
 
@@ -5003,28 +5034,25 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
         }
 
         function navigateProfaDd(idx, dir) {
-            const dd = document.getElementById('profaDd_' + idx);
-            if (!dd || dd.style.display !== 'block') {
-                filterProfaSearch(idx, '');
-                return;
+            // Get full list (open or closed)
+            const TOP8 = ['Ghost Sentinel','Storm Screamer (SH)','Archmage','Dominator (Over)','Cardinal (BP)','Sword Muse (SwM)','Spectral Dancer (BD)','Hierophant (PP)'];
+            let list = window['_ddItems_' + idx];
+            if (!list || !list.length) {
+                // Build from SEARCH_POPULARITY
+                list = (typeof SEARCH_POPULARITY !== 'undefined' ? SEARCH_POPULARITY : Object.keys(PROFA_NAMES))
+                    .filter(p => !TOP8.includes(p));
+                window['_ddItems_' + idx] = list;
             }
-            const items = dd.querySelectorAll('.pfa-dd-item');
-            if (!items.length) return;
-            // Find current highlighted
-            let cur = -1;
-            items.forEach((el, i) => { if (el.style.background) cur = i; });
-            const next = Math.max(0, Math.min(items.length - 1, cur + dir));
-            items.forEach(el => el.style.background = '');
-            items[next].style.background = '#6366f133';
-            items[next].scrollIntoView({ block: 'nearest' });
-            // Preview this profa
-            const profa = items[next].dataset.profa;
-            if (profa) {
-                pendingProfas[idx] = profa;
-                const inp = document.getElementById('profaSearch_' + idx);
-                if (inp) inp.value = profa;
-                const btn = document.getElementById('profaConfirmBtn_' + idx);
-                if (btn) btn.style.opacity = '1';
+            if (!list.length) return;
+            const cur = list.indexOf(pendingProfas[idx]);
+            const next = Math.max(0, Math.min(list.length - 1, cur + dir));
+            previewProfa(idx, list[next]);
+            // Also highlight in dropdown if open
+            const dd = document.getElementById('profaDd_' + idx);
+            if (dd && dd.style.display === 'block') {
+                const items = dd.querySelectorAll('.pfa-dd-item');
+                items.forEach((el, i) => el.style.background = i === next ? '#6366f133' : '');
+                items[next] && items[next].scrollIntoView({ block: 'nearest' });
             }
         }
 
@@ -5068,7 +5096,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             }) : sorted;
             if (!filtered.length) { dd.style.display = 'none'; return; }
             // Исключаем из списка те 8 проф которые уже есть кнопками
-            const TOP8_EXCL = ['Ghost Sentinel','Storm Screamer (SH)','Archmage','Doomcryer (WC)','Cardinal (BP)','Sword Muse (SwM)','Spectral Dancer (BD)','Hierophant (PP)'];
+            const TOP8_EXCL = ['Ghost Sentinel','Storm Screamer (SH)','Archmage','Dominator (Over)','Cardinal (BP)','Sword Muse (SwM)','Spectral Dancer (BD)','Hierophant (PP)'];
             const SEARCH_POPULARITY = ["Moonlight Sentinel", "Sagittarius", "Titan (Destro)", "АВ/ПВ", "Shillien Templar (SK)", "Judicator", "Trickster", "Eva's Saint (EE)", "Shillien Saint (SE)", "Duelist (Glad)", "Soultaker (Necro)", "Hell Knight (DA)", "Phoenix Knight (Paladin)", "Soulhound", "Eva's Templar (TK)", "Doombringer", "Adventurer", "Spectral Master (Shadow)", "Arcana Lord (Cat)", "Elemental Master (Pony)", "Mystic Muse (MM)", "Ghost Hunter", "Wind Rider", "Dreadnought (Warlord)", "Fortune Seeker (Bounty Hunter)", "Maestro (Warsmith)", "Grand Khavatari (Tyrant)"];
             // Фильтруем и сортируем по популярности
             const filteredNoDups = (q
