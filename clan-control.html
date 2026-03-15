@@ -3209,8 +3209,9 @@ function resolveClass2ToClass3(n) {
                                 allPlayers[key].deaths   = Math.max(allPlayers[key].deaths   || 0, p.deaths   || 0);
                                 allPlayers[key].pvp_dmg  = Math.max(allPlayers[key].pvp_dmg  || 0, p.pvp_dmg  || 0);
                                 allPlayers[key].pve_dmg  = Math.max(allPlayers[key].pve_dmg  || 0, p.pve_dmg  || 0);
+                                if (!allPlayers[key].class2 && p.class2) allPlayers[key].class2 = p.class2;
                             } else {
-                                allPlayers[key] = { name: p.name, kills: p.kills||0, deaths: p.deaths||0, pvp_dmg: p.pvp_dmg||0, pve_dmg: p.pve_dmg||0 };
+                                allPlayers[key] = { name: p.name, kills: p.kills||0, deaths: p.deaths||0, pvp_dmg: p.pvp_dmg||0, pve_dmg: p.pve_dmg||0, class2: p.class2||null };
                             }
                         });
                     }
@@ -3370,7 +3371,12 @@ function resolveClass2ToClass3(n) {
                     // Проверяем конфликт профы
                     if (detectedProfa && detectedProfa !== '—') {
                         const currentProfas = existing.profas || (existing.profa && existing.profa !== '—' ? [existing.profa] : []);
-                        if (!currentProfas.includes(detectedProfa)) {
+                        if (currentProfas.length === 0 || existing.profa === '—') {
+                            // Профа не назначена — ставим автоматически
+                            existing.profa = detectedProfa;
+                            existing.profas = [detectedProfa];
+                        } else if (!currentProfas.includes(detectedProfa)) {
+                            // Профа уже есть и отличается — спрашиваем
                             profaConflicts.push({ player: existing, detectedProfa, currentProfas });
                         }
                     }
