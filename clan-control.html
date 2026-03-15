@@ -4908,11 +4908,14 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                         '<span style="font-size:11px;color:#475569;margin-left:auto">⚔️ ' + kills + ' киллов</span>' +
                     '</div>' +
                     '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">' + btnHtml + '</div>' +
-                    '<div style="position:relative">' +
+                    '<div style="position:relative;display:flex;gap:6px;align-items:center">' +
                         '<input id="' + searchId + '" type="text" placeholder="Поиск профы..." autocomplete="off" ' +
                         'oninput="filterProfaSearch(' + idx + ',this.value)" ' +
                         'onfocus="toggleProfaDd(' + idx + ',this)" ' +
-                        'style="width:100%;background:#12171f;border:1px solid #2d3748;border-radius:7px;padding:5px 10px;color:#e2e8f0;font-size:12px;outline:none;box-sizing:border-box">' +
+                        'data-pidx="' + idx + '" onkeydown="handleProfaKey(event,this)" ' +
+                        'style="flex:1;background:#12171f;border:1px solid #2d3748;border-radius:7px;padding:5px 10px;color:#e2e8f0;font-size:12px;outline:none;box-sizing:border-box">' +
+                        '<button id="' + "profaConfirmBtn_" + idx + '" onmousedown="event.preventDefault();confirmProfa(' + idx + ')" ' +
+                        'style="background:#22c55e;border:none;border-radius:7px;padding:5px 10px;color:#000;font-weight:700;font-size:13px;cursor:pointer;opacity:0.4;transition:opacity .2s;flex-shrink:0">✓</button>' +
                         '<div id="' + ddId + '" style="display:none;position:absolute;bottom:100%;left:0;right:0;background:#1a1f29;border:1px solid #6366f1;border-radius:8px;max-height:150px;overflow-y:auto;z-index:10;margin-bottom:2px"></div>' +
                     '</div>' +
                     (selected ? '<div style="margin-top:6px;font-size:11px;color:#22c55e">✓ Выбрано: ' + (PROFA_NAMES[selected]||selected) + '</div>' : '') +
@@ -4920,12 +4923,34 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             }).join('');
         }
 
+        const pendingProfas = {}; // idx -> profa (предварительный выбор)
+
+        function previewProfa(idx, profa) {
+            // Предварительный выбор — подставляет в поле, список остаётся
+            pendingProfas[idx] = profa;
+            const inp = document.getElementById('profaSearch_' + idx);
+            if (inp) inp.value = profa;
+            // Подсвечиваем активный пункт
+            const dd = document.getElementById('profaDd_' + idx);
+            if (dd) dd.querySelectorAll('.pfa-dd-item').forEach(el => {
+                el.style.background = el.dataset.profa === profa ? '#6366f133' : '';
+            });
+            // Обновить кнопку галочки
+            const btn = document.getElementById('profaConfirmBtn_' + idx);
+            if (btn) btn.style.opacity = '1';
+        }
+
+        function confirmProfa(idx) {
+            const profa = pendingProfas[idx];
+            if (!profa) return;
+            selectProfa(idx, profa);
+        }
+
         function selectProfa(idx, profa) {
             const player = profaAssignQueue[idx].player;
             profaAssignSelected[player.id] = profa;
-            // Close dropdown
+            delete pendingProfas[idx];
             document.querySelectorAll('[id^="profaDd_"]').forEach(dd => dd.style.display = 'none');
-            // Clear search input
             const inp = document.getElementById('profaSearch_' + idx);
             if (inp) { inp.value = ''; inp.blur(); }
             renderProfaAssignList();
@@ -4936,9 +4961,50 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             if (profa) selectProfa(queueIdx, profa);
         }
 
+        function handleProfaKey(event, inp) {
+            const idx = parseInt(inp.dataset.pidx);
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                confirmProfa(idx);
+            } else if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                navigateProfaDd(idx, 1);
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                navigateProfaDd(idx, -1);
+            }
+        }
+
+        function navigateProfaDd(idx, dir) {
+            const dd = document.getElementById('profaDd_' + idx);
+            if (!dd || dd.style.display !== 'block') {
+                filterProfaSearch(idx, '');
+                return;
+            }
+            const items = dd.querySelectorAll('.pfa-dd-item');
+            if (!items.length) return;
+            // Find current highlighted
+            let cur = -1;
+            items.forEach((el, i) => { if (el.style.background) cur = i; });
+            const next = Math.max(0, Math.min(items.length - 1, cur + dir));
+            items.forEach(el => el.style.background = '');
+            items[next].style.background = '#6366f133';
+            items[next].scrollIntoView({ block: 'nearest' });
+            // Preview this profa
+            const profa = items[next].dataset.profa;
+            if (profa) {
+                pendingProfas[idx] = profa;
+                const inp = document.getElementById('profaSearch_' + idx);
+                if (inp) inp.value = profa;
+                const btn = document.getElementById('profaConfirmBtn_' + idx);
+                if (btn) btn.style.opacity = '1';
+            }
+        }
+
         function toggleProfaDd(idx, inputEl) {
             const dd = document.getElementById('profaDd_' + idx);
-            if (dd && dd.style.display !== 'none') {
+            if (!dd) return;
+            if (dd.style.display === 'block') {
                 dd.style.display = 'none';
                 inputEl.blur();
             } else {
@@ -4995,7 +5061,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     const i3 = src3 ? '<img src="' + src3 + '" style="width:22px;height:22px;border-radius:50%;flex-shrink:0">' : '';
                     itemImg = i2 + i3;
                 }
-                return '<div onmousedown="event.preventDefault();selectProfaByIdx(' + idx + ',' + pfI + ')" style="display:flex;align-items:center;gap:6px;padding:7px 12px;cursor:pointer;font-size:12px;color:#e2e8f0;border-bottom:1px solid #1e2530" class="pfa-dd-item">' +
+                return '<div onmousedown="event.preventDefault();previewProfa(' + idx + ',\"' + pf.replace(/\"/g,'&quot;') + '\")" data-profa="' + pf.replace(/"/g,'&quot;') + '" style="display:flex;align-items:center;gap:6px;padding:7px 12px;cursor:pointer;font-size:12px;color:#e2e8f0;border-bottom:1px solid #1e2530" class="pfa-dd-item">' +
                     itemImg + '<span>' + pf + '</span><span style="color:#64748b;margin-left:auto">(' + short + ')</span></div>';
             }).join('');
             dd.style.display = filteredNoDups.length ? 'block' : 'none';
