@@ -3309,11 +3309,38 @@ function resolveClass2ToClass3(n) {
                 const badgeBg = isNew ? '#22c55e' : '#475569';
                 const badgeColor = isNew ? '#000' : '#fff';
                 const badgeText = isNew ? 'NEW' : pacLabel;
+
+                // Иконка 2й профы + кнопка/список выбора 3й
+                const class2 = p.class2 || null;
+                const class2src = class2 ? getClass2Icon(class2) : null;
+                const class3options = class2 ? resolveClass2ToClass3(class2) : [];
+                const currentProfa = inRoster ? (inRoster.profa || '—') : (p.profa || '—');
+
+                const class2Html = class2src
+                    ? `<img src="${class2src}" title="${class2}" style="width:18px;height:18px;border-radius:50%;border:1px solid #2d3748;flex-shrink:0">`
+                    : '';
+
+                let profaHtml = '';
+                if (currentProfa && currentProfa !== '—') {
+                    profaHtml = profaIconHtml(currentProfa, 15);
+                } else if (class3options.length === 1) {
+                    const shortName = PROFA_NAMES[class3options[0]] || class3options[0];
+                    profaHtml = `<span onclick="dayLastParsed[${i}].profa='${class3options[0].replace(/'/g,"\'")}';renderDayAnalyzedPlayers(dayLastParsed)" style="font-size:10px;color:#22c55e;cursor:pointer;background:#22c55e11;border:1px solid #22c55e33;border-radius:4px;padding:1px 6px">+ ${shortName}</span>`;
+                } else if (class3options.length > 1) {
+                    const opts = class3options.map(c3 => {
+                        const sn = PROFA_NAMES[c3] || c3;
+                        return `<option value="${c3}">${c3} (${sn})</option>`;
+                    }).join('');
+                    profaHtml = `<select onchange="dayLastParsed[${i}].profa=this.value;renderDayAnalyzedPlayers(dayLastParsed)" style="background:#0b0e14;border:1px solid #6366f1;border-radius:4px;color:#a5b4fc;font-size:10px;padding:1px 4px;cursor:pointer;max-width:110px"><option value="">Выбери...</option>${opts}</select>`;
+                }
+
                 return `<div style="background:#1a1f29;border-radius:8px;padding:8px 10px;border:1px solid #1e2530">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-                        <div style="display:flex;align-items:center;gap:6px">
+                        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
                             <span style="font-size:9px;background:${badgeBg};color:${badgeColor};font-weight:900;padding:1px 5px;border-radius:3px;text-transform:uppercase">${badgeText}</span>
-                            <input value="${p.name}" oninput="dayLastParsed[${i}]._rawName=dayLastParsed[${i}]._rawName||dayLastParsed[${i}].name; dayLastParsed[${i}].name=this.value" onblur="saveAlias(dayLastParsed[${i}]._rawName||dayLastParsed[${i}].name, this.value)" onclick="let v=this.value,l=v.length;this.setSelectionRange(l,l)" style="background:#0b0e14;border:1px solid #2d3748;border-radius:6px;padding:3px 8px;color:white;font-weight:700;font-size:13px;width:140px">
+                            ${class2Html}
+                            <input value="${p.name}" oninput="dayLastParsed[${i}]._rawName=dayLastParsed[${i}]._rawName||dayLastParsed[${i}].name; dayLastParsed[${i}].name=this.value" onblur="saveAlias(dayLastParsed[${i}]._rawName||dayLastParsed[${i}].name, this.value)" onclick="let v=this.value,l=v.length;this.setSelectionRange(l,l)" style="background:#0b0e14;border:1px solid #2d3748;border-radius:6px;padding:3px 8px;color:white;font-weight:700;font-size:13px;width:130px">
+                            ${profaHtml}
                         </div>
                         <button onclick="dayLastParsed.splice(${i},1);renderDayAnalyzedPlayers(dayLastParsed)" style="color:#64748b;background:none;border:none;cursor:pointer;font-size:12px">✕</button>
                     </div>
