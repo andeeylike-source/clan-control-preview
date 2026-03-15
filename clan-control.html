@@ -4946,6 +4946,18 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
 
         const pendingProfas = {}; // idx -> profa (предварительный выбор)
 
+        function selectProfaByItemIdxDirect(queueIdx, itemIdx) {
+            const items = window['_ddItems_' + queueIdx];
+            if (!items || itemIdx >= items.length) return;
+            const profa = items[itemIdx];
+            // Show in input with icon but DON'T confirm yet - just preview
+            previewProfa(queueIdx, profa);
+            // Close dropdown
+            const dd = document.getElementById('profaDd_' + queueIdx);
+            if (dd) dd.style.display = 'none';
+            _ddOpenIdx = null;
+        }
+
         function previewProfaByItemIdx(queueIdx, itemIdx) {
             const items = window['_ddItems_' + queueIdx];
             if (!items || itemIdx >= items.length) return;
@@ -5062,17 +5074,21 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
         function openProfaDdOnly(idx, inputEl) {
             const dd = document.getElementById('profaDd_' + idx);
             if (!dd) return;
-            if (dd.style.display === 'block') {
+            // Toggle: if already open -> close
+            if (dd.style.display === 'block' && _ddOpenIdx === idx) {
                 dd.style.display = 'none';
                 _ddOpenIdx = null;
                 return;
             }
+            // Close other dropdowns
             if (_ddOpenIdx !== null && _ddOpenIdx !== idx) {
                 const other = document.getElementById('profaDd_' + _ddOpenIdx);
                 if (other) other.style.display = 'none';
             }
             _ddOpenIdx = idx;
-            filterProfaSearch(idx, inputEl.value);
+            // Show full list (clear search)
+            inputEl.value = pendingProfas[idx] || '';
+            filterProfaSearch(idx, '');
         }
 
         function toggleProfaDd(idx, inputEl) {
@@ -5128,7 +5144,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     const i3 = src3 ? '<img src="' + src3 + '" style="width:22px;height:22px;border-radius:50%;flex-shrink:0">' : '';
                     itemImg = i2 + i3;
                 }
-                return '<div onmousedown="_selectingItem=true;event.preventDefault();previewProfaByItemIdx(' + idx + ',' + itemI + ')" style="display:flex;align-items:center;gap:6px;padding:7px 12px;cursor:pointer;font-size:12px;color:#e2e8f0;border-bottom:1px solid #1e2530" class="pfa-dd-item">' +
+                return '<div onmousedown="_selectingItem=true;event.preventDefault();selectProfaByItemIdxDirect(' + idx + ',' + itemI + ')" style="display:flex;align-items:center;gap:6px;padding:7px 12px;cursor:pointer;font-size:12px;color:#e2e8f0;border-bottom:1px solid #1e2530" class="pfa-dd-item">' +
                     itemImg + '<span>' + pf + '</span><span style="color:#64748b;margin-left:auto">(' + short + ')</span></div>';
             }).join('');
             dd.style.display = filteredNoDups.length ? 'block' : 'none';
@@ -5161,7 +5177,8 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
         // Закрыть дропдаун при клике вне
         document.addEventListener('click', function(e) {
             if (_selectingItem) { _selectingItem = false; return; }
-            if (!e.target.closest('[id^="profaDd_"]') && !e.target.closest('#profaAssignList')) {
+            // Close if clicking outside any dropdown and outside input
+            if (!e.target.closest('[id^="profaDd_"]') && !e.target.closest('#profaAssignList input')) {
                 document.querySelectorAll('[id^="profaDd_"]').forEach(dd => dd.style.display = 'none');
                 _ddOpenIdx = null;
             }
