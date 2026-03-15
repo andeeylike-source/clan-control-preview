@@ -4772,11 +4772,13 @@ function getClass2IconByClass3(class3) { return CLASS3_TO_CLASS2_ICON[class3] ||
                     const border = isSelected ? '#6366f1' : '#2d3748';
                     const color = isSelected ? '#a5b4fc' : '#94a3b8';
                     const pfIdx = Object.keys(PROFA_NAMES).indexOf(pf);
-                    // Иконка 2й профы (маленькая, левее) + иконка 3й (основная)
-                    const img2 = src2 ? '<img src="' + src2 + '" title="2я профа" style="width:13px;height:13px;border-radius:50%;flex-shrink:0;opacity:0.7;margin-right:-4px">' : '';
-                    const img3 = src3 ? '<img src="' + src3 + '" title="' + pf + '" style="width:20px;height:20px;border-radius:50%;flex-shrink:0">' : '';
-                    const check = isSelected ? '<span style="font-size:10px">✓</span>' : '';
-                    return '<button onclick="selectProfaByIdx(' + idx + ',' + pfIdx + ')" title="' + pf + '" style="display:inline-flex;align-items:center;gap:4px;background:' + bg + ';border:1px solid ' + border + ';border-radius:8px;padding:5px 9px;font-size:11px;cursor:pointer;color:' + color + ';font-weight:600;transition:all .15s">' + img2 + img3 + short + check + '</button>';
+                    // Иконки одинакового размера: 2я (меньше яркость) → стрелка → 3я
+                    const img2 = src2 ? '<img src="' + src2 + '" title="2я профа" style="width:22px;height:22px;border-radius:50%;flex-shrink:0;opacity:0.65">' : '';
+                    const img3 = src3 ? '<img src="' + src3 + '" title="' + pf + '" style="width:22px;height:22px;border-radius:50%;flex-shrink:0">' : '';
+                    const check = isSelected ? ' ✓' : '';
+                    const tooltip = ' title="' + pf + '"';
+                    // img2 слева, текст по центру, img3 справа
+                    return '<button onclick="selectProfaByIdx(' + idx + ',' + pfIdx + ')"' + tooltip + ' style="display:inline-flex;align-items:center;gap:4px;background:' + bg + ';border:1px solid ' + border + ';border-radius:8px;padding:5px 8px;font-size:11px;cursor:pointer;color:' + color + ';font-weight:600;transition:all .15s">' + img2 + '<span>' + short + check + '</span>' + img3 + '</button>';
                 }).join('');
 
                 // Поиск по остальным
