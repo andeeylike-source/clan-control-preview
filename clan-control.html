@@ -726,6 +726,22 @@
                 <button onclick="applyDayParsedStats()" style="background:#22c55e;color:white;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;width:100%;margin-top:8px">✅ Применить в ростер</button>
             </div>
 
+            <!-- СОСТАВ КЛАНА НА ЭТОТ ДЕНЬ -->
+            <div class="section-label" style="margin-top:16px">👥 Состав клана на этот день</div>
+            <div id="dayClanRosterStatus" style="display:none;font-size:11px;padding:6px 10px;border-radius:8px;margin-bottom:6px"></div>
+            <label for="dayClanRosterUpload" id="dayClanRosterDropZone" style="display:block;border:2px dashed #2d3748;border-radius:12px;padding:12px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:6px" onmouseover="this.style.borderColor='#22c55e'" onmouseout="this.style.borderColor='#2d3748'">
+                <div id="dayClanRosterDropContent">
+                    <div style="font-size:18px;margin-bottom:3px">👥</div>
+                    <div style="font-size:11px;color:#64748b">Скрин окна гильдии (список участников)</div>
+                    <div style="font-size:10px;color:#475569;margin-top:2px">AI прочитает всех ников — зафиксирует состав на эту дату</div>
+                </div>
+                <input type="file" id="dayClanRosterUpload" accept="image/*" style="display:none" onchange="handleClanRosterScreenshot(event)">
+            </label>
+            <div id="dayClanRosterAnalyzeBlock" style="display:none;margin-bottom:6px">
+                <button onclick="analyzeClanRosterScreenshot()" id="clanRosterAnalyzeBtn" style="background:#22c55e;color:#000;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;width:100%">🔍 Читать состав клана (AI)</button>
+            </div>
+            <div id="dayClanRosterResult" style="display:none;margin-bottom:6px;font-size:11px;color:#64748b;padding:8px 12px;background:#0b0e14;border-radius:8px;border:1px solid #1e2530"></div>
+
             <button onclick="saveDayModal()" class="btn-primary w-full mt-1" style="font-size:14px;padding:12px;font-weight:700">💾 Сохранить</button>
         </div>
     </div>
@@ -963,7 +979,9 @@
                     // Значок скриншотов
                     const shots = dayScreenshots[dateStr];
                     if (shots && shots.length > 0) {
-                        kmBadge = `<div class="km-stat-badge">📸 ${shots.length}</div>`;
+                        kmBadge = `<div class="km-stat-badge">📸 ${shots.length}${clanRosterByDate[dateStr] ? ' · 👥' + clanRosterByDate[dateStr].length : ''}</div>`;
+                    } else if (clanRosterByDate[dateStr]) {
+                        kmBadge = `<div class="km-stat-badge">👥 ${clanRosterByDate[dateStr].length}</div>`;
                     }
                 }
 
@@ -1002,6 +1020,25 @@
             // Инициализируем превью скриншотов для этого дня
             renderDayScreenshotPreviews(dateStr);
 
+            // Сбрасываем буфер скрина состава
+            dayClanRosterFile = null;
+            document.getElementById('dayClanRosterAnalyzeBlock').style.display = 'none';
+            document.getElementById('dayClanRosterResult').style.display = 'none';
+            document.getElementById('dayClanRosterDropContent').innerHTML = `
+                <div style="font-size:18px;margin-bottom:3px">👥</div>
+                <div style="font-size:11px;color:#64748b">Скрин окна гильдии (список участников)</div>
+                <div style="font-size:10px;color:#475569;margin-top:2px">AI прочитает всех ников — зафиксирует состав на эту дату</div>`;
+            // Показываем уже сохранённый состав если есть
+            const statusEl = document.getElementById('dayClanRosterStatus');
+            const savedRoster = clanRosterByDate[dateStr];
+            if (savedRoster && savedRoster.length > 0) {
+                statusEl.style.display = 'block';
+                statusEl.style.cssText = 'display:block;font-size:11px;padding:6px 10px;border-radius:8px;background:#14532d22;border:1px solid #22c55e44;color:#4ade80;margin-bottom:6px';
+                statusEl.innerHTML = `✅ Состав зафиксирован: <b style="color:#e2e8f0">${savedRoster.length}</b> участников · <button onclick="deleteClanRosterForDay('${dateStr}')" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:10px;padding:0;margin-left:8px">✕ Удалить</button>`;
+            } else {
+                statusEl.style.display = 'none';
+            }
+
             // Копируем текущее состояние в pending-буферы для этого дня
             pendingStatuses = Object.assign({}, eventStatuses);
             pendingOverrides = Object.assign({}, eventOverrides);
@@ -1010,7 +1047,12 @@
             document.getElementById('dayModal').style.display = 'flex';
         }
 
-        function renderDayEventsList(dateStr) {
+        function deleteClanRosterForDay(dateStr) {
+            delete clanRosterByDate[dateStr];
+            saveToStorage();
+            document.getElementById('dayClanRosterStatus').style.display = 'none';
+            if (document.getElementById('page-stats').classList.contains('active')) renderCcAbsenceReport();
+        }
             const container = document.getElementById('dayEventsList');
             const events = getAllEventsForDate(dateStr);
 
@@ -1382,12 +1424,16 @@
         function renderPProfaList() {
             const el = document.getElementById('pProfaList');
             if (!el) return;
-            el.innerHTML = pProfaCurrent.map((pf, i) => `
-                <span style="display:inline-flex;align-items:center;gap:5px;background:#1e2530;border:1px solid #2d3748;border-radius:6px;padding:3px 10px;font-size:11px;color:#e2e8f0">
+            el.innerHTML = pProfaCurrent.map((pf, i) => {
+                const iconUrl = PROFA_ICONS[pf];
+                const iconHtml = iconUrl ? `<img src="${iconUrl}" style="width:20px;height:20px;border-radius:3px;object-fit:cover" onerror="this.style.display='none'">` : '';
+                return `<span style="display:inline-flex;align-items:center;gap:5px;background:#1e2530;border:1px solid #2d3748;border-radius:6px;padding:3px 10px;font-size:11px;color:#e2e8f0">
+                    ${iconHtml}
                     ${i === 0 ? '<span style="font-size:8px;background:#6366f1;color:#fff;padding:1px 4px;border-radius:3px;font-weight:700">ОСНОВНАЯ</span>' : ''}
                     ${pf}
-                    <button onclick="removeProfaFromList(${i})" style="background:none;border:none;color:#475569;cursor:pointer;font-size:12px;padding:0;line-height:1" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#475569'">×</button>
-                </span>`).join('');
+                    <button onclick="removeProfaFromList(${i})" style="background:none;border:none;color:#475569;cursor:pointer;font-size:12px;padding:0;line-height:1;margin-left:2px" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#475569'">×</button>
+                </span>`;
+            }).join('');
         }
 
         function addProfaFromSelect(sel) {
@@ -2136,10 +2182,22 @@
             const fmtDate = ds => { const [y,m,d] = ds.split('-'); return `${d}.${m}`; };
 
             // Строим для каждого игрока историю присутствия по датам
-            const playerHistory = {}; // normKey → [true/false per date]
-            roster.forEach(p => {
-                const key = normalizeNick(p.name);
-                playerHistory[key] = { name: p.name, pac: p.pac, rank: p.rank, dates: [] };
+            // Используем clanRosterByDate если есть — иначе текущий ростер
+            const playerHistory = {};
+
+            allDates.forEach(d => {
+                const clanOnDay = clanRosterByDate[d]; // массив ников или undefined
+                const membersOnDay = clanOnDay
+                    ? clanOnDay.map(n => resolveAlias(n))
+                    : roster.map(r => r.name);
+
+                membersOnDay.forEach(name => {
+                    const key = normalizeNick(name);
+                    if (!playerHistory[key]) {
+                        const rp = roster.find(r => normalizeNick(r.name) === key);
+                        playerHistory[key] = { name: rp ? rp.name : name, pac: rp ? rp.pac : 'СОЛО', rank: rp ? rp.rank : 'ИГРОК', dates: [] };
+                    }
+                });
             });
 
             allDates.forEach(d => {
@@ -2672,26 +2730,47 @@
         // ===== ИКОНКИ ПРОФ =====
         const PROFA_ICONS = {
             // Маги
-            'Archmage': '🔵', 'Mystic Muse (MM)': '🔵', 'Storm Screamer (SH)': '⚡',
-            'Soultaker (Necro)': '💀', 'Arcana Lord (Cat)': '🐱', 'Elemental Master (Pony)': '🦄',
-            'Spectral Master (Shadow)': '👤',
+            'Archmage':                  'https://l2elo.com/images/classes/archmage.png',
+            'Mystic Muse (MM)':          'https://l2elo.com/images/classes/mystic_muse.png',
+            'Storm Screamer (SH)':       'https://l2elo.com/images/classes/storm_screamer.png',
+            'Soultaker (Necro)':         'https://l2elo.com/images/classes/soultaker.png',
+            'Arcana Lord (Cat)':         'https://l2elo.com/images/classes/arcana_lord.png',
+            'Elemental Master (Pony)':   'https://l2elo.com/images/classes/elemental_master.png',
+            'Spectral Master (Shadow)':  'https://l2elo.com/images/classes/spectral_master.png',
             // Хилеры/Баферы
-            'Cardinal (BP)': '✝️', "Eva's Saint (EE)": '💚', 'Shillien Saint (SE)': '🖤',
-            'Dominator (Over)': '👑', 'Doomcryer (WC)': '📯', 'Hierophant (PP)': '🌟',
-            'Sword Muse (SwM)': '🎵', 'Spectral Dancer (BD)': '💃',
+            'Cardinal (BP)':             'https://l2elo.com/images/classes/cardinal.png',
+            "Eva's Saint (EE)":          'https://l2elo.com/images/classes/evas_saint.png',
+            'Shillien Saint (SE)':       'https://l2elo.com/images/classes/shillien_saint.png',
+            'Dominator (Over)':          'https://l2elo.com/images/classes/dominator.png',
+            'Doomcryer (WC)':            'https://l2elo.com/images/classes/doomcryer.png',
+            'Hierophant (PP)':           'https://l2elo.com/images/classes/hierophant.png',
+            'Sword Muse (SwM)':          'https://l2elo.com/images/classes/sword_muse.png',
+            'Spectral Dancer (BD)':      'https://l2elo.com/images/classes/spectral_dancer.png',
             // Лучники
-            'Sagittarius': '🏹', 'Moonlight Sentinel': '🌙', 'Ghost Sentinel': '👻',
+            'Sagittarius':               'https://l2elo.com/images/classes/sagittarius.png',
+            'Moonlight Sentinel':        'https://l2elo.com/images/classes/moonlight_sentinel.png',
+            'Ghost Sentinel':            'https://l2elo.com/images/classes/ghost_sentinel.png',
             // Кинжалы
-            'Adventurer': '🗡️', 'Wind Rider': '💨', 'Ghost Hunter': '🔪',
+            'Adventurer':                'https://l2elo.com/images/classes/adventurer.png',
+            'Wind Rider':                'https://l2elo.com/images/classes/wind_rider.png',
+            'Ghost Hunter':              'https://l2elo.com/images/classes/ghost_hunter.png',
             // Танки
-            'Phoenix Knight (Paladin)': '🛡️', 'Hell Knight (DA)': '😈',
-            "Eva's Templar (TK)": '🛡️', 'Shillien Templar (SK)': '⚫',
+            'Phoenix Knight (Paladin)':  'https://l2elo.com/images/classes/phoenix_knight.png',
+            'Hell Knight (DA)':          'https://l2elo.com/images/classes/hell_knight.png',
+            "Eva's Templar (TK)":        'https://l2elo.com/images/classes/evas_templar.png',
+            'Shillien Templar (SK)':     'https://l2elo.com/images/classes/shillien_templar.png',
             // Воины
-            'Duelist (Glad)': '⚔️', 'Dreadnought (Warlord)': '🔨', 'Grand Khavatari (Tyrant)': '👊',
-            'Titan (Destro)': '💪', 'Fortune Seeker (Bounty)': '💰', 'Maestro (Warsmith)': '🔧',
+            'Duelist (Glad)':            'https://l2elo.com/images/classes/duelist.png',
+            'Dreadnought (Warlord)':     'https://l2elo.com/images/classes/dreadnought.png',
+            'Grand Khavatari (Tyrant)':  'https://l2elo.com/images/classes/grand_khavatari.png',
+            'Titan (Destro)':            'https://l2elo.com/images/classes/titan.png',
+            'Fortune Seeker (Bounty)':   'https://l2elo.com/images/classes/fortune_seeker.png',
+            'Maestro (Warsmith)':        'https://l2elo.com/images/classes/maestro.png',
         };
         function getProfaIcon(profa) {
-            return PROFA_ICONS[profa] ? `<span style="font-size:12px">${PROFA_ICONS[profa]}</span>` : '';
+            const url = PROFA_ICONS[profa];
+            if (!url) return '';
+            return `<img src="${url}" style="width:20px;height:20px;border-radius:3px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`;
         }
 
         function normalizeNick(name) {
@@ -2893,7 +2972,7 @@
 ОКНО ГРУППЫ — определяй строго по содержимому:
 - Есть строка "Лидер: ИМЯ"
 - Есть строка "Состав: N чел. / N рядом"
-- Есть таблица "Член группы" с колонками: имя | иконка | × | 💀 | PvP урон | PvE урон
+- Есть таблица "Член группы" с колонками: имя | иконка класса | × | 💀 | PvP урон | PvE урон
 - Заголовок окна = название пака (например "NKIZIMO", "ВИЗАРД" и т.д.)
 - НА ФОНЕ ИГРЫ могут быть случайные тексты — статусы персонажей, чат, сообщения — ПОЛНОСТЬЮ ИГНОРИРУЙ ИХ
 - pack_name берётся ТОЛЬКО из заголовка окна "Член группы", не из фонового текста
@@ -2909,14 +2988,31 @@
 ИЗВЛЕКИ всех участников из окна ГРУППЫ (таблица "Член группы").${isFirst ? `
 Также прочитай из окна "Командный канал": общее число игроков и всех лидеров с их суммарной статой группы.` : ''}
 
+ИКОНКИ КЛАССОВ — в колонке рядом с именем есть маленькая иконка класса персонажа. Определи класс по иконке:
+- Синяя сфера/магия = Archmage, Mystic Muse, Storm Screamer (маги)
+- Тёмная магия/череп = Soultaker
+- Огненный/кошка = Arcana Lord
+- Зелёный/природа = Elemental Master
+- Тень/призрак = Spectral Master
+- Белый крест/лечение = Cardinal (BP), Eva's Saint (EE), Shillien Saint (SE)
+- Корона/баф = Dominator, Hierophant, Doomcryer
+- Музыкальная нота/меч = Sword Muse, Spectral Dancer
+- Лук/стрела = Sagittarius, Moonlight Sentinel, Ghost Sentinel
+- Кинжал/тень = Adventurer, Wind Rider, Ghost Hunter
+- Щит/золото = Phoenix Knight, Hell Knight, Eva's Templar, Shillien Templar
+- Меч/воин = Duelist, Dreadnought, Titan, Grand Khavatari
+- Гном/золото = Fortune Seeker, Maestro
+Если не можешь определить класс точно — напиши null.
+
 Верни ТОЛЬКО JSON без markdown:
-{"pack_name":"ИМЯ ПАКА","pack_leader":"ИМЯ ЛИДЕРА","total_count":9,${isFirst ? '"raid_total":67,"command_channel":[{"leader":"ВИЗАРД","members":9,"kills":3,"deaths":60,"pvp_dmg":262,"pve_dmg":103}],' : ''}"players":[{"name":"ВИЗАРД","kills":0,"deaths":4,"pvp_dmg":3,"pve_dmg":0},{"name":"Ник","kills":0,"deaths":4,"pvp_dmg":3,"pve_dmg":0}]}
+{"pack_name":"ИМЯ ПАКА","pack_leader":"ИМЯ ЛИДЕРА","total_count":9,${isFirst ? '"raid_total":67,"command_channel":[{"leader":"ВИЗАРД","members":9,"kills":3,"deaths":60,"pvp_dmg":262,"pve_dmg":103}],' : ''}"players":[{"name":"ВИЗАРД","class":"Cardinal (BP)","kills":0,"deaths":4,"pvp_dmg":3,"pve_dmg":0},{"name":"Ник","class":null,"kills":0,"deaths":4,"pvp_dmg":3,"pve_dmg":0}]}
 
 Требования:
 - pack_name = заголовок окна ГРУППЫ — это текст В САМОЙ ВЕРХНЕЙ СТРОКЕ окна с таблицей "Член группы". НЕ берёт из фона, чата, статусов персонажей или любого текста вне окна
 - pack_leader = имя из строки "Лидер: ИМЯ" внутри окна ГРУППЫ
 - total_count = число из строки "Состав: N чел." окна ГРУППЫ${isFirst ? '\n- raid_total = число из строки "Состав: N груп. / N чел." окна Командного канала (второе число)\n- command_channel = все строки таблицы Командного канала (суммарная стата группы на каждого лидера)' : ''}
 - players = ВСЕ строки из таблицы "Член группы" включая лидера — берёшь их личную стату прямо из этой таблицы
+- class = название класса на английском точно как в примере выше, или null если не определить
 - Лидер ЕСТЬ в таблице "Член группы" — включи его как обычного участника с его личными цифрами
 - Имена точно как написано (регистр важен)
 - Колонки таблицы "Член группы" слева направо: имя | иконка класса | × (kills) | 💀 (deaths) | PvP урон | PvE урон
@@ -3161,10 +3257,21 @@
                 const badgeBg = isNew ? '#22c55e' : '#475569';
                 const badgeColor = isNew ? '#000' : '#fff';
                 const badgeText = isNew ? 'NEW' : pacLabel;
+                // Иконка класса распознанного AI
+                const classIconUrl = p.class ? PROFA_ICONS[p.class] : null;
+                const classIcon = classIconUrl
+                    ? `<img src="${classIconUrl}" style="width:18px;height:18px;border-radius:3px;object-fit:cover" onerror="this.style.display='none'" title="${p.class}">`
+                    : (p.class ? `<span style="font-size:9px;color:#6366f1;background:#6366f122;padding:1px 5px;border-radius:3px" title="Класс распознан">${p.class.split(' ')[0]}</span>` : '');
+                // Показываем если у игрока обнаружена новая профа
+                const newProfaHint = p._newProfaDetected
+                    ? `<span style="font-size:9px;color:#f59e0b;background:#f59e0b11;padding:1px 5px;border-radius:3px" title="Уже есть: ${(p._existingProfas||[]).join(', ')}">+${p._newProfaDetected.split(' ')[0]}?</span>`
+                    : '';
                 return `<div style="background:#1a1f29;border-radius:8px;padding:8px 10px;border:1px solid #1e2530">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
                         <div style="display:flex;align-items:center;gap:6px">
                             <span style="font-size:9px;background:${badgeBg};color:${badgeColor};font-weight:900;padding:1px 5px;border-radius:3px;text-transform:uppercase">${badgeText}</span>
+                            ${classIcon}
+                            ${newProfaHint}
                             <input value="${p.name}" oninput="dayLastParsed[${i}]._rawName=dayLastParsed[${i}]._rawName||dayLastParsed[${i}].name; dayLastParsed[${i}].name=this.value" onblur="saveAlias(dayLastParsed[${i}]._rawName||dayLastParsed[${i}].name, this.value)" onclick="let v=this.value,l=v.length;this.setSelectionRange(l,l)" style="background:#0b0e14;border:1px solid #2d3748;border-radius:6px;padding:3px 8px;color:white;font-weight:700;font-size:13px;width:140px">
                         </div>
                         <button onclick="dayLastParsed.splice(${i},1);renderDayAnalyzedPlayers(dayLastParsed)" style="color:#64748b;background:none;border:none;cursor:pointer;font-size:12px">✕</button>
@@ -3184,31 +3291,194 @@
         // { [dateStr]: { players: [{name, kills, deaths, pvp_dmg, pve_dmg}], raidTotal, appliedAt } }
         let appliedStatsByDate = {};
 
+        // Состав клана по датам: { [dateStr]: [nickName, ...] }
+        let clanRosterByDate = {};
+
+        // Временный буфер скрина состава клана
+        let dayClanRosterFile = null;
+
+        function handleClanRosterScreenshot(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            dayClanRosterFile = file;
+            const zone = document.getElementById('dayClanRosterDropContent');
+            zone.innerHTML = `<div style="font-size:11px;color:#22c55e;font-weight:700">📎 ${file.name}</div>`;
+            document.getElementById('dayClanRosterAnalyzeBlock').style.display = 'block';
+        }
+
+        async function analyzeClanRosterScreenshot() {
+            if (!dayClanRosterFile) return;
+            const apiKey = getNextApiKey();
+            if (!apiKey) { alert('Нет API ключей'); return; }
+
+            const btn = document.getElementById('clanRosterAnalyzeBtn');
+            btn.disabled = true;
+            btn.innerText = '⏳ Читаю состав...';
+
+            const base64 = await new Promise((res, rej) => {
+                const r = new FileReader();
+                r.onload = () => res(r.result.split(',')[1]);
+                r.onerror = () => rej(new Error('Read failed'));
+                r.readAsDataURL(dayClanRosterFile);
+            });
+            const mediaType = dayClanRosterFile.type || 'image/png';
+
+            const prompt = `Это скрин окна гильдии/клана из игры Lineage 2.
+Прочитай все ники участников клана которые видны на скрине.
+Верни ТОЛЬКО JSON без markdown: {"members":["НИК1","НИК2","НИК3",...]}
+Требования:
+- Включи все видимые ники точно как написано
+- Не включай названия колонок, заголовки, статусы — только ники игроков
+- Если скрин не является окном гильдии — верни {"members":[],"error":"not_guild_window"}`;
+
+            try {
+                const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`,
+                        'HTTP-Referer': 'https://andeeylike-source.github.io/clan-control/',
+                        'X-Title': 'Clan Control'
+                    },
+                    body: JSON.stringify({
+                        model: 'google/gemini-2.0-flash-lite-001',
+                        max_tokens: 2000,
+                        messages: [{ role: 'user', content: [
+                            { type: 'image_url', image_url: { url: `data:${mediaType};base64,${base64}` } },
+                            { type: 'text', text: prompt }
+                        ]}]
+                    })
+                });
+
+                const data = await response.json();
+                const text = (data.choices?.[0]?.message?.content || '').replace(/```json|```/g, '').trim();
+                const parsed = JSON.parse(text);
+
+                if (parsed.error || !parsed.members || parsed.members.length === 0) {
+                    throw new Error('Не удалось прочитать состав — убедись что это скрин окна гильдии');
+                }
+
+                const members = parsed.members;
+                const dateStr = activeDayDate;
+
+                // Сохраняем состав на эту дату
+                clanRosterByDate[dateStr] = members;
+
+                // Синхронизируем с ростером — новых добавляем
+                let newCount = 0;
+                members.forEach(nick => {
+                    const resolved = resolveAlias(nick);
+                    const key = normalizeNick(resolved);
+                    const existing = roster.find(r => normalizeNick(r.name) === key);
+                    if (!existing) {
+                        roster.push({ id: Date.now() + Math.random(), name: resolved, rank: 'ИГРОК', profa: '—', profas: [], pac: 'СОЛО', attendance: 0, isNew: true });
+                        newCount++;
+                    }
+                });
+
+                saveToStorage();
+
+                const resultEl = document.getElementById('dayClanRosterResult');
+                resultEl.style.display = 'block';
+                resultEl.style.color = '#22c55e';
+                resultEl.innerHTML = `✅ Зафиксировано <b style="color:#e2e8f0">${members.length}</b> участников клана на ${dateStr}${newCount > 0 ? ` · <span style="color:#22c55e">+${newCount} новых добавлено в клан</span>` : ''}`;
+
+                const statusEl = document.getElementById('dayClanRosterStatus');
+                statusEl.style.display = 'block';
+                statusEl.style.cssText = 'display:block;font-size:11px;padding:6px 10px;border-radius:8px;background:#14532d22;border:1px solid #22c55e44;color:#4ade80';
+                statusEl.innerText = `👥 Состав клана: ${members.length} чел. зафиксировано`;
+
+                btn.innerText = `✅ Прочитано ${members.length} ников`;
+                document.getElementById('dayClanRosterAnalyzeBlock').style.display = 'none';
+                dayClanRosterFile = null;
+
+                if (document.getElementById('page-stats').classList.contains('active')) renderCcAbsenceReport();
+
+            } catch(e) {
+                btn.disabled = false;
+                btn.innerText = '🔍 Читать состав клана (AI)';
+                const resultEl = document.getElementById('dayClanRosterResult');
+                resultEl.style.display = 'block';
+                resultEl.style.color = '#ef4444';
+                resultEl.innerText = '❌ Ошибка: ' + e.message;
+            }
+        }
+
         function applyDayParsedStats() {
             if (!dayLastParsed.length) return;
             const dateStr = activeDayDate;
 
             // ===== ДОБАВЛЯЕМ НОВЫХ ИГРОКОВ В РОСТЕР (только если нет) =====
             let newCount = 0;
+            let profaAssigned = 0;
             dayLastParsed.forEach(p => {
                 // 1. Сначала резолвим через алиас
                 const resolvedName = resolveAlias(p.name);
                 // 2. Потом ищем по нормализованному ключу
                 const normKey = normalizeNick(resolvedName);
                 const existing = roster.find(r => normalizeNick(r.name) === normKey);
+
+                // Маппинг class из AI → значение profa в системе
+                const CLASS_MAP = {
+                    'Archmage': 'Archmage',
+                    'Mystic Muse': 'Mystic Muse (MM)', 'Mystic Muse (MM)': 'Mystic Muse (MM)',
+                    'Storm Screamer': 'Storm Screamer (SH)', 'Storm Screamer (SH)': 'Storm Screamer (SH)',
+                    'Soultaker': 'Soultaker (Necro)', 'Soultaker (Necro)': 'Soultaker (Necro)',
+                    'Arcana Lord': 'Arcana Lord (Cat)', 'Arcana Lord (Cat)': 'Arcana Lord (Cat)',
+                    'Elemental Master': 'Elemental Master (Pony)', 'Elemental Master (Pony)': 'Elemental Master (Pony)',
+                    'Spectral Master': 'Spectral Master (Shadow)', 'Spectral Master (Shadow)': 'Spectral Master (Shadow)',
+                    'Cardinal': 'Cardinal (BP)', 'Cardinal (BP)': 'Cardinal (BP)',
+                    "Eva's Saint": "Eva's Saint (EE)", "Eva's Saint (EE)": "Eva's Saint (EE)",
+                    'Shillien Saint': 'Shillien Saint (SE)', 'Shillien Saint (SE)': 'Shillien Saint (SE)',
+                    'Dominator': 'Dominator (Over)', 'Dominator (Over)': 'Dominator (Over)',
+                    'Doomcryer': 'Doomcryer (WC)', 'Doomcryer (WC)': 'Doomcryer (WC)',
+                    'Hierophant': 'Hierophant (PP)', 'Hierophant (PP)': 'Hierophant (PP)',
+                    'Sword Muse': 'Sword Muse (SwM)', 'Sword Muse (SwM)': 'Sword Muse (SwM)',
+                    'Spectral Dancer': 'Spectral Dancer (BD)', 'Spectral Dancer (BD)': 'Spectral Dancer (BD)',
+                    'Sagittarius': 'Sagittarius',
+                    'Moonlight Sentinel': 'Moonlight Sentinel',
+                    'Ghost Sentinel': 'Ghost Sentinel',
+                    'Adventurer': 'Adventurer',
+                    'Wind Rider': 'Wind Rider',
+                    'Ghost Hunter': 'Ghost Hunter',
+                    'Phoenix Knight': 'Phoenix Knight (Paladin)', 'Phoenix Knight (Paladin)': 'Phoenix Knight (Paladin)',
+                    'Hell Knight': 'Hell Knight (DA)', 'Hell Knight (DA)': 'Hell Knight (DA)',
+                    "Eva's Templar": "Eva's Templar (TK)", "Eva's Templar (TK)": "Eva's Templar (TK)",
+                    'Shillien Templar': 'Shillien Templar (SK)', 'Shillien Templar (SK)': 'Shillien Templar (SK)',
+                    'Duelist': 'Duelist (Glad)', 'Duelist (Glad)': 'Duelist (Glad)',
+                    'Dreadnought': 'Dreadnought (Warlord)', 'Dreadnought (Warlord)': 'Dreadnought (Warlord)',
+                    'Grand Khavatari': 'Grand Khavatari (Tyrant)', 'Grand Khavatari (Tyrant)': 'Grand Khavatari (Tyrant)',
+                    'Titan': 'Titan (Destro)', 'Titan (Destro)': 'Titan (Destro)',
+                    'Fortune Seeker': 'Fortune Seeker (Bounty)', 'Fortune Seeker (Bounty)': 'Fortune Seeker (Bounty)',
+                    'Maestro': 'Maestro (Warsmith)', 'Maestro (Warsmith)': 'Maestro (Warsmith)',
+                };
+                const detectedProfa = p.class ? (CLASS_MAP[p.class] || null) : null;
+
                 if (!existing) {
                     roster.push({
                         id: Date.now() + Math.random(),
                         name: resolvedName,
                         rank: 'ИГРОК',
-                        profa: '—',
+                        profa: detectedProfa || '—',
+                        profas: detectedProfa ? [detectedProfa] : [],
                         pac: 'СОЛО',
                         attendance: 0,
                         isNew: true
                     });
                     newCount++;
+                    if (detectedProfa) profaAssigned++;
                 } else {
                     existing.isNew = false;
+                    // Присваиваем профу если AI распознал И у игрока ещё нет профы
+                    if (detectedProfa && (!existing.profa || existing.profa === '—')) {
+                        existing.profa = detectedProfa;
+                        existing.profas = [detectedProfa];
+                        profaAssigned++;
+                    } else if (detectedProfa && existing.profas && !existing.profas.includes(detectedProfa)) {
+                        // Если профа новая (например вторая профа) — показываем в результатах но не добавляем автоматически
+                        p._newProfaDetected = detectedProfa;
+                        p._existingProfas = existing.profas;
+                    }
                     // Сохраняем алиас если имя отличалось
                     if (p.name !== resolvedName || p.name !== existing.name) {
                         nickAliases[p.name.toLowerCase()] = existing.name;
@@ -3275,6 +3545,7 @@
                 .map(p => p.name) : [];
             let msg = prevSnap ? `🔄 Перезаписано (старая стата вычтена)` : `✅ Применено`;
             if (newCount > 0) msg += ` · +${newCount} новых (NEW)`;
+            if (profaAssigned > 0) msg += ` · 🎭 ${profaAssigned} проф распознано`;
             if (newPlayers.length > 0) msg += ` · 🆕 Найдены пропавшие: ${newPlayers.join(', ')}`;
             if (mismatches.length > 0) msg += ` · ⚠️ Несостыковки: ${mismatches.join(' | ')}`;
             setDayStatus(mismatches.length || newPlayers.length ? 'warning' : 'success', msg);
@@ -4037,7 +4308,8 @@
                     nickAliases,
                     exhaustedKeys,
                     appliedStatsByDate,
-                    playerNotes
+                    playerNotes,
+                    clanRosterByDate
                 };
                 localStorage.setItem(LS_KEY, JSON.stringify(data));
             } catch(e) {
@@ -4061,6 +4333,7 @@
                 if (data.exhaustedKeys) exhaustedKeys = data.exhaustedKeys;
                 if (data.appliedStatsByDate) appliedStatsByDate = data.appliedStatsByDate;
                 if (data.playerNotes)  playerNotes   = data.playerNotes;
+                if (data.clanRosterByDate) clanRosterByDate = data.clanRosterByDate;
                 return true;
             } catch(e) {
                 console.warn('localStorage load failed:', e);
