@@ -4931,7 +4931,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     '<div style="position:relative;display:flex;gap:6px;align-items:center">' +
                         '<input id="' + searchId + '" type="text" placeholder="Поиск профы..." autocomplete="off" ' +
                         'oninput="filterProfaSearch(' + idx + ',this.value)" ' +
-                        'onfocus="toggleProfaDd(' + idx + ',this)" ' +
+                        'onclick="openProfaDdOnly(' + idx + ',this)" ' +
                         'data-pidx="' + idx + '" onkeydown="handleProfaKey(event,this)" ' +
                         'style="flex:1;background:#12171f;border:1px solid #2d3748;border-radius:7px;padding:5px 10px;color:#e2e8f0;font-size:12px;outline:none;box-sizing:border-box">' +
                         '<button id="' + "profaConfirmBtn_" + idx + '" onmousedown="event.preventDefault();confirmProfa(' + idx + ')" ' +
@@ -5021,15 +5021,27 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             }
         }
 
-        function toggleProfaDd(idx, inputEl) {
+        let _ddOpenIdx = null;
+        let _selectingItem = false;
+
+        function openProfaDdOnly(idx, inputEl) {
             const dd = document.getElementById('profaDd_' + idx);
             if (!dd) return;
             if (dd.style.display === 'block') {
                 dd.style.display = 'none';
-                inputEl.blur();
-            } else {
-                filterProfaSearch(idx, inputEl.value);
+                _ddOpenIdx = null;
+                return;
             }
+            if (_ddOpenIdx !== null && _ddOpenIdx !== idx) {
+                const other = document.getElementById('profaDd_' + _ddOpenIdx);
+                if (other) other.style.display = 'none';
+            }
+            _ddOpenIdx = idx;
+            filterProfaSearch(idx, inputEl.value);
+        }
+
+        function toggleProfaDd(idx, inputEl) {
+            openProfaDdOnly(idx, inputEl);
         }
 
         function filterProfaSearch(idx, q) {
@@ -5081,7 +5093,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     const i3 = src3 ? '<img src="' + src3 + '" style="width:22px;height:22px;border-radius:50%;flex-shrink:0">' : '';
                     itemImg = i2 + i3;
                 }
-                return '<div onmousedown="event.preventDefault();previewProfa(' + idx + ',\"' + pf.replace(/\"/g,'&quot;') + '\")" data-profa="' + pf.replace(/"/g,'&quot;') + '" style="display:flex;align-items:center;gap:6px;padding:7px 12px;cursor:pointer;font-size:12px;color:#e2e8f0;border-bottom:1px solid #1e2530" class="pfa-dd-item">' +
+                return '<div onmousedown="_selectingItem=true;event.preventDefault();previewProfa(' + idx + ',\"' + pf.replace(/\"/g,'&quot;') + '\")" data-profa="' + pf.replace(/"/g,'&quot;') + '" style="display:flex;align-items:center;gap:6px;padding:7px 12px;cursor:pointer;font-size:12px;color:#e2e8f0;border-bottom:1px solid #1e2530" class="pfa-dd-item">' +
                     itemImg + '<span>' + pf + '</span><span style="color:#64748b;margin-left:auto">(' + short + ')</span></div>';
             }).join('');
             dd.style.display = filteredNoDups.length ? 'block' : 'none';
@@ -5113,9 +5125,10 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
 
         // Закрыть дропдаун при клике вне
         document.addEventListener('click', function(e) {
-            // Закрыть все дропдауны если клик не на поле ввода и не на самом дропдауне
-            if (!e.target.closest('[id^="profaDd_"]') && !e.target.classList.contains('ac-input')) {
+            if (_selectingItem) { _selectingItem = false; return; }
+            if (!e.target.closest('[id^="profaDd_"]') && !e.target.closest('#profaAssignList')) {
                 document.querySelectorAll('[id^="profaDd_"]').forEach(dd => dd.style.display = 'none');
+                _ddOpenIdx = null;
             }
         });
 
