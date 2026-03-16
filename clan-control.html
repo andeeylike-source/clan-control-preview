@@ -562,6 +562,17 @@
                     </label>
                 </div>
             </div>
+            <div class="card mb-6">
+                <h2 class="text-lg font-bold mb-2">💾 Резервная копия</h2>
+                <p class="text-slate-500 text-sm mb-4">Экспортируй все данные в JSON и импортируй их на другом компьютере. Включает ростер, архив, паки, историю КМ, алиасы, заметки, API-ключи и настройки уведомлений.</p>
+                <div class="flex gap-3 flex-wrap">
+                    <button onclick="exportData()" class="btn-primary">⬇️ Экспорт данных</button>
+                    <button onclick="document.getElementById('importDataInput').click()" style="background:#1e2530;color:#e2e8f0;border:none;padding:10px 20px;border-radius:10px;cursor:pointer;font-weight:600">⬆️ Импорт данных</button>
+                    <input id="importDataInput" type="file" accept="application/json,.json" style="display:none" onchange="importData(event)">
+                </div>
+                <div id="backupStatus" style="display:none;margin-top:12px;font-size:13px;padding:10px;border-radius:8px"></div>
+            </div>
+
             <div class="card">
                 <h2 class="text-lg font-bold mb-2">🗑️ Данные</h2>
                 <p class="text-slate-500 text-sm mb-4">Сбросить все данные приложения (ростер, статистика, события). Ключи сохранятся.</p>
@@ -4116,17 +4127,20 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     ? dayPlayers.reduce((s,p)=>s+(p.pve_dmg||0),0)
                     : cmdChannel.reduce((s,cc)=>s+(cc.pve_dmg||0),0);
 
-                const kmTotalsInlineHtml = (kmTotalKills || kmTotalDeaths || kmTotalPvp || kmTotalPve) ? `
-                    <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;background:#1a1f29;border:1px solid #1e2530;border-radius:10px;padding:10px 16px;font-size:13px;min-width:420px;max-width:100%">
-                        <span style="color:#64748b;text-transform:uppercase;font-size:10px;font-weight:700;letter-spacing:.04em">Итого КМ</span>
-                        <span style="color:#f59e0b;font-weight:700">⚔️ ${kmTotalKills}</span>
-                        <span style="color:#ef4444;font-weight:700">💀 ${kmTotalDeaths}</span>
-                        <span style="color:#818cf8;font-weight:700">🗡️ ${kmTotalPvp.toLocaleString()}</span>
-                        <span style="color:#22c55e;font-weight:700">🐉 ${kmTotalPve.toLocaleString()}</span>
-                    </div>` : '';
+                const kmTotalsHtml = `
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 10px 0">
+                        <div style="background:#1a1f29;border:1px solid #1e2530;border-radius:8px;padding:6px 12px;font-size:12px;display:flex;align-items:center;gap:6px">
+                            <span style="color:#64748b;text-transform:uppercase;font-size:10px;font-weight:700">Итого КМ</span>
+                            <span style="color:#f59e0b">⚔️ ${kmTotalKills}</span>
+                            <span style="color:#ef4444">💀 ${kmTotalDeaths}</span>
+                            <span style="color:#818cf8">🗡️ ${kmTotalPvp.toLocaleString()}</span>
+                            <span style="color:#22c55e">🐉 ${kmTotalPve.toLocaleString()}</span>
+                        </div>
+                    </div>`;
 
                 const topPreviewHtml = (topKills.length > 0 || hasCommandChannel) ? `
                     <div id="${topPreviewId}" style="display:none;margin-top:8px">
+                        ${kmTotalsHtml}
                         ${topKills.length > 0 ? `<div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:6px">🏆 Топ убийств</div>
                         <div style="display:flex;flex-wrap:wrap;gap:6px">
                         ${topKills.map((p,i) => `<div style="background:#1a1f29;border:1px solid #1e2530;border-radius:8px;padding:5px 10px;font-size:12px;display:flex;align-items:center;gap:6px">
@@ -4276,14 +4290,13 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 }).join('') : '';
 
                 return `<div class="card mb-6">
-                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px;flex-wrap:wrap">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                         <div>
                             <div style="font-size:18px;font-weight:800">${dateFormatted}</div>
                             <div style="font-size:12px;color:#f59e0b;font-weight:700;text-transform:uppercase;margin-top:2px">⚔️ ${eventLabel}</div>
                             ${recognized > 0 ? `<div style="font-size:11px;color:#64748b;margin-top:3px">👥 ${recognized} игроков${missing > 0 ? ` · <span style="color:#f87171">⚠️ не хватает ${missing}</span>` : ''}</div>` : ''}
                         </div>
-                        ${kmTotalsInlineHtml ? `<div style="flex:1;display:flex;justify-content:center;align-items:flex-start;min-width:320px">${kmTotalsInlineHtml}</div>` : `<div style="flex:1"></div>`}
-                        <button onclick="openCalendarDay('${dateStr}')" style="background:none;border:1px solid #2d3748;color:#94a3b8;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .2s;align-self:flex-start" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#94a3b8'">📅 Открыть в календаре</button>
+                        <button onclick="openCalendarDay('${dateStr}')" style="background:none;border:1px solid #2d3748;color:#94a3b8;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#94a3b8'">📅 Открыть в календаре</button>
                     </div>
                     ${hasCommandChannel ? `
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -4546,6 +4559,138 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 console.warn('localStorage load failed:', e);
                 return false;
             }
+        }
+
+
+        function showBackupStatus(type, message) {
+            const el = document.getElementById('backupStatus');
+            if (!el) return;
+            const ok = type === 'success';
+            el.style.display = 'block';
+            el.style.background = ok ? '#14532d22' : '#7f1d1d22';
+            el.style.border = ok ? '1px solid #22c55e44' : '1px solid #ef444444';
+            el.style.color = ok ? '#4ade80' : '#fca5a5';
+            el.innerText = message;
+            setTimeout(() => {
+                if (el.innerText === message) el.style.display = 'none';
+            }, 4000);
+        }
+
+        function collectBackupData() {
+            let geminiKeys = [];
+            try { geminiKeys = JSON.parse(localStorage.getItem('clanControl_geminiKeys') || '[]'); } catch(e) {}
+            let notify = { popup: true, sound: true };
+            try { notify = JSON.parse(localStorage.getItem('cc_notify') || '{"popup":true,"sound":true}'); } catch(e) {}
+
+            return {
+                version: 1,
+                exportedAt: new Date().toISOString(),
+                appStorageKey: LS_KEY,
+                data: {
+                    roster,
+                    archive,
+                    packs,
+                    manualEvents,
+                    eventStatuses,
+                    eventOverrides,
+                    kmStats,
+                    nickAliases,
+                    exhaustedKeys,
+                    appliedStatsByDate,
+                    playerNotes,
+                    dayScreenshots
+                },
+                geminiKeys,
+                notifySettings: notify
+            };
+        }
+
+        function exportData() {
+            try {
+                const backup = collectBackupData();
+                const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+                a.href = url;
+                a.download = `clan-control-backup-${stamp}.json`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                showBackupStatus('success', '✅ Резервная копия скачана');
+            } catch (e) {
+                console.error('exportData failed:', e);
+                showBackupStatus('error', '❌ Не удалось создать резервную копию');
+            }
+        }
+
+        function importData(event) {
+            const file = event && event.target && event.target.files ? event.target.files[0] : null;
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                try {
+                    const backup = JSON.parse(reader.result);
+                    const payload = backup && backup.data ? backup.data : backup;
+
+                    if (!payload || typeof payload !== 'object') {
+                        throw new Error('Некорректный формат файла');
+                    }
+
+                    if (payload.roster) roster = payload.roster;
+                    if (payload.archive) archive = payload.archive;
+                    if (payload.packs) packs = payload.packs;
+                    if (payload.manualEvents) manualEvents = payload.manualEvents;
+                    if (payload.eventStatuses) eventStatuses = payload.eventStatuses;
+                    if (payload.eventOverrides) eventOverrides = payload.eventOverrides;
+                    if (payload.kmStats) kmStats = payload.kmStats;
+                    if (payload.nickAliases) nickAliases = payload.nickAliases;
+                    if (payload.exhaustedKeys) exhaustedKeys = payload.exhaustedKeys;
+                    if (payload.appliedStatsByDate) appliedStatsByDate = payload.appliedStatsByDate;
+                    if (payload.playerNotes) playerNotes = payload.playerNotes;
+                    if (payload.dayScreenshots) dayScreenshots = payload.dayScreenshots;
+
+                    const importedKeys = backup.geminiKeys || payload.geminiKeys;
+                    if (Array.isArray(importedKeys)) {
+                        localStorage.setItem('clanControl_geminiKeys', JSON.stringify(importedKeys));
+                    }
+
+                    const importedNotify = backup.notifySettings || payload.notifySettings;
+                    if (importedNotify && typeof importedNotify === 'object') {
+                        notifySettings = {
+                            popup: !!importedNotify.popup,
+                            sound: !!importedNotify.sound
+                        };
+                        localStorage.setItem('cc_notify', JSON.stringify(notifySettings));
+                    }
+
+                    saveToStorage();
+                    try { if (typeof sanitizeBrokenHistoryEntries === 'function') sanitizeBrokenHistoryEntries(); } catch(e) {}
+                    try { if (typeof loadNotifySettings === 'function') loadNotifySettings(); } catch(e) {}
+
+                    renderRoster();
+                    renderPacks();
+                    renderCalendar();
+                    renderArchive();
+                    if (document.getElementById('page-stats').classList.contains('active')) renderStats();
+                    if (document.getElementById('page-screenshots').classList.contains('active')) renderScreenshotArchive();
+                    if (document.getElementById('page-settings').classList.contains('active')) {
+                        renderApiKeys();
+                        renderAliases();
+                    }
+
+                    showBackupStatus('success', '✅ Данные импортированы');
+                } catch (e) {
+                    console.error('importData failed:', e);
+                    showBackupStatus('error', '❌ Не удалось импортировать файл');
+                } finally {
+                    const input = document.getElementById('importDataInput');
+                    if (input) input.value = '';
+                }
+            };
+            reader.readAsText(file, 'utf-8');
         }
 
         function clearStorage() {
