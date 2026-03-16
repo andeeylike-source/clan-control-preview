@@ -452,7 +452,11 @@
                     <div style="display:flex;align-items:center;gap:8px">
                         <span style="font-size:11px;color:#64748b">Порог:</span>
                         <div style="display:flex;gap:4px">
-                            ${[3,4,5,6,7].map(n => `<button onclick="setCcThreshold(${n})" id="ccBtn${n}" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">${n}</button>`).join('')}
+                            <button onclick="setCcThreshold(3)" id="ccBtn3" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">3</button>
+                            <button onclick="setCcThreshold(4)" id="ccBtn4" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">4</button>
+                            <button onclick="setCcThreshold(5)" id="ccBtn5" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">5</button>
+                            <button onclick="setCcThreshold(6)" id="ccBtn6" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">6</button>
+                            <button onclick="setCcThreshold(7)" id="ccBtn7" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">7</button>
                         </div>
                         <span style="font-size:11px;color:#64748b">КМ подряд</span>
                     </div>
@@ -3621,6 +3625,11 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
 
             // ===== СОХРАНЯЕМ СНАПШОТ (статистика теперь считается на лету из снапшотов) =====
             roster.forEach(p => { p.kills = 0; p.deaths = 0; p.pvp_dmg = 0; p.pve_dmg = 0; });
+            if (!isValidHistoryDateKey(dateStr)) {
+                setDayStatus('error', '❌ Не удалось сохранить статистику: битая дата дня');
+                return;
+            }
+
             const prevSnap = appliedStatsByDate[dateStr];
             let mergedPlayers = dayLastParsed.map(p => ({...p}));
             if (prevSnap && prevSnap.players) {
@@ -4043,7 +4052,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             const datesFromEvents = Object.keys(eventStatuses).map(k => k.split('|')[0]);
             const datesFromSnaps = Object.keys(appliedStatsByDate);
             const allDates = [...new Set([...datesFromEvents, ...datesFromSnaps])]
-                .filter(Boolean)
+                .filter(dateStr => isValidHistoryDateKey(dateStr))
                 .sort((a,b) => b.localeCompare(a));
 
             if (allDates.length === 0) {
@@ -4481,6 +4490,26 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
         // ===== LOCAL STORAGE =====
         const LS_KEY = 'clanControl_v1';
 
+
+        function isValidHistoryDateKey(dateStr) {
+            if (typeof dateStr !== 'string') return false;
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const dt = new Date(y, m - 1, d);
+            return dt.getFullYear() === y && dt.getMonth() === (m - 1) && dt.getDate() === d;
+        }
+
+        function cleanupBrokenHistoryEntries() {
+            let removed = 0;
+            const cleaned = {};
+            Object.entries(appliedStatsByDate || {}).forEach(([dateStr, snap]) => {
+                if (isValidHistoryDateKey(dateStr)) cleaned[dateStr] = snap;
+                else removed++;
+            });
+            appliedStatsByDate = cleaned;
+            return removed;
+        }
+
         function saveToStorage() {
             try {
                 const data = {
@@ -4518,6 +4547,11 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 if (data.exhaustedKeys) exhaustedKeys = data.exhaustedKeys;
                 if (data.appliedStatsByDate) appliedStatsByDate = data.appliedStatsByDate;
                 if (data.playerNotes)  playerNotes   = data.playerNotes;
+                const removedBrokenHistory = cleanupBrokenHistoryEntries();
+                if (removedBrokenHistory > 0) {
+                    console.warn(`Удалено битых записей истории КМ: ${removedBrokenHistory}`);
+                    saveToStorage();
+                }
                 return true;
             } catch(e) {
                 console.warn('localStorage load failed:', e);
