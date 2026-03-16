@@ -452,11 +452,7 @@
                     <div style="display:flex;align-items:center;gap:8px">
                         <span style="font-size:11px;color:#64748b">Порог:</span>
                         <div style="display:flex;gap:4px">
-                            <button onclick="setCcThreshold(3)" id="ccBtn3" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">3</button>
-                            <button onclick="setCcThreshold(4)" id="ccBtn4" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">4</button>
-                            <button onclick="setCcThreshold(5)" id="ccBtn5" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">5</button>
-                            <button onclick="setCcThreshold(6)" id="ccBtn6" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">6</button>
-                            <button onclick="setCcThreshold(7)" id="ccBtn7" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">7</button>
+                            ${[3,4,5,6,7].map(n => `<button onclick="setCcThreshold(${n})" id="ccBtn${n}" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">${n}</button>`).join('')}
                         </div>
                         <span style="font-size:11px;color:#64748b">КМ подряд</span>
                     </div>
@@ -1310,7 +1306,7 @@
                         <span class="font-bold text-slate-200 player-nick-link" onclick="openPlayerProfile('${p.name}')">${p.name}</span> <span class="badge badge-${p.rank.toLowerCase()}">${p.rank}</span>
                     </td>
                     <td>${p.isNew ? '<span class="text-[9px] bg-emerald-500 text-black font-black px-1.5 py-0.5 rounded uppercase">NEW</span>' : '<span style="color:#475569;font-size:11px">—</span>'}</td>
-                    <td class="text-slate-400 text-xs">${(p.profas && p.profas.length > 0 ? p.profas : (p.profa && p.profa !== '—' ? [p.profa] : [])).map((pf,i) => `<span style="display:inline-flex;align-items:center;gap:6px;background:#1e2530;border-radius:6px;padding:4px 10px;margin-right:6px;${i===0?'color:#a5b4fc':'color:#64748b'}">${profaIconHtml(pf, 30)}</span>`).join('') || '<span style="color:#475569">—</span>'}</td>
+                    <td class="text-slate-400 text-xs">${(p.profas && p.profas.length > 0 ? p.profas : (p.profa && p.profa !== '—' ? [p.profa] : [])).map((pf,i) => `<span style="display:inline-flex;align-items:center;gap:3px;background:#1e2530;border-radius:4px;padding:1px 6px;margin-right:3px;${i===0?'color:#a5b4fc':'color:#64748b'}">${profaIconHtml(pf, 16)}</span>`).join('') || '<span style="color:#475569">—</span>'}</td>
                     <td><span class="pac-tag">${p.pac}</span></td>
                     <td class="${p.attendance < 50 ? 'text-red-400' : p.attendance < 70 ? 'text-yellow-400' : 'text-emerald-400'} font-bold">${totalDates > 0 ? p.attendance + '%' : '—'}</td>
                     <td class="text-right">
@@ -3625,11 +3621,6 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
 
             // ===== СОХРАНЯЕМ СНАПШОТ (статистика теперь считается на лету из снапшотов) =====
             roster.forEach(p => { p.kills = 0; p.deaths = 0; p.pvp_dmg = 0; p.pve_dmg = 0; });
-            if (!isValidHistoryDateKey(dateStr)) {
-                setDayStatus('error', '❌ Не удалось сохранить статистику: битая дата дня');
-                return;
-            }
-
             const prevSnap = appliedStatsByDate[dateStr];
             let mergedPlayers = dayLastParsed.map(p => ({...p}));
             if (prevSnap && prevSnap.players) {
@@ -4052,7 +4043,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             const datesFromEvents = Object.keys(eventStatuses).map(k => k.split('|')[0]);
             const datesFromSnaps = Object.keys(appliedStatsByDate);
             const allDates = [...new Set([...datesFromEvents, ...datesFromSnaps])]
-                .filter(dateStr => isValidHistoryDateKey(dateStr))
+                .filter(Boolean)
                 .sort((a,b) => b.localeCompare(a));
 
             if (allDates.length === 0) {
@@ -4112,9 +4103,34 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 const topKills = [...dayPlayers].sort((a,b)=>(b.kills||0)-(a.kills||0)).slice(0,5);
                 const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
 
-                const topPreviewHtml = topKills.length > 0 ? `
+                const kmTotalKills = dayPlayers.length > 0
+                    ? dayPlayers.reduce((s,p)=>s+(p.kills||0),0)
+                    : cmdChannel.reduce((s,cc)=>s+(cc.kills||0),0);
+                const kmTotalDeaths = dayPlayers.length > 0
+                    ? dayPlayers.reduce((s,p)=>s+(p.deaths||0),0)
+                    : cmdChannel.reduce((s,cc)=>s+(cc.deaths||0),0);
+                const kmTotalPvp = dayPlayers.length > 0
+                    ? dayPlayers.reduce((s,p)=>s+(p.pvp_dmg||0),0)
+                    : cmdChannel.reduce((s,cc)=>s+(cc.pvp_dmg||0),0);
+                const kmTotalPve = dayPlayers.length > 0
+                    ? dayPlayers.reduce((s,p)=>s+(p.pve_dmg||0),0)
+                    : cmdChannel.reduce((s,cc)=>s+(cc.pve_dmg||0),0);
+
+                const kmTotalsHtml = `
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 10px 0">
+                        <div style="background:#1a1f29;border:1px solid #1e2530;border-radius:8px;padding:6px 12px;font-size:12px;display:flex;align-items:center;gap:6px">
+                            <span style="color:#64748b;text-transform:uppercase;font-size:10px;font-weight:700">Итого КМ</span>
+                            <span style="color:#f59e0b">⚔️ ${kmTotalKills}</span>
+                            <span style="color:#ef4444">💀 ${kmTotalDeaths}</span>
+                            <span style="color:#818cf8">🗡️ ${kmTotalPvp.toLocaleString()}</span>
+                            <span style="color:#22c55e">🐉 ${kmTotalPve.toLocaleString()}</span>
+                        </div>
+                    </div>`;
+
+                const topPreviewHtml = (topKills.length > 0 || hasCommandChannel) ? `
                     <div id="${topPreviewId}" style="display:none;margin-top:8px">
-                        <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:6px">🏆 Топ убийств</div>
+                        ${kmTotalsHtml}
+                        ${topKills.length > 0 ? `<div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:6px">🏆 Топ убийств</div>
                         <div style="display:flex;flex-wrap:wrap;gap:6px">
                         ${topKills.map((p,i) => `<div style="background:#1a1f29;border:1px solid #1e2530;border-radius:8px;padding:5px 10px;font-size:12px;display:flex;align-items:center;gap:6px">
                             <span>${medals[i]}</span>
@@ -4122,7 +4138,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                             <span style="color:#f59e0b">⚔️${p.kills||0}</span>
                             <span style="color:#ef4444">💀${p.deaths||0}</span>
                         </div>`).join('')}
-                        </div>
+                        </div>` : ''}
                     </div>` : '';
 
                 const leadersHtml = hasCommandChannel ? cmdChannel.map((cc) => {
@@ -4490,26 +4506,6 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
         // ===== LOCAL STORAGE =====
         const LS_KEY = 'clanControl_v1';
 
-
-        function isValidHistoryDateKey(dateStr) {
-            if (typeof dateStr !== 'string') return false;
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
-            const [y, m, d] = dateStr.split('-').map(Number);
-            const dt = new Date(y, m - 1, d);
-            return dt.getFullYear() === y && dt.getMonth() === (m - 1) && dt.getDate() === d;
-        }
-
-        function cleanupBrokenHistoryEntries() {
-            let removed = 0;
-            const cleaned = {};
-            Object.entries(appliedStatsByDate || {}).forEach(([dateStr, snap]) => {
-                if (isValidHistoryDateKey(dateStr)) cleaned[dateStr] = snap;
-                else removed++;
-            });
-            appliedStatsByDate = cleaned;
-            return removed;
-        }
-
         function saveToStorage() {
             try {
                 const data = {
@@ -4547,11 +4543,6 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 if (data.exhaustedKeys) exhaustedKeys = data.exhaustedKeys;
                 if (data.appliedStatsByDate) appliedStatsByDate = data.appliedStatsByDate;
                 if (data.playerNotes)  playerNotes   = data.playerNotes;
-                const removedBrokenHistory = cleanupBrokenHistoryEntries();
-                if (removedBrokenHistory > 0) {
-                    console.warn(`Удалено битых записей истории КМ: ${removedBrokenHistory}`);
-                    saveToStorage();
-                }
                 return true;
             } catch(e) {
                 console.warn('localStorage load failed:', e);
