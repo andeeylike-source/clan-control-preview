@@ -4116,20 +4116,17 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     ? dayPlayers.reduce((s,p)=>s+(p.pve_dmg||0),0)
                     : cmdChannel.reduce((s,cc)=>s+(cc.pve_dmg||0),0);
 
-                const kmTotalsHtml = `
-                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 10px 0">
-                        <div style="background:#1a1f29;border:1px solid #1e2530;border-radius:8px;padding:6px 12px;font-size:12px;display:flex;align-items:center;gap:6px">
-                            <span style="color:#64748b;text-transform:uppercase;font-size:10px;font-weight:700">Итого КМ</span>
-                            <span style="color:#f59e0b">⚔️ ${kmTotalKills}</span>
-                            <span style="color:#ef4444">💀 ${kmTotalDeaths}</span>
-                            <span style="color:#818cf8">🗡️ ${kmTotalPvp.toLocaleString()}</span>
-                            <span style="color:#22c55e">🐉 ${kmTotalPve.toLocaleString()}</span>
-                        </div>
-                    </div>`;
+                const kmTotalsInlineHtml = (kmTotalKills || kmTotalDeaths || kmTotalPvp || kmTotalPve) ? `
+                    <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;background:#1a1f29;border:1px solid #1e2530;border-radius:10px;padding:10px 16px;font-size:13px;min-width:420px;max-width:100%">
+                        <span style="color:#64748b;text-transform:uppercase;font-size:10px;font-weight:700;letter-spacing:.04em">Итого КМ</span>
+                        <span style="color:#f59e0b;font-weight:700">⚔️ ${kmTotalKills}</span>
+                        <span style="color:#ef4444;font-weight:700">💀 ${kmTotalDeaths}</span>
+                        <span style="color:#818cf8;font-weight:700">🗡️ ${kmTotalPvp.toLocaleString()}</span>
+                        <span style="color:#22c55e;font-weight:700">🐉 ${kmTotalPve.toLocaleString()}</span>
+                    </div>` : '';
 
                 const topPreviewHtml = (topKills.length > 0 || hasCommandChannel) ? `
                     <div id="${topPreviewId}" style="display:none;margin-top:8px">
-                        ${kmTotalsHtml}
                         ${topKills.length > 0 ? `<div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:6px">🏆 Топ убийств</div>
                         <div style="display:flex;flex-wrap:wrap;gap:6px">
                         ${topKills.map((p,i) => `<div style="background:#1a1f29;border:1px solid #1e2530;border-radius:8px;padding:5px 10px;font-size:12px;display:flex;align-items:center;gap:6px">
@@ -4279,13 +4276,14 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 }).join('') : '';
 
                 return `<div class="card mb-6">
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px;flex-wrap:wrap">
                         <div>
                             <div style="font-size:18px;font-weight:800">${dateFormatted}</div>
                             <div style="font-size:12px;color:#f59e0b;font-weight:700;text-transform:uppercase;margin-top:2px">⚔️ ${eventLabel}</div>
                             ${recognized > 0 ? `<div style="font-size:11px;color:#64748b;margin-top:3px">👥 ${recognized} игроков${missing > 0 ? ` · <span style="color:#f87171">⚠️ не хватает ${missing}</span>` : ''}</div>` : ''}
                         </div>
-                        <button onclick="openCalendarDay('${dateStr}')" style="background:none;border:1px solid #2d3748;color:#94a3b8;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#94a3b8'">📅 Открыть в календаре</button>
+                        ${kmTotalsInlineHtml ? `<div style="flex:1;display:flex;justify-content:center;align-items:flex-start;min-width:320px">${kmTotalsInlineHtml}</div>` : `<div style="flex:1"></div>`}
+                        <button onclick="openCalendarDay('${dateStr}')" style="background:none;border:1px solid #2d3748;color:#94a3b8;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .2s;align-self:flex-start" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#94a3b8'">📅 Открыть в календаре</button>
                     </div>
                     ${hasCommandChannel ? `
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
