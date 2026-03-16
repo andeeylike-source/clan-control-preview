@@ -1306,7 +1306,7 @@
                         <span class="font-bold text-slate-200 player-nick-link" onclick="openPlayerProfile('${p.name}')">${p.name}</span> <span class="badge badge-${p.rank.toLowerCase()}">${p.rank}</span>
                     </td>
                     <td>${p.isNew ? '<span class="text-[9px] bg-emerald-500 text-black font-black px-1.5 py-0.5 rounded uppercase">NEW</span>' : '<span style="color:#475569;font-size:11px">—</span>'}</td>
-                    <td class="text-slate-400 text-xs">${(p.profas && p.profas.length > 0 ? p.profas : (p.profa && p.profa !== '—' ? [p.profa] : [])).map((pf,i) => `<span style="display:inline-flex;align-items:center;gap:3px;background:#1e2530;border-radius:4px;padding:1px 6px;margin-right:3px;${i===0?'color:#a5b4fc':'color:#64748b'}">${profaIconHtml(pf, 16)}</span>`).join('') || '<span style="color:#475569">—</span>'}</td>
+                    <td class="text-slate-400 text-xs">${(p.profas && p.profas.length > 0 ? p.profas : (p.profa && p.profa !== '—' ? [p.profa] : [])).map((pf,i) => `<span style="display:inline-flex;align-items:center;gap:6px;background:#1e2530;border-radius:6px;padding:4px 10px;margin-right:6px;${i===0?'color:#a5b4fc':'color:#64748b'}">${profaIconHtml(pf, 30)}</span>`).join('') || '<span style="color:#475569">—</span>'}</td>
                     <td><span class="pac-tag">${p.pac}</span></td>
                     <td class="${p.attendance < 50 ? 'text-red-400' : p.attendance < 70 ? 'text-yellow-400' : 'text-emerald-400'} font-bold">${totalDates > 0 ? p.attendance + '%' : '—'}</td>
                     <td class="text-right">
@@ -3519,7 +3519,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 const currentProfa = inRoster ? (inRoster.profa || '—') : (p.profa || '—');
 
                 const class2Html = class2src
-                    ? `<img src="${class2src}" title="${class2}" style="width:36px;height:36px;border-radius:50%;border:1px solid #2d3748;flex-shrink:0">`
+                    ? `<img src="${class2src}" title="${class2}" style="width:18px;height:18px;border-radius:50%;border:1px solid #2d3748;flex-shrink:0">`
                     : '';
 
                 let profaHtml = '';
@@ -4383,7 +4383,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 const class2src = class2 ? getClass2Icon(class2) : null;
                 const class3options = class2 ? resolveClass2ToClass3(class2) : [];
                 const class2Html = class2src
-                    ? `<img src="${class2src}" title="${class2}" style="width:36px;height:36px;border-radius:50%;border:1px solid #2d3748;flex-shrink:0">`
+                    ? `<img src="${class2src}" title="${class2}" style="width:20px;height:20px;border-radius:50%;border:1px solid #2d3748;flex-shrink:0">`
                     : '';
 
                 // Кнопка выбора 3й профы (если есть варианты и профа ещё не назначена)
@@ -4901,16 +4901,16 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     if (isAvPv) {
                         // АВ/ПВ — иконка 2й профы (кинжал)
                         const avIcon = getClass2Icon('Abyss Walker');
-                        const avImg = avIcon ? '<img src="' + avIcon + '" style="width:36px;height:36px;border-radius:50%;flex-shrink:0">' : '';
+                        const avImg = avIcon ? '<img src="' + avIcon + '" style="width:24px;height:24px;border-radius:50%;flex-shrink:0">' : '';
                         btnContent = avImg + '<span>' + short + (isSelected?' ✓':'') + '</span>';
                     } else if (isKinjalThird) {
                         // Ghost Hunter / Wind Rider — только иконка 3й
-                        const img3only = src3 ? '<img src="' + src3 + '" style="width:36px;height:36px;border-radius:50%;flex-shrink:0">' : '';
+                        const img3only = src3 ? '<img src="' + src3 + '" style="width:24px;height:24px;border-radius:50%;flex-shrink:0">' : '';
                         btnContent = img3only + '<span>' + short + (isSelected?' ✓':'') + '</span>';
                     } else {
                         // Остальные — иконка 2й (яркая) слева + текст + иконка 3й справа
-                        const img2b = src2 ? '<img src="' + src2 + '" style="width:36px;height:36px;border-radius:50%;flex-shrink:0">' : '';
-                        const img3b = src3 ? '<img src="' + src3 + '" style="width:36px;height:36px;border-radius:50%;flex-shrink:0">' : '';
+                        const img2b = src2 ? '<img src="' + src2 + '" style="width:22px;height:22px;border-radius:50%;flex-shrink:0">' : '';
+                        const img3b = src3 ? '<img src="' + src3 + '" style="width:24px;height:24px;border-radius:50%;flex-shrink:0">' : '';
                         btnContent = img2b + '<span>' + short + (isSelected?' ✓':'') + '</span>' + img3b;
                     }
                     return '<button onclick="selectProfaByIdx(' + idx + ',' + pfIdx + ')" title="' + pf + '" style="display:inline-flex;align-items:center;gap:4px;background:' + bg + ';border:1px solid ' + border + ';border-radius:8px;padding:5px 8px;font-size:11px;cursor:pointer;color:' + color + ';font-weight:600;transition:all .15s">' + btnContent + '</button>';
@@ -4977,12 +4977,12 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     const noClass2 = (profa === 'Ghost Hunter' || profa === 'Wind Rider');
                     let iconHtml = '';
                     if (profa === 'АВ/ПВ' && src2) {
-                        iconHtml = '<img src="' + src2 + '" style="width:36px;height:36px;border-radius:50%">';
+                        iconHtml = '<img src="' + src2 + '" style="width:22px;height:22px;border-radius:50%">';
                     } else if (!noClass2 && src2 && src3) {
-                        iconHtml = '<img src="' + src2 + '" style="width:36px;height:36px;border-radius:50%;opacity:0.8">'
-                                 + '<img src="' + src3 + '" style="width:36px;height:36px;border-radius:50%;margin-left:2px">';
+                        iconHtml = '<img src="' + src2 + '" style="width:18px;height:18px;border-radius:50%;opacity:0.8">'
+                                 + '<img src="' + src3 + '" style="width:22px;height:22px;border-radius:50%;margin-left:2px">';
                     } else if (src3) {
-                        iconHtml = '<img src="' + src3 + '" style="width:36px;height:36px;border-radius:50%">';
+                        iconHtml = '<img src="' + src3 + '" style="width:22px;height:22px;border-radius:50%">';
                     }
                     wrap.innerHTML = iconHtml;
                     wrap.style.display = iconHtml ? 'flex' : 'none';
@@ -5134,13 +5134,13 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 let itemImg = '';
                 if (pf === 'АВ/ПВ') {
                     const av = getClass2Icon('Abyss Walker');
-                    itemImg = av ? '<img src="' + av + '" style="width:36px;height:36px;border-radius:50%;flex-shrink:0">' : '';
+                    itemImg = av ? '<img src="' + av + '" style="width:22px;height:22px;border-radius:50%;flex-shrink:0">' : '';
                 } else if (pf === 'Ghost Hunter' || pf === 'Wind Rider') {
-                    itemImg = src3 ? '<img src="' + src3 + '" style="width:36px;height:36px;border-radius:50%;flex-shrink:0">' : '';
+                    itemImg = src3 ? '<img src="' + src3 + '" style="width:22px;height:22px;border-radius:50%;flex-shrink:0">' : '';
                 } else {
                     const src2s = getClass2IconByClass3(pf);
-                    const i2 = src2s ? '<img src="' + src2s + '" style="width:36px;height:36px;border-radius:50%;flex-shrink:0">' : '';
-                    const i3 = src3 ? '<img src="' + src3 + '" style="width:36px;height:36px;border-radius:50%;flex-shrink:0">' : '';
+                    const i2 = src2s ? '<img src="' + src2s + '" style="width:20px;height:20px;border-radius:50%;flex-shrink:0">' : '';
+                    const i3 = src3 ? '<img src="' + src3 + '" style="width:22px;height:22px;border-radius:50%;flex-shrink:0">' : '';
                     itemImg = i2 + i3;
                 }
                 return '<div onmousedown="_selectingItem=true;event.preventDefault();selectProfaByItemIdxDirect(' + idx + ',' + itemI + ')" style="display:flex;align-items:center;gap:6px;padding:7px 12px;cursor:pointer;font-size:12px;color:#e2e8f0;border-bottom:1px solid #1e2530" class="pfa-dd-item">' +
