@@ -4294,27 +4294,25 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     </div>`;
                 }).join('') : '';
 
-                // Считаем итоги — суммируем по пакам из screenPlayersMap
-                // Это те же данные что показываются справа у каждого пака
+                // Считаем итоги — суммируем по уникальным пакам из screenPlayersMap
+                // Дедупликация по нормализованному имени первого игрока (лидера)
                 let totalKills = 0, totalDeaths = 0, totalPvp = 0, totalPve = 0;
-                const spmPacks = Object.values(screenPlayersMapDay);
-                if (spmPacks.length > 0) {
-                    // Собираем уникальных игроков по имени (защита от дублей паков)
-                    const seen = {};
-                    spmPacks.forEach(players => {
+                const spmEntries = Object.entries(screenPlayersMapDay);
+                if (spmEntries.length > 0) {
+                    const seenLeaders = new Set();
+                    spmEntries.forEach(([packKey, players]) => {
+                        if (!players || players.length === 0) return;
+                        const leaderKey = normalizeNick(players[0].name || packKey);
+                        if (seenLeaders.has(leaderKey)) return;
+                        seenLeaders.add(leaderKey);
                         players.forEach(p => {
-                            const key = normalizeNick(p.name||'');
-                            if (!seen[key]) {
-                                seen[key] = true;
-                                totalKills  += (p.kills||0);
-                                totalDeaths += (p.deaths||0);
-                                totalPvp    += (p.pvp_dmg||0);
-                                totalPve    += (p.pve_dmg||0);
-                            }
+                            totalKills  += (p.kills||0);
+                            totalDeaths += (p.deaths||0);
+                            totalPvp    += (p.pvp_dmg||0);
+                            totalPve    += (p.pve_dmg||0);
                         });
                     });
                 } else if (cmdChannel.length > 0) {
-                    // Fallback: суммируем командный канал
                     cmdChannel.forEach(cc => {
                         totalKills  += (cc.kills||0);
                         totalDeaths += (cc.deaths||0);
