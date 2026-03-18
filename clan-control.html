@@ -3121,37 +3121,43 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
 - Есть строка "Лидер: ИМЯ"
 - Есть строка "Состав: N чел. / N рядом"
 - Есть таблица "Член группы" с колонками: имя | иконка | × | 💀 | PvP урон | PvE урон
-- Заголовок окна = название пака (например "NKIZIMO", "ВИЗАРД" и т.д.)
-- НА ФОНЕ ИГРЫ могут быть случайные тексты — статусы персонажей, чат, сообщения — ПОЛНОСТЬЮ ИГНОРИРУЙ ИХ
-- pack_name берётся ТОЛЬКО из заголовка окна "Член группы", не из фонового текста
+- Заголовок окна = название пака (например "ВИЗАРД", "BLizZy" и т.д.)
 
 ОКНО "КОМАНДНЫЙ КАНАЛ" — определяй строго по содержимому:
 - Заголовок: "Командный канал"
-- Есть строка "Состав: N груп. / N чел. / N рядом" — N чел. = ОБЩЕЕ число всех игроков рейда
-- Таблица с колонками: Лидер | 👥 | × | 💀 | PvP урон | PvE урон
-- Каждая строка = лидер пака и СУММАРНАЯ стата его группы (не личная!)
+- Строка "Состав: N груп. / N чел. / N рядом"
+- Таблица: Лидер | 👥 | × | 💀 | PvP урон | PvE урон
 
-СТРОГО БЕРИ ДАННЫЕ ТОЛЬКО ИЗ ТАБЛИЦ ЭТИХ ДВУХ ОКОН. Любой текст вне этих окон — игнорируй полностью.
+СТРОГО БЕРИ ДАННЫЕ ТОЛЬКО ИЗ ТАБЛИЦ ЭТИХ ДВУХ ОКОН. Любой текст вне окон — игнорируй.
 
 ИЗВЛЕКИ всех участников из окна ГРУППЫ (таблица "Член группы").${isFirst ? `
-Также прочитай из окна "Командный канал": общее число игроков и всех лидеров с их суммарной статой группы.` : ''}
+Также прочитай из окна "Командный канал": общее число игроков и всех лидеров с их суммарной статой.` : ''}
 
 Верни ТОЛЬКО JSON без markdown:
-{"pack_name":"ИМЯ ПАКА","pack_leader":"ИМЯ ЛИДЕРА","total_count":9,${isFirst ? '"raid_total":67,"command_channel":[{"leader":"ВИЗАРД","members":9,"kills":3,"deaths":60,"pvp_dmg":262,"pve_dmg":103}],' : ''}"players":[{"name":"ВИЗАРД","class2":"Bishop","kills":0,"deaths":4,"pvp_dmg":3,"pve_dmg":0},{"name":"Ник","class2":null,"kills":0,"deaths":4,"pvp_dmg":3,"pve_dmg":0}]}
+{"pack_name":"ИМЯ ПАКА","pack_leader":"ИМЯ ЛИДЕРА","total_count":9,${isFirst ? '"raid_total":67,"command_channel":[{"leader":"ВИЗАРД","members":9,"kills":6,"deaths":87,"pvp_dmg":370,"pve_dmg":717}],' : ''}"players":[{"name":"ВИЗАРД","class2":"Bishop","kills":0,"deaths":16,"pvp_dmg":0,"pve_dmg":0},{"name":"Ник","class2":null,"kills":4,"deaths":9,"pvp_dmg":139,"pve_dmg":16}]}
 
 Требования:
-- pack_name = заголовок окна ГРУППЫ — это текст В САМОЙ ВЕРХНЕЙ СТРОКЕ окна с таблицей "Член группы". НЕ берёт из фона, чата, статусов персонажей или любого текста вне окна
+- pack_name = заголовок окна ГРУППЫ (верхняя строка окна с таблицей "Член группы")
 - pack_leader = имя из строки "Лидер: ИМЯ" внутри окна ГРУППЫ
-- total_count = число из строки "Состав: N чел." окна ГРУППЫ${isFirst ? '\n- raid_total = число из строки "Состав: N груп. / N чел." окна Командного канала (второе число)\n- command_channel = все строки таблицы Командного канала (суммарная стата группы на каждого лидера)' : ''}
-- players = ВСЕ строки из таблицы "Член группы" включая лидера — берёшь их личную стату прямо из этой таблицы
-- Лидер ЕСТЬ в таблице "Член группы" — включи его как обычного участника с его личными цифрами
-- Имена точно как написано (регистр важен)
-- Колонки таблицы "Член группы" слева направо: имя | иконка класса | × (kills) | 💀 (deaths) | PvP урон | PvE урон
-- kills = ТОЛЬКО маленькое число в колонке × (обычно 0-50), deaths = ТОЛЬКО маленькое число в колонке 💀 (обычно 0-100)
-- pvp_dmg = число в колонке "PvP урон" (может быть большим: сотни, тысячи), pve_dmg = число в колонке "PvE урон"
-- ВАЖНО: не путай урон со смертями — смерти это маленькое число (0-100), урон может быть тысячи
-- class2 = название класса по иконке в колонке "иконка класса" — это ВТОРАЯ профессия персонажа в Lineage 2. Возможные значения: Paladin, Dark Avenger, Gladiator, Warlord, Treasure Hunter, Hawkeye, Temple Knight, Sword Singer, Silver Ranger, Plains Walker, Shillien Knight, Bladedancer, Abyss Walker, Phantom Ranger, Spellhowler, Phantom Summoner, Shillien Elder, Sorcerer, Necromancer, Warlock, Spellsinger, Elemental Summoner, Bishop, Prophet, Elven Elder, Overlord, Warcryer, Destroyer, Tyrant, Bounty Hunter, Warsmith, Berserker, Male Soulbreaker, Female Soulbreaker, Arbalester, Inspector. Если не можешь определить — ставь null
-- Если значение не видно — ставь 0`;
+- total_count = число из строки "Состав: N чел." окна ГРУППЫ${isFirst ? '\n- raid_total = второе число из "Состав: N груп. / N чел." командного канала\n- command_channel = все строки таблицы командного канала' : ''}
+- players = ВСЕ строки таблицы "Член группы" включая лидера
+
+КРИТИЧЕСКИ ВАЖНО — порядок колонок в таблице "Член группы":
+  1. Имя персонажа
+  2. Иконка класса (картинка)
+  3. × — это УБИЙСТВА (kills). Маленькое целое число, обычно 0-50.
+  4. 💀 — это СМЕРТИ (deaths). Маленькое целое число, обычно 0-50.
+  5. PvP урон — может быть большим: 0, 139, 1238, 5122 и т.д.
+  6. PvE урон — может быть большим: 0, 16, 701, 1444 и т.д.
+
+ПРАВИЛА ВАЛИДАЦИИ (обязательно проверь перед выводом):
+- kills и deaths — это МАЛЕНЬКИЕ числа (0-99). Если видишь число больше 100 в колонке × или 💀 — ты читаешь не ту колонку!
+- pvp_dmg и pve_dmg — могут быть ЛЮБЫМИ числами включая большие
+- Никогда не путай kills/deaths с pvp_dmg/pve_dmg
+- Если kills === deaths для большинства игроков — ты перепутал колонки, исправь
+- class2 = класс по иконке (второй клас в L2). Если не определить — null
+- Имена точно как написано, регистр важен
+- Если значение не видно — 0`;
 
                     // Пауза между запросами чтобы не превышать rate limit
                     if (i > 0) await new Promise(r => setTimeout(r, 2000));
@@ -3218,6 +3224,29 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
 
                     // Поддержка нового формата {total_count, players} и старого формата []
                     const players = Array.isArray(parsed) ? parsed : (parsed.players || []);
+
+                    // ===== АВТОКОРРЕКЦИЯ ПЕРЕПУТАННЫХ КОЛОНОК =====
+                    // Если AI перепутал deaths и pvp_dmg (kills===deaths у большинства игроков)
+                    if (players.length >= 3) {
+                        const sameKD = players.filter(p => (p.kills||0) === (p.deaths||0) && (p.kills||0) > 0).length;
+                        const bigDeaths = players.filter(p => (p.deaths||0) > 100).length;
+                        if (sameKD >= players.length * 0.5 || bigDeaths >= 2) {
+                            // Скорее всего перепутаны: deaths ↔ pvp_dmg
+                            console.warn(`Скрин ${i+1}: подозрение на перепутанные колонки, исправляю...`);
+                            players.forEach(p => {
+                                // Если deaths > 100 — это pvp_dmg, а реальные deaths потеряны → обнуляем
+                                if ((p.deaths||0) > 100) {
+                                    p.pvp_dmg = p.pvp_dmg || p.deaths;
+                                    p.deaths = 0;
+                                }
+                                // Если kills === deaths и kills > 0 — deaths скорее всего pvp_dmg
+                                if (p.kills === p.deaths && p.kills > 0 && (p.pvp_dmg||0) === 0) {
+                                    p.pvp_dmg = p.deaths;
+                                    p.deaths = 0;
+                                }
+                            });
+                        }
+                    }
 
                     // Сохраняем raid_total и command_channel с первого скриншота
                     if (i === 0 && parsed.raid_total) {
@@ -4265,14 +4294,41 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     </div>`;
                 }).join('') : '';
 
-                // Считаем итоги дня из dayPlayers (снапшот — все игроки)
+                // Считаем итоги — суммируем по пакам из screenPlayersMap
+                // Это те же данные что показываются справа у каждого пака
                 let totalKills = 0, totalDeaths = 0, totalPvp = 0, totalPve = 0;
-                dayPlayers.forEach(p => {
-                    totalKills  += (p.kills||0);
-                    totalDeaths += (p.deaths||0);
-                    totalPvp    += (p.pvp_dmg||0);
-                    totalPve    += (p.pve_dmg||0);
-                });
+                const spmPacks = Object.values(screenPlayersMapDay);
+                if (spmPacks.length > 0) {
+                    // Собираем уникальных игроков по имени (защита от дублей паков)
+                    const seen = {};
+                    spmPacks.forEach(players => {
+                        players.forEach(p => {
+                            const key = normalizeNick(p.name||'');
+                            if (!seen[key]) {
+                                seen[key] = true;
+                                totalKills  += (p.kills||0);
+                                totalDeaths += (p.deaths||0);
+                                totalPvp    += (p.pvp_dmg||0);
+                                totalPve    += (p.pve_dmg||0);
+                            }
+                        });
+                    });
+                } else if (cmdChannel.length > 0) {
+                    // Fallback: суммируем командный канал
+                    cmdChannel.forEach(cc => {
+                        totalKills  += (cc.kills||0);
+                        totalDeaths += (cc.deaths||0);
+                        totalPvp    += (cc.pvp_dmg||0);
+                        totalPve    += (cc.pve_dmg||0);
+                    });
+                } else {
+                    dayPlayers.forEach(p => {
+                        totalKills  += (p.kills||0);
+                        totalDeaths += (p.deaths||0);
+                        totalPvp    += (p.pvp_dmg||0);
+                        totalPve    += (p.pve_dmg||0);
+                    });
+                }
                 const hasTotals   = totalKills+totalDeaths+totalPvp+totalPve > 0;
 
                 return `<div class="card mb-6">
