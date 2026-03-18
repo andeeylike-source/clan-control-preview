@@ -3819,15 +3819,36 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 kmProfaOverrides[dateStr][key] = profa;
                 if (!playerProfaByDate[key]) playerProfaByDate[key] = {};
                 playerProfaByDate[key][dateStr] = profa;
+
+                // Автоматически добавляем профу в ростер игрока если её там нет
+                const rp = roster.find(r => normalizeNick(r.name) === key);
+                if (rp && profa !== '—') {
+                    if (!rp.profas) rp.profas = rp.profa && rp.profa !== '—' ? [rp.profa] : [];
+                    if (!rp.profas.includes(profa)) {
+                        rp.profas.push(profa);
+                        if (!rp.profa || rp.profa === '—') rp.profa = profa;
+                    }
+                }
             }
             saveToStorage();
-            // Если профиль этого игрока открыт — обновляем
-            if (document.getElementById('page-profile').classList.contains('active') && currentProfileName) {
-                const rp = roster.find(r => normalizeNick(r.name) === key);
-                if (rp) renderPlayerProfile(rp.name);
+
+            // Обновляем иконку профы прямо в DOM — без полного перерендера
+            // Находим строку игрока в раскрытом паке по data-атрибутам
+            const rowEl = document.querySelector(`[data-kmprofa-key="${key}"][data-kmprofa-date="${dateStr}"]`);
+            if (rowEl && profa && profa !== '—') {
+                rowEl.innerHTML = profaIconHtml(profa, 20);
             }
-            // Обновляем историю КМ если открыта
-            if (document.getElementById('page-screenshots').classList.contains('active')) renderScreenshotArchive();
+
+            // Закрываем меню профы
+            document.querySelectorAll('.profa-menu').forEach(m => m.style.display = 'none');
+
+            // Если профиль этого игрока открыт — обновляем его
+            if (document.getElementById('page-profile').classList.contains('active') && currentProfileName) {
+                const rp2 = roster.find(r => normalizeNick(r.name) === key);
+                if (rp2 && normalizeNick(currentProfileName) === key) {
+                    renderPlayerProfile(rp2.name);
+                }
+            }
         }
 
         function getKmProfa(dateStr, playerName) {
@@ -4473,19 +4494,25 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                         const normPKey = normalizeNick(p.name);
                         const savedKmProfa = (playerProfaByDate[normPKey] && playerProfaByDate[normPKey][dateStr]) || null;
                         const memberProfa = savedKmProfa || (inRoster ? (inRoster.profa || '—') : '—');
-                        const memberProfaHtml = memberProfa && memberProfa !== '—' ? profaIconHtml(memberProfa, 20) : '';
-                        const mProfas = inRoster && inRoster.profas && inRoster.profas.length > 1 ? inRoster.profas : (inRoster && inRoster.profa && inRoster.profa !== '—' ? [inRoster.profa] : []);
-                        const profaSwitchHtml = mProfas.length > 1
-                            ? (function() {
-                                const items = mProfas.map(pf => {
-                                    const shortName = (PROFA_NAMES&&PROFA_NAMES[pf]) ? pf.split(' (')[0].split(' ').slice(0,2).join(' ')+'('+PROFA_NAMES[pf]+')' : pf.split(' (')[0];
-                                    const enc = encodeURIComponent(pf);
-                                    const check = pf === memberProfa ? ' ✓' : '';
-                                    return '<div onclick="setKmProfa(\'' + dateStr + '\',decodeURIComponent(\'' + encodeURIComponent(normPKey) + '\'),decodeURIComponent(\'' + enc + '\'));this.closest(\'.profa-menu\').style.display=\'none\'" style="padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12px;border-bottom:1px solid #1e2530" onmouseover="this.style.background=\'#6366f1\'" onmouseout="this.style.background=\'\'">' + profaIconHtml(pf,16) + ' ' + shortName + check + '</div>';
-                                }).join('');
-                                return '<span style="position:relative;display:inline-flex" class="profa-switch-wrap"><button onclick="toggleProfaMenu(this)" title="Сменить профу" style="background:#1e2530;border:none;color:#64748b;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer;margin-left:4px">🎭▾</button><div class="profa-menu" style="display:none;position:absolute;top:calc(100%+4px);left:0;background:#1a1f29;border:1px solid #6366f1;border-radius:8px;z-index:50;min-width:180px;box-shadow:0 8px 24px rgba(0,0,0,.6)">' + items + '</div></span>';
-                              })()
-                            : '';
+                        const memberProfaHtml = memberProfa && memberProfa !== '—'
+                            ? `<span data-kmprofa-key="${normPKey}" data-kmprofa-date="${dateStr}" style="display:inline-flex;align-items:center">${profaIconHtml(memberProfa, 20)}</span>`
+                            : `<span data-kmprofa-key="${normPKey}" data-kmprofa-date="${dateStr}" style="display:inline-flex;align-items:center"></span>`;
+                        const mProfas = inRoster && inRoster.profas && inRoster.profas.length > 0 ? inRoster.profas : (inRoster && inRoster.profa && inRoster.profa !== '—' ? [inRoster.profa] : []);
+                        // Список для меню: сначала профы игрока, потом разделитель, потом все остальные
+                        const allProfaKeys = Object.keys(PROFA_ICONS || {});
+                        const otherProfas = allProfaKeys.filter(pf => !mProfas.includes(pf));
+                        const menuProfas = [...mProfas, ...otherProfas];
+                        const profaSwitchHtml = inRoster ? (function() {
+                            const items = menuProfas.map((pf, idx) => {
+                                const shortName = (PROFA_NAMES&&PROFA_NAMES[pf]) ? pf.split(' (')[0].split(' ').slice(0,2).join(' ')+'('+PROFA_NAMES[pf]+')' : pf.split(' (')[0];
+                                const enc = encodeURIComponent(pf);
+                                const check = pf === memberProfa ? ' ✓' : '';
+                                const sep = idx === mProfas.length && otherProfas.length > 0 && mProfas.length > 0 ? '<div style="height:1px;background:#2d3748;margin:4px 0"></div>' : '';
+                                return sep + '<div onclick="setKmProfa(\'' + dateStr + '\',decodeURIComponent(\'' + encodeURIComponent(normPKey) + '\'),decodeURIComponent(\'' + enc + '\'));this.closest(\'.profa-menu\').style.display=\'none\'" style="padding:6px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12px;border-bottom:1px solid #1e253044" onmouseover="this.style.background=\'#6366f1\'" onmouseout="this.style.background=\'\'">' + profaIconHtml(pf,16) + ' ' + shortName + check + '</div>';
+                            }).join('');
+                            return '<span style="position:relative;display:inline-flex" class="profa-switch-wrap"><button onclick="toggleProfaMenu(this)" title="Сменить профу" style="background:#1e2530;border:none;color:#64748b;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer;margin-left:4px">🎭▾</button><div class="profa-menu" style="display:none;position:absolute;top:calc(100%+4px);left:0;background:#1a1f29;border:1px solid #6366f1;border-radius:8px;z-index:50;min-width:200px;max-height:280px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.6)">' + items + '</div></span>';
+                          })()
+                        : '';
                         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:#0b0e14;border-radius:6px;margin-bottom:4px;font-size:12px">
                             <span style="font-weight:600;display:flex;align-items:center;gap:6px">${memberProfaHtml}<span class="player-nick-link" onclick="openPlayerProfile('${p.name.replace(/'/g,"\\'")}')" style="cursor:pointer">${p.name}</span>${badgeHtml}${profaSwitchHtml}${editBtn}</span>
                             <span style="display:flex;gap:12px">
