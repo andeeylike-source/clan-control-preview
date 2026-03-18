@@ -4265,47 +4265,14 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     </div>`;
                 }).join('') : '';
 
-                // Считаем итоги дня — суммируем dispKills каждого пака (то что отображается справа)
+                // Считаем итоги дня из dayPlayers (снапшот — все игроки)
                 let totalKills = 0, totalDeaths = 0, totalPvp = 0, totalPve = 0;
-                if (cmdChannel.length > 0) {
-                    cmdChannel.forEach(cc => {
-                        // Повторяем ту же логику что и в leadersHtml для dispKills
-                        const normLeader = normalizeNick(cc.leader);
-                        let packName = Object.entries(packLeadersMap).find(([,l]) => normalizeNick(l) === normLeader)?.[0];
-                        if (!packName) {
-                            for (const spKey of Object.keys(screenPlayersMapDay)) {
-                                if (normalizeNick(spKey) === normLeader) { packName = spKey; break; }
-                            }
-                        }
-                        let screenParty = packName ? (screenPlayersMapDay[packName] || []) : [];
-                        if (screenParty.length === 0) {
-                            for (const [spKey, spPlayers] of Object.entries(screenPlayersMapDay)) {
-                                if (spPlayers.length > 0 && spPlayers[0].name && normalizeNick(spPlayers[0].name) === normLeader) { screenParty = spPlayers; break; }
-                            }
-                        }
-                        if (screenParty.length === 0) {
-                            for (const [spKey, spPlayers] of Object.entries(screenPlayersMapDay)) {
-                                if (spPlayers.some(p => p.name && normalizeNick(p.name) === normLeader)) { screenParty = spPlayers; break; }
-                            }
-                        }
-                        if (screenParty.length > 0) {
-                            totalKills  += screenParty.reduce((s,p)=>s+(p.kills||0),0);
-                            totalDeaths += screenParty.reduce((s,p)=>s+(p.deaths||0),0);
-                            totalPvp    += screenParty.reduce((s,p)=>s+(p.pvp_dmg||0),0);
-                            totalPve    += screenParty.reduce((s,p)=>s+(p.pve_dmg||0),0);
-                        } else {
-                            totalKills  += (cc.kills||0);
-                            totalDeaths += (cc.deaths||0);
-                            totalPvp    += (cc.pvp_dmg||0);
-                            totalPve    += (cc.pve_dmg||0);
-                        }
-                    });
-                } else {
-                    totalKills  = dayPlayers.reduce((s,p)=>s+(p.kills||0),0);
-                    totalDeaths = dayPlayers.reduce((s,p)=>s+(p.deaths||0),0);
-                    totalPvp    = dayPlayers.reduce((s,p)=>s+(p.pvp_dmg||0),0);
-                    totalPve    = dayPlayers.reduce((s,p)=>s+(p.pve_dmg||0),0);
-                }
+                dayPlayers.forEach(p => {
+                    totalKills  += (p.kills||0);
+                    totalDeaths += (p.deaths||0);
+                    totalPvp    += (p.pvp_dmg||0);
+                    totalPve    += (p.pve_dmg||0);
+                });
                 const hasTotals   = totalKills+totalDeaths+totalPvp+totalPve > 0;
 
                 return `<div class="card mb-6">
@@ -5406,6 +5373,8 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             renderCalendar();
             renderPacks();
             renderRoster();
+            // Синхронизируем статистику ростера из снапшотов при старте
+            syncRosterStatsFromSnapshots();
         };
     </script>
     <!-- DATE PICKER POPUP -->
