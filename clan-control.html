@@ -4276,7 +4276,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                         const memberProfa = inRoster ? (inRoster.profa || '—') : '—';
                         const memberProfaHtml = memberProfa && memberProfa !== '—' ? profaIconHtml(memberProfa, 20) : '';
                         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:#0b0e14;border-radius:6px;margin-bottom:4px;font-size:12px">
-                            <span style="font-weight:600;display:flex;align-items:center;gap:6px">${memberProfaHtml}<span>${p.name}</span>${badgeHtml}${editBtn}</span>
+                            <span style="font-weight:600;display:flex;align-items:center;gap:6px">${memberProfaHtml}<span class="player-nick-link" onclick="openPlayerProfile('${p.name.replace(/'/g,"\\'")}')" style="cursor:pointer">${p.name}</span>${badgeHtml}${editBtn}</span>
                             <span style="display:flex;gap:12px">
                                 <span style="color:#f59e0b">⚔️ ${p.kills||0}</span>
                                 <span style="color:#ef4444">💀 ${p.deaths||0}</span>
@@ -4324,7 +4324,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                              style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#1a1f29;cursor:pointer">
                             <div style="display:flex;align-items:center;gap:10px">
                                 ${(() => { const lr = roster.find(r => normalizeNick(r.name) === normalizeNick(cc.leader)); const lp = lr ? (lr.profa || '—') : '—'; return lp && lp !== '—' ? profaIconHtml(lp, 24) : ''; })()}
-                                <span style="font-weight:800;font-size:13px">${cc.leader}</span>
+                                <span class="player-nick-link" onclick="openPlayerProfile('${cc.leader.replace(/'/g,"\\'")}')" style="font-weight:800;font-size:13px;cursor:pointer">${cc.leader}</span>
                                 ${packName ? `<span style="font-size:9px;background:#1e2530;color:#94a3b8;padding:1px 6px;border-radius:3px;text-transform:uppercase">${packName}</span>` : ''}
                                 <span style="font-size:10px;color:#64748b">👥 ${partyPlayers.length > 0 ? partyPlayers.length : (cc.members||0)}</span>
                                 ${hasDiscrepancy ? `<span title="Расхождение с командным каналом" style="font-size:11px">⚠️</span>` : ''}
