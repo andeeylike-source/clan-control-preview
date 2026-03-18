@@ -452,7 +452,11 @@
                     <div style="display:flex;align-items:center;gap:8px">
                         <span style="font-size:11px;color:#64748b">Порог:</span>
                         <div style="display:flex;gap:4px">
-                            ${[3,4,5,6,7].map(n => `<button onclick="setCcThreshold(${n})" id="ccBtn${n}" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">${n}</button>`).join('')}
+                            <button onclick="setCcThreshold(3)" id="ccBtn3" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">3</button>
+                            <button onclick="setCcThreshold(4)" id="ccBtn4" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">4</button>
+                            <button onclick="setCcThreshold(5)" id="ccBtn5" style="background:#6366f1;border:1px solid #6366f1;color:#fff;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">5</button>
+                            <button onclick="setCcThreshold(6)" id="ccBtn6" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">6</button>
+                            <button onclick="setCcThreshold(7)" id="ccBtn7" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">7</button>
                         </div>
                         <span style="font-size:11px;color:#64748b">КМ подряд</span>
                     </div>
@@ -2676,9 +2680,12 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     const seenLeaders = new Set();
                     Object.entries(spm).forEach(([packKey, players]) => {
                         if (!players || players.length === 0) return;
+                        // Дедупликация по нормализованному имени первого игрока И имени пака
                         const leaderKey = normalizeNick(players[0].name || packKey);
-                        if (seenLeaders.has(leaderKey)) return; // дубль пака
+                        const packNormKey = normalizeNick(packKey);
+                        if (seenLeaders.has(leaderKey) || seenLeaders.has(packNormKey)) return;
                         seenLeaders.add(leaderKey);
+                        seenLeaders.add(packNormKey);
                         playersForDate.push(...players);
                     });
                 } else {
@@ -4174,6 +4181,9 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                         </div>
                     </div>` : '';
 
+                // Накапливаем итоги прямо из dispKills каждого пака
+                let totalKills = 0, totalDeaths = 0, totalPvp = 0, totalPve = 0;
+
                 const leadersHtml = hasCommandChannel ? cmdChannel.map((cc) => {
                     // Ищем пак по нормализованному имени лидера
                     const normLeader = normalizeNick(cc.leader);
@@ -4272,6 +4282,11 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     const dispDeaths  = partyPlayers.length > 0 ? sumDeaths  : (cc.deaths||0);
                     const dispPvp     = partyPlayers.length > 0 ? sumPvp     : (cc.pvp_dmg||0);
                     const dispPve     = partyPlayers.length > 0 ? sumPve     : (cc.pve_dmg||0);
+                    // Накапливаем в общий итог
+                    totalKills  += dispKills;
+                    totalDeaths += dispDeaths;
+                    totalPvp    += dispPvp;
+                    totalPve    += dispPve;
 
                     // Расхождения с командным каналом
                     const ccKills  = cc.kills  || 0;
@@ -4311,18 +4326,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     </div>`;
                 }).join('') : '';
 
-                // Считаем итоги — прямая сумма dayPlayers (уникальные по имени)
-                let totalKills = 0, totalDeaths = 0, totalPvp = 0, totalPve = 0;
-                const _seen = new Set();
-                dayPlayers.forEach(p => {
-                    const _k = normalizeNick(p.name||'');
-                    if (_seen.has(_k)) return;
-                    _seen.add(_k);
-                    totalKills  += (p.kills||0);
-                    totalDeaths += (p.deaths||0);
-                    totalPvp    += (p.pvp_dmg||0);
-                    totalPve    += (p.pve_dmg||0);
-                });
+                // Итоги накоплены выше из dispKills каждого пака
                 const hasTotals   = totalKills+totalDeaths+totalPvp+totalPve > 0;
 
                 return `<div class="card mb-6">
