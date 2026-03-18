@@ -562,18 +562,6 @@
                     </label>
                 </div>
             </div>
-            <div class="card mb-6">
-                <h2 class="text-lg font-bold mb-2">💾 Экспорт / Импорт данных</h2>
-                <p class="text-slate-500 text-sm mb-4">Сохраняй данные в файл и загружай обратно. Удобно для переноса между устройствами или резервного копирования.</p>
-                <div class="flex gap-3 flex-wrap">
-                    <button onclick="exportData()" style="background:#1e3a5f;color:#60a5fa;border:none;padding:10px 20px;border-radius:10px;cursor:pointer;font-weight:600">📤 Экспорт в JSON</button>
-                    <label style="background:#1a3a1a;color:#4ade80;border:none;padding:10px 20px;border-radius:10px;cursor:pointer;font-weight:600">
-                        📥 Импорт из JSON
-                        <input type="file" accept=".json" onchange="importData(event)" style="display:none">
-                    </label>
-                </div>
-                <div id="importStatus" style="display:none;margin-top:12px;font-size:13px;padding:10px;border-radius:8px"></div>
-            </div>
             <div class="card">
                 <h2 class="text-lg font-bold mb-2">🗑️ Данные</h2>
                 <p class="text-slate-500 text-sm mb-4">Сбросить все данные приложения (ростер, статистика, события). Ключи сохранятся.</p>
@@ -4265,12 +4253,25 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     </div>`;
                 }).join('') : '';
 
+                // Считаем итоги дня
+                const totalKills  = dayPlayers.reduce((s,p)=>s+(p.kills||0),0);
+                const totalDeaths = dayPlayers.reduce((s,p)=>s+(p.deaths||0),0);
+                const totalPvp    = dayPlayers.reduce((s,p)=>s+(p.pvp_dmg||0),0);
+                const totalPve    = dayPlayers.reduce((s,p)=>s+(p.pve_dmg||0),0);
+                const hasTotals   = totalKills+totalDeaths+totalPvp+totalPve > 0;
+
                 return `<div class="card mb-6">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                         <div>
                             <div style="font-size:18px;font-weight:800">${dateFormatted}</div>
                             <div style="font-size:12px;color:#f59e0b;font-weight:700;text-transform:uppercase;margin-top:2px">⚔️ ${eventLabel}</div>
                             ${recognized > 0 ? `<div style="font-size:11px;color:#64748b;margin-top:3px">👥 ${recognized} игроков${missing > 0 ? ` · <span style="color:#f87171">⚠️ не хватает ${missing}</span>` : ''}</div>` : ''}
+                            ${hasTotals ? `<div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap">
+                                <span style="font-size:13px;font-weight:700;color:#f59e0b">⚔️ ${totalKills.toLocaleString()}</span>
+                                <span style="font-size:13px;font-weight:700;color:#ef4444">💀 ${totalDeaths.toLocaleString()}</span>
+                                <span style="font-size:13px;font-weight:700;color:#818cf8">🗡️ ${totalPvp.toLocaleString()}</span>
+                                <span style="font-size:13px;font-weight:700;color:#22c55e">🐉 ${totalPve.toLocaleString()}</span>
+                            </div>` : ''}
                         </div>
                         <button onclick="openCalendarDay('${dateStr}')" style="background:none;border:1px solid #2d3748;color:#94a3b8;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#94a3b8'">📅 Открыть в календаре</button>
                     </div>
@@ -4535,81 +4536,6 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 console.warn('localStorage load failed:', e);
                 return false;
             }
-        }
-
-        function exportData() {
-            const data = {
-                version: 2,
-                exportedAt: new Date().toISOString(),
-                appStorageKey: 'clanControl_v1',
-                data: {
-                    roster,
-                    archive,
-                    packs,
-                    manualEvents,
-                    eventStatuses,
-                    eventOverrides,
-                    kmStats: {},
-                    nickAliases,
-                    exhaustedKeys,
-                    appliedStatsByDate
-                }
-            };
-            const json = JSON.stringify(data, null, 2);
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            const date = new Date().toISOString().slice(0,19).replace('T','-').replace(/:/g,'-');
-            a.href = url;
-            a.download = `clan-control-backup-${date}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        function importData(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const st = document.getElementById('importStatus');
-            st.style.cssText = 'display:block;background:#1e1b4b;border:1px solid #6366f144;color:#a5b4fc;font-size:13px;padding:10px;border-radius:8px;margin-top:12px';
-            st.innerText = '⏳ Читаю файл...';
-            const reader = new FileReader();
-            reader.onload = e => {
-                try {
-                    const json = JSON.parse(e.target.result);
-                    // Поддержка обоих форматов: v1 (data.data) и прямой объект
-                    const d = json.data || json;
-                    if (!d.roster) throw new Error('Неверный формат файла — нет данных ростера');
-
-                    showConfirm(
-                        '📥 Импортировать данные?',
-                        `Файл от ${json.exportedAt ? new Date(json.exportedAt).toLocaleString('ru-RU') : 'неизвестно'}.\nИгроков: ${d.roster.length}, снапшотов КМ: ${Object.keys(d.appliedStatsByDate||{}).length}.\n\nТекущие данные будут заменены!`,
-                        () => {
-                            if (d.roster)             roster              = d.roster;
-                            if (d.archive)            archive             = d.archive;
-                            if (d.packs)              packs               = d.packs;
-                            if (d.manualEvents)       manualEvents        = d.manualEvents;
-                            if (d.eventStatuses)      eventStatuses       = d.eventStatuses;
-                            if (d.eventOverrides)     eventOverrides      = d.eventOverrides;
-                            if (d.nickAliases)        nickAliases         = d.nickAliases;
-                            if (d.exhaustedKeys)      exhaustedKeys       = d.exhaustedKeys;
-                            if (d.appliedStatsByDate) appliedStatsByDate  = d.appliedStatsByDate;
-                            saveToStorage();
-                            renderRoster();
-                            renderCalendar();
-                            renderPacks();
-                            st.style.cssText = 'display:block;background:#14532d22;border:1px solid #22c55e44;color:#4ade80;font-size:13px;padding:10px;border-radius:8px;margin-top:12px';
-                            st.innerText = `✅ Импортировано! Игроков: ${roster.length}, КМ дней: ${Object.keys(appliedStatsByDate).length}`;
-                            setTimeout(() => st.style.display = 'none', 5000);
-                        },
-                        true
-                    );
-                } catch(err) {
-                    st.style.cssText = 'display:block;background:#7f1d1d22;border:1px solid #ef444444;color:#f87171;font-size:13px;padding:10px;border-radius:8px;margin-top:12px';
-                    st.innerText = `❌ Ошибка: ${err.message}`;
-                }
-            };
-            reader.readAsText(file);
-            event.target.value = '';
         }
 
         function clearStorage() {
