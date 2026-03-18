@@ -1915,7 +1915,9 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 const snap = appliedStatsByDate[d];
                 const p = snap && snap.players && snap.players.find(p => normalizeNick(p.name) === normKey);
                 // Профа вручную назначена на этот КМ?
-                const assignedProfa = (playerProfaByDate[normKey] && playerProfaByDate[normKey][d]) || null;
+                const assignedProfa = (playerProfaByDate[normKey] && playerProfaByDate[normKey][d])
+                    || (playerProfaByDate[player.name] && playerProfaByDate[player.name][d])
+                    || null;
                 const kmProfa = assignedProfa
                     || (p && p.profa && p.profa !== '—' ? p.profa : null)
                     || (player.profa && player.profa !== '—' ? player.profa : null);
@@ -1925,9 +1927,16 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 // Если проф 1 — все КМ в стате. Если проф > 1:
                 //   - КМ с назначенной профой = активной → в стате
                 //   - КМ без назначенной профы → НЕ в стате (неизвестно на чём играл)
+                const normActive = activeProfaForProfile ? activeProfaForProfile.toLowerCase().trim() : '';
+                const normAssigned = assignedProfa ? assignedProfa.toLowerCase().trim() : '';
+                const profaMatches = normAssigned && normActive && (
+                    normAssigned === normActive ||
+                    normAssigned.includes(normActive.split(' (')[0].toLowerCase()) ||
+                    normActive.includes(normAssigned.split(' (')[0].toLowerCase())
+                );
                 const inProfaStat = !activeProfaForProfile
                     || allProfasList.length <= 1
-                    || (assignedProfa ? assignedProfa === activeProfaForProfile : false);
+                    || (assignedProfa ? profaMatches : false);
                 return {
                     date: d,
                     present: wasPresent,          // для явки — всегда
@@ -2107,7 +2116,12 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                             <span class="badge badge-${player.rank.toLowerCase()}">${player.rank}</span>
                             ${player.pac && player.pac !== 'СОЛО' ? `<span class="pac-tag">${player.pac}</span>` : '<span style="font-size:10px;color:#475569;background:#1e2530;padding:2px 8px;border-radius:4px">СОЛО</span>'}
                             ${allProfasList.map((pf,i) => {
-                                const kmCount = allDates.filter(d => playerProfaByDate[normKey] && playerProfaByDate[normKey][d] === pf).length;
+                                const kmCount = allDates.filter(d => {
+                                    const ap = playerProfaByDate[normKey] && playerProfaByDate[normKey][d];
+                                    if (!ap) return false;
+                                    const a = ap.toLowerCase().trim(), b = pf.toLowerCase().trim();
+                                    return a === b || a.includes(b.split(' (')[0].toLowerCase()) || b.includes(a.split(' (')[0].toLowerCase());
+                                }).length;
                                 const countLabel = kmCount > 0 ? `<span style="font-size:9px;background:#6366f133;padding:1px 5px;border-radius:3px;margin-left:2px;color:#a5b4fc">${kmCount} КМ</span>` : `<span style="font-size:9px;color:#475569;margin-left:2px">0 КМ</span>`;
                                 return `
                             <button onclick="switchProfileProfa('${player.name.replace(/'/g,"\'")}','${pf.replace(/'/g,"\'")}',this)"
