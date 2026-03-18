@@ -1322,7 +1322,7 @@
                         <span class="font-bold text-slate-200 player-nick-link" onclick="openPlayerProfile('${p.name}')">${p.name}</span> <span class="badge badge-${p.rank.toLowerCase()}">${p.rank}</span>
                     </td>
                     <td>${p.isNew ? '<span class="text-[9px] bg-emerald-500 text-black font-black px-1.5 py-0.5 rounded uppercase">NEW</span>' : '<span style="color:#475569;font-size:11px">—</span>'}</td>
-                    <td class="text-slate-400 text-xs">${(p.profas && p.profas.length > 0 ? p.profas : (p.profa && p.profa !== '—' ? [p.profa] : [])).map((pf,i) => `<span style="display:inline-flex;align-items:center;gap:3px;background:#1e2530;border-radius:4px;padding:1px 6px;margin-right:3px;${i===0?'color:#a5b4fc':'color:#64748b'}">${profaIconHtml(pf, 16)}</span>`).join('') || '<span style="color:#475569">—</span>'}</td>
+                    <td class="text-slate-400 text-xs">${(p.profas && p.profas.length > 0 ? p.profas : (p.profa && p.profa !== '—' ? [p.profa] : [])).map((pf,i) => `<span style="display:inline-flex;align-items:center;gap:5px;background:#1e2530;border-radius:6px;padding:4px 9px;margin-right:4px;${i===0?'color:#a5b4fc':'color:#64748b'}">${profaIconHtml(pf, 22)}</span>`).join('') || '<span style="color:#475569">—</span>'}</td>
                     <td><span class="pac-tag">${p.pac}</span></td>
                     <td class="${p.attendance < 50 ? 'text-red-400' : p.attendance < 70 ? 'text-yellow-400' : 'text-emerald-400'} font-bold">${totalDates > 0 ? p.attendance + '%' : '—'}</td>
                     <td class="text-right">
@@ -1400,8 +1400,8 @@
                     <td class="font-bold text-slate-200">${p.name}</td>
                     <td style="white-space:nowrap">${
                         (p.profas && p.profas.length > 1)
-                            ? p.profas.map(pf => profaIconHtml(pf, 18)).join('<span style="color:#2d3748;margin:0 2px">·</span>')
-                            : profaIconHtml(p.profa, 18)
+                            ? p.profas.map(pf => profaIconHtml(pf, 22)).join('<span style="color:#2d3748;margin:0 2px">·</span>')
+                            : profaIconHtml(p.profa, 22)
                     }</td>
                     <td class="text-right flex gap-3 justify-end">
                         <button onclick="restoreFromArchive(${p.id})" class="text-emerald-500 font-bold hover:underline">Восстановить</button>
@@ -2554,10 +2554,15 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     const display = fmt ? Number(val).toLocaleString() : val;
                     const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
                     const pac = (p.pac && p.pac !== 'СОЛО') ? `<span style="font-size:9px;background:#1e2530;color:#94a3b8;padding:1px 5px;border-radius:3px;margin-left:6px;text-transform:uppercase">${p.pac}</span>` : '';
+                    const rp = roster.find(r => normalizeNick(r.name) === normalizeNick(p.name));
+                    const cardProfa = rp ? (rp.profa || '—') : '—';
+                    const cardProfaHtml = cardProfa && cardProfa !== '—'
+                        ? `<span style="display:inline-flex;align-items:center;margin-left:8px">${profaIconHtml(cardProfa, 20)}</span>`
+                        : '';
                     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#0b0e14;border-radius:8px;margin-bottom:6px">
                         <div style="display:flex;align-items:center;gap:8px;min-width:0">
                             <span style="font-size:16px;flex-shrink:0">${medals[i]}</span>
-                            <span class="player-nick-link" onclick="openPlayerProfile('${p.name}')" style="font-weight:700;font-size:14px">${p.name}</span>${pac}
+                            <span class="player-nick-link" onclick="openPlayerProfile('${p.name}')" style="font-weight:700;font-size:14px">${p.name}</span>${pac}${cardProfaHtml}
                         </div>
                         <span style="font-weight:900;font-size:15px;color:${color};flex-shrink:0;margin-left:8px">${display}</span>
                     </div>`;
@@ -2771,9 +2776,15 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 if (field === 'name') return dir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
                 return dir === 'desc' ? vb-va : va-vb;
             });
-            tbody.innerHTML = sorted.map(p => `
+            tbody.innerHTML = sorted.map(p => {
+                const rp2 = roster.find(r => normalizeNick(r.name) === normalizeNick(p.name));
+                const statProfa = rp2 ? (rp2.profa || '—') : '—';
+                const statProfaHtml = statProfa && statProfa !== '—'
+                    ? `<span style="display:inline-flex;align-items:center;gap:5px;background:#1e2530;border-radius:6px;padding:3px 8px;margin-left:8px">${profaIconHtml(statProfa, 20)}</span>`
+                    : '';
+                return `
                 <tr style="border-bottom:1px solid #1e2530">
-                    <td style="padding:10px 14px;font-weight:700"><span class="player-nick-link" onclick="openPlayerProfile('${p.name}')">${p.name}</span> ${p.isNew ? '<span style="font-size:9px;background:#22c55e;color:#000;font-weight:900;padding:1px 4px;border-radius:3px;text-transform:uppercase">NEW</span>' : ''}</td>
+                    <td style="padding:10px 14px;font-weight:700"><span style="display:inline-flex;align-items:center;gap:6px"><span class="player-nick-link" onclick="openPlayerProfile('${p.name}')">${p.name}</span>${statProfaHtml}</span> ${p.isNew ? '<span style="font-size:9px;background:#22c55e;color:#000;font-weight:900;padding:1px 4px;border-radius:3px;text-transform:uppercase">NEW</span>' : ''}</td>
                     <td style="padding:10px 14px"><span style="font-size:11px;background:#1e2530;color:#94a3b8;padding:2px 8px;border-radius:4px;text-transform:uppercase">${p.pac||'СОЛО'}</span></td>
                     <td style="padding:10px 14px;text-align:center;font-weight:700;color:${p.attendance>=70?'#22c55e':p.attendance>=40?'#f59e0b':'#ef4444'}">${p.attendance}%</td>
                     <td style="padding:10px 14px;text-align:center;color:#a78bfa;font-weight:700">${p.kda}</td>
@@ -2781,7 +2792,8 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     <td style="padding:10px 14px;text-align:center;color:#ef4444;font-weight:700">${p.deaths||0}</td>
                     <td style="padding:10px 14px;text-align:center;color:#6366f1">${(p.pvp_dmg||0).toLocaleString()}</td>
                     <td style="padding:10px 14px;text-align:center;color:#22c55e">${(p.pve_dmg||0).toLocaleString()}</td>
-                </tr>`).join('');
+                </tr>`;
+            }).join('');
         }
 
         // ===== СКРИНШОТЫ В МОДАЛКЕ ДНЯ =====
@@ -4261,8 +4273,10 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                             ? `<span title="Не в ростере — нажми ✏️ чтобы исправить ник" style="color:#f87171;font-size:10px;margin-left:4px">⚠️ не в ростере</span>`
                             : (inRoster.pac === 'СОЛО' ? `<span style="font-size:9px;color:#64748b;background:#1e2530;padding:1px 5px;border-radius:3px;margin-left:5px">соло</span>` : '');
                         const editBtn = `<button onclick="kmRenamePlayer('${dateStr}','${p.name.replace(/'/g,"\\'")}',this)" title="Исправить ник" style="background:none;border:none;color:#475569;cursor:pointer;font-size:11px;padding:0 4px;line-height:1;margin-left:4px;opacity:0;transition:opacity .15s" class="km-edit-btn">✏️</button>`;
+                        const memberProfa = inRoster ? (inRoster.profa || '—') : '—';
+                        const memberProfaHtml = memberProfa && memberProfa !== '—' ? profaIconHtml(memberProfa, 20) : '';
                         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:#0b0e14;border-radius:6px;margin-bottom:4px;font-size:12px">
-                            <span style="font-weight:600;display:flex;align-items:center">${p.name}${badgeHtml}${editBtn}</span>
+                            <span style="font-weight:600;display:flex;align-items:center;gap:6px">${memberProfaHtml}<span>${p.name}</span>${badgeHtml}${editBtn}</span>
                             <span style="display:flex;gap:12px">
                                 <span style="color:#f59e0b">⚔️ ${p.kills||0}</span>
                                 <span style="color:#ef4444">💀 ${p.deaths||0}</span>
@@ -4309,6 +4323,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                         <div onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='block'?'none':'block';this.querySelector('.arr').textContent=b.style.display==='block'?'▲':'▼'"
                              style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#1a1f29;cursor:pointer">
                             <div style="display:flex;align-items:center;gap:10px">
+                                ${(() => { const lr = roster.find(r => normalizeNick(r.name) === normalizeNick(cc.leader)); const lp = lr ? (lr.profa || '—') : '—'; return lp && lp !== '—' ? profaIconHtml(lp, 24) : ''; })()}
                                 <span style="font-weight:800;font-size:13px">${cc.leader}</span>
                                 ${packName ? `<span style="font-size:9px;background:#1e2530;color:#94a3b8;padding:1px 6px;border-radius:3px;text-transform:uppercase">${packName}</span>` : ''}
                                 <span style="font-size:10px;color:#64748b">👥 ${partyPlayers.length > 0 ? partyPlayers.length : (cc.members||0)}</span>
