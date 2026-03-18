@@ -4253,16 +4253,21 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     </div>`;
                 }).join('') : '';
 
-                // Считаем итоги дня из commandChannel (суммарная стата групп со скрина)
-                // Это точнее чем сумма личной статы игроков
-                let totalKills, totalDeaths, totalPvp, totalPve;
-                if (cmdChannel.length > 0) {
-                    totalKills  = cmdChannel.reduce((s,cc)=>s+(cc.kills||0),0);
-                    totalDeaths = cmdChannel.reduce((s,cc)=>s+(cc.deaths||0),0);
-                    totalPvp    = cmdChannel.reduce((s,cc)=>s+(cc.pvp_dmg||0),0);
-                    totalPve    = cmdChannel.reduce((s,cc)=>s+(cc.pve_dmg||0),0);
-                } else {
-                    // Fallback — сумма личной статы игроков
+                // Считаем итоги дня — суммируем личную стату игроков из screenPlayersMap
+                // (цифра 2 на скрине — стата каждого игрока в паке)
+                let totalKills = 0, totalDeaths = 0, totalPvp = 0, totalPve = 0;
+                if (Object.keys(screenPlayersMapDay).length > 0) {
+                    // Суммируем по всем игрокам всех паков из screenPlayersMap
+                    Object.values(screenPlayersMapDay).forEach(players => {
+                        players.forEach(p => {
+                            totalKills  += (p.kills   || 0);
+                            totalDeaths += (p.deaths  || 0);
+                            totalPvp    += (p.pvp_dmg || 0);
+                            totalPve    += (p.pve_dmg || 0);
+                        });
+                    });
+                } else if (dayPlayers.length > 0) {
+                    // Fallback — сумма из снапшота
                     totalKills  = dayPlayers.reduce((s,p)=>s+(p.kills||0),0);
                     totalDeaths = dayPlayers.reduce((s,p)=>s+(p.deaths||0),0);
                     totalPvp    = dayPlayers.reduce((s,p)=>s+(p.pvp_dmg||0),0);
