@@ -450,6 +450,7 @@
                             <th onclick="handleSort('profa')">Профа <span id="sort-profa"></span></th>
                             <th onclick="handleSort('pac')">Пак <span id="sort-pac"></span></th>
                             <th onclick="handleSort('attendance')">КМ % <span id="sort-attendance"></span></th>
+                            <th onclick="handleSort('valueScore')" style="cursor:pointer">Ценность ⭐ <span id="sort-valueScore"></span></th>
                             <th class="text-right">Действия</th>
                         </tr>
                     </thead>
@@ -1337,7 +1338,28 @@
 
             let filtered = roster.filter(p => p.name.toLowerCase().includes(searchQuery));
 
-            // Добавляем КМ% к каждому игроку
+            // Добавляем КМ% и Ценность к каждому игроку
+            const _statsMapRoster = calcStatsForPeriod(rosterDateFrom, rosterDateTo);
+            const _allRosterStats = Object.values(_statsMapRoster);
+            const _maxKillsR  = Math.max(..._allRosterStats.map(s=>s.kills||0), 1);
+            const _maxPvpR    = Math.max(..._allRosterStats.map(s=>s.pvp_dmg||0), 1);
+            const _maxPveR    = Math.max(..._allRosterStats.map(s=>s.pve_dmg||0), 1);
+            const _maxDeathsR = Math.max(..._allRosterStats.map(s=>s.deaths||0), 1);
+            const _allSortedR = [..._allRosterStats].sort((a,b)=>(b.kills||0)-(a.kills||0));
+
+            // ROLE_MAP для ростера
+            const _ROLE_MAP_R = {
+                'Хилер': ['Cardinal','Eva\u2019s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'],
+                'Танк':  ['Phoenix Knight','Hell Knight','Eva\u2019s Templar','Shillien Templar'],
+            };
+            function _getRoleR(pf) {
+                if (!pf || pf === '—') return 'Боевой';
+                for (const [role, list] of Object.entries(_ROLE_MAP_R)) {
+                    if (list.some(x => pf.includes(x.split(' ')[0]))) return role;
+                }
+                return 'Боевой';
+            }
+
             filtered = filtered.map(p => {
                 let attendance = 0;
                 if (totalDates > 0) {
@@ -1345,14 +1367,61 @@
                     const present = allDates.filter(d => {
                         const snap = appliedStatsByDate[d];
                         return snap && snap.players && snap.players.some(sp => {
-                            // Резолвим алиас имени из снапшота перед сравнением
                             const resolvedName = resolveAlias(sp.name);
                             return normalizeNick(resolvedName) === key || normalizeNick(sp.name) === key;
                         });
                     }).length;
                     attendance = Math.round(present / totalDates * 100);
                 }
-                return { ...p, attendance };
+
+                // Ценность
+                let valueScore = 0;
+                const nk = normalizeNick(p.name);
+                const ps = _statsMapRoster[nk];
+                if (ps && totalDates > 0) {
+                    const kills  = ps.kills  || 0;
+                    const deaths = ps.deaths || 0;
+                    const pvp    = ps.pvp_dmg || 0;
+                    const pve    = ps.pve_dmg || 0;
+                    const kda    = kills / Math.max(deaths, 1);
+
+                    const presScore  = attendance;
+                    const kdaScore   = Math.min(100, Math.round(kda / 5 * 100));
+                    const pvpScore   = Math.round((pvp / _maxPvpR) * 100);
+                    const pveScore   = Math.round((pve / _maxPveR) * 100);
+                    const aggrScore  = Math.round((kills / _maxKillsR) * 100);
+                    const deathScore = Math.round(Math.max(0, 100 - (deaths / _maxDeathsR) * 100));
+
+                    // Рейтинг класса
+                    const profaName = p.profa && p.profa !== '—' ? p.profa : null;
+                    const classmates = profaName ? roster.filter(r => {
+                        if (normalizeNick(r.name) === nk) return false;
+                        const rp = r.profa && r.profa !== '—' ? r.profa : null;
+                        return rp && rp.split(' (')[0].toLowerCase() === profaName.split(' (')[0].toLowerCase();
+                    }) : [];
+                    const classmateKills = classmates.map(r => (_statsMapRoster[normalizeNick(r.name)]?.kills||0));
+                    const classRank = classmateKills.filter(k => k > kills).length + 1;
+                    const classTotal = classmateKills.length + 1;
+                    const classScore = classTotal > 1 ? Math.round((1-(classRank-1)/classTotal)*100) : 50;
+
+                    // Клановый рейтинг
+                    const rankIdx = _allSortedR.findIndex(s => normalizeNick(s.name) === nk);
+                    const rankNum = rankIdx >= 0 ? rankIdx + 1 : _allSortedR.length;
+                    const clanScore = Math.round((1-(rankNum-1)/Math.max(_allSortedR.length-1,1))*100);
+
+                    const role = _getRoleR(profaName);
+                    if (role === 'Хилер') {
+                        valueScore = Math.round(presScore*0.35 + classScore*0.25 + kdaScore*0.20 + deathScore*0.20);
+                    } else if (role === 'Танк') {
+                        valueScore = Math.round(presScore*0.30 + deathScore*0.25 + classScore*0.25 + kdaScore*0.20);
+                    } else {
+                        valueScore = Math.round(presScore*0.20 + classScore*0.20 + kdaScore*0.20 + clanScore*0.15 + pvpScore*0.15 + pveScore*0.10);
+                    }
+                } else if (totalDates === 0) {
+                    valueScore = null; // нет данных
+                }
+
+                return { ...p, attendance, valueScore };
             });
 
             let sorted = [...filtered].sort((a, b) => {
@@ -1364,6 +1433,10 @@
                 }
                 if (currentSort.field === 'attendance') {
                     return currentSort.direction === 'asc' ? a.attendance - b.attendance : b.attendance - a.attendance;
+                }
+                if (currentSort.field === 'valueScore') {
+                    const va = a.valueScore ?? -1, vb = b.valueScore ?? -1;
+                    return currentSort.direction === 'asc' ? va - vb : vb - va;
                 }
                 if (currentSort.field === 'isNew') {
                     const nA = a.isNew ? 1 : 0;
@@ -1393,9 +1466,19 @@
                         <span class="font-bold text-slate-200">${p.name}</span> <span class="badge badge-${p.rank.toLowerCase()}">${p.rank}</span>
                     </td>
                     <td>${p.isNew ? '<span class="text-[9px] bg-emerald-500 text-black font-black px-1.5 py-0.5 rounded uppercase">NEW</span>' : '<span style="color:#475569;font-size:11px">—</span>'}</td>
-                    <td class="text-slate-400 text-xs">${(p.profas && p.profas.length > 0 ? p.profas : (p.profa && p.profa !== '—' ? [p.profa] : [])).map((pf,i) => `<span style="display:inline-flex;align-items:center;gap:5px;background:#1e2530;border-radius:6px;padding:4px 9px;margin-right:4px;${i===0?'color:#a5b4fc':'color:#64748b'}">${profaIconHtml(pf, 22)}</span>`).join('') || '<span style="color:#475569">—</span>'}</td>
+                    <td onclick="event.stopPropagation();editPlayer(${p.id})" style="cursor:pointer" title="Нажми чтобы изменить профу" class="text-slate-400 text-xs">${(p.profas && p.profas.length > 0 ? p.profas : (p.profa && p.profa !== '—' ? [p.profa] : [])).map((pf,i) => `<span style="display:inline-flex;align-items:center;gap:5px;background:#1e2530;border-radius:6px;padding:4px 9px;margin-right:4px;${i===0?'color:#a5b4fc':'color:#64748b'}">${profaIconHtml(pf, 22)}</span>`).join('') || '<span style="color:#6366f155;font-size:11px;border:1px dashed #2d3748;padding:3px 8px;border-radius:6px">+ профа</span>'}</td>
                     <td onclick="event.stopPropagation()"><span class="pac-tag" onclick="event.stopPropagation();openPackFromRoster('${p.id}')" title="Нажми чтобы изменить пак" style="cursor:pointer" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='';this.style.color=''">${p.pac}</span></td>
                     <td class="${p.attendance < 50 ? 'text-red-400' : p.attendance < 70 ? 'text-yellow-400' : 'text-emerald-400'} font-bold">${totalDates > 0 ? p.attendance + '%' : '—'}</td>
+                    <td onclick="event.stopPropagation()">
+                        ${p.valueScore === null || p.valueScore === undefined
+                            ? '<span style="color:#475569;font-size:11px">—</span>'
+                            : `<span style="display:inline-flex;align-items:center;gap:5px;cursor:help" onclick="event.stopPropagation();showInfoModal('value')" title="Ценность для клана">
+                                <span style="font-weight:800;color:${p.valueScore>=70?'#22c55e':p.valueScore>=40?'#f59e0b':'#ef4444'};font-size:13px">${p.valueScore}</span>
+                                <span style="width:40px;height:5px;background:#1e2530;border-radius:3px;overflow:hidden;display:inline-block">
+                                    <span style="display:block;height:100%;width:${p.valueScore}%;background:${p.valueScore>=70?'#22c55e':p.valueScore>=40?'#f59e0b':'#ef4444'};border-radius:3px"></span>
+                                </span>
+                              </span>`}
+                    </td>
                     <td class="text-right">
                         <div class="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onclick="event.stopPropagation();editPlayer(${p.id})" class="text-orange-400" title="Редактировать">✏️</button>
@@ -1419,16 +1502,17 @@
             const opts = packOptions.map(pk => `<option value="${pk}" ${pk===p.pac?'selected':''}>${pk}</option>`).join('');
             const modal = document.createElement('div');
             modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:300;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+            modal.id = 'packChangeModal';
             modal.innerHTML = `<div style="background:#12171f;border:1px solid #1e2530;border-radius:16px;padding:28px;width:340px;max-width:94vw">
                 <div style="font-size:16px;font-weight:800;margin-bottom:16px;color:#e2e8f0">🎯 Изменить пак — <span style="color:#6366f1">${p.name}</span></div>
                 <select id="packRosterSelect" style="width:100%;background:#0b0e14;border:1px solid #2d3748;border-radius:8px;padding:10px;color:#e2e8f0;font-size:14px;margin-bottom:16px;outline:none">${opts}</select>
                 <div style="display:flex;gap:10px;justify-content:flex-end">
-                    <button onclick="this.closest('[style*=fixed]').remove()" style="background:#1e2530;border:none;color:#64748b;border-radius:8px;padding:8px 18px;cursor:pointer;font-weight:600">Отмена</button>
+                    <button onclick="document.getElementById('packChangeModal').remove()" style="background:#1e2530;border:none;color:#64748b;border-radius:8px;padding:8px 18px;cursor:pointer;font-weight:600">Отмена</button>
                     <button onclick="(function(){
                         const sel = document.getElementById('packRosterSelect');
                         const pp = window._packRosterPlayer;
                         if (pp) { pp.pac = sel.value; saveToStorage(); renderRoster(); if(document.getElementById('page-packs').classList.contains('active')) renderPacks(); }
-                        document.querySelector('[style*=position:fixed][style*=inset:0]').remove();
+                        document.getElementById('packChangeModal').remove();
                     })()" style="background:#6366f1;border:none;color:white;border-radius:8px;padding:8px 18px;cursor:pointer;font-weight:700">💾 Сохранить</button>
                 </div>
             </div>`;
@@ -1571,6 +1655,11 @@
             closePlayerModal();
             saveToStorage();
             renderRoster();
+            // Если профиль этого игрока открыт — обновляем его
+            if (document.getElementById('page-profile').classList.contains('active') && currentProfileName) {
+                const saved = roster.find(r => r.id == (editId ? parseInt(editId) : -1) || normalizeNick(r.name) === normalizeNick(currentProfileName));
+                if (saved) renderPlayerProfile(saved.name);
+            }
         }
 
         function clearAllNew() {
@@ -2319,7 +2408,10 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                         </div>
                     </div>
                 </div>
-                <button onclick="goBackFromProfile()" style="background:#12171f;border:1px solid #1e2530;color:#64748b;border-radius:10px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;flex-shrink:0" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#1e2530';this.style.color='#64748b'">← Назад</button>
+                <div style="display:flex;gap:8px;flex-shrink:0">
+                    <button onclick="editPlayer(${player.id})" style="background:#12171f;border:1px solid #2d3748;color:#64748b;border-radius:10px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#f59e0b';this.style.color='#f59e0b'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#64748b'" title="Редактировать игрока">✏️ Редактировать</button>
+                    <button onclick="goBackFromProfile()" style="background:#12171f;border:1px solid #1e2530;color:#64748b;border-radius:10px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;flex-shrink:0" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#1e2530';this.style.color='#64748b'">← Назад</button>
+                </div>
             </div>
 
             <!-- ГЛАВНАЯ СТРОКА СТАТ -->
@@ -5972,8 +6064,29 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             kda: {
                 icon: '⚡',
                 title: 'KDA — Kill/Death Ratio',
-                sub: 'Коэффициент убийств',
-                body: '<b>KDA = Убийства ÷ Смерти</b><br><br>Показывает насколько эффективно игрок убивает по сравнению с тем как часто умирает.<br><br>• <b>KDA 1.0</b> — убийств столько же сколько смертей<br>• <b>KDA 2.0+</b> — хороший результат для ДД<br>• <b>KDA 0.5-</b> — умирает чаще чем убивает',
+                sub: 'Коэффициент эффективности',
+                body: '<b>KDA = Убийства ÷ Смерти</b><br><br>Интерпретация зависит от роли:<br><br><b>⚔️ Воин / Лучник / Кинжал / Маг</b><br>Чем выше — тем лучше. KDA 2.0+ хороший результат, 1.0 — средний, ниже 0.5 — плохо.<br><br><b>🛡️ Танк</b><br>KDA не главный показатель — танк принимает урон и умирает. Важнее явка и живучесть.<br><br><b>💊 Хилер / Баффер</b><br>Убийства не их роль. KDA 0.2–0.5 это норма. Оценивается по явке и живучести.',
+                formula: 'KDA = <span>Убийства</span> ÷ max(<span>Смерти</span>, 1)'
+            },
+            kda_tank: {
+                icon: '🛡️',
+                title: 'KDA — для Танка',
+                sub: 'Коэффициент эффективности',
+                body: '<b>KDA = Убийства ÷ Смерти</b><br><br>Для танка KDA <b>не является главным показателем</b>. Танк принимает удары на себя и умирает чаще остальных — это его работа.<br><br>Важные показатели для танка:<br>• <b>Явка</b> — держит линию, не пропускает КМ<br>• <b>Живучесть</b> — сколько раз умирает на убийство<br>• <b>Рейтинг класса</b> — насколько хорош среди своих',
+                formula: 'Для танка: Явка + Живучесть важнее чем KDA'
+            },
+            kda_healer: {
+                icon: '💊',
+                title: 'KDA — для Хилера/Баффера',
+                sub: 'Коэффициент эффективности',
+                body: '<b>KDA = Убийства ÷ Смерти</b><br><br>Для хилера и баффера убийства <b>не являются целью</b>. KDA 0.1–0.5 это совершенно нормально.<br><br>Реальная ценность хилера:<br>• <b>Явка</b> — присутствие на каждом КМ критично<br>• <b>Живучесть</b> — мёртвый хилер не хилит<br>• <b>Рейтинг класса</b> — место среди других хилеров/бафферов',
+                formula: 'Для хилера: Явка + Живучесть + Рейтинг класса'
+            },
+            kda_dps: {
+                icon: '⚔️',
+                title: 'KDA — для ДД',
+                sub: 'Коэффициент эффективности',
+                body: '<b>KDA = Убийства ÷ Смерти</b><br><br>Для боевых классов KDA — ключевой показатель эффективности.<br><br>• <b>KDA 3.0+</b> — отличный результат 🟢<br>• <b>KDA 2.0–3.0</b> — хорошо 🟡<br>• <b>KDA 1.0–2.0</b> — средне, есть куда расти<br>• <b>KDA ниже 1.0</b> — умирает чаще чем убивает 🔴<br><br><b>Кинжал</b> — должен иметь высокий KDA, иначе теряет смысл роли.',
                 formula: 'KDA = <span>Убийства</span> ÷ max(<span>Смерти</span>, 1)'
             },
             rank: {
@@ -6013,8 +6126,31 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             }
         };
 
+        // Определяем роль текущего открытого профиля для умного тултипа
+        function getProfileRole() {
+            if (!currentProfileName) return null;
+            const p = roster.find(r => normalizeNick(r.name) === normalizeNick(currentProfileName));
+            if (!p) return null;
+            const pf = p.profa && p.profa !== '—' ? p.profa : null;
+            if (!pf) return null;
+            const tanks   = ['Phoenix Knight','Hell Knight','Eva\'s Templar','Shillien Templar'];
+            const healers = ['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'];
+            if (tanks.some(x => pf.includes(x.split(' ')[0]))) return 'tank';
+            if (healers.some(x => pf.includes(x.split(' ')[0]))) return 'healer';
+            return 'dps';
+        }
+
         function showInfoModal(key) {
-            const tip = INFO_TIPS[key];
+            // Для KDA — выбираем тип подсказки в зависимости от роли игрока
+            let resolvedKey = key;
+            if (key === 'kda') {
+                const role = getProfileRole();
+                if (role === 'tank')   resolvedKey = 'kda_tank';
+                else if (role === 'healer') resolvedKey = 'kda_healer';
+                else if (role === 'dps')    resolvedKey = 'kda_dps';
+                // если роль неизвестна — показываем общий kda
+            }
+            const tip = INFO_TIPS[resolvedKey] || INFO_TIPS[key];
             if (!tip) return;
             let overlay = document.getElementById('infoModalOverlay');
             if (!overlay) {
