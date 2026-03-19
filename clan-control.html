@@ -658,7 +658,6 @@
                         <input type="text" id="kmHistorySearch" placeholder="🔍 Поиск игрока по КМам..."
                             title="Введи ник чтобы найти все КМ где участвовал этот игрок"
                             style="background:#12171f;border:1px solid #1e2530;border-radius:10px;padding:8px 14px;color:#e2e8f0;font-size:13px;outline:none;width:240px;transition:border-color .2s"
-                            oninput="renderKmHistory()"
                             onfocus="this.style.borderColor='#6366f1'"
                             onblur="this.style.borderColor='#1e2530'">
                     </div>
@@ -2147,8 +2146,14 @@ const CLASS3_TO_CLASS2_ICON = {
 function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
         // ===== ПРОФИЛЬ ИГРОКА =====
         let currentProfileName = null;
+        let profileReturnPage = "roster"; // куда возвращаться из профиля
 
         function openPlayerProfile(playerName) {
+            // Запоминаем откуда открыли профиль
+            const activePage = document.querySelector('.page-section.active');
+            if (activePage && activePage.id !== 'page-profile') {
+                profileReturnPage = activePage.id.replace('page-', '');
+            }
             currentProfileName = playerName;
             const navProfile = document.getElementById('nav-profile');
             if (navProfile) navProfile.style.display = '';
@@ -2791,6 +2796,61 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                             </div>`;
                         }
 
+                        // === ЛУЧШИЙ ПАК — в каком паке показал лучший результат ===
+                        const packPerformance = {};
+                        dayStats.filter(d => d.present && d.inStat).forEach(ds => {
+                            const snap = appliedStatsByDate[ds.date];
+                            if (!snap || !snap.screenPlayersMap) return;
+                            Object.entries(snap.screenPlayersMap).forEach(([packName, players]) => {
+                                const me = players.find(p => normalizeNick(resolveAlias(p.name)) === normKey || normalizeNick(p.name) === normKey);
+                                if (me && (me.kills||0) > 0) {
+                                    if (!packPerformance[packName]) packPerformance[packName] = { kills: 0, count: 0 };
+                                    packPerformance[packName].kills += me.kills||0;
+                                    packPerformance[packName].count++;
+                                }
+                            });
+                        });
+                        const packEntries = Object.entries(packPerformance).filter(([,v]) => v.count > 0);
+                        if (packEntries.length > 1) {
+                            packEntries.sort((a,b) => (b[1].kills/b[1].count) - (a[1].kills/a[1].count));
+                            const best = packEntries[0];
+                            const worst = packEntries[packEntries.length-1];
+                            const bestAvg = (best[1].kills/best[1].count).toFixed(1);
+                            const worstAvg = (worst[1].kills/worst[1].count).toFixed(1);
+                            if (parseFloat(bestAvg) > parseFloat(worstAvg) * 1.5) {
+                                strengths.push({ icon:'👥', title:'Лучший пак: ' + best[0], text:'Средние убийства ' + bestAvg + '/КМ в паке ' + best[0] + ' vs ' + worstAvg + '/КМ в ' + worst[0] + '. Результат зависит от окружения.' });
+                            }
+                        }
+
+                        // === СМЕРТИ НА УБИЙСТВО — для ДД ===
+                        if (isDps && totalKills > 5 && totalDeaths > 0) {
+                            const deathPerKill = totalDeaths / totalKills;
+                            if (deathPerKill > 2) {
+                                issues.push({ icon:'💀', severity:'medium', title:'Много смертей на убийство', text:'На каждое убийство приходится ' + deathPerKill.toFixed(1) + ' смерти. Старайся умирать реже — позиционирование и тайминги входа в бой.' });
+                            } else if (deathPerKill < 0.5 && totalKills > 10) {
+                                strengths.push({ icon:'🛡️', title:'Выживаемость', text:'Только ' + deathPerKill.toFixed(1) + ' смерти на убийство. Отличный контроль позиции.' });
+                            }
+                        }
+
+                        // === PvE ВКЛАД для саппортов ===
+                        if (isHealer || isTank) {
+                            if (totalPve > 100) {
+                                strengths.push({ icon:'🐉', title:'PvE вклад', text: totalPve.toLocaleString() + ' PvE урона — активно помогает в PvE контенте помимо основной роли.' });
+                            }
+                        }
+
+                        // === КОНКРЕТНЫЕ СОВЕТЫ по КМ ===
+                        if (isDps && dayStats.length >= 2) {
+                            const sorted = dayStats.filter(d=>d.present&&d.inStat).sort((a,b)=>b.kills-a.kills);
+                            if (sorted.length >= 2) {
+                                const bestDay = sorted[0];
+                                const worstDay = sorted[sorted.length-1];
+                                if (bestDay.kills > worstDay.kills * 2 && bestDay.kills > 5) {
+                                    issues.push({ icon:'🔍', severity:'low', title:'Разница между КМ', text:'Лучший КМ (' + bestDay.date.split('-').reverse().slice(0,2).join('.') + '): ' + bestDay.kills + ' убийств. Худший (' + worstDay.date.split('-').reverse().slice(0,2).join('.') + '): ' + worstDay.kills + '. Проанализируй что было по-другому — пак, таргет, позиция?' });
+                                }
+                            }
+                        }
+
                         if (issues.length === 0 && strengths.length === 0) {
                             return `<div class="prf-card" style="border-color:#22c55e44">
                                 <div class="prf-section-title">🔍 Анализ игрока</div>
@@ -2905,7 +2965,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
         function goBackFromProfile() {
             document.getElementById('nav-profile').style.display = 'none';
             currentProfileName = null;
-            showPage('roster');
+            showPage(profileReturnPage || 'roster');
         }
 
 
@@ -4925,7 +4985,12 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     const daySnap = appliedStatsByDate[dateStr];
                     const dayPl = daySnap && daySnap.players ? daySnap.players : [];
                     const cmdCh = daySnap && daySnap.commandChannel ? daySnap.commandChannel : [];
-                    const matchInPlayers = dayPl.some(p => p.name && p.name.toLowerCase().includes(searchQ));
+                    const matchInPlayers = dayPl.some(p => {
+                        if (!p.name) return false;
+                        const n = p.name.toLowerCase();
+                        const resolved = resolveAlias(p.name).toLowerCase();
+                        return n.includes(searchQ) || resolved.includes(searchQ);
+                    });
                     const matchInLeaders = cmdCh.some(c => c.leader && c.leader.toLowerCase().includes(searchQ));
                     if (!matchInPlayers && !matchInLeaders) return '';
                 }
@@ -6376,6 +6441,75 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
         }
 
 
+
+        // Показать список игроков из "Обратить внимание" — модалка со списком
+        let _lastAttentionData = {};
+        function showAttentionList(listType) {
+            // Recalculate data
+            const allDates = Object.keys(appliedStatsByDate).sort();
+            const totalDates = allDates.length;
+            const statsMap = calcStatsForPeriod('', '');
+            const tanks=['Phoenix Knight','Hell Knight','Eva\'s Templar','Shillien Templar'];
+            const healers=['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'];
+            function isSup(pf) { return pf&&pf!=='—'&&[...tanks,...healers].some(x=>pf.includes(x.split(' ')[0])); }
+
+            let title = '', players = [];
+            if (listType === 'deadweight') {
+                title = '⚠️ ДД с 0 убийств';
+                roster.forEach(p => {
+                    const nk=normalizeNick(p.name); const ps=statsMap[nk]; if(!ps) return;
+                    const att=allDates.filter(d=>{const s=appliedStatsByDate[d];return s&&s.players&&s.players.some(sp=>normalizeNick(resolveAlias(sp.name))===nk);}).length;
+                    if ((ps.kills||0)===0 && att>0 && !isSup(p.profa)) {
+                        players.push({name:p.name, att:Math.round(att/totalDates*100), deaths:ps.deaths||0, profa:p.profa||'—'});
+                    }
+                });
+            } else if (listType === 'supports') {
+                title = '💊 Надёжные саппорты (80%+ явка)';
+                roster.forEach(p => {
+                    if (!isSup(p.profa)) return;
+                    const nk=normalizeNick(p.name);
+                    const att=allDates.filter(d=>{const s=appliedStatsByDate[d];return s&&s.players&&s.players.some(sp=>normalizeNick(resolveAlias(sp.name))===nk||normalizeNick(sp.name)===nk);}).length;
+                    const pct = totalDates>0 ? Math.round(att/totalDates*100) : 0;
+                    if (pct >= 80) players.push({name:p.name, att:pct, profa:p.profa||'—'});
+                });
+                players.sort((a,b)=>b.att-a.att);
+            } else if (listType === 'solostrong') {
+                title = '💎 Сильные СОЛО-игроки';
+                roster.forEach(p => {
+                    if (p.pac !== 'СОЛО') return;
+                    const nk=normalizeNick(p.name); const ps=statsMap[nk]; if(!ps) return;
+                    const att=allDates.filter(d=>{const s=appliedStatsByDate[d];return s&&s.players&&s.players.some(sp=>normalizeNick(resolveAlias(sp.name))===nk||normalizeNick(sp.name)===nk);}).length;
+                    if ((ps.kills||0)>5 && att>0) players.push({name:p.name, kills:ps.kills||0, att:Math.round(att/totalDates*100), profa:p.profa||'—'});
+                });
+                players.sort((a,b)=>b.kills-a.kills);
+            }
+
+            // Show modal
+            const listHtml = players.map(p => 
+                '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #1e2530;cursor:pointer" onclick="document.getElementById(\'attentionListModal\').style.display=\'none\';openPlayerProfile(\''+p.name.replace(/'/g,"\\'")+'\')">' +
+                '<span style="font-weight:700;color:#e2e8f0;flex:1">'+p.name+'</span>' +
+                '<span style="font-size:11px;color:#64748b">'+p.profa+'</span>' +
+                (p.kills !== undefined ? '<span style="font-size:11px;color:#f59e0b">'+p.kills+' ⚔️</span>' : '') +
+                '<span style="font-size:11px;color:'+(p.att>=70?'#22c55e':p.att>=40?'#f59e0b':'#ef4444')+'">'+p.att+'%</span>' +
+                '</div>'
+            ).join('');
+
+            let modal = document.getElementById('attentionListModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'attentionListModal';
+                modal.className = 'modal-overlay';
+                modal.addEventListener('click', e => { if(e.target===modal) modal.style.display='none'; });
+                document.body.appendChild(modal);
+            }
+            modal.innerHTML = '<div style="background:#12171f;border:1px solid #1e2530;border-radius:16px;width:480px;max-width:96vw;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">' +
+                '<div style="padding:20px 24px 16px;border-bottom:1px solid #1e2530;display:flex;justify-content:space-between;align-items:center">' +
+                '<div style="font-size:16px;font-weight:700;color:#e2e8f0">'+title+' ('+players.length+')</div>' +
+                '<button onclick="this.closest(\'.modal-overlay\').style.display=\'none\'" style="background:#1e2530;border:none;color:#94a3b8;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px">✕</button></div>' +
+                '<div style="overflow-y:auto;padding:8px 12px">'+listHtml+'</div></div>';
+            modal.style.display = 'flex';
+        }
+
         function renderDashAttention() {
             const el = document.getElementById('dashAttention');
             if (!el) return;
@@ -6393,28 +6527,31 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             const pp = {};
             allDates.forEach(d => { const sn=appliedStatsByDate[d]; if(!sn||!sn.screenPlayersMap) return; Object.entries(sn.screenPlayersMap).forEach(([pk,pls])=>{ if(!pls) return; pls.forEach(p=>{ const nk=normalizeNick(resolveAlias(p.name)); if(!pp[nk]) pp[nk]=new Set(); pp[nk].add(pk); }); }); });
             const nomads = Object.entries(pp).filter(([,s])=>s.size>=2).map(([nk,s])=>{ const r=roster.find(x=>normalizeNick(x.name)===nk); const ps=statsMap[nk]; return {name:r?r.name:nk,packs:[...s],kills:ps?.kills||0}; }).sort((a,b)=>b.kills-a.kills);
-            nomads.slice(0,2).forEach(mp => { if(mp.kills>5) items.push({icon:'🔀',type:'info',title:mp.name+' — кочевник',text:'В '+mp.packs.length+' паках ('+mp.packs.slice(0,3).join(', ')+')'}); });
+            nomads.slice(0,2).forEach(mp => { if(mp.kills>5) items.push({icon:'🔀',type:'info',title:mp.name+' — кочевник',text:'В '+mp.packs.length+' паках ('+mp.packs.slice(0,3).join(', ')+')', player:mp.name}); });
 
             // ДД с 0 убийств
             const allPS = roster.map(p=>{const nk=normalizeNick(p.name);const ps=statsMap[nk];if(!ps) return null;const pr=allDates.filter(d=>{const s=appliedStatsByDate[d];return s&&s.players&&s.players.some(sp=>normalizeNick(resolveAlias(sp.name))===nk||normalizeNick(sp.name)===nk);}).length;return{name:p.name,kills:ps.kills||0,deaths:ps.deaths||0,att:Math.round(pr/totalDates*100),profa:p.profa,pac:p.pac};}).filter(Boolean);
             const deadW = allPS.filter(p=>p.kills===0&&p.att>30&&!isSup(p.profa));
-            if(deadW.length>0) items.push({icon:'⚠️',type:'warn',title:deadW.length+' ДД с 0 убийств',text:deadW.slice(0,4).map(p=>p.name).join(', ')+(deadW.length>4?' +'+(deadW.length-4):'')});
+            if(deadW.length>0) items.push({icon:'⚠️',type:'warn',title:deadW.length+' ДД с 0 убийств',text:deadW.slice(0,4).map(p=>p.name).join(', ')+(deadW.length>4?' +'+(deadW.length-4):''), players:deadW.map(p=>p.name), listType:'deadweight'});
 
             // MVP
             const dps=allPS.filter(p=>!isSup(p.profa)&&p.kills>3).map(p=>({...p,kda:p.kills/Math.max(p.deaths,1)})).sort((a,b)=>b.kda-a.kda);
-            if(dps.length>0&&dps[0].kda>2) items.push({icon:'⭐',type:'good',title:'MVP: '+dps[0].name,text:'KDA '+dps[0].kda.toFixed(2)+' ('+dps[0].kills+'⚔️/'+dps[0].deaths+'💀)'});
+            if(dps.length>0&&dps[0].kda>2) items.push({icon:'⭐',type:'good',title:'MVP: '+dps[0].name,text:'KDA '+dps[0].kda.toFixed(2)+' ('+dps[0].kills+'⚔️/'+dps[0].deaths+'💀)', player:dps[0].name});
 
             // Надёжные саппорты
             const relSup = allPS.filter(p=>isSup(p.profa)&&p.att>=80);
-            if(relSup.length>0) items.push({icon:'💊',type:'good',title:relSup.length+' надёжных саппортов',text:relSup.slice(0,4).map(p=>p.name).join(', ')+'. Явка 80%+'});
+            if(relSup.length>0) items.push({icon:'💊',type:'good',title:relSup.length+' надёжных саппортов',text:relSup.slice(0,4).map(p=>p.name).join(', ')+'. Явка 80%+', players:relSup.map(p=>p.name), listType:'supports'});
 
             // Сильные СОЛО
             const gs = allPS.filter(p=>p.pac==='СОЛО'&&p.kills>8&&p.att>=50);
-            if(gs.length>0) items.push({icon:'💎',type:'info',title:gs.length+' сильных СОЛО',text:gs.slice(0,3).map(p=>p.name+' ('+p.kills+'⚔️)').join(', ')+'. Стоит забрать в пак.'});
+            if(gs.length>0) items.push({icon:'💎',type:'info',title:gs.length+' сильных СОЛО',text:gs.slice(0,3).map(p=>p.name+' ('+p.kills+'⚔️)').join(', ')+'. Стоит забрать в пак.', players:gs.map(p=>p.name), listType:'solostrong'});
 
             if(items.length===0){el.innerHTML='<div style="color:#22c55e;font-size:13px;padding:12px 0">✅ Всё хорошо.</div>';return;}
             const tc={info:'#3b82f6',warn:'#f59e0b',good:'#22c55e'};
-            el.innerHTML = items.map(a=>'<div class="dash-alert" style="border-left-color:'+(tc[a.type]||'#3b82f6')+'"><span style="font-size:16px;flex-shrink:0">'+a.icon+'</span><div><div style="font-size:12px;font-weight:800;color:#e2e8f0;margin-bottom:2px">'+a.title+'</div><div style="font-size:11px;color:#64748b">'+a.text+'</div></div></div>').join('');
+            el.innerHTML = items.map(a=>{
+                const click = a.player ? ' onclick="openPlayerProfile(\''+a.player.replace(/'/g,"\\'")+'\');"' : (a.players ? ' onclick="showAttentionList(\''+a.listType+'\')" style="cursor:pointer;border-left-color:'+(tc[a.type]||'#3b82f6')+'"' : ' style="border-left-color:'+(tc[a.type]||'#3b82f6')+'"');
+                return '<div class="dash-alert"'+click+'><span style="font-size:16px;flex-shrink:0">'+a.icon+'</span><div><div style="font-size:12px;font-weight:800;color:#e2e8f0;margin-bottom:2px">'+a.title+'</div><div style="font-size:11px;color:#64748b">'+a.text+'</div></div><span style="color:#2d3748;font-size:14px;margin-left:auto">'+(a.player||a.players?'→':'')+'</span></div>';
+            }).join('');
         }
 
         function renderDashAlerts() {
@@ -6565,7 +6702,10 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             if (allDates.length >= 2) {
                 const last = allDates[allDates.length-1], prev = allDates[allDates.length-2];
                 const ls = appliedStatsByDate[last]?.players||[], ps = appliedStatsByDate[prev]?.players||[];
-                const diffs = ls.map(lp => { const nk=normalizeNick(lp.name); const pp=ps.find(p=>normalizeNick(p.name)===nk); return {name:lp.name, diff:(lp.kills||0)-(pp?(pp.kills||0):0)}; });
+                // Только ДД в растущих/падающих (без танков/хилеров)
+                const _supRoles = ['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer','Phoenix Knight','Hell Knight','Eva\'s Templar','Shillien Templar'];
+                function _isDps(name) { const r=roster.find(x=>normalizeNick(x.name)===normalizeNick(name)); if(!r||!r.profa||r.profa==='—') return true; return !_supRoles.some(x=>r.profa.includes(x.split(' ')[0])); }
+                const diffs = ls.filter(lp=>_isDps(lp.name)).map(lp => { const nk=normalizeNick(lp.name); const pp=ps.find(p=>normalizeNick(p.name)===nk); return {name:lp.name, diff:(lp.kills||0)-(pp?(pp.kills||0):0)}; });
                 function renderList(el2, list, isUp) {
                     if (!el2) return;
                     if (!list.length) { el2.innerHTML='<div style="color:#475569;font-size:12px;padding:8px 0">—</div>'; return; }
@@ -6812,6 +6952,13 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 const debouncedRender = debounce(renderRoster, 200);
                 rosterInput.removeAttribute('oninput');
                 rosterInput.addEventListener('input', debouncedRender);
+            }
+
+            // Debounce на поиск по Истории КМ
+            const kmSearchInput = document.getElementById('kmHistorySearch');
+            if (kmSearchInput) {
+                const debouncedKm = debounce(renderKmHistory, 400);
+                kmSearchInput.addEventListener('input', debouncedKm);
             }
 
             // Восстанавливаем страницу из URL hash
