@@ -2334,7 +2334,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 <div class="prf-card" style="text-align:center;position:relative;overflow:hidden">
                     <div style="position:absolute;top:10px;right:12px;font-size:18px;opacity:.15">${icon}</div>
                     <div class="prf-val-big" style="color:${color}">${val}</div>
-                    <div class="prf-val-label" style="display:flex;align-items:center;justify-content:center;gap:4px">${label}${tipKey ? '<span class=\"info-q-btn\" onclick=\"showInfoModal(''+tipKey+'')\" >?</span>' : ''}</div>
+                    <div class="prf-val-label" style="display:flex;align-items:center;justify-content:center;gap:4px">${label}${tipKey ? `<span class="info-q-btn" onclick="showInfoModal('${tipKey}')">?</span>` : ''}</div>
                 </div>`).join('')}
                 <div class="prf-card" style="text-align:center;position:relative;overflow:hidden;border-color:${valueColor}55;cursor:help" title="Ценность игрока для клана: учитываются явка, KDA, урон и место среди одноклассников. 0-40 — низкая, 40-70 — средняя, 70-100 — высокая">
                     <div style="position:absolute;top:10px;right:12px;font-size:18px;opacity:.15">⭐</div>
