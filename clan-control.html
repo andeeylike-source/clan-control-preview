@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clan Control v11</title>
+    <title>Clan Control v12</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -170,7 +170,7 @@
         }
         .calendar-day {
             background: #12171f;
-            min-height: 130px;
+            min-height: 100px;
             padding: 10px;
             transition: background 0.2s;
             cursor: pointer;
@@ -412,7 +412,7 @@
 
     <aside class="sidebar">
         <h2 class="text-blue-500 font-black text-xl tracking-tighter uppercase">Clan Control</h2>
-        <div style="font-size:9px;color:#475569;margin-top:-8px;margin-bottom:20px;letter-spacing:.05em">v11</div>
+        <div style="font-size:9px;color:#475569;margin-top:-8px;margin-bottom:20px;letter-spacing:.05em">v12</div>
         
         <nav>
             <div style="font-size:9px;font-weight:800;color:#334155;text-transform:uppercase;letter-spacing:.1em;padding:6px 16px 4px;margin-top:4px">Аналитика</div>
@@ -448,25 +448,26 @@
                     <h1 class="text-3xl font-bold">Дашборд</h1>
                     <div id="dashSubtitle" class="text-slate-500 text-sm mt-1"></div>
                 </div>
-                <div id="dashNextEvent" style="background:#6366f122;border:1px solid #6366f144;border-radius:10px;padding:10px 16px;font-size:12px;color:#a5b4fc;font-weight:600"></div>
+                <div id="dashNextEvent" style="background:#6366f122;border:1px solid #6366f144;border-radius:10px;padding:10px 16px;font-size:12px;color:#a5b4fc;font-weight:600;cursor:pointer" onclick="showPage('calendar')"></div>
             </div>
-            <!-- Карточки -->
-            <div class="dash-grid" id="dashCards"></div>
-            <!-- Алерты -->
-            <div style="margin-bottom:24px">
-                <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#475569;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:6px">🔔 Предупреждения <span id="dashAlertCount" style="background:#ef4444;color:white;border-radius:10px;padding:1px 7px;font-size:9px"></span></div>
-                <div id="dashAlerts"></div>
+            <!-- Навигация -->
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px" id="dashNavCards"></div>
+            <!-- Алерты + Обратить внимание -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+                <div>
+                    <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#475569;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:6px">🔔 Предупреждения <span id="dashAlertCount" style="background:#ef4444;color:white;border-radius:10px;padding:1px 7px;font-size:9px"></span></div>
+                    <div id="dashAlerts" style="max-height:340px;overflow-y:auto"></div>
+                </div>
+                <div>
+                    <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#475569;letter-spacing:.08em;margin-bottom:10px">👁 Обратить внимание</div>
+                    <div id="dashAttention" style="max-height:340px;overflow-y:auto"></div>
+                </div>
             </div>
-            <!-- Топ игроков и спарклайн -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-                <div class="dash-card">
-                    <div class="dash-card-title">🏆 Топ-5 по ценности</div>
-                    <div id="dashTopValue"></div>
-                </div>
-                <div class="dash-card">
-                    <div class="dash-card-title">📈 Топ-5 растущих</div>
-                    <div id="dashTopGrowing"></div>
-                </div>
+            <!-- Рейтинги -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+                <div class="dash-card"><div class="dash-card-title">🏆 Топ-5 ценных</div><div id="dashTopValue"></div></div>
+                <div class="dash-card"><div class="dash-card-title">📈 Растут</div><div id="dashTopGrowing"></div></div>
+                <div class="dash-card"><div class="dash-card-title">📉 Падают</div><div id="dashTopFalling"></div></div>
             </div>
         </section>
 
@@ -487,6 +488,7 @@
                     <button onclick="changeMonth(1)" class="p-2 bg-slate-800 rounded-lg">→</button>
                 </div>
             </div>
+            <div id="calendarSummary" style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap"></div>
             <div class="calendar-grid" id="calendarGrid"></div>
         </section>
 
@@ -1099,6 +1101,7 @@
 
         // ===== РЕНДЕР КАЛЕНДАРЯ =====
         function renderCalendar() {
+            renderCalendarSummary();
             const grid = document.getElementById('calendarGrid');
             const label = document.getElementById('calendarMonthLabel');
             if (!grid || !label) return;
@@ -1555,7 +1558,7 @@
                     <td onclick="event.stopPropagation()">
                         ${p.valueScore === null || p.valueScore === undefined
                             ? '<span style="color:#475569;font-size:11px">—</span>'
-                            : `<span style="display:inline-flex;align-items:center;gap:5px;cursor:help" onclick="event.stopPropagation();showInfoModal('value')" title="Ценность для клана">
+                            : `<span style="display:inline-flex;align-items:center;gap:5px;cursor:help" onclick="event.stopPropagation();showInfoModal('value')">
                                 <span style="font-weight:800;color:${p.valueScore>=70?'#22c55e':p.valueScore>=40?'#f59e0b':'#ef4444'};font-size:13px">${p.valueScore}</span>
                                 <span style="width:40px;height:5px;background:#1e2530;border-radius:3px;overflow:hidden;display:inline-block">
                                     <span style="display:block;height:100%;width:${p.valueScore}%;background:${p.valueScore>=70?'#22c55e':p.valueScore>=40?'#f59e0b':'#ef4444'};border-radius:3px"></span>
@@ -6303,6 +6306,17 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             let timer;
             return function(...args) { clearTimeout(timer); timer = setTimeout(() => fn.apply(this, args), ms); };
         }
+
+        function renderCalendarSummary() {
+            const el = document.getElementById('calendarSummary'); if(!el) return;
+            const allDates = Object.keys(appliedStatsByDate).sort();
+            const year=currentDate.getFullYear(), month=currentDate.getMonth();
+            let total=0,done=0,missed=0;
+            for(let d=1;d<=31;d++){const dt=new Date(year,month,d);if(dt.getMonth()!==month)break;const ds=localDateStr(dt);getAllEventsForDate(ds).forEach(ev=>{total++;const st=getEventStatus(ds,ev.key);if(st==='done')done++;else if(st==='past')missed++;});}
+            const kmMonth = allDates.filter(d=>d.startsWith(year+'-'+String(month+1).padStart(2,'0'))).length;
+            el.innerHTML='<div style="background:#12171f;border:1px solid #1e2530;border-radius:8px;padding:8px 14px;font-size:12px"><span style="color:#64748b">События:</span> <b style="color:#e2e8f0">'+total+'</b> <span style="color:#22c55e;margin-left:4px">✓'+done+'</span>'+(missed>0?' <span style="color:#ef4444">✗'+missed+'</span>':'')+'</div><div style="background:#12171f;border:1px solid #1e2530;border-radius:8px;padding:8px 14px;font-size:12px"><span style="color:#64748b">КМ записано:</span> <b style="color:#3b82f6">'+kmMonth+'</b></div>';
+        }
+
         // Debounce будет применён при инициализации (window.onload)
 
         // ===== НАСТРАИВАЕМЫЕ ВЕСА ЦЕННОСТИ =====
@@ -6318,76 +6332,89 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             const totalKm = allDates.length;
             const totalPlayers = roster.length;
             const newPlayers = roster.filter(p => p.isNew).length;
-            const avgAttendance = totalKm > 0 ? Math.round(allDates.reduce((sum, d) => {
-                const snap = appliedStatsByDate[d];
-                return sum + (snap && snap.players ? snap.players.length : 0);
-            }, 0) / totalKm) : 0;
 
             // Следующее событие
             const today = todayStr();
             let nextEvent = null;
             for (let i = 0; i < 14; i++) {
-                const d = new Date();
-                d.setDate(d.getDate() + i);
+                const d = new Date(); d.setDate(d.getDate() + i);
                 const ds = localDateStr(d);
                 const evs = getAllEventsForDate(ds).filter(e => getEventStatus(ds, e.key) !== 'done');
                 if (evs.length > 0) {
                     const dayLabel = i === 0 ? 'Сегодня' : i === 1 ? 'Завтра' : d.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
-                    nextEvent = { label: dayLabel, event: evs[0] };
-                    break;
+                    nextEvent = { label: dayLabel, event: evs[0] }; break;
                 }
             }
             const nextEl = document.getElementById('dashNextEvent');
-            if (nextEl) {
-                nextEl.innerHTML = nextEvent 
-                    ? '⏭ ' + nextEvent.label + ': <b>' + nextEvent.event.title + '</b>' + (nextEvent.event.time ? ' в ' + nextEvent.event.time : '')
-                    : '✅ Нет предстоящих событий';
-            }
+            if (nextEl) nextEl.innerHTML = nextEvent ? '⏭ ' + nextEvent.label + ': <b>' + nextEvent.event.title + '</b>' + (nextEvent.event.time ? ' в ' + nextEvent.event.time : '') : '✅ Нет событий';
 
             const subtitle = document.getElementById('dashSubtitle');
-            if (subtitle) subtitle.textContent = '👥 ' + totalPlayers + ' игроков · 📅 ' + totalKm + ' КМ в истории';
+            if (subtitle) subtitle.textContent = totalPlayers + ' игроков · ' + totalKm + ' КМ';
 
-            // Карточки
-            const cards = document.getElementById('dashCards');
-            if (!cards) return;
-
-            // Средний KDA клана
-            const statsMap = calcStatsForPeriod('', '');
-            const allStats = Object.values(statsMap).filter(s => (s.kills||0) > 0);
-            const avgKda = allStats.length > 0 
-                ? (allStats.reduce((s, p) => s + (p.kills||0) / Math.max(p.deaths||1, 1), 0) / allStats.length).toFixed(2)
-                : '—';
-            
-            // Активных за последние 3 КМ
-            const last3 = allDates.slice(-3);
-            const activeLast3 = new Set();
-            last3.forEach(d => {
-                const snap = appliedStatsByDate[d];
-                if (snap && snap.players) snap.players.forEach(p => activeLast3.add(normalizeNick(p.name)));
+            // Активных из РОСТЕРА (пересечение с последними КМ)
+            const lastN = allDates.slice(-Math.min(3, totalKm));
+            let activeCount = 0;
+            roster.forEach(p => {
+                const nk = normalizeNick(p.name);
+                if (lastN.some(d => { const s = appliedStatsByDate[d]; return s && s.players && s.players.some(sp => normalizeNick(resolveAlias(sp.name)) === nk || normalizeNick(sp.name) === nk); })) activeCount++;
             });
 
-            // Спарклайн явки по КМ
-            const sparkData = allDates.slice(-10).map(d => {
-                const snap = appliedStatsByDate[d];
-                return snap && snap.players ? snap.players.length : 0;
-            });
-            const sparkMax = Math.max(...sparkData, 1);
-            const sparkHtml = '<div class="dash-sparkline">' + sparkData.map(v => 
-                '<div class="dash-sparkline-bar" style="height:' + Math.round(v/sparkMax*100) + '%"></div>'
-            ).join('') + '</div>';
-
-            cards.innerHTML = [
-                { title: '👥 Ростер', num: totalPlayers, sub: newPlayers > 0 ? '+' + newPlayers + ' новых' : 'Все в строю', color: '#6366f1' },
-                { title: '📅 КМ записано', num: totalKm, sub: totalKm > 0 ? 'Последний: ' + allDates[allDates.length-1].split('-').reverse().join('.') : 'Нет данных', color: '#3b82f6' },
-                { title: '👁 Средняя явка', num: avgAttendance, sub: 'человек на КМ' + sparkHtml, color: '#22c55e' },
-                { title: '⚡ Средний KDA клана', num: avgKda, sub: allStats.length + ' боевых игроков', color: '#f59e0b' },
-                { title: '🔥 Активных (3 КМ)', num: activeLast3.size, sub: 'из ' + totalPlayers + ' в ростере', color: activeLast3.size < totalPlayers * 0.5 ? '#ef4444' : '#22c55e' },
-                { title: '⚔️ Рейд Паков', num: packs.length, sub: packs.map(p=>p.name).join(', ') || '—', color: '#a78bfa' },
-            ].map(c => '<div class="dash-card"><div class="dash-card-title">' + c.title + '</div><div class="dash-big-num" style="color:' + c.color + '">' + c.num + '</div><div class="dash-sub">' + c.sub + '</div></div>').join('');
-
-            // ===== АЛЕРТЫ =====
+            // Навигационные карточки (кликабельные)
+            const navCards = document.getElementById('dashNavCards');
+            if (navCards) {
+                const nd = [
+                    { icon:'👥', num: totalPlayers, sub:'Клан' + (newPlayers > 0 ? ' · +' + newPlayers + ' new' : ''), color:'#6366f1', page:'roster' },
+                    { icon:'📅', num: totalKm > 0 ? allDates[allDates.length-1].split('-').slice(1).reverse().join('.') : '—', sub:'Календарь · ' + totalKm + ' КМ', color:'#3b82f6', page:'calendar' },
+                    { icon:'⚔️', num: packs.length, sub:'Рейд Паки', color:'#a78bfa', page:'packs' },
+                    { icon:'📊', num: activeCount + '/' + totalPlayers, sub:'Активных (' + lastN.length + ' КМ)', color: activeCount < totalPlayers * 0.5 ? '#ef4444' : '#22c55e', page:'stats' },
+                ];
+                navCards.innerHTML = nd.map(c => '<div class="dash-card" style="cursor:pointer;display:flex;align-items:center;gap:14px;padding:16px 18px" onclick="showPage(\'' + c.page + '\')">' + '<span style="font-size:24px">' + c.icon + '</span><div><div style="font-size:18px;font-weight:900;color:' + c.color + '">' + c.num + '</div><div style="font-size:11px;color:#64748b">' + c.sub + '</div></div></div>').join('');
+            }
             renderDashAlerts();
+            renderDashAttention();
             renderDashTopPlayers();
+        }
+
+
+        function renderDashAttention() {
+            const el = document.getElementById('dashAttention');
+            if (!el) return;
+            const allDates = Object.keys(appliedStatsByDate).sort();
+            const totalDates = allDates.length;
+            const statsMap = calcStatsForPeriod('', '');
+            const items = [];
+            if (totalDates === 0) { el.innerHTML = '<div style="color:#475569;font-size:12px;padding:8px 0">Загрузи скриншоты КМ</div>'; return; }
+
+            const tanks=['Phoenix Knight','Hell Knight','Eva\'s Templar','Shillien Templar'];
+            const healers=['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'];
+            function isSup(pf) { return pf&&pf!=='—'&&[...tanks,...healers].some(x=>pf.includes(x.split(' ')[0])); }
+
+            // Кочевники: в разных паках по скринам
+            const pp = {};
+            allDates.forEach(d => { const sn=appliedStatsByDate[d]; if(!sn||!sn.screenPlayersMap) return; Object.entries(sn.screenPlayersMap).forEach(([pk,pls])=>{ if(!pls) return; pls.forEach(p=>{ const nk=normalizeNick(resolveAlias(p.name)); if(!pp[nk]) pp[nk]=new Set(); pp[nk].add(pk); }); }); });
+            const nomads = Object.entries(pp).filter(([,s])=>s.size>=2).map(([nk,s])=>{ const r=roster.find(x=>normalizeNick(x.name)===nk); const ps=statsMap[nk]; return {name:r?r.name:nk,packs:[...s],kills:ps?.kills||0}; }).sort((a,b)=>b.kills-a.kills);
+            nomads.slice(0,2).forEach(mp => { if(mp.kills>5) items.push({icon:'🔀',type:'info',title:mp.name+' — кочевник',text:'В '+mp.packs.length+' паках ('+mp.packs.slice(0,3).join(', ')+')'}); });
+
+            // ДД с 0 убийств
+            const allPS = roster.map(p=>{const nk=normalizeNick(p.name);const ps=statsMap[nk];if(!ps) return null;const pr=allDates.filter(d=>{const s=appliedStatsByDate[d];return s&&s.players&&s.players.some(sp=>normalizeNick(resolveAlias(sp.name))===nk||normalizeNick(sp.name)===nk);}).length;return{name:p.name,kills:ps.kills||0,deaths:ps.deaths||0,att:Math.round(pr/totalDates*100),profa:p.profa,pac:p.pac};}).filter(Boolean);
+            const deadW = allPS.filter(p=>p.kills===0&&p.att>30&&!isSup(p.profa));
+            if(deadW.length>0) items.push({icon:'⚠️',type:'warn',title:deadW.length+' ДД с 0 убийств',text:deadW.slice(0,4).map(p=>p.name).join(', ')+(deadW.length>4?' +'+(deadW.length-4):'')});
+
+            // MVP
+            const dps=allPS.filter(p=>!isSup(p.profa)&&p.kills>3).map(p=>({...p,kda:p.kills/Math.max(p.deaths,1)})).sort((a,b)=>b.kda-a.kda);
+            if(dps.length>0&&dps[0].kda>2) items.push({icon:'⭐',type:'good',title:'MVP: '+dps[0].name,text:'KDA '+dps[0].kda.toFixed(2)+' ('+dps[0].kills+'⚔️/'+dps[0].deaths+'💀)'});
+
+            // Надёжные саппорты
+            const relSup = allPS.filter(p=>isSup(p.profa)&&p.att>=80);
+            if(relSup.length>0) items.push({icon:'💊',type:'good',title:relSup.length+' надёжных саппортов',text:relSup.slice(0,4).map(p=>p.name).join(', ')+'. Явка 80%+'});
+
+            // Сильные СОЛО
+            const gs = allPS.filter(p=>p.pac==='СОЛО'&&p.kills>8&&p.att>=50);
+            if(gs.length>0) items.push({icon:'💎',type:'info',title:gs.length+' сильных СОЛО',text:gs.slice(0,3).map(p=>p.name+' ('+p.kills+'⚔️)').join(', ')+'. Стоит забрать в пак.'});
+
+            if(items.length===0){el.innerHTML='<div style="color:#22c55e;font-size:13px;padding:12px 0">✅ Всё хорошо.</div>';return;}
+            const tc={info:'#3b82f6',warn:'#f59e0b',good:'#22c55e'};
+            el.innerHTML = items.map(a=>'<div class="dash-alert" style="border-left-color:'+(tc[a.type]||'#3b82f6')+'"><span style="font-size:16px;flex-shrink:0">'+a.icon+'</span><div><div style="font-size:12px;font-weight:800;color:#e2e8f0;margin-bottom:2px">'+a.title+'</div><div style="font-size:11px;color:#64748b">'+a.text+'</div></div></div>').join('');
         }
 
         function renderDashAlerts() {
@@ -6487,80 +6514,68 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             const totalDates = allDates.length;
             if (totalDates === 0) return;
 
-            // Value calculation (simplified from roster render)
             const _allStats = Object.values(statsMap);
-            const _maxKills = Math.max(..._allStats.map(s=>s.kills||0), 1);
-            const _maxPvp   = Math.max(..._allStats.map(s=>s.pvp_dmg||0), 1);
-            const _maxPve   = Math.max(..._allStats.map(s=>s.pve_dmg||0), 1);
-            const _maxDeaths= Math.max(..._allStats.map(s=>s.deaths||0), 1);
+            const _maxPvp = Math.max(..._allStats.map(s=>s.pvp_dmg||0), 1);
+            const _maxPve = Math.max(..._allStats.map(s=>s.pve_dmg||0), 1);
+            const _maxDeaths = Math.max(..._allStats.map(s=>s.deaths||0), 1);
+            const _allSorted = [..._allStats].sort((a,b)=>(b.kills||0)-(a.kills||0));
 
-            const ROLE_MAP_D = {
-                'Хилер': ['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'],
-                'Танк':  ['Phoenix Knight','Hell Knight','Eva\'s Templar','Shillien Templar'],
-            };
-            function getRoleD(pf) {
-                if (!pf || pf === '—') return 'Боевой';
-                for (const [role, list] of Object.entries(ROLE_MAP_D)) {
-                    if (list.some(x => pf.includes(x.split(' ')[0]))) return role;
-                }
-                return 'Боевой';
-            }
+            const ROLE_MAP_D = {'Хилер':['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'],'Танк':['Phoenix Knight','Hell Knight','Eva\'s Templar','Shillien Templar']};
+            function getRoleD(pf) { if (!pf||pf==='—') return 'Боевой'; for (const [role,list] of Object.entries(ROLE_MAP_D)) { if (list.some(x=>pf.includes(x.split(' ')[0]))) return role; } return 'Боевой'; }
 
+            // EXACT same value formula as renderRoster
             const playerValues = roster.map(p => {
                 const nk = normalizeNick(p.name);
                 const ps = statsMap[nk];
-                if (!ps) return { name: p.name, value: 0 };
-                const kills = ps.kills||0, deaths = ps.deaths||0;
-                const kda = kills / Math.max(deaths, 1);
-                const presCount = allDates.filter(d => {
-                    const snap = appliedStatsByDate[d];
-                    return snap && snap.players && snap.players.some(sp => normalizeNick(resolveAlias(sp.name)) === nk || normalizeNick(sp.name) === nk);
-                }).length;
-                const presence = Math.round(presCount / totalDates * 100);
-                const kdaScore = Math.min(100, Math.round(kda / 5 * 100));
-                const pvpScore = Math.round(((ps.pvp_dmg||0) / _maxPvp) * 100);
-                const deathScore = Math.round(Math.max(0, 100 - (deaths / _maxDeaths) * 100));
-                const role = getRoleD(p.profa);
+                if (!ps) return null;
+                const kills=ps.kills||0, deaths=ps.deaths||0, kda=kills/Math.max(deaths,1);
+                const presCount = allDates.filter(d => { const sn=appliedStatsByDate[d]; return sn&&sn.players&&sn.players.some(sp=>normalizeNick(resolveAlias(sp.name))===nk||normalizeNick(sp.name)===nk); }).length;
+                const presence = Math.round(presCount/totalDates*100);
+                const kdaScore = Math.min(100, Math.round(kda/5*100));
+                const pvpScore = Math.round((ps.pvp_dmg||0)/_maxPvp*100);
+                const pveScore = Math.round((ps.pve_dmg||0)/_maxPve*100);
+                const deathScore = Math.round(Math.max(0, 100-(deaths/_maxDeaths)*100));
+                const profaName = p.profa&&p.profa!=='—' ? p.profa : null;
+                const classmates = profaName ? roster.filter(r => { if(normalizeNick(r.name)===nk) return false; const rp=r.profa&&r.profa!=='—'?r.profa:null; return rp&&rp.split(' (')[0].toLowerCase()===profaName.split(' (')[0].toLowerCase(); }) : [];
+                const classmateKills = classmates.map(r=>(statsMap[normalizeNick(r.name)]?.kills||0));
+                const classRank = classmateKills.filter(k=>k>kills).length+1;
+                const classTotal = classmateKills.length+1;
+                const classScore = classTotal>1 ? Math.round((1-(classRank-1)/classTotal)*100) : 50;
+                const rankIdx = _allSorted.findIndex(s=>normalizeNick(s.name)===nk);
+                const clanScore = Math.round((1-(rankIdx>=0?rankIdx:_allSorted.length-1)/Math.max(_allSorted.length-1,1))*100);
+                const role = getRoleD(profaName);
                 let val;
-                if (role === 'Хилер') val = Math.round(presence*0.35 + kdaScore*0.20 + deathScore*0.20 + 25);
-                else if (role === 'Танк') val = Math.round(presence*0.30 + deathScore*0.25 + kdaScore*0.20 + 25);
-                else val = Math.round(presence*0.20 + kdaScore*0.20 + pvpScore*0.15 + 15);
-                return { name: p.name, value: val, profa: p.profa };
-            }).sort((a,b) => b.value - a.value);
+                if (role==='Хилер') val=Math.round(presence*0.35+classScore*0.25+kdaScore*0.20+deathScore*0.20);
+                else if (role==='Танк') val=Math.round(presence*0.30+deathScore*0.25+classScore*0.25+kdaScore*0.20);
+                else val=Math.round(presence*0.20+classScore*0.20+kdaScore*0.20+clanScore*0.15+pvpScore*0.15+pveScore*0.10);
+                return { name:p.name, value:val, kills };
+            }).filter(Boolean).sort((a,b)=>b.value-a.value);
 
             const valEl = document.getElementById('dashTopValue');
             if (valEl) {
-                valEl.innerHTML = playerValues.slice(0, 5).map((p, i) => {
-                    const color = p.value >= 70 ? '#22c55e' : p.value >= 40 ? '#f59e0b' : '#ef4444';
-                    return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #1e2530;cursor:pointer" onclick="openPlayerProfile(\'' + p.name + '\')">' +
-                        '<span style="font-size:14px;font-weight:900;color:#475569;width:20px">#' + (i+1) + '</span>' +
-                        '<span style="font-weight:700;color:#e2e8f0;flex:1">' + p.name + '</span>' +
-                        '<span style="font-weight:900;color:' + color + '">' + p.value + '</span></div>';
+                valEl.innerHTML = playerValues.slice(0,5).map((p,i) => {
+                    const c = p.value>=70?'#22c55e':p.value>=40?'#f59e0b':'#ef4444';
+                    return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #1e2530;cursor:pointer" onclick="openPlayerProfile(\''+p.name.replace(/'/g,"\\'")+'\')">#'+(i+1)+' <span style="font-weight:700;color:#e2e8f0;flex:1">'+p.name+'</span><span style="font-weight:900;color:'+c+'">'+p.value+'</span></div>';
                 }).join('');
             }
 
-            // Топ растущих: сравниваем последний КМ с предпоследним по убийствам
+            // Growing & Falling
             const growEl = document.getElementById('dashTopGrowing');
-            if (growEl && allDates.length >= 2) {
-                const last = allDates[allDates.length - 1];
-                const prev = allDates[allDates.length - 2];
-                const lastSnap = appliedStatsByDate[last]?.players || [];
-                const prevSnap = appliedStatsByDate[prev]?.players || [];
-                const growth = lastSnap.map(lp => {
-                    const nk = normalizeNick(lp.name);
-                    const pp = prevSnap.find(p => normalizeNick(p.name) === nk);
-                    const diff = (lp.kills||0) - (pp ? (pp.kills||0) : 0);
-                    return { name: lp.name, diff, kills: lp.kills||0 };
-                }).filter(g => g.diff > 0).sort((a,b) => b.diff - a.diff);
-
-                growEl.innerHTML = growth.length > 0 
-                    ? growth.slice(0,5).map((g, i) => 
-                        '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #1e2530;cursor:pointer" onclick="openPlayerProfile(\'' + g.name + '\')">' +
-                        '<span style="font-size:14px;font-weight:900;color:#475569;width:20px">#' + (i+1) + '</span>' +
-                        '<span style="font-weight:700;color:#e2e8f0;flex:1">' + g.name + '</span>' +
-                        '<span style="font-weight:700;color:#22c55e">+' + g.diff + ' ⚔️</span></div>'
-                    ).join('')
-                    : '<div style="color:#475569;font-size:12px">Нужно 2+ КМ для сравнения</div>';
+            const fallEl = document.getElementById('dashTopFalling');
+            if (allDates.length >= 2) {
+                const last = allDates[allDates.length-1], prev = allDates[allDates.length-2];
+                const ls = appliedStatsByDate[last]?.players||[], ps = appliedStatsByDate[prev]?.players||[];
+                const diffs = ls.map(lp => { const nk=normalizeNick(lp.name); const pp=ps.find(p=>normalizeNick(p.name)===nk); return {name:lp.name, diff:(lp.kills||0)-(pp?(pp.kills||0):0)}; });
+                function renderList(el2, list, isUp) {
+                    if (!el2) return;
+                    if (!list.length) { el2.innerHTML='<div style="color:#475569;font-size:12px;padding:8px 0">—</div>'; return; }
+                    el2.innerHTML = list.slice(0,5).map((g,i)=>'<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #1e2530;cursor:pointer;font-size:13px" onclick="openPlayerProfile(\''+g.name.replace(/'/g,"\\'")+'\')">#'+(i+1)+' <span style="font-weight:700;color:#e2e8f0;flex:1">'+g.name+'</span><span style="font-weight:700;color:'+(isUp?'#22c55e':'#ef4444')+'">'+(isUp?'+':'')+g.diff+' ⚔️</span></div>').join('');
+                }
+                renderList(growEl, diffs.filter(g=>g.diff>0).sort((a,b)=>b.diff-a.diff), true);
+                renderList(fallEl, diffs.filter(g=>g.diff<0).sort((a,b)=>a.diff-b.diff), false);
+            } else {
+                if(growEl) growEl.innerHTML='<div style="color:#475569;font-size:12px">Нужно 2+ КМ</div>';
+                if(fallEl) fallEl.innerHTML='<div style="color:#475569;font-size:12px">Нужно 2+ КМ</div>';
             }
         }
 
