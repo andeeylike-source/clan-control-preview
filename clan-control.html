@@ -1923,10 +1923,17 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             const dayStats = allDates.map(d => {
                 const snap = appliedStatsByDate[d];
                 const p = snap && snap.players && snap.players.find(p => normalizeNick(p.name) === normKey);
-                // Профа вручную назначена на этот КМ?
-                const assignedProfa = (playerProfaByDate[normKey] && playerProfaByDate[normKey][d])
-                    || (playerProfaByDate[player.name] && playerProfaByDate[player.name][d])
-                    || null;
+                // Профа вручную назначена на этот КМ? — ищем по всем вариантам ключа
+                let assignedProfa = (playerProfaByDate[normKey] && playerProfaByDate[normKey][d]) || null;
+                if (!assignedProfa) {
+                    // Перебираем все ключи в playerProfaByDate — ищем совпадение по нормализации
+                    for (const k of Object.keys(playerProfaByDate)) {
+                        if (normalizeNick(k) === normKey && playerProfaByDate[k][d]) {
+                            assignedProfa = playerProfaByDate[k][d];
+                            break;
+                        }
+                    }
+                }
                 const kmProfa = assignedProfa
                     || (p && p.profa && p.profa !== '—' ? p.profa : null)
                     || (player.profa && player.profa !== '—' ? player.profa : null);
@@ -1999,21 +2006,27 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             const kdaRankIdx = allPlayersByKda.findIndex(p => normalizeNick(p.name) === normKey);
             const kdaRankNum = kdaRankIdx >= 0 ? kdaRankIdx + 1 : null;
 
-            // Профа и роль
-            const profaName = player.profa && player.profa !== '—' ? player.profa : null;
+            // Профа и роль — берём АКТИВНУЮ профу (не просто первую из ростера)
+            const profaName = activeProfaForProfile || (player.profa && player.profa !== '—' ? player.profa : null);
             const ROLE_MAP = {
-                'Танк': ['Phoenix Knight','Hell Knight','Eva\'s Templar','Shillien Templar'],
+                'Танк':         ['Phoenix Knight','Hell Knight','Eva\'s Templar','Shillien Templar'],
                 'Хилер/Баффер': ['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'],
-                'Лучник': ['Sagittarius','Moonlight Sentinel','Ghost Sentinel'],
-                'Кинжал': ['Adventurer','Wind Rider','Ghost Hunter'],
-                'Маг': ['Archmage','Soultaker','Mystic Muse','Storm Screamer','Spectral Master'],
-                'Воин': ['Duelist','Dreadnought','Grand Khavatari','Titan','Fortune Seeker','Maestro'],
-                'Призыватель': ['Arcana Lord','Elemental Master','Spectral Master'],
+                'Лучник':       ['Sagittarius','Moonlight Sentinel','Ghost Sentinel'],
+                'Кинжал':       ['Adventurer','Wind Rider','Ghost Hunter'],
+                'Маг':          ['Archmage','Soultaker','Mystic Muse','Storm Screamer','Spectral Master'],
+                'Воин':         ['Duelist','Dreadnought','Grand Khavatari','Titan','Fortune Seeker','Maestro'],
+                'Призыватель':  ['Arcana Lord','Elemental Master','Spectral Master'],
             };
-            const playerRole = profaName ? Object.entries(ROLE_MAP).find(([,profas]) => profas.some(p => profaName.includes(p.split(' ')[0])))?.[0] : null;
+            const getRole = (pf) => pf ? Object.entries(ROLE_MAP).find(([,profas]) => profas.some(p => pf.includes(p.split(' ')[0])))?.[0] : null;
+            const playerRole = getRole(profaName);
 
-            // Статистика по классу (игроки с той же профой)
-            const classmates = profaName ? roster.filter(r => r.profa === profaName && normalizeNick(r.name) !== normKey) : [];
+            // Статистика по классу — все у кого та же активная профа
+            const classmates = profaName ? roster.filter(r => {
+                if (normalizeNick(r.name) === normKey) return false;
+                const rProfas = r.profas && r.profas.length > 0 ? r.profas : (r.profa && r.profa !== '—' ? [r.profa] : []);
+                return rProfas.some(rp => rp.toLowerCase().trim() === profaName.toLowerCase().trim()
+                    || rp.split(' (')[0].toLowerCase() === profaName.split(' (')[0].toLowerCase());
+            }) : [];
             const classmateStats = classmates.map(r => {
                 const s = statsMap[normalizeNick(r.name)];
                 return s ? { name: r.name, kills: s.kills||0, kda: parseFloat((s.kills/Math.max(s.deaths,1)).toFixed(2)) } : null;
@@ -2024,8 +2037,9 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
 
             // Статистика по роли
             const rolemates = playerRole ? roster.filter(r => {
-                const rRole = Object.entries(ROLE_MAP).find(([,profas]) => profas.some(p => r.profa && r.profa.includes(p.split(' ')[0])))?.[0];
-                return rRole === playerRole && normalizeNick(r.name) !== normKey;
+                if (normalizeNick(r.name) === normKey) return false;
+                const rProfas = r.profas && r.profas.length > 0 ? r.profas : (r.profa && r.profa !== '—' ? [r.profa] : []);
+                return rProfas.some(rp => getRole(rp) === playerRole);
             }) : [];
             const rolemateStats = rolemates.map(r => {
                 const s = statsMap[normalizeNick(r.name)];
@@ -2037,15 +2051,48 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             // Заметки
             const note = playerNotes[normKey] || '';
 
-            // Радар-данные: агрессивность, живучесть, урон, присутствие, поддержка
+            // ===== РАДАР =====
             const maxKillsAll = Math.max(...allPlayersSorted.map(p=>p.kills||0), 1);
             const maxPvpAll   = Math.max(...allPlayersSorted.map(p=>p.pvp_dmg||0), 1);
             const maxPveAll   = Math.max(...allPlayersSorted.map(p=>p.pve_dmg||0), 1);
-            const aggrScore   = Math.round((totalKills / maxKillsAll) * 100);
-            const survScore   = totalDeaths > 0 ? Math.round(Math.max(0, 100 - (totalDeaths / Math.max(totalKills,1)) * 30)) : 100;
+            const maxDeathsAll= Math.max(...allPlayersSorted.map(p=>p.deaths||0), 1);
+
+            const presScore   = attendance;
+            const kdaScore    = Math.min(100, Math.round(parseFloat(kda) / 5 * 100)); // KDA 5+ = 100
             const pvpScore    = Math.round((totalPvp / maxPvpAll) * 100);
             const pveScore    = Math.round((totalPve / maxPveAll) * 100);
-            const presScore   = attendance;
+            const aggrScore   = Math.round((totalKills / maxKillsAll) * 100);
+            // Живучесть: меньше смертей на убийство = лучше
+            const survScore   = totalDeaths > 0 ? Math.round(Math.max(0, 100 - (totalDeaths / Math.max(totalKills,1)) * 30)) : 100;
+            // Рейтинг среди класса (чем меньше место — тем больше)
+            const classScore  = classTotal > 1 ? Math.round((1 - (classRankKills-1)/(classTotal)) * 100) : 50;
+
+            // Ценность — зависит от роли
+            let valueScore = 0;
+            let radarLabels, radarScores;
+            if (playerRole === 'Хилер/Баффер') {
+                // Хилер: явка, KDA, живучесть, рейтинг класса, PvP
+                valueScore = Math.round(presScore*0.35 + kdaScore*0.25 + survScore*0.2 + classScore*0.15 + pvpScore*0.05);
+                radarLabels = ['ЯВКА','KDA','ЖИВУЧЕСТЬ','РЕЙТИНГ','PVP'];
+                radarScores = [presScore, kdaScore, survScore, classScore, pvpScore];
+            } else if (playerRole === 'Танк') {
+                // Танк: живучесть, явка, KDA, PvP, рейтинг
+                valueScore = Math.round(survScore*0.3 + presScore*0.25 + kdaScore*0.2 + pvpScore*0.15 + classScore*0.1);
+                radarLabels = ['ЖИВУЧЕСТЬ','ЯВКА','KDA','PVP','РЕЙТИНГ'];
+                radarScores = [survScore, presScore, kdaScore, pvpScore, classScore];
+            } else if (playerRole === 'Призыватель') {
+                // Призыватель: PvE, явка, KDA, PvP, рейтинг
+                valueScore = Math.round(pveScore*0.35 + presScore*0.25 + kdaScore*0.2 + pvpScore*0.1 + classScore*0.1);
+                radarLabels = ['PVE','ЯВКА','KDA','PVP','РЕЙТИНГ'];
+                radarScores = [pveScore, presScore, kdaScore, pvpScore, classScore];
+            } else {
+                // Воин/Лучник/Кинжал/Маг: убийства, KDA, PvP, явка, рейтинг
+                valueScore = Math.round(aggrScore*0.3 + kdaScore*0.25 + pvpScore*0.2 + presScore*0.15 + classScore*0.1);
+                radarLabels = ['УБИЙСТВА','KDA','PVP','ЯВКА','РЕЙТИНГ'];
+                radarScores = [aggrScore, kdaScore, pvpScore, presScore, classScore];
+            }
+            // Цвет ценности
+            const valueColor = valueScore >= 70 ? '#22c55e' : valueScore >= 40 ? '#f59e0b' : '#ef4444';
 
             const fmtDate = ds => { const [y,m,d] = ds.split('-'); return `${d}.${m}.${y.slice(2)}`; };
             const fmtNum  = n => n >= 1000 ? (n/1000).toFixed(1)+'K' : n;
@@ -2080,10 +2127,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 return `<svg viewBox="0 0 260 260" width="100%" height="auto" style="max-width:240px">${grid}${axes}${poly}${dots}${lbls}</svg>`;
             }
 
-            const radarHtml = radarSVG(
-                [aggrScore, pvpScore, pveScore, presScore, survScore],
-                ['АТАКА','PVP','PVE','ПОСЕЩ.','CON']
-            );
+            const radarHtml = radarSVG(radarScores, radarLabels);
 
             // Кольцо присутствия
             const circR = 36, circC = 42, circ = 2*Math.PI*circR;
@@ -2364,14 +2408,28 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
 
                     <!-- Радар -->
                     <div class="prf-card" style="text-align:center">
-                        <div class="prf-section-title">Стиль игры</div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                            <div class="prf-section-title" style="margin-bottom:0">Стиль игры</div>
+                            ${playerRole ? `<div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;background:#1e2530;padding:2px 8px;border-radius:4px">${playerRole}</div>` : ''}
+                        </div>
                         ${radarHtml}
+                        <!-- Ценность игрока -->
+                        <div style="background:#0b0e14;border-radius:8px;padding:10px 12px;margin-top:8px;display:flex;align-items:center;justify-content:space-between;border:1px solid ${valueColor}44">
+                            <div>
+                                <div style="font-size:9px;color:#475569;font-weight:800;text-transform:uppercase;letter-spacing:.08em">Ценность</div>
+                                <div style="font-size:9px;color:#475569;margin-top:2px">${playerRole === 'Хилер/Баффер' ? 'явка · KDA · живучесть' : playerRole === 'Танк' ? 'живучесть · явка · KDA' : 'убийства · KDA · PvP'}</div>
+                            </div>
+                            <div style="font-size:26px;font-weight:900;color:${valueColor}">${valueScore}</div>
+                        </div>
+                        <!-- Мини-карточки показателей -->
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px;text-align:left">
-                            ${[['Атака',aggrScore,'#f59e0b'],['PvP урон',pvpScore,'#818cf8'],['PvE урон',pveScore,'#22c55e'],['Присутствие',presScore,'#6366f1'],['CON',survScore,'#a78bfa']].map(([lb,sc,cl])=>`
-                            <div style="background:#0b0e14;border-radius:6px;padding:5px 8px">
-                                <div style="font-size:9px;color:#475569;font-weight:700;text-transform:uppercase">${lb}</div>
-                                <div style="font-size:14px;font-weight:900;color:${cl}">${sc}</div>
-                            </div>`).join('')}
+                            ${radarLabels.map((lb,i) => {
+                                const colors = ['#f59e0b','#a78bfa','#818cf8','#6366f1','#22c55e','#ef4444'];
+                                return `<div style="background:#0b0e14;border-radius:6px;padding:5px 8px">
+                                    <div style="font-size:9px;color:#475569;font-weight:700;text-transform:uppercase">${lb}</div>
+                                    <div style="font-size:14px;font-weight:900;color:${colors[i]||'#94a3b8'}">${radarScores[i]}</div>
+                                </div>`;
+                            }).join('')}
                         </div>
                     </div>
 
