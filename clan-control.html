@@ -1652,6 +1652,8 @@
             if(pageId === 'stats') renderStats();
             if(pageId === 'screenshots') renderScreenshotArchive();
             if(pageId === 'settings') { renderApiKeys(); renderAliases(); }
+            // Сохраняем текущую страницу (кроме профиля — он зависит от игрока)
+            if (pageId !== 'profile') localStorage.setItem('cc_lastPage', pageId);
         }
 
         // ===== ЗАМЕТКИ ОФИЦЕРА =====
@@ -5772,6 +5774,11 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             renderRoster();
             // Синхронизируем статистику ростера из снапшотов при старте
             syncRosterStatsFromSnapshots();
+            // Восстанавливаем последнюю открытую страницу
+            const lastPage = localStorage.getItem('cc_lastPage');
+            if (lastPage && document.getElementById('page-' + lastPage)) {
+                showPage(lastPage);
+            }
         };
     </script>
     <!-- DATE PICKER POPUP -->
