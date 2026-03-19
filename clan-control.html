@@ -32,6 +32,10 @@
             padding: 40px;
             overflow-y: auto;
             background: linear-gradient(135deg, #0b0e14 0%, #12171f 100%);
+            visibility: hidden;
+        }
+        .main-content.ready {
+            visibility: visible;
         }
 
         .nav-item {
@@ -341,7 +345,7 @@
             <div onclick="showPage('calendar')" id="nav-calendar" class="nav-item">📅 Календарь КМ</div>
             <div onclick="showPage('roster')" id="nav-roster" class="nav-item">👥 Клан</div>
             <div onclick="showPage('profile')" id="nav-profile" class="nav-item" style="display:none">👤 Профиль</div>
-            <div onclick="showPage('packs')" id="nav-packs" class="nav-item active">⚔️ Рейд Паки</div>
+            <div onclick="showPage('packs')" id="nav-packs" class="nav-item">⚔️ Рейд Паки</div>
             <div onclick="showPage('archive')" id="nav-archive" class="nav-item">🗄️ Архив</div>
             <div onclick="showPage('screenshots')" id="nav-screenshots" class="nav-item">📋 История КМ</div>
             <div onclick="showPage('settings')" id="nav-settings" class="nav-item">⚙️ Настройки</div>
@@ -420,7 +424,7 @@
         </section>
 
         <!-- РЕЙД ПАКИ -->
-        <section id="page-packs" class="page-section active">
+        <section id="page-packs" class="page-section">
             <div class="flex justify-between items-center mb-8">
                 <h1 class="text-3xl font-bold">Рейд Паки</h1>
                 <button onclick="createNewPack()" class="btn-primary">+ Создать пак</button>
@@ -5774,11 +5778,12 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             renderRoster();
             // Синхронизируем статистику ростера из снапшотов при старте
             syncRosterStatsFromSnapshots();
-            // Восстанавливаем последнюю открытую страницу
-            const lastPage = localStorage.getItem('cc_lastPage');
-            if (lastPage && document.getElementById('page-' + lastPage)) {
-                showPage(lastPage);
-            }
+            // Восстанавливаем последнюю открытую страницу (или показываем паки по умолчанию)
+            const lastPage = localStorage.getItem('cc_lastPage') || 'packs';
+            const pageEl = document.getElementById('page-' + lastPage);
+            if (pageEl) showPage(lastPage); else showPage('packs');
+            // Показываем контент только после того как нужная страница активна
+            document.querySelector('.main-content').classList.add('ready');
         };
     </script>
     <!-- DATE PICKER POPUP -->
