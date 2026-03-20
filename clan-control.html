@@ -2553,7 +2553,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                                 ? `<span style="display:inline-flex;align-items:center;gap:4px">${profaIconHtml(d.profa,16)}</span>`
                                 : '<span style="color:#475569;font-size:10px">—</span>';
                             return `<div style="display:grid;grid-template-columns:60px 1fr 80px 52px 52px 80px 80px;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;font-size:12px;transition:background .15s;cursor:default;${isBest&&d.inStat ? 'background:#f59e0b11;border:1px solid #f59e0b22;' : ''}${absent ? 'opacity:0.35;' : notInStat ? 'opacity:0.5;' : ''}" class="km-row">
-                                <div style="font-size:11px;font-weight:700;color:${isBest&&d.inStat?'#f59e0b':absent||notInStat?'#475569':'#94a3b8'}">${fmtDate(d.date)}</div>
+                                <div style="font-size:11px;font-weight:700;color:${isBest&&d.inStat?'#f59e0b':absent||notInStat?'#475569':'#94a3b8'};cursor:pointer;text-decoration:underline;text-decoration-style:dashed;text-underline-offset:3px" onclick="navigateToKmDate('${d.date}')" title="Перейти к КМ ${fmtDate(d.date)}">${fmtDate(d.date)}</div>
                                 <div><div class="km-bar-wrap"><div class="km-bar-fill" style="width:${absent?0:pct}%;background:${barColor}"></div></div></div>
                                 <div>${absent ? '' : kmProfaOpts}</div>
                                 <div style="text-align:center;font-weight:700;color:#f59e0b">${absent?'—':d.inStat?d.kills:'·'}</div>
@@ -2886,8 +2886,8 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                             strengths.push({ icon:'🐉', title:'PvE вклад', text: totalPve.toLocaleString() + ' PvE урона — активно помогает в PvE контенте помимо основной роли.' });
                         }
 
-                        // === ОБЩИЙ ПРОГРЕСС ===
-                        if (presentDates.length >= 2) {
+                        // === ОБЩИЙ ПРОГРЕСС (только для ДД) ===
+                        if (presentDates.length >= 2 && isDps) {
                             const firstKm = dayStats.find(d => d.present && d.inStat);
                             const lastKm = [...dayStats].reverse().find(d => d.present && d.inStat);
                             if (firstKm && lastKm && firstKm.date !== lastKm.date) {
@@ -2898,6 +2898,17 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                                     } else {
                                         issues.push({ icon:'📊', severity:'low', title:'Регресс: ' + improvement + ' убийств', text:'С ' + firstKm.kills + '⚔️ до ' + lastKm.kills + '⚔️.' });
                                     }
+                                }
+                            }
+                        }
+                        // Прогресс для саппортов — по смертям (меньше = лучше)
+                        if (!isDps && presentDates.length >= 2) {
+                            const _firstKm = dayStats.find(d => d.present && d.inStat);
+                            const _lastKm = [...dayStats].reverse().find(d => d.present && d.inStat);
+                            if (_firstKm && _lastKm && _firstKm.date !== _lastKm.date) {
+                                const deathDiff = (_lastKm.deaths||0) - (_firstKm.deaths||0);
+                                if (deathDiff < -3) {
+                                    strengths.push({ icon:'📊', title:'Прогресс: ' + deathDiff + ' смертей', text:'(' + _firstKm.date.split('-').reverse().slice(0,2).join('.') + '): ' + _firstKm.deaths + '💀 → (' + _lastKm.date.split('-').reverse().slice(0,2).join('.') + '): ' + _lastKm.deaths + '💀. Стал умирать реже.' });
                                 }
                             }
                         }
@@ -3011,6 +3022,37 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             const sp = document.getElementById('noteSaved');
             sp.style.display = 'inline';
             setTimeout(() => sp.style.display = 'none', 2000);
+        }
+
+
+        // Навигация из профиля в Историю КМ на конкретную дату
+        function navigateToKmDate(dateStr) {
+            showPage('screenshots');
+            // Ждём рендер и скроллим к нужной дате
+            setTimeout(() => {
+                // Ищем карточку с этой датой в Истории КМ
+                const cards = document.querySelectorAll('#kmHistoryContent .card');
+                for (const card of cards) {
+                    if (card.textContent.includes(dateStr.split('-').reverse().join('.'))) {
+                        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        card.style.outline = '2px solid #6366f1';
+                        card.style.outlineOffset = '4px';
+                        setTimeout(() => { card.style.outline = ''; card.style.outlineOffset = ''; }, 3000);
+                        break;
+                    }
+                    // Также проверяем по формату "12 марта 2026 г."
+                    const [y,m,d] = dateStr.split('-');
+                    const dateObj = new Date(Number(y), Number(m)-1, Number(d));
+                    const formatted = dateObj.toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'});
+                    if (card.textContent.includes(formatted)) {
+                        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        card.style.outline = '2px solid #6366f1';
+                        card.style.outlineOffset = '4px';
+                        setTimeout(() => { card.style.outline = ''; card.style.outlineOffset = ''; }, 3000);
+                        break;
+                    }
+                }
+            }, 300);
         }
 
         function goBackFromProfile() {
@@ -3611,23 +3653,29 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
         function analyzePlayerSynergy(playerName) {
             const nk = normalizeNick(playerName);
             const allDates = Object.keys(appliedStatsByDate).sort();
-            const packResults = {}; // { packLeader: { kills:[], deaths:[], dates:[] } }
+            const packResults = {}; // { normalizedLeader: { kills:[], deaths:[], dates:[], displayName } }
             allDates.forEach(ds => {
                 const snap = appliedStatsByDate[ds];
                 if (!snap || !snap.screenPlayersMap) return;
+                const leaders = snap.packLeaders || {};
                 Object.entries(snap.screenPlayersMap).forEach(([packName, players]) => {
                     if (!players) return;
                     const me = players.find(p => normalizeNick(resolveAlias(p.name))===nk || normalizeNick(p.name)===nk);
                     if (!me) return;
-                    if (!packResults[packName]) packResults[packName] = { kills:[], deaths:[], dates:[] };
-                    packResults[packName].kills.push(me.kills||0);
-                    packResults[packName].deaths.push(me.deaths||0);
-                    packResults[packName].dates.push(ds);
+                    // Нормализуем имя пака через лидера
+                    const leader = leaders[packName] || packName;
+                    const normLeader = normalizeNick(leader);
+                    // Не считаем пак где ты сам лидер
+                    if (normLeader === nk) return;
+                    const displayName = roster.find(r => normalizeNick(r.name) === normLeader)?.name || leader;
+                    if (!packResults[normLeader]) packResults[normLeader] = { kills:[], deaths:[], dates:[], displayName };
+                    packResults[normLeader].kills.push(me.kills||0);
+                    packResults[normLeader].deaths.push(me.deaths||0);
+                    packResults[normLeader].dates.push(ds);
                 });
             });
-            // Средние показатели по пакам
-            const summary = Object.entries(packResults).map(([pack, data]) => ({
-                pack, count: data.dates.length,
+            const summary = Object.entries(packResults).map(([, data]) => ({
+                pack: data.displayName, count: data.dates.length,
                 avgKills: data.kills.length ? +(data.kills.reduce((s,v)=>s+v,0)/data.kills.length).toFixed(1) : 0,
                 avgDeaths: data.deaths.length ? +(data.deaths.reduce((s,v)=>s+v,0)/data.deaths.length).toFixed(1) : 0,
             })).filter(s => s.count > 0).sort((a,b) => b.avgKills - a.avgKills);
@@ -5501,7 +5549,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     }
                 }
 
-                return `<div class="card mb-6">
+                return `<div class="card mb-6" data-km-date="${dateStr}">
                     ${searchHighlightHtml}
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                         <div>
@@ -6800,11 +6848,22 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             const healers=['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'];
             function isSup(pf) { return pf&&pf!=='—'&&[...tanks,...healers].some(x=>pf.includes(x.split(' ')[0])); }
 
-            // Кочевники: в разных паках по скринам
+            // Кочевники: в разных паках по скринам (нормализуем имена паков через лидеров)
             const pp = {};
-            allDates.forEach(d => { const sn=appliedStatsByDate[d]; if(!sn||!sn.screenPlayersMap) return; Object.entries(sn.screenPlayersMap).forEach(([pk,pls])=>{ if(!pls) return; pls.forEach(p=>{ const nk=normalizeNick(resolveAlias(p.name)); if(!pp[nk]) pp[nk]=new Set(); pp[nk].add(pk); }); }); });
-            const nomads = Object.entries(pp).filter(([,s])=>s.size>=2).map(([nk,s])=>{ const r=roster.find(x=>normalizeNick(x.name)===nk); const ps=statsMap[nk]; return {name:r?r.name:nk,packs:[...s],kills:ps?.kills||0}; }).sort((a,b)=>b.kills-a.kills);
-            nomads.slice(0,2).forEach(mp => { if(mp.kills>5) items.push({icon:'🔀',type:'info',title:mp.name+' — кочевник',text:'В '+mp.packs.length+' паках ('+mp.packs.slice(0,3).join(', ')+')', player:mp.name}); });
+            allDates.forEach(d => { const sn=appliedStatsByDate[d]; if(!sn||!sn.screenPlayersMap) return;
+                const leaders = sn.packLeaders || {};
+                Object.entries(sn.screenPlayersMap).forEach(([pk,pls])=>{ if(!pls) return;
+                    // Нормализуем имя пака через лидера
+                    const leader = leaders[pk] || pk;
+                    const normPack = normalizeNick(leader);
+                    pls.forEach(p=>{ const nk=normalizeNick(resolveAlias(p.name));
+                        if (nk === normPack) return; // не считаем свой собственный пак
+                        if(!pp[nk]) pp[nk]=new Set(); pp[nk].add(normPack);
+                    });
+                });
+            });
+            const nomads = Object.entries(pp).filter(([,s])=>s.size>=2).map(([nk,s])=>{ const r=roster.find(x=>normalizeNick(x.name)===nk); const ps=statsMap[nk]; return {name:r?r.name:nk,packs:[...s].map(lnk=>{const lr=roster.find(x=>normalizeNick(x.name)===lnk);return lr?lr.name:lnk;}),kills:ps?.kills||0}; }).sort((a,b)=>b.kills-a.kills);
+            nomads.slice(0,2).forEach(mp => { if(mp.kills>5) items.push({icon:'🔀',type:'info',title:mp.name+' — кочевник',text:'В паках: '+mp.packs.slice(0,3).join(', '), player:mp.name}); });
 
             // ДД с 0 убийств
             const allPS = roster.map(p=>{const nk=normalizeNick(p.name);const ps=statsMap[nk];if(!ps) return null;const pr=allDates.filter(d=>{const s=appliedStatsByDate[d];return s&&s.players&&s.players.some(sp=>normalizeNick(resolveAlias(sp.name))===nk||normalizeNick(sp.name)===nk);}).length;return{name:p.name,kills:ps.kills||0,deaths:ps.deaths||0,att:Math.round(pr/totalDates*100),profa:p.profa,pac:p.pac};}).filter(Boolean);
