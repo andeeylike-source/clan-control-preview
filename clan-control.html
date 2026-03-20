@@ -2179,9 +2179,9 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 };
             });
 
-            // Санитизация: для хилеров/танков если kills == deaths и оба > 10
-            // или kills > 20 для хилера — это ошибка парсинга AI (deaths скопированы в kills)
-            const _isHealProfa = player.profa && _VAL_HEAL_P.some(x => player.profa.includes(x.split(' ')[0]));
+            // Санитизация: для хилеров если kills == deaths и оба > 15 — ошибка AI
+            const _healProfList = ['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'];
+            const _isHealProfa = player.profa && _healProfList.some(x => player.profa.includes(x.split(' ')[0]));
             if (_isHealProfa) {
                 dayStats.forEach(d => {
                     if (!d.inStat) return;
