@@ -2788,6 +2788,54 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                             issues.push({ icon:'👥', severity:'medium', title:'Играешь СОЛО', text:'Сильный игрок без пака. Присоединяйся к рейд-паку для лучшей координации и результатов.' });
                         }
 
+                        // === АНАЛИЗ ДЛЯ ХИЛЕРОВ/БАФФЕРОВ ===
+                        if (isHealer) {
+                            // Сравнение смертей с другими хилерами
+                            if (totalDeaths > 0 && rolemateStats.length > 1) {
+                                const healerDeaths = rolemateStats.map(r => r.kda ? 1/r.kda : 999);
+                                const myDeathRate = totalDeaths / Math.max(presentDates.length, 1);
+                                const avgHealerDeaths = rolemateStats.reduce((s,r) => {
+                                    const rs = statsMap[normalizeNick(r.name)];
+                                    return s + ((rs?.deaths||0) / Math.max(totalDates,1));
+                                }, 0) / Math.max(rolemateStats.length, 1);
+                                if (myDeathRate > avgHealerDeaths * 1.5 && myDeathRate > 5) {
+                                    issues.push({ icon:'💀', severity:'medium', title:'Много смертей для саппорта', text: myDeathRate.toFixed(1) + ' смертей/КМ — выше среднего для хилеров/бафферов (' + avgHealerDeaths.toFixed(1) + '/КМ). Держись дальше от фронта.' });
+                                } else if (myDeathRate < avgHealerDeaths * 0.7 && presentDates.length >= 2) {
+                                    strengths.push({ icon:'🛡️', title:'Живучий саппорт', text: myDeathRate.toFixed(1) + ' смертей/КМ — ниже среднего для роли. Отличное позиционирование.' });
+                                }
+                            }
+                            // Совет про PvP урон для саппорта
+                            if (totalPvp > 50) {
+                                strengths.push({ icon:'🗡️', title:'Активный саппорт', text: totalPvp.toLocaleString() + ' PvP урона — помогаешь не только хилом, но и уроном.' });
+                            }
+                        }
+
+                        // === АНАЛИЗ ДЛЯ ТАНКОВ ===
+                        if (isTank) {
+                            const deathsPerKm = totalDeaths / Math.max(presentDates.length, 1);
+                            if (deathsPerKm < 5 && presentDates.length >= 2) {
+                                issues.push({ icon:'🛡️', severity:'low', title:'Мало смертей для танка', text: deathsPerKm.toFixed(1) + ' смертей/КМ. Танк должен быть на фронте и принимать удары. Если мало смертей — возможно недостаточно агрессивен.' });
+                            } else if (deathsPerKm > 15) {
+                                issues.push({ icon:'💀', severity:'medium', title:'Слишком много смертей', text: deathsPerKm.toFixed(1) + ' смертей/КМ — даже для танка это много. Нужна лучшая координация с хилерами.' });
+                            }
+                        }
+
+                        // === ОБЩИЙ ПРОГРЕСС ===
+                        if (presentDates.length >= 2) {
+                            const firstKm = dayStats.find(d => d.present && d.inStat);
+                            const lastKm = [...dayStats].reverse().find(d => d.present && d.inStat);
+                            if (firstKm && lastKm && firstKm.date !== lastKm.date) {
+                                const improvement = (lastKm.kills||0) - (firstKm.kills||0);
+                                if (isDps && Math.abs(improvement) > 3) {
+                                    if (improvement > 0) {
+                                        strengths.push({ icon:'📊', title:'Прогресс: +' + improvement + ' убийств', text:'Первый КМ (' + firstKm.date.split('-').reverse().slice(0,2).join('.') + '): ' + firstKm.kills + '⚔️ → Последний (' + lastKm.date.split('-').reverse().slice(0,2).join('.') + '): ' + lastKm.kills + '⚔️. Видимый рост!' });
+                                    } else {
+                                        issues.push({ icon:'📊', severity:'low', title:'Регресс: ' + improvement + ' убийств', text:'С ' + firstKm.kills + '⚔️ до ' + lastKm.kills + '⚔️. Стоит проанализировать причины.' });
+                                    }
+                                }
+                            }
+                        }
+
                         // === НЕТ ДАННЫХ ===
                         if (presentDates.length === 0) {
                             return `<div class="prf-card" style="border-color:#2d3748">
@@ -5225,7 +5273,50 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 // Итоги накоплены выше из dispKills каждого пака
                 const hasTotals   = totalKills+totalDeaths+totalPvp+totalPve > 0;
 
+                // === SEARCH HIGHLIGHT: показываем найденного игрока ===
+                let searchHighlightHtml = '';
+                if (searchQ && dayPlayers.length > 0) {
+                    const foundPlayers = dayPlayers.filter(p => {
+                        if (!p.name) return false;
+                        const n = p.name.toLowerCase();
+                        const resolved = resolveAlias(p.name).toLowerCase();
+                        return n.includes(searchQ) || resolved.includes(searchQ);
+                    });
+                    if (foundPlayers.length > 0) {
+                        searchHighlightHtml = `<div style="background:#6366f111;border:1px solid #6366f133;border-radius:10px;padding:12px 16px;margin-bottom:12px">
+                            <div style="font-size:10px;color:#6366f1;font-weight:700;text-transform:uppercase;margin-bottom:8px">🔍 Найден: ${foundPlayers.length > 1 ? foundPlayers.length + ' совпадений' : ''}</div>
+                            ${foundPlayers.map(fp => {
+                                const kda = ((fp.kills||0) / Math.max(fp.deaths||1, 1)).toFixed(2);
+                                const rp = roster.find(r => normalizeNick(r.name) === normalizeNick(fp.name));
+                                const profaHtml = rp && rp.profa && rp.profa !== '—' ? profaIconHtml(rp.profa, 20) : '';
+                                // Найти в каком паке он был
+                                let packLabel = '';
+                                if (screenPlayersMapDay) {
+                                    for (const [pk, pls] of Object.entries(screenPlayersMapDay)) {
+                                        if (pls && pls.some(sp => normalizeNick(sp.name) === normalizeNick(fp.name) || normalizeNick(resolveAlias(sp.name)) === normalizeNick(fp.name))) {
+                                            packLabel = pk; break;
+                                        }
+                                    }
+                                }
+                                return `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="openPlayerProfile('${fp.name.replace(/'/g,"\'")}')">
+                                    ${profaHtml}
+                                    <span style="font-weight:800;font-size:15px;color:#e2e8f0">${fp.name}</span>
+                                    ${packLabel ? `<span style="font-size:10px;background:#1e2530;color:#94a3b8;padding:2px 8px;border-radius:4px">пак: ${packLabel}</span>` : ''}
+                                    <div style="display:flex;gap:16px;font-size:14px;font-weight:700">
+                                        <span style="color:#f59e0b">⚔️ ${fp.kills||0}</span>
+                                        <span style="color:#ef4444">💀 ${fp.deaths||0}</span>
+                                        <span style="color:#a5b4fc">KDA ${kda}</span>
+                                        <span style="color:#818cf8">🗡️ ${(fp.pvp_dmg||0).toLocaleString()}</span>
+                                        <span style="color:#22c55e">🐉 ${(fp.pve_dmg||0).toLocaleString()}</span>
+                                    </div>
+                                </div>`;
+                            }).join('')}
+                        </div>`;
+                    }
+                }
+
                 return `<div class="card mb-6">
+                    ${searchHighlightHtml}
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                         <div>
                             <div style="font-size:18px;font-weight:800">${dateFormatted}</div>
