@@ -592,7 +592,10 @@
             </div>
 
             <div id="statsContent"></div>
-        </section>
+        
+            <!-- АНАЛИЗ ПО БОССАМ -->
+            <div id="bossAnalysis" style="margin-top:24px"></div>
+</section>
 
         <!-- ПРОФИЛЬ ИГРОКА -->
         <section id="page-profile" class="page-section">
@@ -1423,27 +1426,9 @@
 
             let filtered = roster.filter(p => p.name.toLowerCase().includes(searchQuery));
 
-            // Добавляем КМ% и Ценность к каждому игроку
-            const _statsMapRoster = calcStatsForPeriod(rosterDateFrom, rosterDateTo);
-            const _allRosterStats = Object.values(_statsMapRoster);
-            const _maxKillsR  = Math.max(..._allRosterStats.map(s=>s.kills||0), 1);
-            const _maxPvpR    = Math.max(..._allRosterStats.map(s=>s.pvp_dmg||0), 1);
-            const _maxPveR    = Math.max(..._allRosterStats.map(s=>s.pve_dmg||0), 1);
-            const _maxDeathsR = Math.max(..._allRosterStats.map(s=>s.deaths||0), 1);
-            const _allSortedR = [..._allRosterStats].sort((a,b)=>(b.kills||0)-(a.kills||0));
-
-            // ROLE_MAP для ростера
-            const _ROLE_MAP_R = {
-                'Хилер': ['Cardinal','Eva\u2019s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'],
-                'Танк':  ['Phoenix Knight','Hell Knight','Eva\u2019s Templar','Shillien Templar'],
-            };
-            function _getRoleR(pf) {
-                if (!pf || pf === '—') return 'Боевой';
-                for (const [role, list] of Object.entries(_ROLE_MAP_R)) {
-                    if (list.some(x => pf.includes(x.split(' ')[0]))) return role;
-                }
-                return 'Боевой';
-            }
+            // Добавляем КМ% и Ценность (по-КМ относительная)
+            _valueCache = {}; _valueCacheKey = '';
+            const allValueData = calcAllPlayerValues();
 
             filtered = filtered.map(p => {
                 let attendance = 0;
@@ -1458,54 +1443,9 @@
                     }).length;
                     attendance = Math.round(present / totalDates * 100);
                 }
-
-                // Ценность
-                let valueScore = 0;
                 const nk = normalizeNick(p.name);
-                const ps = _statsMapRoster[nk];
-                if (ps && totalDates > 0) {
-                    const kills  = ps.kills  || 0;
-                    const deaths = ps.deaths || 0;
-                    const pvp    = ps.pvp_dmg || 0;
-                    const pve    = ps.pve_dmg || 0;
-                    const kda    = kills / Math.max(deaths, 1);
-
-                    const presScore  = attendance;
-                    const kdaScore   = Math.min(100, Math.round(kda / 5 * 100));
-                    const pvpScore   = Math.round((pvp / _maxPvpR) * 100);
-                    const pveScore   = Math.round((pve / _maxPveR) * 100);
-                    const aggrScore  = Math.round((kills / _maxKillsR) * 100);
-                    const deathScore = Math.round(Math.max(0, 100 - (deaths / _maxDeathsR) * 100));
-
-                    // Рейтинг класса
-                    const profaName = p.profa && p.profa !== '—' ? p.profa : null;
-                    const classmates = profaName ? roster.filter(r => {
-                        if (normalizeNick(r.name) === nk) return false;
-                        const rp = r.profa && r.profa !== '—' ? r.profa : null;
-                        return rp && rp.split(' (')[0].toLowerCase() === profaName.split(' (')[0].toLowerCase();
-                    }) : [];
-                    const classmateKills = classmates.map(r => (_statsMapRoster[normalizeNick(r.name)]?.kills||0));
-                    const classRank = classmateKills.filter(k => k > kills).length + 1;
-                    const classTotal = classmateKills.length + 1;
-                    const classScore = classTotal > 1 ? Math.round((1-(classRank-1)/classTotal)*100) : 50;
-
-                    // Клановый рейтинг
-                    const rankIdx = _allSortedR.findIndex(s => normalizeNick(s.name) === nk);
-                    const rankNum = rankIdx >= 0 ? rankIdx + 1 : _allSortedR.length;
-                    const clanScore = Math.round((1-(rankNum-1)/Math.max(_allSortedR.length-1,1))*100);
-
-                    const role = _getRoleR(profaName);
-                    if (role === 'Хилер') {
-                        valueScore = Math.round(presScore*0.35 + classScore*0.25 + kdaScore*0.20 + deathScore*0.20);
-                    } else if (role === 'Танк') {
-                        valueScore = Math.round(presScore*0.30 + deathScore*0.25 + classScore*0.25 + kdaScore*0.20);
-                    } else {
-                        valueScore = Math.round(presScore*0.20 + classScore*0.20 + kdaScore*0.20 + clanScore*0.15 + pvpScore*0.15 + pveScore*0.10);
-                    }
-                } else if (totalDates === 0) {
-                    valueScore = null; // нет данных
-                }
-
+                const vd = allValueData[nk];
+                const valueScore = vd ? vd.value : (totalDates === 0 ? null : 0);
                 return { ...p, attendance, valueScore };
             });
 
@@ -1916,7 +1856,7 @@
             if(pageId === 'settings') { renderApiKeys(); renderAliases(); renderValueWeightsUI(); }
             // Обновляем hash в URL (кроме профиля — у него свой hash)
             if (pageId !== 'profile') {
-                history.replaceState(null, '', '#' + pageId);
+                try { history.replaceState(null, '', '#' + pageId); } catch(e) {}
             }
         }
 
@@ -2159,7 +2099,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             if (navProfile) navProfile.style.display = '';
             showPage('profile');
             // Сохраняем профиль в hash: #profile/НикИгрока
-            history.replaceState(null, '', '#profile/' + encodeURIComponent(playerName));
+            try { history.replaceState(null, '', '#profile/' + encodeURIComponent(playerName)); } catch(e) {}
             renderPlayerProfile(playerName);
         }
 
@@ -2345,17 +2285,28 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             // Смерти — меньше лучше (инвертированный)
             const deathScore = Math.round(Math.max(0, 100 - (totalDeaths / Math.max(maxDeathsAll,1)) * 100));
 
-            // Ценность — зависит от роли (по твоей логике)
-            let valueScore = 0;
+            // Ценность — по-КМ относительная (единая формула)
+            const _pvd = getPlayerValue(player.name);
+            let valueScore = _pvd.value !== null ? _pvd.value : 0;
             let radarLabels, radarScores;
             let valueFormula = '';
             const isSupportRole = playerRole === 'Хилер/Баффер' || playerRole === 'Танк';
             if (playerRole === 'Хилер/Баффер') {
-                // Саппорт: явка×35, кл.рейтинг×25, KDA×20, мало смертей×20
-                valueScore = Math.round(presScore*0.35 + classScore*0.25 + kdaScore*0.20 + deathScore*0.20);
                 radarLabels = ['ЯВКА','КЛ.РЕЙ','KDA','ЖИВУЧ.','PVP'];
                 radarScores = [presScore, classScore, kdaScore, deathScore, pvpScore];
-                valueFormula = 'Явка×35% · Рейтинг класса×25% · KDA×20% · Живучесть×20%';
+                valueFormula = 'КМ-скор×65% + Явка×35% (vs медиана хилеров на каждом КМ)';
+            } else if (playerRole === 'Танк') {
+                radarLabels = ['ЖИВУЧ.','ЯВКА','КЛ.РЕЙ','KDA','PVP'];
+                radarScores = [deathScore, presScore, classScore, kdaScore, pvpScore];
+                valueFormula = 'КМ-скор×65% + Явка×35% (vs медиана танков на каждом КМ)';
+            } else if (playerRole === 'Призыватель') {
+                radarLabels = ['PVE','ЯВКА','КЛ.РЕЙ','KDA','PVP'];
+                radarScores = [pveScore, presScore, classScore, kdaScore, pvpScore];
+                valueFormula = 'КМ-скор×65% + Явка×35%';
+            } else {
+                radarLabels = ['ЯВКА','КЛ.РЕЙ','KDA','PVP','PVE'];
+                radarScores = [presScore, classScore, kdaScore, pvpScore, pveScore];
+                valueFormula = 'КМ-скор×65% + Явка×35% (vs медиана ДД на каждом КМ)';
             } else if (playerRole === 'Танк') {
                 // Танк: явка×30, кл.рейтинг×25, KDA×20, мало смертей×25
                 valueScore = Math.round(presScore*0.30 + classScore*0.25 + kdaScore*0.20 + deathScore*0.25);
@@ -2783,59 +2734,6 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                             }
                         }
 
-                        // === РЕКОМЕНДАЦИЯ ПО ПАКУ ===
-                        if (player.pac === 'СОЛО' && totalKills > 5 && attendance >= 50) {
-                            issues.push({ icon:'👥', severity:'medium', title:'Играешь СОЛО', text:'Сильный игрок без пака. Присоединяйся к рейд-паку для лучшей координации и результатов.' });
-                        }
-
-                        // === АНАЛИЗ ДЛЯ ХИЛЕРОВ/БАФФЕРОВ ===
-                        if (isHealer) {
-                            // Сравнение смертей с другими хилерами
-                            if (totalDeaths > 0 && rolemateStats.length > 1) {
-                                const healerDeaths = rolemateStats.map(r => r.kda ? 1/r.kda : 999);
-                                const myDeathRate = totalDeaths / Math.max(presentDates.length, 1);
-                                const avgHealerDeaths = rolemateStats.reduce((s,r) => {
-                                    const rs = statsMap[normalizeNick(r.name)];
-                                    return s + ((rs?.deaths||0) / Math.max(totalDates,1));
-                                }, 0) / Math.max(rolemateStats.length, 1);
-                                if (myDeathRate > avgHealerDeaths * 1.5 && myDeathRate > 5) {
-                                    issues.push({ icon:'💀', severity:'medium', title:'Много смертей для саппорта', text: myDeathRate.toFixed(1) + ' смертей/КМ — выше среднего для хилеров/бафферов (' + avgHealerDeaths.toFixed(1) + '/КМ). Держись дальше от фронта.' });
-                                } else if (myDeathRate < avgHealerDeaths * 0.7 && presentDates.length >= 2) {
-                                    strengths.push({ icon:'🛡️', title:'Живучий саппорт', text: myDeathRate.toFixed(1) + ' смертей/КМ — ниже среднего для роли. Отличное позиционирование.' });
-                                }
-                            }
-                            // Совет про PvP урон для саппорта
-                            if (totalPvp > 50) {
-                                strengths.push({ icon:'🗡️', title:'Активный саппорт', text: totalPvp.toLocaleString() + ' PvP урона — помогаешь не только хилом, но и уроном.' });
-                            }
-                        }
-
-                        // === АНАЛИЗ ДЛЯ ТАНКОВ ===
-                        if (isTank) {
-                            const deathsPerKm = totalDeaths / Math.max(presentDates.length, 1);
-                            if (deathsPerKm < 5 && presentDates.length >= 2) {
-                                issues.push({ icon:'🛡️', severity:'low', title:'Мало смертей для танка', text: deathsPerKm.toFixed(1) + ' смертей/КМ. Танк должен быть на фронте и принимать удары. Если мало смертей — возможно недостаточно агрессивен.' });
-                            } else if (deathsPerKm > 15) {
-                                issues.push({ icon:'💀', severity:'medium', title:'Слишком много смертей', text: deathsPerKm.toFixed(1) + ' смертей/КМ — даже для танка это много. Нужна лучшая координация с хилерами.' });
-                            }
-                        }
-
-                        // === ОБЩИЙ ПРОГРЕСС ===
-                        if (presentDates.length >= 2) {
-                            const firstKm = dayStats.find(d => d.present && d.inStat);
-                            const lastKm = [...dayStats].reverse().find(d => d.present && d.inStat);
-                            if (firstKm && lastKm && firstKm.date !== lastKm.date) {
-                                const improvement = (lastKm.kills||0) - (firstKm.kills||0);
-                                if (isDps && Math.abs(improvement) > 3) {
-                                    if (improvement > 0) {
-                                        strengths.push({ icon:'📊', title:'Прогресс: +' + improvement + ' убийств', text:'Первый КМ (' + firstKm.date.split('-').reverse().slice(0,2).join('.') + '): ' + firstKm.kills + '⚔️ → Последний (' + lastKm.date.split('-').reverse().slice(0,2).join('.') + '): ' + lastKm.kills + '⚔️. Видимый рост!' });
-                                    } else {
-                                        issues.push({ icon:'📊', severity:'low', title:'Регресс: ' + improvement + ' убийств', text:'С ' + firstKm.kills + '⚔️ до ' + lastKm.kills + '⚔️. Стоит проанализировать причины.' });
-                                    }
-                                }
-                            }
-                        }
-
                         // === НЕТ ДАННЫХ ===
                         if (presentDates.length === 0) {
                             return `<div class="prf-card" style="border-color:#2d3748">
@@ -2844,7 +2742,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                             </div>`;
                         }
 
-                        // === ЛУЧШИЙ ПАК — в каком паке показал лучший результат ===
+                        // === ЛУЧШИЙ ПАК ===
                         const packPerformance = {};
                         dayStats.filter(d => d.present && d.inStat).forEach(ds => {
                             const snap = appliedStatsByDate[ds.date];
@@ -2861,40 +2759,163 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                         const packEntries = Object.entries(packPerformance).filter(([,v]) => v.count > 0);
                         if (packEntries.length > 1) {
                             packEntries.sort((a,b) => (b[1].kills/b[1].count) - (a[1].kills/a[1].count));
-                            const best = packEntries[0];
-                            const worst = packEntries[packEntries.length-1];
-                            const bestAvg = (best[1].kills/best[1].count).toFixed(1);
-                            const worstAvg = (worst[1].kills/worst[1].count).toFixed(1);
+                            const best = packEntries[0], worst = packEntries[packEntries.length-1];
+                            const bestAvg = (best[1].kills/best[1].count).toFixed(1), worstAvg = (worst[1].kills/worst[1].count).toFixed(1);
                             if (parseFloat(bestAvg) > parseFloat(worstAvg) * 1.5) {
-                                strengths.push({ icon:'👥', title:'Лучший пак: ' + best[0], text:'Средние убийства ' + bestAvg + '/КМ в паке ' + best[0] + ' vs ' + worstAvg + '/КМ в ' + worst[0] + '. Результат зависит от окружения.' });
+                                strengths.push({ icon:'👥', title:'Лучший пак: ' + best[0], text:'Средние убийства ' + bestAvg + '/КМ vs ' + worstAvg + '/КМ в ' + worst[0] });
                             }
                         }
 
-                        // === СМЕРТИ НА УБИЙСТВО — для ДД ===
-                        if (isDps && totalKills > 5 && totalDeaths > 0) {
-                            const deathPerKill = totalDeaths / totalKills;
-                            if (deathPerKill > 2) {
-                                issues.push({ icon:'💀', severity:'medium', title:'Много смертей на убийство', text:'На каждое убийство приходится ' + deathPerKill.toFixed(1) + ' смерти. Старайся умирать реже — позиционирование и тайминги входа в бой.' });
-                            } else if (deathPerKill < 0.5 && totalKills > 10) {
-                                strengths.push({ icon:'🛡️', title:'Выживаемость', text:'Только ' + deathPerKill.toFixed(1) + ' смерти на убийство. Отличный контроль позиции.' });
+
+                        // === СИНЕРГИЯ ПАКОВ — с кем лучше результаты ===
+                        const synergy = analyzePlayerSynergy(player.name);
+                        if (synergy.length >= 2 && isDps) {
+                            const best = synergy[0];
+                            const worst = synergy[synergy.length-1];
+                            if (best.avgKills > worst.avgKills * 1.3 && best.count > 0 && worst.count > 0) {
+                                strengths.push({ icon:'🤝', title:'Лучшая синергия: пак ' + best.pack, text:'Ср. убийства: ' + best.avgKills + '/КМ (' + best.count + ' КМ). В паке ' + worst.pack + ': ' + worst.avgKills + '/КМ. Рекомендуется играть с ' + best.pack + '.' });
                             }
+                        }
+                        if (synergy.length >= 2 && !isDps) {
+                            const best = synergy.reduce((a,b) => a.avgDeaths < b.avgDeaths ? a : b);
+                            const worst = synergy.reduce((a,b) => a.avgDeaths > b.avgDeaths ? a : b);
+                            if (worst.avgDeaths > best.avgDeaths * 1.5 && best.count > 0 && worst.count > 0) {
+                                strengths.push({ icon:'🤝', title:'Лучшая синергия: пак ' + best.pack, text:'Ср. смертей: ' + best.avgDeaths + '/КМ (' + best.count + ' КМ). В паке ' + worst.pack + ': ' + worst.avgDeaths + '/КМ. Меньше смертей = лучшая поддержка.' });
+                            }
+                        }
+
+                        // === ОТНОСИТЕЛЬНЫЙ АНАЛИЗ ПО КМ (сравнение с медианой роли на КАЖДОМ КМ) ===
+                        const _tankProfs = ['Phoenix Knight','Hell Knight','Eva\'s Templar','Shillien Templar'];
+                        const _healProfs = ['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'];
+                        function _getPlayerRole(pf) {
+                            if (!pf || pf === '—') return 'dps';
+                            if (_tankProfs.some(x => pf.includes(x.split(' ')[0]))) return 'tank';
+                            if (_healProfs.some(x => pf.includes(x.split(' ')[0]))) return 'healer';
+                            return 'dps';
+                        }
+                        const myRole = isTank ? 'tank' : isHealer ? 'healer' : 'dps';
+
+                        // Для каждого КМ где игрок присутствовал — считаем медианы по роли
+                        let kmAboveMedianKills = 0, kmBelowMedianKills = 0;
+                        let kmAboveMedianDeaths = 0, kmBelowMedianDeaths = 0;
+                        let totalKmAnalyzed = 0;
+                        const perKmComparisons = []; // { date, myKills, medKills, myDeaths, medDeaths, difficulty }
+
+                        presentDates.forEach(dateStr => {
+                            const snap = appliedStatsByDate[dateStr];
+                            if (!snap || !snap.players) return;
+                            // Все игроки этого КМ с ролями
+                            const kmPlayers = snap.players.map(sp => {
+                                const rp = roster.find(r => normalizeNick(r.name) === normalizeNick(resolveAlias(sp.name)) || normalizeNick(r.name) === normalizeNick(sp.name));
+                                const role = rp ? _getPlayerRole(rp.profa) : ((sp.kills||0) > 5 ? 'dps' : 'dps');
+                                return { ...sp, _role: role };
+                            });
+                            // Мой результат на этом КМ
+                            const me = kmPlayers.find(sp => normalizeNick(resolveAlias(sp.name)) === normKey || normalizeNick(sp.name) === normKey);
+                            if (!me) return;
+
+                            // Медиана смертей/убийств по моей роли на этом КМ
+                            const sameRole = kmPlayers.filter(p => p._role === myRole && normalizeNick(p.name) !== normKey);
+                            if (sameRole.length < 2) return; // мало данных
+
+                            const roleKills = sameRole.map(p => p.kills||0).sort((a,b) => a-b);
+                            const roleDeaths = sameRole.map(p => p.deaths||0).sort((a,b) => a-b);
+                            const medRoleKills = roleKills[Math.floor(roleKills.length/2)];
+                            const medRoleDeaths = roleDeaths[Math.floor(roleDeaths.length/2)];
+
+                            // Общая "сложность" КМ — средние смерти всех
+                            const allDeaths = kmPlayers.map(p => p.deaths||0);
+                            const avgAllDeaths = allDeaths.reduce((s,v) => s+v, 0) / allDeaths.length;
+
+                            totalKmAnalyzed++;
+                            const myK = me.kills||0, myD = me.deaths||0;
+                            if (myK > medRoleKills * 1.2) kmAboveMedianKills++;
+                            if (myK < medRoleKills * 0.8 && medRoleKills > 0) kmBelowMedianKills++;
+                            if (myD > medRoleDeaths * 1.3) kmAboveMedianDeaths++;
+                            if (myD < medRoleDeaths * 0.7 && medRoleDeaths > 0) kmBelowMedianDeaths++;
+
+                            perKmComparisons.push({ date: dateStr, myKills: myK, medKills: medRoleKills, myDeaths: myD, medDeaths: medRoleDeaths, difficulty: avgAllDeaths.toFixed(1) });
+                        });
+
+                        // === ОТНОСИТЕЛЬНЫЕ ОЦЕНКИ ===
+                        if (totalKmAnalyzed >= 1) {
+                            const fmtD = ds => ds.split('-').reverse().slice(0,2).join('.');
+
+                            if (isDps) {
+                                // ДД: убийства выше/ниже медианы роли
+                                if (kmAboveMedianKills > totalKmAnalyzed * 0.6) {
+                                    strengths.push({ icon:'⚔️', title:'Выше медианы роли', text:'На ' + kmAboveMedianKills + ' из ' + totalKmAnalyzed + ' КМ убивал больше медианы своей роли. Стабильно сильнее среднего.' });
+                                } else if (kmBelowMedianKills > totalKmAnalyzed * 0.6) {
+                                    issues.push({ icon:'⚔️', severity:'medium', title:'Ниже медианы роли', text:'На ' + kmBelowMedianKills + ' из ' + totalKmAnalyzed + ' КМ убивал меньше медианы роли. Проанализируй позиционирование и выбор целей.' });
+                                }
+                                // Смерти относительно медианы
+                                if (kmAboveMedianDeaths > totalKmAnalyzed * 0.6) {
+                                    issues.push({ icon:'💀', severity:'medium', title:'Умираешь чаще роли', text:'На ' + kmAboveMedianDeaths + ' из ' + totalKmAnalyzed + ' КМ смертей больше медианы ДД. Старайся входить в бой с группой, не соло.' });
+                                }
+                            }
+
+                            if (isTank) {
+                                // Танк: смерти ниже медианы танков = плохо (не танкует)
+                                if (kmBelowMedianDeaths > totalKmAnalyzed * 0.6 && totalKmAnalyzed >= 2) {
+                                    issues.push({ icon:'🛡️', severity:'low', title:'Смерти ниже медианы танков', text:'На ' + kmBelowMedianDeaths + ' из ' + totalKmAnalyzed + ' КМ умирал реже других танков. Возможно недостаточно агрессивен на фронте.' });
+                                } else if (kmAboveMedianDeaths > totalKmAnalyzed * 0.6) {
+                                    issues.push({ icon:'💀', severity:'medium', title:'Смерти выше медианы танков', text:'На ' + kmAboveMedianDeaths + ' из ' + totalKmAnalyzed + ' КМ умирал чаще других танков. Нужна координация с хилерами или смена тактики.' });
+                                } else if (totalKmAnalyzed >= 2) {
+                                    strengths.push({ icon:'🛡️', title:'Стабильный танк', text:'Смерти в рамках медианы танков — на уровне с другими танками клана.' });
+                                }
+                            }
+
+                            if (isHealer) {
+                                // Хилер: смерти выше медианы хилеров = плохо
+                                if (kmAboveMedianDeaths > totalKmAnalyzed * 0.5) {
+                                    issues.push({ icon:'💀', severity:'medium', title:'Умирает чаще других саппортов', text:'На ' + kmAboveMedianDeaths + ' из ' + totalKmAnalyzed + ' КМ смертей больше медианы хилеров/бафферов. Позиционирование критично для саппорта.' });
+                                } else if (kmBelowMedianDeaths > totalKmAnalyzed * 0.5 && totalKmAnalyzed >= 2) {
+                                    strengths.push({ icon:'🛡️', title:'Живучий саппорт', text:'На ' + kmBelowMedianDeaths + ' из ' + totalKmAnalyzed + ' КМ умирал реже медианы саппортов. Отличное позиционирование.' });
+                                }
+                                if (totalPvp > 50) {
+                                    strengths.push({ icon:'🗡️', title:'Активный саппорт', text: totalPvp.toLocaleString() + ' PvP урона — помогаешь не только хилом.' });
+                                }
+                            }
+
+                            // Показать сравнение по КМ (для всех ролей)
+                            if (perKmComparisons.length >= 2) {
+                                const bestKmRel = perKmComparisons.reduce((best, c) => {
+                                    const diff = (c.myKills - c.medKills);
+                                    return diff > (best._diff||0) ? { ...c, _diff: diff } : best;
+                                }, { _diff: -999 });
+                                const worstKmRel = perKmComparisons.reduce((worst, c) => {
+                                    const diff = (c.myKills - c.medKills);
+                                    return diff < (worst._diff||0) ? { ...c, _diff: diff } : worst;
+                                }, { _diff: 999 });
+
+                                if (bestKmRel._diff > 3 && worstKmRel._diff < -3) {
+                                    issues.push({ icon:'🔍', severity:'low', title:'Зависимость от КМ', text:'Лучший КМ (' + fmtD(bestKmRel.date) + '): +' + bestKmRel._diff + ' от медианы (сложность: ' + bestKmRel.difficulty + ' ср.смертей). Худший (' + fmtD(worstKmRel.date) + '): ' + worstKmRel._diff + ' (сложность: ' + worstKmRel.difficulty + '). Результат сильно зависит от обстановки.' });
+                                }
+                            }
+                        }
+
+                        // === РЕКОМЕНДАЦИЯ ПО ПАКУ ===
+                        if (player.pac === 'СОЛО' && totalKills > 5 && attendance >= 50) {
+                            issues.push({ icon:'👥', severity:'medium', title:'Играешь СОЛО', text:'Сильный игрок без пака. Присоединяйся к рейд-паку для лучшей координации и результатов.' });
                         }
 
                         // === PvE ВКЛАД для саппортов ===
-                        if (isHealer || isTank) {
-                            if (totalPve > 100) {
-                                strengths.push({ icon:'🐉', title:'PvE вклад', text: totalPve.toLocaleString() + ' PvE урона — активно помогает в PvE контенте помимо основной роли.' });
-                            }
+                        if ((isHealer || isTank) && totalPve > 100) {
+                            strengths.push({ icon:'🐉', title:'PvE вклад', text: totalPve.toLocaleString() + ' PvE урона — активно помогает в PvE контенте помимо основной роли.' });
                         }
 
-                        // === КОНКРЕТНЫЕ СОВЕТЫ по КМ ===
-                        if (isDps && dayStats.length >= 2) {
-                            const sorted = dayStats.filter(d=>d.present&&d.inStat).sort((a,b)=>b.kills-a.kills);
-                            if (sorted.length >= 2) {
-                                const bestDay = sorted[0];
-                                const worstDay = sorted[sorted.length-1];
-                                if (bestDay.kills > worstDay.kills * 2 && bestDay.kills > 5) {
-                                    issues.push({ icon:'🔍', severity:'low', title:'Разница между КМ', text:'Лучший КМ (' + bestDay.date.split('-').reverse().slice(0,2).join('.') + '): ' + bestDay.kills + ' убийств. Худший (' + worstDay.date.split('-').reverse().slice(0,2).join('.') + '): ' + worstDay.kills + '. Проанализируй что было по-другому — пак, таргет, позиция?' });
+                        // === ОБЩИЙ ПРОГРЕСС ===
+                        if (presentDates.length >= 2) {
+                            const firstKm = dayStats.find(d => d.present && d.inStat);
+                            const lastKm = [...dayStats].reverse().find(d => d.present && d.inStat);
+                            if (firstKm && lastKm && firstKm.date !== lastKm.date) {
+                                const improvement = (lastKm.kills||0) - (firstKm.kills||0);
+                                if (Math.abs(improvement) > 3) {
+                                    if (improvement > 0) {
+                                        strengths.push({ icon:'📊', title:'Прогресс: +' + improvement + ' убийств', text:'(' + firstKm.date.split('-').reverse().slice(0,2).join('.') + '): ' + firstKm.kills + '⚔️ → (' + lastKm.date.split('-').reverse().slice(0,2).join('.') + '): ' + lastKm.kills + '⚔️' });
+                                    } else {
+                                        issues.push({ icon:'📊', severity:'low', title:'Регресс: ' + improvement + ' убийств', text:'С ' + firstKm.kills + '⚔️ до ' + lastKm.kills + '⚔️.' });
+                                    }
                                 }
                             }
                         }
@@ -3237,6 +3258,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
         }
 
         function renderStats() {
+            setTimeout(renderBossAnalysis, 100);
             renderCcAbsenceReport();
             const el = document.getElementById('statsContent');
             const labelEl = document.getElementById('statsPeriodLabel');
@@ -3497,6 +3519,188 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 }
             });
         }
+
+        // ===== ЦЕННОСТЬ НА ОСНОВЕ ПО-КМ ОТНОСИТЕЛЬНЫХ ПОКАЗАТЕЛЕЙ =====
+        const _VAL_TANK_P = ['Phoenix Knight','Hell Knight','Eva\'s Templar','Shillien Templar'];
+        const _VAL_HEAL_P = ['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'];
+        function _valRole(pf) {
+            if (!pf || pf === '—') return 'dps';
+            if (_VAL_TANK_P.some(x => pf.includes(x.split(' ')[0]))) return 'tank';
+            if (_VAL_HEAL_P.some(x => pf.includes(x.split(' ')[0]))) return 'healer';
+            return 'dps';
+        }
+        let _valueCache = {}, _valueCacheKey = '';
+
+        function calcAllPlayerValues() {
+            const allDates = Object.keys(appliedStatsByDate).sort();
+            const totalDates = allDates.length;
+            const ck = totalDates + '_' + (allDates[allDates.length-1]||'') + '_' + roster.length;
+            if (_valueCacheKey === ck && Object.keys(_valueCache).length > 0) return _valueCache;
+            _valueCacheKey = ck; _valueCache = {};
+            if (totalDates === 0) return _valueCache;
+
+            // Медианы по ролям на каждом КМ
+            const kmMed = {};
+            allDates.forEach(ds => {
+                const snap = appliedStatsByDate[ds];
+                if (!snap || !snap.players) return;
+                const byR = { dps:[], healer:[], tank:[] };
+                snap.players.forEach(sp => {
+                    const rp = roster.find(r => normalizeNick(r.name)===normalizeNick(resolveAlias(sp.name)) || normalizeNick(r.name)===normalizeNick(sp.name));
+                    byR[rp ? _valRole(rp.profa) : 'dps'].push({ k:sp.kills||0, d:sp.deaths||0, pvp:sp.pvp_dmg||0 });
+                });
+                const med = arr => { if(!arr.length) return 0; const s=[...arr].sort((a,b)=>a-b); return s[Math.floor(s.length/2)]; };
+                kmMed[ds] = {};
+                ['dps','healer','tank'].forEach(r => {
+                    const p = byR[r];
+                    kmMed[ds][r] = { mK:med(p.map(x=>x.k)), mD:med(p.map(x=>x.d)), mP:med(p.map(x=>x.pvp)), n:p.length };
+                });
+            });
+
+            roster.forEach(player => {
+                const nk = normalizeNick(player.name);
+                const role = _valRole(player.profa);
+                let scores = [], presCount = 0;
+                allDates.forEach(ds => {
+                    const snap = appliedStatsByDate[ds];
+                    if (!snap || !snap.players) return;
+                    const me = snap.players.find(sp => normalizeNick(resolveAlias(sp.name))===nk || normalizeNick(sp.name)===nk);
+                    if (!me) return;
+                    presCount++;
+                    const m = kmMed[ds]?.[role];
+                    if (!m || m.n < 2) { scores.push(50); return; }
+                    const myK=me.kills||0, myD=me.deaths||0, myP=me.pvp_dmg||0;
+                    let sc = 50;
+                    if (role==='dps') {
+                        const kR = m.mK>0 ? myK/m.mK : (myK>0?2:0.5);
+                        const dR = m.mD>0 ? myD/m.mD : 1;
+                        const pR = m.mP>0 ? myP/m.mP : (myP>0?1.5:0.5);
+                        sc = Math.round(Math.min(100,kR*50)*0.45 + Math.min(100,Math.max(0,(2-dR)*50))*0.30 + Math.min(100,pR*50)*0.25);
+                    } else if (role==='tank') {
+                        const dR = m.mD>0 ? myD/m.mD : 1;
+                        const dS = dR>0.7&&dR<1.5 ? 70 : (dR<0.5?30:(dR>2?25:50));
+                        sc = Math.round(dS + Math.min(20, myP/Math.max(m.mP,1)*10));
+                    } else {
+                        const dR = m.mD>0 ? myD/m.mD : 1;
+                        sc = Math.round(Math.min(100,Math.max(0,(2-dR)*50))*0.8 + Math.min(15,myP/Math.max(m.mP||1,1)*8) + 10);
+                    }
+                    scores.push(Math.max(0,Math.min(100,sc)));
+                });
+                const att = totalDates>0 ? presCount/totalDates : 0;
+                const avg = scores.length>0 ? scores.reduce((s,v)=>s+v,0)/scores.length : 0;
+                _valueCache[nk] = { value: Math.max(0,Math.min(100,Math.round(avg*0.65+att*100*0.35))), attendance:Math.round(att*100), avgKmScore:Math.round(avg), kmCount:presCount };
+            });
+            return _valueCache;
+        }
+        function getPlayerValue(name) { const c=calcAllPlayerValues(); return c[normalizeNick(name)]||{value:null,attendance:0,avgKmScore:0,kmCount:0}; }
+
+        // ===== АНАЛИЗ ПО БОССАМ =====
+        function analyzeByBoss() {
+            const allDates = Object.keys(appliedStatsByDate).sort();
+            const result = {}; // { bossName: { dates, avgKills, avgDeaths, rolePerf: { dps:{}, healer:{}, tank:{} }, classPerf: {} } }
+            allDates.forEach(ds => {
+                const snap = appliedStatsByDate[ds];
+                if (!snap || !snap.players) return;
+                // Определяем какой босс был в этот день
+                const evs = getAllEventsForDate(ds);
+                const doneEvs = evs.filter(e => eventStatuses[ds+'|'+e.key]);
+                const bossName = doneEvs.length > 0 ? doneEvs[0].title : 'Неизвестный КМ';
+                if (!result[bossName]) result[bossName] = { dates:[], totalKills:0, totalDeaths:0, totalPvp:0, byRole:{dps:{k:0,d:0,n:0},healer:{k:0,d:0,n:0},tank:{k:0,d:0,n:0}}, byClass:{} };
+                const r = result[bossName];
+                r.dates.push(ds);
+                snap.players.forEach(sp => {
+                    const rp = roster.find(rx => normalizeNick(rx.name)===normalizeNick(resolveAlias(sp.name))||normalizeNick(rx.name)===normalizeNick(sp.name));
+                    const role = rp ? _valRole(rp.profa) : 'dps';
+                    const k=sp.kills||0, d=sp.deaths||0;
+                    r.totalKills+=k; r.totalDeaths+=d; r.totalPvp+=(sp.pvp_dmg||0);
+                    r.byRole[role].k+=k; r.byRole[role].d+=d; r.byRole[role].n++;
+                    // По классу
+                    const cls = rp && rp.profa && rp.profa !== '—' ? rp.profa.split(' (')[0].split(' ').slice(0,2).join(' ') : null;
+                    if (cls) {
+                        if (!r.byClass[cls]) r.byClass[cls] = { k:0, d:0, n:0 };
+                        r.byClass[cls].k+=k; r.byClass[cls].d+=d; r.byClass[cls].n++;
+                    }
+                });
+            });
+            return result;
+        }
+
+        // ===== СИНЕРГИЯ ПАКОВ — с кем игрок показывает лучшие результаты =====
+        function analyzePlayerSynergy(playerName) {
+            const nk = normalizeNick(playerName);
+            const allDates = Object.keys(appliedStatsByDate).sort();
+            const packResults = {}; // { packLeader: { kills:[], deaths:[], dates:[] } }
+            allDates.forEach(ds => {
+                const snap = appliedStatsByDate[ds];
+                if (!snap || !snap.screenPlayersMap) return;
+                Object.entries(snap.screenPlayersMap).forEach(([packName, players]) => {
+                    if (!players) return;
+                    const me = players.find(p => normalizeNick(resolveAlias(p.name))===nk || normalizeNick(p.name)===nk);
+                    if (!me) return;
+                    if (!packResults[packName]) packResults[packName] = { kills:[], deaths:[], dates:[] };
+                    packResults[packName].kills.push(me.kills||0);
+                    packResults[packName].deaths.push(me.deaths||0);
+                    packResults[packName].dates.push(ds);
+                });
+            });
+            // Средние показатели по пакам
+            const summary = Object.entries(packResults).map(([pack, data]) => ({
+                pack, count: data.dates.length,
+                avgKills: data.kills.length ? +(data.kills.reduce((s,v)=>s+v,0)/data.kills.length).toFixed(1) : 0,
+                avgDeaths: data.deaths.length ? +(data.deaths.reduce((s,v)=>s+v,0)/data.deaths.length).toFixed(1) : 0,
+            })).filter(s => s.count > 0).sort((a,b) => b.avgKills - a.avgKills);
+            return summary;
+        }
+
+
+        function renderBossAnalysis() {
+            const el = document.getElementById('bossAnalysis');
+            if (!el) return;
+            const data = analyzeByBoss();
+            const bosses = Object.entries(data).filter(([,v]) => v.dates.length > 0);
+            if (bosses.length === 0) { el.innerHTML = ''; return; }
+
+            el.innerHTML = '<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#475569;letter-spacing:.08em;margin-bottom:12px">📊 Анализ по боссам / событиям</div>' +
+                '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px">' +
+                bosses.map(([boss, d]) => {
+                    const n = d.dates.length;
+                    const avgK = Math.round(d.totalKills/n);
+                    const avgD = Math.round(d.totalDeaths/n);
+                    const kda = (d.totalKills/Math.max(d.totalDeaths,1)).toFixed(2);
+                    // Лучшие классы по KDA
+                    const classPerf = Object.entries(d.byClass)
+                        .filter(([,v])=>v.n>=2)
+                        .map(([cls,v])=>({cls, kda:(v.k/Math.max(v.d,1)).toFixed(2), avgK:(v.k/v.n).toFixed(1), n:v.n}))
+                        .sort((a,b)=>b.kda-a.kda);
+                    const topClasses = classPerf.slice(0,3);
+                    const worstClasses = classPerf.slice(-2).filter(c=>parseFloat(c.kda)<1);
+
+                    // Роли
+                    const roleLabels = {dps:'⚔️ ДД', healer:'💊 Хил', tank:'🛡️ Танк'};
+                    const roleHtml = ['dps','healer','tank'].map(r => {
+                        const rd = d.byRole[r];
+                        if (rd.n === 0) return '';
+                        const rKda = (rd.k/Math.max(rd.d,1)).toFixed(2);
+                        return '<span style="font-size:10px;background:#1e2530;border-radius:4px;padding:2px 6px;color:#94a3b8">'+roleLabels[r]+' KDA '+rKda+'</span>';
+                    }).join(' ');
+
+                    let insights = '';
+                    if (topClasses.length > 0) {
+                        insights += '<div style="font-size:11px;color:#22c55e;margin-top:6px">✅ Сильные: ' + topClasses.map(c=>c.cls+' (KDA '+c.kda+')').join(', ') + '</div>';
+                    }
+                    if (worstClasses.length > 0) {
+                        insights += '<div style="font-size:11px;color:#ef4444;margin-top:3px">⚠️ Слабые: ' + worstClasses.map(c=>c.cls+' (KDA '+c.kda+')').join(', ') + '</div>';
+                    }
+
+                    return '<div style="background:#12171f;border:1px solid #1e2530;border-radius:12px;padding:16px">' +
+                        '<div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:6px">'+boss+'</div>' +
+                        '<div style="font-size:11px;color:#64748b;margin-bottom:8px">'+n+' КМ · avg ⚔️'+avgK+' 💀'+avgD+' · KDA '+kda+'</div>' +
+                        '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">'+roleHtml+'</div>' +
+                        insights +
+                    '</div>';
+                }).join('') + '</div>';
+        }
+
         function sortStats(field) {
             if (statsSort.field === field) statsSort.dir = statsSort.dir === 'desc' ? 'asc' : 'desc';
             else { statsSort.field = field; statsSort.dir = 'desc'; }
@@ -6737,47 +6941,15 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
         }
 
         function renderDashTopPlayers() {
-            const statsMap = calcStatsForPeriod('', '');
             const allDates = Object.keys(appliedStatsByDate).sort();
-            const totalDates = allDates.length;
-            if (totalDates === 0) return;
-
-            const _allStats = Object.values(statsMap);
-            const _maxPvp = Math.max(..._allStats.map(s=>s.pvp_dmg||0), 1);
-            const _maxPve = Math.max(..._allStats.map(s=>s.pve_dmg||0), 1);
-            const _maxDeaths = Math.max(..._allStats.map(s=>s.deaths||0), 1);
-            const _allSorted = [..._allStats].sort((a,b)=>(b.kills||0)-(a.kills||0));
-
-            const ROLE_MAP_D = {'Хилер':['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'],'Танк':['Phoenix Knight','Hell Knight','Eva\'s Templar','Shillien Templar']};
-            function getRoleD(pf) { if (!pf||pf==='—') return 'Боевой'; for (const [role,list] of Object.entries(ROLE_MAP_D)) { if (list.some(x=>pf.includes(x.split(' ')[0]))) return role; } return 'Боевой'; }
-
-            // EXACT same value formula as renderRoster
+            if (allDates.length === 0) return;
+            // Единая по-КМ формула ценности
+            const allValues = calcAllPlayerValues();
             const playerValues = roster.map(p => {
                 const nk = normalizeNick(p.name);
-                const ps = statsMap[nk];
-                if (!ps) return null;
-                const kills=ps.kills||0, deaths=ps.deaths||0, kda=kills/Math.max(deaths,1);
-                const presCount = allDates.filter(d => { const sn=appliedStatsByDate[d]; return sn&&sn.players&&sn.players.some(sp=>normalizeNick(resolveAlias(sp.name))===nk||normalizeNick(sp.name)===nk); }).length;
-                const presence = Math.round(presCount/totalDates*100);
-                const kdaScore = Math.min(100, Math.round(kda/5*100));
-                const pvpScore = Math.round((ps.pvp_dmg||0)/_maxPvp*100);
-                const pveScore = Math.round((ps.pve_dmg||0)/_maxPve*100);
-                const deathScore = Math.round(Math.max(0, 100-(deaths/_maxDeaths)*100));
-                const profaName = p.profa&&p.profa!=='—' ? p.profa : null;
-                const classmates = profaName ? roster.filter(r => { if(normalizeNick(r.name)===nk) return false; const rp=r.profa&&r.profa!=='—'?r.profa:null; return rp&&rp.split(' (')[0].toLowerCase()===profaName.split(' (')[0].toLowerCase(); }) : [];
-                const classmateKills = classmates.map(r=>(statsMap[normalizeNick(r.name)]?.kills||0));
-                const classRank = classmateKills.filter(k=>k>kills).length+1;
-                const classTotal = classmateKills.length+1;
-                const classScore = classTotal>1 ? Math.round((1-(classRank-1)/classTotal)*100) : 50;
-                const rankIdx = _allSorted.findIndex(s=>normalizeNick(s.name)===nk);
-                const clanScore = Math.round((1-(rankIdx>=0?rankIdx:_allSorted.length-1)/Math.max(_allSorted.length-1,1))*100);
-                const role = getRoleD(profaName);
-                let val;
-                if (role==='Хилер') val=Math.round(presence*0.35+classScore*0.25+kdaScore*0.20+deathScore*0.20);
-                else if (role==='Танк') val=Math.round(presence*0.30+deathScore*0.25+classScore*0.25+kdaScore*0.20);
-                else val=Math.round(presence*0.20+classScore*0.20+kdaScore*0.20+clanScore*0.15+pvpScore*0.15+pveScore*0.10);
-                return { name:p.name, value:val, kills };
-            }).filter(Boolean).sort((a,b)=>b.value-a.value);
+                const vd = allValues[nk];
+                return vd && vd.value > 0 ? { name: p.name, value: vd.value } : null;
+            }).filter(Boolean).sort((a,b) => b.value - a.value);
 
             const valEl = document.getElementById('dashTopValue');
             if (valEl) {
@@ -6787,27 +6959,18 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 }).join('');
             }
 
-            // Growing & Falling
+            // Growing & Falling (только ДД)
             const growEl = document.getElementById('dashTopGrowing');
             const fallEl = document.getElementById('dashTopFalling');
             if (allDates.length >= 2) {
                 const last = allDates[allDates.length-1], prev = allDates[allDates.length-2];
                 const ls = appliedStatsByDate[last]?.players||[], ps = appliedStatsByDate[prev]?.players||[];
-                // Только ДД в растущих/падающих (без танков/хилеров)
-                const _supRoles = ['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer','Phoenix Knight','Hell Knight','Eva\'s Templar','Shillien Templar'];
-                function _isDps(name) { const r=roster.find(x=>normalizeNick(x.name)===normalizeNick(name)); if(!r||!r.profa||r.profa==='—') return true; return !_supRoles.some(x=>r.profa.includes(x.split(' ')[0])); }
-                const diffs = ls.filter(lp=>_isDps(lp.name)).map(lp => { const nk=normalizeNick(lp.name); const pp=ps.find(p=>normalizeNick(p.name)===nk); return {name:lp.name, diff:(lp.kills||0)-(pp?(pp.kills||0):0)}; });
-                function renderList(el2, list, isUp) {
-                    if (!el2) return;
-                    if (!list.length) { el2.innerHTML='<div style="color:#475569;font-size:12px;padding:8px 0">—</div>'; return; }
-                    el2.innerHTML = list.slice(0,5).map((g,i)=>'<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #1e2530;cursor:pointer;font-size:13px" onclick="openPlayerProfile(\''+g.name.replace(/'/g,"\\'")+'\')">#'+(i+1)+' <span style="font-weight:700;color:#e2e8f0;flex:1">'+g.name+'</span><span style="font-weight:700;color:'+(isUp?'#22c55e':'#ef4444')+'">'+(isUp?'+':'')+g.diff+' ⚔️</span></div>').join('');
-                }
-                renderList(growEl, diffs.filter(g=>g.diff>0).sort((a,b)=>b.diff-a.diff), true);
-                renderList(fallEl, diffs.filter(g=>g.diff<0).sort((a,b)=>a.diff-b.diff), false);
-            } else {
-                if(growEl) growEl.innerHTML='<div style="color:#475569;font-size:12px">Нужно 2+ КМ</div>';
-                if(fallEl) fallEl.innerHTML='<div style="color:#475569;font-size:12px">Нужно 2+ КМ</div>';
-            }
+                function _isDpsD(name) { const r=roster.find(x=>normalizeNick(x.name)===normalizeNick(name)); return !r||!r.profa||r.profa==='—'||!_VAL_TANK_P.concat(_VAL_HEAL_P).some(x=>r.profa.includes(x.split(' ')[0])); }
+                const diffs = ls.filter(lp=>_isDpsD(lp.name)).map(lp => { const nk=normalizeNick(lp.name); const pp=ps.find(p=>normalizeNick(p.name)===nk); return {name:lp.name, diff:(lp.kills||0)-(pp?(pp.kills||0):0)}; });
+                function rl(el2,list,isUp) { if(!el2) return; if(!list.length){el2.innerHTML='<div style="color:#475569;font-size:12px;padding:8px 0">—</div>';return;} el2.innerHTML=list.slice(0,5).map((g,i)=>'<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #1e2530;cursor:pointer;font-size:13px" onclick="openPlayerProfile(\''+g.name.replace(/'/g,"\\'")+'\')">#'+(i+1)+' <span style="font-weight:700;color:#e2e8f0;flex:1">'+g.name+'</span><span style="font-weight:700;color:'+(isUp?'#22c55e':'#ef4444')+'">'+(isUp?'+':'')+g.diff+' ⚔️</span></div>').join(''); }
+                rl(growEl, diffs.filter(g=>g.diff>0).sort((a,b)=>b.diff-a.diff), true);
+                rl(fallEl, diffs.filter(g=>g.diff<0).sort((a,b)=>a.diff-b.diff), false);
+            } else { if(growEl) growEl.innerHTML='<div style="color:#475569;font-size:12px">Нужно 2+ КМ</div>'; if(fallEl) fallEl.innerHTML='<div style="color:#475569;font-size:12px">Нужно 2+ КМ</div>'; }
         }
 
         // ===== НАСТРОЙКИ ВЕСОВ ЦЕННОСТИ (UI) =====
@@ -7053,7 +7216,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             }
 
             // Восстанавливаем страницу из URL hash
-            const hash = location.hash.slice(1); // убираем #
+            const hash = (location.hash || '').slice(1); // убираем #
             if (hash.startsWith('profile/')) {
                 const playerName = decodeURIComponent(hash.slice(8));
                 const player = roster.find(r => r.name === playerName || normalizeNick(r.name) === normalizeNick(playerName));
