@@ -3961,7 +3961,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             let hash = len;
             for (let i = 0; i < head.length; i++) hash = ((hash << 5) - hash + head.charCodeAt(i)) | 0;
             for (let i = 0; i < tail.length; i++) hash = ((hash << 5) - hash + tail.charCodeAt(i)) | 0;
-            return 'sh2_' + Math.abs(hash).toString(36) + '_' + len;
+            return 'sh3_' + Math.abs(hash).toString(36) + '_' + len;
         }
         function getScreenshotCache() {
             try { return JSON.parse(localStorage.getItem('cc_screenshot_cache') || '{}'); } catch(e) { return {}; }
@@ -4027,6 +4027,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
 
 ВАЖНО:
 - Ники копируй ПОСИМВОЛЬНО, буква за буквой. Не угадывай — читай каждый символ. Ники часто содержат хитрые сочетания: строчная b (не D), цифра 1 (не l), цифра 0 (не O), заглавная I (не l). Пример: TANb4A (маленькая b, не D). Если не уверен — бери символ как есть.
+- ДЛИННЫЕ НИКИ могут переноситься на следующую строку! Например "МамаЕщеПятьМи" на одной строке и "нуТ" на следующей — это ОДИН ник "МамаЕщеПятьМинуТ", а НЕ два разных игрока. Признаки переноса: вторая строка не имеет своей профессии и уровня, или текст явно является продолжением предыдущего ника. Склеивай такие строки в один ник.
 - Профессию копируй на русском как написано
 - online=true для левой колонки (Online Players), false для правой (Offline)
 - Уровень — число из колонки Lvl
