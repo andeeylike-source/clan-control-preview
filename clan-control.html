@@ -2178,6 +2178,24 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     assigned: !!assignedProfa
                 };
             });
+
+            // Санитизация: для хилеров/танков если kills == deaths и оба > 10
+            // или kills > 20 для хилера — это ошибка парсинга AI (deaths скопированы в kills)
+            const _sanitRole = playerRole;
+            if (_sanitRole === 'Хилер/Баффер' || _sanitRole === 'Танк') {
+                dayStats.forEach(d => {
+                    if (!d.inStat) return;
+                    const isHealer = _sanitRole === 'Хилер/Баффер';
+                    // Хилер с > 15 убийств и kills == deaths → точно ошибка
+                    if (isHealer && d.kills > 15 && d.kills === d.deaths) {
+                        d.kills = 0; // kills были скопированы из deaths
+                    }
+                    // Хилер с > 20 убийств вообще → подозрительно, обнуляем если pvp_dmg == 0
+                    else if (isHealer && d.kills > 20 && d.pvp_dmg === 0) {
+                        d.kills = 0;
+                    }
+                });
+            }
             const presentStats = dayStats.filter(d => d.inStat);
 
             const totalKills  = presentStats.reduce((s,d)=>s+d.kills,0);
@@ -3571,7 +3589,12 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 const byR = { dps:[], healer:[], tank:[] };
                 snap.players.forEach(sp => {
                     const rp = roster.find(r => normalizeNick(r.name)===normalizeNick(resolveAlias(sp.name)) || normalizeNick(r.name)===normalizeNick(sp.name));
-                    byR[rp ? _valRole(rp.profa) : 'dps'].push({ k:sp.kills||0, d:sp.deaths||0, pvp:sp.pvp_dmg||0 });
+                    const role2 = rp ? _valRole(rp.profa) : 'dps';
+                    let sk=sp.kills||0, sd=sp.deaths||0, sp2=sp.pvp_dmg||0;
+                    // Санитизация: хилер kills==deaths>15 → kills=0
+                    if (role2==='healer' && sk>15 && sk===sd) sk=0;
+                    if (role2==='healer' && sk>20 && sp2===0) sk=0;
+                    byR[role2].push({ k:sk, d:sd, pvp:sp2 });
                 });
                 const med = arr => { if(!arr.length) return 0; const s=[...arr].sort((a,b)=>a-b); return s[Math.floor(s.length/2)]; };
                 kmMed[ds] = {};
@@ -3593,7 +3616,10 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     presCount++;
                     const m = kmMed[ds]?.[role];
                     if (!m || m.n < 2) { scores.push(50); return; }
-                    const myK=me.kills||0, myD=me.deaths||0, myP=me.pvp_dmg||0;
+                    let myK=me.kills||0, myD=me.deaths||0, myP=me.pvp_dmg||0;
+                    // Санитизация: хилер с kills==deaths>15 → kills=0 (ошибка AI)
+                    if (role==='healer' && myK>15 && myK===myD) myK=0;
+                    if (role==='healer' && myK>20 && myP===0) myK=0;
                     let sc = 50;
                     if (role==='dps') {
                         const kR = m.mK>0 ? myK/m.mK : (myK>0?2:0.5);
@@ -3635,7 +3661,10 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 snap.players.forEach(sp => {
                     const rp = roster.find(rx => normalizeNick(rx.name)===normalizeNick(resolveAlias(sp.name))||normalizeNick(rx.name)===normalizeNick(sp.name));
                     const role = rp ? _valRole(rp.profa) : 'dps';
-                    const k=sp.kills||0, d=sp.deaths||0;
+                    let k=sp.kills||0, d=sp.deaths||0;
+                    // Санитизация: хилер kills==deaths>15 → kills=0
+                    if (role==='healer' && k>15 && k===d) k=0;
+                    if (role==='healer' && k>20 && (sp.pvp_dmg||0)===0) k=0;
                     r.totalKills+=k; r.totalDeaths+=d; r.totalPvp+=(sp.pvp_dmg||0);
                     r.byRole[role].k+=k; r.byRole[role].d+=d; r.byRole[role].n++;
                     // По классу
