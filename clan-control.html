@@ -3905,6 +3905,10 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             'воин': 'Titan', 'рыцарь': 'Phoenix Knight',
             'маг-целитель': 'Cardinal', 'волшебник': 'Archmage',
             'шаман': 'Dominator',
+            'отшельник': 'Grand Khavatari', 'танцор смерти': 'Spectral Dancer',
+            'искатель сокровищ': 'Adventurer', 'вестник войны': 'Doomcryer',
+            'bladedancer': 'Spectral Dancer', 'treasure hunter': 'Adventurer',
+            'warcryer': 'Doomcryer', 'tyrant': 'Grand Khavatari',
         };
 
         function resolveRuProfa(ruName) {
@@ -4049,7 +4053,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             let html2 = '';
 
             if (newPlayers.length > 0) {
-                html2 += '<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#22c55e;margin-bottom:8px">🆕 Новые игроки (' + newPlayers.length + ')</div>';
+                html2 += '<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#22c55e;margin-bottom:8px">🆕 Новые игроки (🟢 онлайн · 🔴 оффлайн) — ' + newPlayers.length + ')</div>';
                 html2 += '<div style="max-height:300px;overflow-y:auto;border:1px solid #1e2530;border-radius:10px">';
                 html2 += newPlayers.map((p, i) => {
                     const profaDisplay = p.enProfa ? (PROFA_NAMES && PROFA_NAMES[p.enProfa] ? p.enProfa.split(' (')[0] + ' (' + PROFA_NAMES[p.enProfa] + ')' : p.enProfa) : p.prof_ru + ' ❓';
