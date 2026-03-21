@@ -586,7 +586,7 @@
             <div style="background:#12171f;border:1px solid #1e2530;border-radius:12px;padding:20px;margin-bottom:24px">
                 <div onclick="var el=document.getElementById('ccAbsenceReport');var btn=document.getElementById('ccToggleBtn');if(el.style.display==='none'){el.style.display='';btn.textContent='▲ Свернуть'}else{el.style.display='none';btn.textContent='▼ Показать'}" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;cursor:pointer">
                     <div>
-                        <div style="font-size:13px;font-weight:800;color:#e2e8f0">⚠️ Не попали в CC подряд <span id="ccToggleBtn" style="font-size:10px;color:#475569;margin-left:8px">▲ Свернуть</span></div>
+                        <div style="font-size:13px;font-weight:800;color:#e2e8f0">⚠️ Не попали в CC подряд <span id="ccToggleBtn" style="font-size:10px;color:#475569;margin-left:8px">▼ Показать</span></div>
                         <div style="font-size:11px;color:#475569;margin-top:2px">Игроки из ростера которые отсутствовали в Командном канале N+ КМ подряд</div>
                     </div>
                     <div onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:8px">
@@ -601,7 +601,7 @@
                         <span style="font-size:11px;color:#64748b">КМ подряд</span>
                     </div>
                 </div>
-                <div id="ccAbsenceReport"></div>
+                <div id="ccAbsenceReport" style="display:none"></div>
             </div>
 
             <div id="statsContent"></div>
@@ -4025,7 +4025,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             let hash = len;
             for (let i = 0; i < head.length; i++) hash = ((hash << 5) - hash + head.charCodeAt(i)) | 0;
             for (let i = 0; i < tail.length; i++) hash = ((hash << 5) - hash + tail.charCodeAt(i)) | 0;
-            return 'sh7_' + Math.abs(hash).toString(36) + '_' + len;
+            return 'sh8_' + Math.abs(hash).toString(36) + '_' + len;
         }
         function getScreenshotCache() {
             try { return JSON.parse(localStorage.getItem('cc_screenshot_cache') || '{}'); } catch(e) { return {}; }
@@ -5019,52 +5019,77 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 }
             }
 
-            // ===== АВТОКОРРЕКЦИЯ: свопаем kills/deaths по пакам если не совпадают с КК =====
+            // ===== ДЕДУПЛИКАЦИЯ screenPlayersMap: объединяем паки с одинаковым лидером =====
+            const deduped = {};
+            Object.entries(screenPlayersMap).forEach(([packName, players]) => {
+                const leader = packLeaders[packName];
+                const normLeader = leader ? normalizeNick(leader) : normalizeNick(packName);
+                if (!deduped[normLeader]) {
+                    deduped[normLeader] = { packName, players: players || [] };
+                } else {
+                    // Мержим: если текущий пак имеет больше игроков — заменяем
+                    const existing = deduped[normLeader];
+                    if ((players||[]).length > existing.players.length) {
+                        deduped[normLeader] = { packName, players: players || [] };
+                    }
+                }
+            });
+            // Перезаписываем screenPlayersMap дедуплицированным
+            const cleanMap = {};
+            Object.values(deduped).forEach(({packName, players}) => { cleanMap[packName] = players; });
+            screenPlayersMap = cleanMap;
+
+            // ===== АВТОКОРРЕКЦИЯ: свопаем kills/deaths по ВСЕМ пакам если не совпадают с КК =====
             if (commandChannel.length > 0 && Object.keys(screenPlayersMap).length > 0) {
                 commandChannel.forEach(cc => {
-                    const packName = Object.keys(screenPlayersMap).find(pk => {
+                    const ccNorm = normalizeNick(cc.leader);
+                    // Свопаем ВСЕ паки с совпадающим лидером (не только первый)
+                    Object.keys(screenPlayersMap).forEach(pk => {
                         const leader = packLeaders[pk];
-                        return leader && normalizeNick(leader) === normalizeNick(cc.leader);
+                        const pkNorm = leader ? normalizeNick(leader) : normalizeNick(pk);
+                        if (pkNorm !== ccNorm) return;
+                        const players = screenPlayersMap[pk];
+                        if (!players || players.length === 0) return;
+                        const sumK = players.reduce((s,p) => s + (p.kills||0), 0);
+                        const sumD = players.reduce((s,p) => s + (p.deaths||0), 0);
+                        const ccK = cc.kills || 0;
+                        const ccD = cc.deaths || 0;
+                        const diffNormal = Math.abs(sumK - ccK) + Math.abs(sumD - ccD);
+                        const diffSwapped = Math.abs(sumD - ccK) + Math.abs(sumK - ccD);
+                        if (diffSwapped < diffNormal * 0.5 && diffNormal > 10) {
+                            console.warn('Пак ' + pk + ': свопаю kills/deaths');
+                            players.forEach(p => { const tmp = p.kills; p.kills = p.deaths; p.deaths = tmp; });
+                        }
                     });
-                    if (!packName) return;
-                    const players = screenPlayersMap[packName];
-                    if (!players || players.length === 0) return;
-                    const sumK = players.reduce((s,p) => s + (p.kills||0), 0);
-                    const sumD = players.reduce((s,p) => s + (p.deaths||0), 0);
-                    const ccK = cc.kills || 0;
-                    const ccD = cc.deaths || 0;
-                    const diffNormal = Math.abs(sumK - ccK) + Math.abs(sumD - ccD);
-                    const diffSwapped = Math.abs(sumD - ccK) + Math.abs(sumK - ccD);
-                    if (diffSwapped < diffNormal * 0.5 && diffNormal > 10) {
-                        console.warn('Пак ' + packName + ': свопаю kills/deaths');
-                        players.forEach(p => { const tmp = p.kills; p.kills = p.deaths; p.deaths = tmp; });
-                    }
                 });
             }
 
             // ===== ПЕРЕСТРОЕНИЕ allPlayers из исправленных screenPlayersMap =====
-            // Очищаем и пересобираем — теперь данные уже скорректированы
             const rebuiltPlayers = {};
             Object.values(screenPlayersMap).forEach(players => {
                 if (!players) return;
                 players.forEach(p => {
                     if (!p.name) return;
-                    const key = p.name.toLowerCase();
+                    const key = normalizeNick(p.name);
                     if (rebuiltPlayers[key]) {
-                        rebuiltPlayers[key].kills    = Math.max(rebuiltPlayers[key].kills    || 0, p.kills    || 0);
-                        rebuiltPlayers[key].deaths   = Math.max(rebuiltPlayers[key].deaths   || 0, p.deaths   || 0);
-                        rebuiltPlayers[key].pvp_dmg  = Math.max(rebuiltPlayers[key].pvp_dmg  || 0, p.pvp_dmg  || 0);
-                        rebuiltPlayers[key].pve_dmg  = Math.max(rebuiltPlayers[key].pve_dmg  || 0, p.pve_dmg  || 0);
+                        // Берём данные только если у текущего больше активности (не нули)
+                        const curActivity = (rebuiltPlayers[key].kills||0) + (rebuiltPlayers[key].deaths||0) + (rebuiltPlayers[key].pvp_dmg||0);
+                        const newActivity = (p.kills||0) + (p.deaths||0) + (p.pvp_dmg||0);
+                        if (newActivity > curActivity) {
+                            rebuiltPlayers[key].kills = p.kills||0;
+                            rebuiltPlayers[key].deaths = p.deaths||0;
+                            rebuiltPlayers[key].pvp_dmg = p.pvp_dmg||0;
+                            rebuiltPlayers[key].pve_dmg = p.pve_dmg||0;
+                        }
                         if (!rebuiltPlayers[key].class2 && p.class2) rebuiltPlayers[key].class2 = p.class2;
                     } else {
                         rebuiltPlayers[key] = { name: p.name, kills: p.kills||0, deaths: p.deaths||0, pvp_dmg: p.pvp_dmg||0, pve_dmg: p.pve_dmg||0, class2: p.class2||null };
                     }
                 });
             });
-            // Перезаписываем allPlayers исправленными данными
-            Object.keys(rebuiltPlayers).forEach(key => {
-                allPlayers[key] = rebuiltPlayers[key];
-            });
+            // Перезаписываем allPlayers
+            Object.keys(allPlayers).forEach(k => delete allPlayers[k]);
+            Object.entries(rebuiltPlayers).forEach(([key, val]) => { allPlayers[val.name.toLowerCase()] = val; });
 
             dayLastParsed = Object.values(allPlayers);
             dayExpectedTotal = expectedTotal;
@@ -5747,6 +5772,45 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             checkEmptySimilarModal();
         }
 
+        function mergeWithCustomName(nameA, nameB, correctName, btn) {
+            correctName = correctName.trim();
+            if (!correctName) return;
+            // Добавляем алиасы: оба старых ника → правильный
+            if (nameA !== correctName) {
+                nickAliases[nameA.toLowerCase()] = correctName;
+                nickAliases[nameA] = correctName;
+            }
+            if (nameB !== correctName) {
+                nickAliases[nameB.toLowerCase()] = correctName;
+                nickAliases[nameB] = correctName;
+            }
+            // Ищем обоих в ростере
+            const pA = roster.find(p => p.name === nameA);
+            const pB = roster.find(p => p.name === nameB);
+            // Оставляем одного, переименовываем в correctName
+            if (pA && pB) {
+                // Мержим данные в pA
+                pA.name = correctName;
+                pA.kills = Math.max(pA.kills||0, pB.kills||0);
+                pA.deaths = Math.max(pA.deaths||0, pB.deaths||0);
+                pA.pvp_dmg = Math.max(pA.pvp_dmg||0, pB.pvp_dmg||0);
+                pA.pve_dmg = Math.max(pA.pve_dmg||0, pB.pve_dmg||0);
+                if (!pA.profa || pA.profa === '—') pA.profa = pB.profa;
+                if (!pA.profas?.length && pB.profas?.length) pA.profas = pB.profas;
+                // Удаляем pB
+                const idx = roster.indexOf(pB);
+                if (idx >= 0) { archive.push(pB); roster.splice(idx, 1); }
+            } else if (pA) {
+                pA.name = correctName;
+            } else if (pB) {
+                pB.name = correctName;
+            }
+            saveToStorage();
+            renderRoster();
+            btn.closest('[data-pair]').remove();
+            checkEmptyDupesModal();
+        }
+
         function mergeNickPair(nameA, nameB, keepName, btn) {
             const removeName = keepName === nameA ? nameB : nameA;
             // Добавляем алиас
@@ -5895,10 +5959,14 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     html2 += ' <span style="color:#f59e0b">≈</span> ';
                     html2 += '<span style="font-weight:800">' + bn + '</span> ' + pkBdg(pb);
                     html2 += '<span style="font-size:10px;color:#64748b;margin-left:auto">расст. ' + dist + '</span></div>';
-                    html2 += '<div style="display:flex;gap:8px">';
-                    html2 += '<button onclick="mergeNickPair(\'' + esc(an) + '\',\'' + esc(bn) + '\',\'' + esc(an) + '\',this)" style="flex:1;background:#6366f122;border:1px solid #6366f144;color:#a5b4fc;border-radius:8px;padding:6px;font-size:11px;font-weight:700;cursor:pointer">Оставить «' + an + '»</button>';
-                    html2 += '<button onclick="mergeNickPair(\'' + esc(an) + '\',\'' + esc(bn) + '\',\'' + esc(bn) + '\',this)" style="flex:1;background:#6366f122;border:1px solid #6366f144;color:#a5b4fc;border-radius:8px;padding:6px;font-size:11px;font-weight:700;cursor:pointer">Оставить «' + bn + '»</button>';
-                    html2 += '<button onclick="markDifferentPair(\'' + esc(an) + '\',\'' + esc(bn) + '\',this)" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:8px;padding:6px 12px;font-size:11px;cursor:pointer">Разные</button>';
+                    html2 += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">';
+                    html2 += '<input id="dupEdit' + i + '" type="text" value="' + an + '" style="flex:1;background:#12171f;border:1px solid #2d3748;border-radius:6px;padding:5px 8px;color:#e2e8f0;font-size:12px;font-weight:700">';
+                    html2 += '<button onclick="mergeWithCustomName(\'' + esc(an) + '\',\'' + esc(bn) + '\',document.getElementById(\'dupEdit' + i + '\').value,this)" style="background:#22c55e;color:white;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">✓ Объединить</button>';
+                    html2 += '</div>';
+                    html2 += '<div style="display:flex;gap:6px">';
+                    html2 += '<button onclick="mergeNickPair(\'' + esc(an) + '\',\'' + esc(bn) + '\',\'' + esc(an) + '\',this)" style="flex:1;background:#6366f122;border:1px solid #6366f144;color:#a5b4fc;border-radius:8px;padding:5px;font-size:10px;cursor:pointer">«' + an + '»</button>';
+                    html2 += '<button onclick="mergeNickPair(\'' + esc(an) + '\',\'' + esc(bn) + '\',\'' + esc(bn) + '\',this)" style="flex:1;background:#6366f122;border:1px solid #6366f144;color:#a5b4fc;border-radius:8px;padding:5px;font-size:10px;cursor:pointer">«' + bn + '»</button>';
+                    html2 += '<button onclick="markDifferentPair(\'' + esc(an) + '\',\'' + esc(bn) + '\',this)" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:8px;padding:5px 10px;font-size:10px;cursor:pointer">Разные</button>';
                     html2 += '</div></div>';
                 });
             }
