@@ -508,8 +508,7 @@
                         <div class="dp-wrap"><button class="dp-btn" id="rosterToBtn" onclick="openDatePicker('rosterTo',this)">Конец</button></div>
                         <button onclick="clearPeriod('roster')" style="background:none;border:none;color:#475569;cursor:pointer;font-size:10px" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#475569'">✕</button>
                     </div>
-                    <button onclick="removeDuplicates()" class="px-4 py-2 border border-red-900 text-red-400 rounded-lg text-sm font-medium hover:bg-red-900/20">Дубли</button>
-                    <button onclick="debugDuplicates()" class="px-4 py-2 border border-purple-900 text-purple-400 rounded-lg text-sm font-medium hover:bg-purple-900/20">🔬 Похожие ники</button>
+                    <button onclick="findAllDuplicates()" class="px-4 py-2 border border-purple-900 text-purple-400 rounded-lg text-sm font-medium hover:bg-purple-900/20">🔬 Найти дубли</button>
                     <button onclick="clearAllNew()" class="px-4 py-2 border border-slate-600 text-slate-400 rounded-lg text-sm font-medium hover:bg-slate-800">Снять NEW</button>
                     <button onclick="unverifyAll()" class="px-4 py-2 border border-slate-600 text-slate-400 rounded-lg text-sm font-medium hover:bg-slate-800" title="Снять все отметки проверки">Снять ✓</button>
                     <button onclick="resetAllStats()" class="px-4 py-2 border border-red-900 text-red-500 rounded-lg text-sm font-medium hover:bg-red-900/20">Сброс статы</button>
@@ -585,12 +584,12 @@
 
             <!-- ОТЧЁТ: НЕ ПОПАЛИ В CC -->
             <div style="background:#12171f;border:1px solid #1e2530;border-radius:12px;padding:20px;margin-bottom:24px">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+                <div onclick="var el=document.getElementById('ccAbsenceReport');var btn=document.getElementById('ccToggleBtn');if(el.style.display==='none'){el.style.display='';btn.textContent='▲ Свернуть'}else{el.style.display='none';btn.textContent='▼ Показать'}" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;cursor:pointer">
                     <div>
-                        <div style="font-size:13px;font-weight:800;color:#e2e8f0">⚠️ Не попали в CC подряд</div>
+                        <div style="font-size:13px;font-weight:800;color:#e2e8f0">⚠️ Не попали в CC подряд <span id="ccToggleBtn" style="font-size:10px;color:#475569;margin-left:8px">▲ Свернуть</span></div>
                         <div style="font-size:11px;color:#475569;margin-top:2px">Игроки из ростера которые отсутствовали в Командном канале N+ КМ подряд</div>
                     </div>
-                    <div style="display:flex;align-items:center;gap:8px">
+                    <div onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:8px">
                         <span style="font-size:11px;color:#64748b">Порог:</span>
                         <div style="display:flex;gap:4px">
                             <button onclick="setCcThreshold(3)" id="ccBtn3" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">3</button>
@@ -2015,10 +2014,14 @@ function getProfaIcon(profa) {
     if (!profa || profa === '—') return null;
     // Точное совпадение
     if (PROFA_ICONS[profa]) return PROFA_ICONS[profa];
-    // Частичное совпадение по первому слову
-    const key = Object.keys(PROFA_ICONS).find(k => 
-        profa.toLowerCase().includes(k.toLowerCase().split(' ')[0]) ||
-        k.toLowerCase().includes(profa.toLowerCase().split(' ')[0])
+    // Частичное: проверяем ВСЕ слова ключа (не только первое)
+    const profaL = profa.toLowerCase();
+    const key = Object.keys(PROFA_ICONS).find(k => {
+        const words = k.toLowerCase().split(' ');
+        return words.every(w => profaL.includes(w));
+    }) || Object.keys(PROFA_ICONS).find(k =>
+        profaL.includes(k.toLowerCase().split(' ')[0]) ||
+        k.toLowerCase().includes(profaL.split(' ')[0])
     );
     return key ? PROFA_ICONS[key] : null;
 }
@@ -2882,7 +2885,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                         if (allProfasList.length >= 2) {
                             const _pTanks = ['Phoenix Knight','Hell Knight','Eva\'s Templar','Shillien Templar'];
                             const _pHeals = ['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'];
-                            function _pRole(pf) { if(!pf||pf==='—') return 'dps'; if(_pTanks.some(x=>pf.includes(x.split(' ')[0]))) return 'tank'; if(_pHeals.some(x=>pf.includes(x.split(' ')[0]))) return 'healer'; return 'dps'; }
+                            function _pRole(pf) { if(!pf||pf==='—') return 'dps'; if(_pHeals.some(x=>pf.includes(x.split(' ')[0]) && pf.includes(x.split(' ')[1]||''))) return 'healer'; if(_pTanks.some(x=>pf.includes(x.split(' ')[0]) && pf.includes(x.split(' ')[1]||''))) return 'tank'; return 'dps'; }
                             const profaStats = allProfasList.map(pf => {
                                 const normPf = pf.toLowerCase().trim();
                                 let kills = 0, deaths = 0, pvp = 0, kmCount = 0;
@@ -2945,8 +2948,8 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                         const _healProfs = ['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'];
                         function _getPlayerRole(pf) {
                             if (!pf || pf === '—') return 'dps';
-                            if (_tankProfs.some(x => pf.includes(x.split(' ')[0]))) return 'tank';
-                            if (_healProfs.some(x => pf.includes(x.split(' ')[0]))) return 'healer';
+                            if (_healProfs.some(x => pf.includes(x.split(' ')[0]) && pf.includes(x.split(' ')[1]||''))) return 'healer';
+                            if (_tankProfs.some(x => pf.includes(x.split(' ')[0]) && pf.includes(x.split(' ')[1]||''))) return 'tank';
                             return 'dps';
                         }
                         const myRole = isTank ? 'tank' : isHealer ? 'healer' : 'dps';
@@ -3723,8 +3726,9 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
         const _VAL_HEAL_P = ['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'];
         function _valRole(pf) {
             if (!pf || pf === '—') return 'dps';
-            if (_VAL_TANK_P.some(x => pf.includes(x.split(' ')[0]))) return 'tank';
-            if (_VAL_HEAL_P.some(x => pf.includes(x.split(' ')[0]))) return 'healer';
+            // Хилеры ПЕРВЫМИ — иначе "Shillien Saint" совпадёт с "Shillien Templar"
+            if (_VAL_HEAL_P.some(x => pf.includes(x.split(' ')[0]) && (x.split(' ').length < 2 || pf.includes(x.split(' ')[1]?.split(' ')[0] || '')))) return 'healer';
+            if (_VAL_TANK_P.some(x => pf.includes(x.split(' ')[0]) && (x.split(' ').length < 2 || pf.includes(x.split(' ')[1]?.split(' ')[0] || '')))) return 'tank';
             return 'dps';
         }
         let _valueCache = {}, _valueCacheKey = '';
@@ -4021,7 +4025,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             let hash = len;
             for (let i = 0; i < head.length; i++) hash = ((hash << 5) - hash + head.charCodeAt(i)) | 0;
             for (let i = 0; i < tail.length; i++) hash = ((hash << 5) - hash + tail.charCodeAt(i)) | 0;
-            return 'sh6_' + Math.abs(hash).toString(36) + '_' + len;
+            return 'sh7_' + Math.abs(hash).toString(36) + '_' + len;
         }
         function getScreenshotCache() {
             try { return JSON.parse(localStorage.getItem('cc_screenshot_cache') || '{}'); } catch(e) { return {}; }
@@ -5018,7 +5022,6 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             // ===== АВТОКОРРЕКЦИЯ: свопаем kills/deaths по пакам если не совпадают с КК =====
             if (commandChannel.length > 0 && Object.keys(screenPlayersMap).length > 0) {
                 commandChannel.forEach(cc => {
-                    // Ищем пак по лидеру
                     const packName = Object.keys(screenPlayersMap).find(pk => {
                         const leader = packLeaders[pk];
                         return leader && normalizeNick(leader) === normalizeNick(cc.leader);
@@ -5026,32 +5029,42 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     if (!packName) return;
                     const players = screenPlayersMap[packName];
                     if (!players || players.length === 0) return;
-                    
                     const sumK = players.reduce((s,p) => s + (p.kills||0), 0);
                     const sumD = players.reduce((s,p) => s + (p.deaths||0), 0);
                     const ccK = cc.kills || 0;
                     const ccD = cc.deaths || 0;
-                    
-                    // Если сумма пака примерно совпадает с КК при свопе — свопаем
                     const diffNormal = Math.abs(sumK - ccK) + Math.abs(sumD - ccD);
                     const diffSwapped = Math.abs(sumD - ccK) + Math.abs(sumK - ccD);
-                    
                     if (diffSwapped < diffNormal * 0.5 && diffNormal > 10) {
-                        console.warn('Пак ' + packName + ': свопаю kills/deaths (сумма пака: ' + sumK + '/' + sumD + ', КК: ' + ccK + '/' + ccD + ')');
-                        players.forEach(p => {
-                            const tmp = p.kills; p.kills = p.deaths; p.deaths = tmp;
-                        });
-                        // Также обновляем allPlayers
-                        players.forEach(p => {
-                            const key = p.name.toLowerCase();
-                            if (allPlayers[key]) {
-                                allPlayers[key].kills = Math.max(allPlayers[key].kills||0, p.kills||0);
-                                allPlayers[key].deaths = Math.max(allPlayers[key].deaths||0, p.deaths||0);
-                            }
-                        });
+                        console.warn('Пак ' + packName + ': свопаю kills/deaths');
+                        players.forEach(p => { const tmp = p.kills; p.kills = p.deaths; p.deaths = tmp; });
                     }
                 });
             }
+
+            // ===== ПЕРЕСТРОЕНИЕ allPlayers из исправленных screenPlayersMap =====
+            // Очищаем и пересобираем — теперь данные уже скорректированы
+            const rebuiltPlayers = {};
+            Object.values(screenPlayersMap).forEach(players => {
+                if (!players) return;
+                players.forEach(p => {
+                    if (!p.name) return;
+                    const key = p.name.toLowerCase();
+                    if (rebuiltPlayers[key]) {
+                        rebuiltPlayers[key].kills    = Math.max(rebuiltPlayers[key].kills    || 0, p.kills    || 0);
+                        rebuiltPlayers[key].deaths   = Math.max(rebuiltPlayers[key].deaths   || 0, p.deaths   || 0);
+                        rebuiltPlayers[key].pvp_dmg  = Math.max(rebuiltPlayers[key].pvp_dmg  || 0, p.pvp_dmg  || 0);
+                        rebuiltPlayers[key].pve_dmg  = Math.max(rebuiltPlayers[key].pve_dmg  || 0, p.pve_dmg  || 0);
+                        if (!rebuiltPlayers[key].class2 && p.class2) rebuiltPlayers[key].class2 = p.class2;
+                    } else {
+                        rebuiltPlayers[key] = { name: p.name, kills: p.kills||0, deaths: p.deaths||0, pvp_dmg: p.pvp_dmg||0, pve_dmg: p.pve_dmg||0, class2: p.class2||null };
+                    }
+                });
+            });
+            // Перезаписываем allPlayers исправленными данными
+            Object.keys(rebuiltPlayers).forEach(key => {
+                allPlayers[key] = rebuiltPlayers[key];
+            });
 
             dayLastParsed = Object.values(allPlayers);
             dayExpectedTotal = expectedTotal;
@@ -5781,7 +5794,127 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
 
         function renderScreenshotArchive() { renderKmHistory(); }
 
-        function debugDuplicates() {
+        // ===== ТРАНСЛИТЕРАЦИЯ для сравнения ников =====
+        const _TRANSLIT = {'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'h','ц':'c','ч':'ch','ш':'sh','щ':'sch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya'};
+        function transliterate(str) {
+            return str.toLowerCase().split('').map(c => _TRANSLIT[c] || c).join('');
+        }
+
+        function findAllDuplicates() {
+            // Этап 1: точные дубли (normalizeNick)
+            const groups = {};
+            roster.forEach(p => {
+                const key = normalizeNick(p.name);
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(p);
+            });
+            const exactDupes = Object.entries(groups).filter(([,v]) => v.length >= 2);
+
+            // Этап 2: похожие ники (расстояние Левенштейна + транслитерация)
+            function levenshtein(a, b) {
+                const m = a.length, n = b.length;
+                const d = Array.from({length: m+1}, (_, i) => [i]);
+                for (let j = 1; j <= n; j++) d[0][j] = j;
+                for (let i = 1; i <= m; i++)
+                    for (let j = 1; j <= n; j++)
+                        d[i][j] = Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+                return d[m][n];
+            }
+
+            const similarPairs = [];
+            for (let i = 0; i < roster.length; i++) {
+                for (let j = i+1; j < roster.length; j++) {
+                    const a = roster[i], b = roster[j];
+                    const na = normalizeNick(a.name), nb = normalizeNick(b.name);
+                    if (na === nb) continue; // exact dupe, handled above
+                    // Skip already marked as different
+                    if (nickAliases['__diff__'+a.name.toLowerCase()+'__'+b.name.toLowerCase()]) continue;
+                    if (nickAliases['__diff__'+b.name.toLowerCase()+'__'+a.name.toLowerCase()]) continue;
+                    // Compare: direct + transliterated
+                    const ta = transliterate(a.name), tb = transliterate(b.name);
+                    const dist1 = levenshtein(na, nb);
+                    const dist2 = levenshtein(ta, tb);
+                    const minDist = Math.min(dist1, dist2);
+                    if (minDist <= 2 && minDist > 0 && na.length > 3 && nb.length > 3) {
+                        similarPairs.push({ a, b, dist: minDist });
+                    }
+                }
+            }
+
+            // Показываем результат
+            const overlay = document.createElement('div');
+            overlay.id = 'dupesOverlay';
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+            overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+
+            if (exactDupes.length === 0 && similarPairs.length === 0) {
+                overlay.innerHTML = '<div style="background:#12171f;border:1px solid #1e2530;border-radius:16px;padding:32px;width:420px;text-align:center"><div style="font-size:36px;margin-bottom:12px">✅</div><div style="font-size:16px;font-weight:800;margin-bottom:8px">Дублей не найдено</div><div style="font-size:13px;color:#64748b;margin-bottom:24px">Все ники уникальны</div><button onclick="this.closest(\'[id]\').remove()" style="background:#6366f1;color:white;border:none;border-radius:10px;padding:10px 28px;font-weight:700;cursor:pointer">Закрыть</button></div>';
+                document.body.appendChild(overlay);
+                return;
+            }
+
+            let html2 = '';
+            // Точные дубли
+            if (exactDupes.length > 0) {
+                html2 += '<div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#ef4444;margin-bottom:8px">⚠️ Точные дубли (' + exactDupes.length + ')</div>';
+                exactDupes.forEach(([key, group]) => {
+                    html2 += '<div style="background:#7f1d1d22;border:1px solid #ef444444;border-radius:10px;padding:12px;margin-bottom:8px">';
+                    html2 += '<div style="font-weight:700;margin-bottom:6px">' + group.map(p => p.name).join(' = ') + '</div>';
+                    html2 += '<button onclick="mergeAll(\'' + key.replace(/'/g,"\\'") + '\');this.closest(\'[data-pair]\').remove();checkEmptyDupesModal()" style="background:#ef4444;color:white;border:none;border-radius:8px;padding:6px 16px;font-size:11px;font-weight:700;cursor:pointer">Объединить</button>';
+                    html2 += '</div>';
+                });
+            }
+            // Похожие ники
+            // Похожие ники
+            if (similarPairs.length > 0) {
+                html2 += '<div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#f59e0b;margin:12px 0 8px">🔍 Похожие ники (' + similarPairs.length + ')</div>';
+                function _findPack2(name) {
+                    const nk = normalizeNick(name);
+                    const dates = Object.keys(appliedStatsByDate).sort().reverse();
+                    for (const d of dates) {
+                        const spm = appliedStatsByDate[d]?.screenPlayersMap;
+                        if (!spm) continue;
+                        for (const [pk, pls] of Object.entries(spm)) {
+                            if (!pls) continue;
+                            if (pls.some(p => normalizeNick(p.name) === nk || normalizeNick(resolveAlias(p.name)) === nk)) {
+                                return appliedStatsByDate[d]?.packLeaders?.[pk] || pk;
+                            }
+                        }
+                    }
+                    const rp = roster.find(r => normalizeNick(r.name) === nk);
+                    return rp?.pac || null;
+                }
+                similarPairs.forEach(function(pair, i) {
+                    const an = pair.a.name, bn = pair.b.name, dist = pair.dist;
+                    const esc = function(s) { return s.replace(/'/g, "\\'"); };
+                    const pa = _findPack2(an), pb = _findPack2(bn);
+                    const pkBdg = function(p) { return p ? '<span style="font-size:10px;background:#1e3a5f;color:#60a5fa;padding:1px 6px;border-radius:4px">' + p + '</span>' : ''; };
+                    html2 += '<div data-pair="s' + i + '" style="background:#0b0e14;border:1px solid #2d3748;border-radius:10px;padding:12px;margin-bottom:8px">';
+                    html2 += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">';
+                    html2 += '<span style="font-weight:800">' + an + '</span> ' + pkBdg(pa);
+                    html2 += ' <span style="color:#f59e0b">≈</span> ';
+                    html2 += '<span style="font-weight:800">' + bn + '</span> ' + pkBdg(pb);
+                    html2 += '<span style="font-size:10px;color:#64748b;margin-left:auto">расст. ' + dist + '</span></div>';
+                    html2 += '<div style="display:flex;gap:8px">';
+                    html2 += '<button onclick="mergeNickPair(\'' + esc(an) + '\',\'' + esc(bn) + '\',\'' + esc(an) + '\',this)" style="flex:1;background:#6366f122;border:1px solid #6366f144;color:#a5b4fc;border-radius:8px;padding:6px;font-size:11px;font-weight:700;cursor:pointer">Оставить «' + an + '»</button>';
+                    html2 += '<button onclick="mergeNickPair(\'' + esc(an) + '\',\'' + esc(bn) + '\',\'' + esc(bn) + '\',this)" style="flex:1;background:#6366f122;border:1px solid #6366f144;color:#a5b4fc;border-radius:8px;padding:6px;font-size:11px;font-weight:700;cursor:pointer">Оставить «' + bn + '»</button>';
+                    html2 += '<button onclick="markDifferentPair(\'' + esc(an) + '\',\'' + esc(bn) + '\',this)" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:8px;padding:6px 12px;font-size:11px;cursor:pointer">Разные</button>';
+                    html2 += '</div></div>';
+                });
+            }
+
+            overlay.innerHTML = '<div style="background:#12171f;border:1px solid #1e2530;border-radius:16px;padding:28px;width:580px;max-height:80vh;overflow-y:auto"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><div><div style="font-size:18px;font-weight:800">🔬 Дубли и похожие ники</div><div style="font-size:12px;color:#94a3b8;margin-top:2px">Точные дубли: '+exactDupes.length+' · Похожие: '+similarPairs.length+'</div></div><button onclick="this.closest(\'[id]\').remove()" style="background:none;border:none;color:#475569;cursor:pointer;font-size:20px">✕</button></div><div id="dupesContent">'+html2+'</div></div>';
+            document.body.appendChild(overlay);
+        }
+
+        function checkEmptyDupesModal() {
+            const el = document.getElementById('dupesContent');
+            if (el && !el.querySelector('[data-pair]') && !el.querySelector('[style*="ef4444"]')) {
+                document.getElementById('dupesOverlay')?.remove();
+            }
+        }
+
+        function debugDuplicates_MANUAL() {
             // Только на странице Клан
             if (!document.getElementById('page-roster')?.classList?.contains('active')) return;
             // Ищем игроков с одинаковым нормализованным ключом
@@ -5881,7 +6014,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             saveToStorage();
             renderRoster();
             document.getElementById('dupesOverlay')?.remove();
-            debugDuplicates(); // перерисовать если остались ещё дубли
+            // не вызываем автоматически
         }
 
         function mergeAll(normKey) {
@@ -5899,7 +6032,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             saveToStorage();
             renderRoster();
             document.getElementById('dupesOverlay')?.remove();
-            debugDuplicates();
+            // не вызываем автоматически
         }
 
         function mergeAllDupes() {
