@@ -6167,7 +6167,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                                 return `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
                                     ${profaHtml}
                                     <span style="font-weight:800;font-size:15px;color:#e2e8f0;cursor:pointer;border-bottom:1px dashed #475569" onclick="openPlayerProfile('${fp.name.replace(/'/g,"\'")}')">${fp.name}</span>
-                                    ${packLabel ? `<span onclick="event.stopPropagation();(function(){var cid='lc_${dateStr.replace(/-/g,'')}';var c=document.getElementById(cid);if(c){c.style.display='block';var tp=document.getElementById('tp_${dateStr.replace(/-/g,'')}');if(tp)tp.style.display='none';var btn=document.getElementById('lb_${dateStr.replace(/-/g,'')}');if(btn)btn.textContent='▲ Скрыть паки';kmOpenPacksState[cid]=true;setTimeout(function(){var items=c.querySelectorAll('[onclick*=openPlayerProfile]');c.scrollIntoView({behavior:'smooth',block:'center'});},100)}})()" style="font-size:10px;background:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;cursor:pointer;border:1px solid #2563eb44" title="Нажми чтобы раскрыть пак">📦 пак: ${packLabel}</span>` : ''}
+                                    ${packLabel ? `<span onclick="event.stopPropagation();openPackAndHighlight('${dateStr}','${fp.name.replace(/'/g,"\\'")}')" style="font-size:10px;background:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;cursor:pointer;border:1px solid #2563eb44" title="Нажми чтобы раскрыть пак и подсветить игрока">📦 пак: ${packLabel}</span>` : ''}
                                     <div style="display:flex;gap:16px;font-size:14px;font-weight:700">
                                         <span style="color:#f59e0b">⚔️ ${fp.kills||0}</span>
                                         <span style="color:#ef4444">💀 ${fp.deaths||0}</span>
@@ -7345,6 +7345,54 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 result += c;
             }
             return switched ? result : '';
+        }
+
+
+        function openPackAndHighlight(dateStr, playerName) {
+            const cid = 'lc_' + dateStr.replace(/-/g, '');
+            const c = document.getElementById(cid);
+            if (!c) return;
+            // Open packs
+            c.style.display = 'block';
+            const tp = document.getElementById('tp_' + dateStr.replace(/-/g, ''));
+            if (tp) tp.style.display = 'none';
+            const btn = document.getElementById('lb_' + dateStr.replace(/-/g, ''));
+            if (btn) btn.textContent = '▲ Скрыть паки';
+            kmOpenPacksState[cid] = true;
+            // Find and highlight the player
+            setTimeout(function() {
+                const normTarget = playerName.toLowerCase();
+                const links = c.querySelectorAll('.player-nick-link');
+                let found = null;
+                links.forEach(function(el) {
+                    if (el.textContent.toLowerCase().trim() === normTarget) found = el;
+                });
+                if (found) {
+                    const row = found.closest('div[style*="display:flex"]');
+                    if (row) {
+                        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        // Flash highlight
+                        row.style.transition = 'background .2s';
+                        row.style.background = '#6366f133';
+                        row.style.borderRadius = '8px';
+                        row.style.boxShadow = '0 0 0 2px #6366f1';
+                        setTimeout(function() {
+                            row.style.background = '';
+                            row.style.boxShadow = '';
+                            setTimeout(function() {
+                                row.style.background = '#6366f133';
+                                row.style.boxShadow = '0 0 0 2px #6366f1';
+                                setTimeout(function() {
+                                    row.style.background = '';
+                                    row.style.boxShadow = '';
+                                }, 500);
+                            }, 300);
+                        }, 500);
+                    }
+                } else {
+                    c.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 150);
         }
 
         function debounce(fn, ms) {
