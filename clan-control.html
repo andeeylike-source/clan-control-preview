@@ -6153,6 +6153,15 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             const el = document.getElementById('kmHistoryContent');
             if (!el) return;
 
+            // Показываем лоадер сразу
+            el.innerHTML = '<div style="text-align:center;padding:32px;color:#475569"><div style="font-size:24px;margin-bottom:8px">⏳</div>Загрузка...</div>';
+
+            // Отложенный рендер чтобы UI не зависал
+            setTimeout(() => { _doRenderKmHistory(el); }, 10);
+        }
+
+        function _doRenderKmHistory(el) {
+
             // Поисковый запрос
             const searchQ = (document.getElementById('kmHistorySearch')?.value || '').toLowerCase().trim();
             const searchQAlt = switchKeyboardLayout(searchQ);
