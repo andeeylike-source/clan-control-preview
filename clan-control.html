@@ -1426,6 +1426,7 @@
         function renderRoster() {
             const body = document.getElementById('rosterBody');
             const searchQuery = document.getElementById('rosterSearchInput').value.toLowerCase().trim();
+            const searchAlt = switchKeyboardLayout(searchQuery);
             const rankPriority = { "КЛ": 1, "ПЛ": 2, "ИГРОК": 3 };
 
             // Считаем КМ% из истории за выбранный период
@@ -1436,7 +1437,10 @@
             });
             const totalDates = allDates.length;
 
-            let filtered = roster.filter(p => p.name.toLowerCase().includes(searchQuery));
+            let filtered = roster.filter(p => {
+                const n = p.name.toLowerCase();
+                return n.includes(searchQuery) || (searchAlt && n.includes(searchAlt));
+            });
 
             // Добавляем КМ% и Ценность (по-КМ относительная)
             _valueCache = {}; _valueCacheKey = '';
@@ -1509,7 +1513,7 @@
                     </td>
                     <td>${p.isNew ? '<span class="text-[9px] bg-emerald-500 text-black font-black px-1.5 py-0.5 rounded uppercase">NEW</span>' : '<span style="color:#475569;font-size:11px">—</span>'}</td>
                     <td onclick="event.stopPropagation();toggleVerified(${p.id})" style="cursor:pointer;text-align:center;font-size:16px" title="Нажми чтобы отметить как проверенный">${p.verified ? '✅' : '<span style="color:#2d3748;font-size:14px">○</span>'}</td>
-                    <td onclick="event.stopPropagation();editPlayer(${p.id})" style="cursor:pointer" title="Нажми чтобы изменить профу" class="text-slate-400 text-xs">${(p.profas && p.profas.length > 0 ? p.profas : (p.profa && p.profa !== '—' ? [p.profa] : [])).map((pf,i) => `<span style="display:inline-flex;align-items:center;gap:5px;background:#1e2530;border-radius:6px;padding:4px 9px;margin-right:4px;${i===0?'color:#a5b4fc':'color:#64748b'}">${profaIconHtml(pf, 22)}<span onclick="event.stopPropagation();showProfaInfo(this.dataset.pf)" data-pf="${pf}" style="cursor:help;color:#475569;font-size:9px;margin-left:3px">?</span></span>`).join('') || '<span style="color:#6366f155;font-size:11px;border:1px dashed #2d3748;padding:3px 8px;border-radius:6px">+ профа</span>'}</td>
+                    <td onclick="event.stopPropagation();editPlayer(${p.id})" style="cursor:pointer" title="Нажми чтобы изменить профу" class="text-slate-400 text-xs">${(p.profas && p.profas.length > 0 ? p.profas : (p.profa && p.profa !== '—' ? [p.profa] : [])).map((pf,i) => `<span style="display:inline-flex;align-items:center;gap:5px;background:#1e2530;border-radius:6px;padding:4px 9px;margin-right:4px;${i===0?'color:#a5b4fc':'color:#64748b'}">${profaIconHtml(pf, 22)}<span onclick="event.stopPropagation();showProfaInfo(this.dataset.pf)" data-pf="${pf}" style="cursor:help;color:#475569;font-size:9px;margin-left:8px;padding:2px 4px">?</span></span>`).join('') || '<span style="color:#6366f155;font-size:11px;border:1px dashed #2d3748;padding:3px 8px;border-radius:6px">+ профа</span>'}</td>
                     <td onclick="event.stopPropagation()"><span class="pac-tag" onclick="event.stopPropagation();openPackFromRoster('${p.id}')" title="Нажми чтобы изменить пак" style="cursor:pointer" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='';this.style.color=''">${p.pac}</span></td>
                     <td class="${p.attendance < 50 ? 'text-red-400' : p.attendance < 70 ? 'text-yellow-400' : 'text-emerald-400'} font-bold">${totalDates > 0 ? p.attendance + '%' : '—'}</td>
                     <td onclick="event.stopPropagation()">
@@ -4303,11 +4307,11 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             if (!modal) {
                 modal = document.createElement('div');
                 modal.id = 'profaInfoModal';
-                modal.className = 'info-modal-overlay';
-                modal.addEventListener('click', function(e) { if(e.target===modal) modal.classList.remove('open'); });
+                modal.className = "info-modal-overlay";
+                
                 document.body.appendChild(modal);
             }
-            modal.innerHTML = '<div class="info-modal-bg"></div><div class="info-modal-box"><button class="info-modal-close" onclick="this.closest(\'.info-modal-overlay\').classList.remove(\'open\')">✕</button><div class="info-modal-icon">🎭</div><div class="info-modal-title">' + (info.short || profa) + '</div><div class="info-modal-sub">' + profa + ' · ' + info.role + '</div><div class="info-modal-body">' + bodyHtml + '</div></div>';
+            modal.innerHTML = '<div class="info-modal-bg" onclick="document.getElementById(\'profaInfoModal\').classList.remove(\'open\')"></div><div class="info-modal-box"><button class="info-modal-close" onclick="this.closest(\'.info-modal-overlay\').classList.remove(\'open\')">✕</button><div class="info-modal-icon">🎭</div><div class="info-modal-title">' + (info.short || profa) + '</div><div class="info-modal-sub">' + profa + ' · ' + info.role + '</div><div class="info-modal-body">' + bodyHtml + '</div></div>';
             modal.classList.add('open');
         }
 
@@ -5825,6 +5829,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
 
             // Поисковый запрос
             const searchQ = (document.getElementById('kmHistorySearch')?.value || '').toLowerCase().trim();
+            const searchQAlt = switchKeyboardLayout(searchQ);
 
             // Собираем все даты: из отмеченных событий И из применённых снапшотов
             const datesFromEvents = Object.keys(eventStatuses).map(k => k.split('|')[0]);
@@ -5852,9 +5857,9 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                         if (!p.name) return false;
                         const n = p.name.toLowerCase();
                         const resolved = resolveAlias(p.name).toLowerCase();
-                        return n.includes(searchQ) || resolved.includes(searchQ);
+                        return n.includes(searchQ) || resolved.includes(searchQ) || (searchQAlt && (n.includes(searchQAlt) || resolved.includes(searchQAlt)));
                     });
-                    const matchInLeaders = cmdCh.some(c => c.leader && c.leader.toLowerCase().includes(searchQ));
+                    const matchInLeaders = cmdCh.some(c => c.leader && c.leader.toLowerCase().includes(searchQ) || (searchQAlt && c.leader.toLowerCase().includes(searchQAlt)));
                     if (!matchInPlayers && !matchInLeaders) return '';
                 }
                 const [y,m,d] = dateStr.split('-');
@@ -6095,7 +6100,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                         if (!p.name) return false;
                         const n = p.name.toLowerCase();
                         const resolved = resolveAlias(p.name).toLowerCase();
-                        return n.includes(searchQ) || resolved.includes(searchQ);
+                        return n.includes(searchQ) || resolved.includes(searchQ) || (searchQAlt && (n.includes(searchQAlt) || resolved.includes(searchQAlt)));
                     });
                     if (foundPlayers.length > 0) {
                         searchHighlightHtml = `<div style="background:#6366f111;border:1px solid #6366f133;border-radius:10px;padding:12px 16px;margin-bottom:12px">
@@ -7273,6 +7278,29 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
 
 
         // ===== DEBOUNCE UTILITY =====
+        // ===== ПЕРЕКЛЮЧЕНИЕ РАСКЛАДКИ КЛАВИАТУРЫ =====
+        function switchKeyboardLayout(str) {
+            if (!str) return '';
+            const en = "qwertyuiop[]asdfghjkl;'zxcvbnm,.`";
+            const ru = "йцукенгшщзхъфывапролджэячсмитьбюё";
+            const EN = en.toUpperCase();
+            const RU = ru.toUpperCase();
+            let result = '', switched = false;
+            for (let i = 0; i < str.length; i++) {
+                const c = str[i];
+                let idx = ru.indexOf(c);
+                if (idx >= 0) { result += en[idx]; switched = true; continue; }
+                idx = RU.indexOf(c);
+                if (idx >= 0) { result += EN[idx]; switched = true; continue; }
+                idx = en.indexOf(c);
+                if (idx >= 0) { result += ru[idx]; switched = true; continue; }
+                idx = EN.indexOf(c);
+                if (idx >= 0) { result += RU[idx]; switched = true; continue; }
+                result += c;
+            }
+            return switched ? result : '';
+        }
+
         function debounce(fn, ms) {
             let timer;
             return function(...args) { clearTimeout(timer); timer = setTimeout(() => fn.apply(this, args), ms); };
