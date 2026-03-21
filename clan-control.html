@@ -1931,6 +1931,12 @@
 
         // ===== ВСПОМОГАТЕЛЬНЫЕ =====
         function showPage(pageId) {
+            // Закрываем все всплывающие окна при смене страницы
+            document.getElementById('similarNicksOverlay')?.remove();
+            document.getElementById('dupesOverlay')?.remove();
+            document.getElementById('attentionListModal')?.remove();
+            document.querySelectorAll('.info-modal-overlay').forEach(m => m.classList.remove('open'));
+            
             document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById('page-' + pageId).classList.add('active');
@@ -5647,6 +5653,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             const overlay = document.createElement('div');
             overlay.id = 'similarNicksOverlay';
             overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+            overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
 
             const rowsHtml = pairs.map(({a, b, dist}) => {
                 // Найти в каком паке/лидере каждый игрок на последнем КМ
@@ -5779,6 +5786,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             const overlay = document.createElement('div');
             overlay.id = 'dupesOverlay';
             overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+            overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
 
             if (dupes.length === 0) {
                 overlay.innerHTML = `
