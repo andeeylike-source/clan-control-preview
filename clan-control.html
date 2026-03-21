@@ -5499,7 +5499,32 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 // 1. Резолвим через алиас
                 const resolvedName = resolveAlias(p.name);
                 const normKey = normalizeNick(resolvedName);
-                const existing = roster.find(r => normalizeNick(r.name) === normKey);
+                let existing = roster.find(r => normalizeNick(r.name) === normKey);
+
+                // 2. Если не нашли — fuzzy match (отличие в 1-2 символа)
+                if (!existing && normKey.length > 3) {
+                    for (const r of roster) {
+                        const rn = normalizeNick(r.name);
+                        if (rn.length > 3 && Math.abs(rn.length - normKey.length) <= 2) {
+                            let diff = 0;
+                            const shorter = rn.length < normKey.length ? rn : normKey;
+                            const longer = rn.length < normKey.length ? normKey : rn;
+                            for (let ci = 0; ci < shorter.length; ci++) {
+                                if (shorter[ci] !== longer[ci]) diff++;
+                            }
+                            diff += longer.length - shorter.length;
+                            if (diff <= 2 && diff > 0) {
+                                existing = r;
+                                // Автоматически создаём алиас
+                                nickAliases[p.name.toLowerCase()] = r.name;
+                                nickAliases[p.name] = r.name;
+                                p.name = r.name; // Исправляем имя в данных
+                                console.log('Fuzzy match: ' + resolvedName + ' → ' + r.name);
+                                break;
+                            }
+                        }
+                    }
+                }
 
                 // Профа назначается ТОЛЬКО через попап — здесь не трогаем
                 if (!existing) {
@@ -5545,22 +5570,13 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 });
             }
 
-            // ===== СОХРАНЯЕМ СНАПШОТ (статистика теперь считается на лету из снапшотов) =====
+            // ===== СОХРАНЯЕМ СНАПШОТ =====
             roster.forEach(p => { p.kills = 0; p.deaths = 0; p.pvp_dmg = 0; p.pve_dmg = 0; });
             const prevSnap = appliedStatsByDate[dateStr];
             let mergedPlayers = dayLastParsed.map(p => ({...p}));
             if (prevSnap && prevSnap.players) {
-                mergedPlayers = mergedPlayers.map(p => {
-                    const old = prevSnap.players.find(o => normalizeNick(o.name) === normalizeNick(p.name));
-                    if (!old) return p;
-                    return {
-                        ...p,
-                        kills:   Math.max(p.kills   || 0, old.kills   || 0),
-                        deaths:  Math.max(p.deaths  || 0, old.deaths  || 0),
-                        pvp_dmg: Math.max(p.pvp_dmg || 0, old.pvp_dmg || 0),
-                        pve_dmg: Math.max(p.pve_dmg || 0, old.pve_dmg || 0),
-                    };
-                });
+                // Новые данные ПЕРЕЗАПИСЫВАЮТ старые (не Math.max!)
+                // Из старых добавляем только тех кого нет в новом анализе
                 prevSnap.players.forEach(old => {
                     const exists = mergedPlayers.find(p => normalizeNick(p.name) === normalizeNick(old.name));
                     if (!exists) {
@@ -6330,7 +6346,8 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                                        : [];
 
                     const partyHtml = partyPlayers.length > 0 ? partyPlayers.map(p => {
-                        const inRoster = roster.find(r => normalizeNick(r.name) === normalizeNick(p.name));
+                        const resolvedN = resolveAlias(p.name);
+                        const inRoster = roster.find(r => normalizeNick(r.name) === normalizeNick(resolvedN) || normalizeNick(r.name) === normalizeNick(p.name));
                         const notInRoster = !inRoster;
                         const pacLabel = inRoster && inRoster.pac === 'СОЛО' ? 'соло' : (inRoster ? inRoster.pac : '');
                         const badgeHtml = notInRoster
