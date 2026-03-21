@@ -468,6 +468,7 @@
                 <div class="dash-card"><div class="dash-card-title">🏆 Топ-5 ценных</div><div id="dashTopValue"></div></div>
                 <div class="dash-card"><div class="dash-card-title">📈 Растут</div><div id="dashTopGrowing"></div></div>
                 <div class="dash-card"><div class="dash-card-title">📉 Падают</div><div id="dashTopFalling"></div></div>
+                <div class="dash-card"><div class="dash-card-title">💎 Редкие таланты</div><div style="font-size:10px;color:#475569;margin-bottom:6px">Играют редко, но показывают отличные результаты</div><div id="dashRareGems"></div></div>
             </div>
         </section>
 
@@ -4011,7 +4012,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
             let hash = len;
             for (let i = 0; i < head.length; i++) hash = ((hash << 5) - hash + head.charCodeAt(i)) | 0;
             for (let i = 0; i < tail.length; i++) hash = ((hash << 5) - hash + tail.charCodeAt(i)) | 0;
-            return 'sh4_' + Math.abs(hash).toString(36) + '_' + len;
+            return 'sh6_' + Math.abs(hash).toString(36) + '_' + len;
         }
         function getScreenshotCache() {
             try { return JSON.parse(localStorage.getItem('cc_screenshot_cache') || '{}'); } catch(e) { return {}; }
@@ -4789,7 +4790,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
 ОКНО "КОМАНДНЫЙ КАНАЛ" — определяй строго по содержимому:
 - Заголовок: "Командный канал"
 - Строка "Состав: N груп. / N чел. / N рядом"
-- Таблица: Лидер | 👥 | × | 💀 | PvP урон | PvE урон
+- Таблица: Лидер | 👥 | ⚔️ kills | 💀 deaths | PvP урон | PvE урон
 
 СТРОГО БЕРИ ДАННЫЕ ТОЛЬКО ИЗ ТАБЛИЦ ЭТИХ ДВУХ ОКОН. Любой текст вне окон — игнорируй.
 
@@ -4917,7 +4918,9 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     // Сохраняем raid_total и command_channel с первого скриншота
                     if (i === 0 && parsed.raid_total) {
                         expectedTotal = parsed.raid_total;
-                        if (parsed.command_channel) commandChannel = parsed.command_channel;
+                        if (parsed.command_channel) {
+                            commandChannel = parsed.command_channel;
+                        }
                         console.log(`Командный канал: ожидается ${expectedTotal} игроков`, commandChannel);
                     }
                     // Санитизация pack_name — если похоже на фоновый текст, берём лидера
@@ -4999,6 +5002,44 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                     console.warn(`Скриншот ${i+1} ошибка:`, e.message);
                     if (!firstError) firstError = e.message;
                 }
+            }
+
+            // ===== АВТОКОРРЕКЦИЯ: свопаем kills/deaths по пакам если не совпадают с КК =====
+            if (commandChannel.length > 0 && Object.keys(screenPlayersMap).length > 0) {
+                commandChannel.forEach(cc => {
+                    // Ищем пак по лидеру
+                    const packName = Object.keys(screenPlayersMap).find(pk => {
+                        const leader = packLeaders[pk];
+                        return leader && normalizeNick(leader) === normalizeNick(cc.leader);
+                    });
+                    if (!packName) return;
+                    const players = screenPlayersMap[packName];
+                    if (!players || players.length === 0) return;
+                    
+                    const sumK = players.reduce((s,p) => s + (p.kills||0), 0);
+                    const sumD = players.reduce((s,p) => s + (p.deaths||0), 0);
+                    const ccK = cc.kills || 0;
+                    const ccD = cc.deaths || 0;
+                    
+                    // Если сумма пака примерно совпадает с КК при свопе — свопаем
+                    const diffNormal = Math.abs(sumK - ccK) + Math.abs(sumD - ccD);
+                    const diffSwapped = Math.abs(sumD - ccK) + Math.abs(sumK - ccD);
+                    
+                    if (diffSwapped < diffNormal * 0.5 && diffNormal > 10) {
+                        console.warn('Пак ' + packName + ': свопаю kills/deaths (сумма пака: ' + sumK + '/' + sumD + ', КК: ' + ccK + '/' + ccD + ')');
+                        players.forEach(p => {
+                            const tmp = p.kills; p.kills = p.deaths; p.deaths = tmp;
+                        });
+                        // Также обновляем allPlayers
+                        players.forEach(p => {
+                            const key = p.name.toLowerCase();
+                            if (allPlayers[key]) {
+                                allPlayers[key].kills = Math.max(allPlayers[key].kills||0, p.kills||0);
+                                allPlayers[key].deaths = Math.max(allPlayers[key].deaths||0, p.deaths||0);
+                            }
+                        });
+                    }
+                });
             }
 
             dayLastParsed = Object.values(allPlayers);
@@ -7727,6 +7768,38 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 rl(growEl, diffs.filter(g=>g.diff>0).sort((a,b)=>b.diff-a.diff), true);
                 rl(fallEl, diffs.filter(g=>g.diff<0).sort((a,b)=>a.diff-b.diff), false);
             } else { if(growEl) growEl.innerHTML='<div style="color:#475569;font-size:12px">Нужно 2+ КМ</div>'; if(fallEl) fallEl.innerHTML='<div style="color:#475569;font-size:12px">Нужно 2+ КМ</div>'; }
+
+            // Редкие таланты — играют редко (<50% явки) но показывают высокие результаты на КМ
+            const gemsEl = document.getElementById('dashRareGems');
+            if (gemsEl && allDates.length >= 2) {
+                const allValues = calcAllPlayerValues();
+                const gems = roster.map(p => {
+                    const nk = normalizeNick(p.name);
+                    const vd = allValues[nk];
+                    if (!vd || vd.kmCount === 0) return null;
+                    const att = vd.attendance;
+                    const avgScore = vd.avgKmScore;
+                    // Редкий талант: явка < 50%, но КМ-скор > 60 (выше среднего когда играет)
+                    if (att < 50 && att > 0 && avgScore > 60 && vd.kmCount >= 1) {
+                        return { name: p.name, att, avgScore, kmCount: vd.kmCount, value: vd.value };
+                    }
+                    return null;
+                }).filter(Boolean).sort((a, b) => b.avgScore - a.avgScore);
+
+                if (gems.length > 0) {
+                    gemsEl.innerHTML = gems.slice(0, 5).map((g, i) => {
+                        return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #1e2530;cursor:pointer;font-size:13px" onclick="openPlayerProfile(\'' + g.name.replace(/'/g, "\\'") + '\')">' +
+                            '<span style="font-weight:700;color:#e2e8f0;flex:1">' + g.name + '</span>' +
+                            '<span style="font-size:10px;color:#f59e0b" title="Явка">' + g.att + '%</span>' +
+                            '<span style="font-size:10px;color:#a5b4fc" title="Средний КМ-скор">' + g.avgScore + ' скор</span>' +
+                            '</div>';
+                    }).join('');
+                } else {
+                    gemsEl.innerHTML = '<div style="color:#475569;font-size:12px;padding:8px 0">—</div>';
+                }
+            } else if (gemsEl) {
+                gemsEl.innerHTML = '<div style="color:#475569;font-size:12px">Нужно 2+ КМ</div>';
+            }
         }
 
         // ===== НАСТРОЙКИ ВЕСОВ ЦЕННОСТИ (UI) =====
