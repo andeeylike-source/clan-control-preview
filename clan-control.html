@@ -759,59 +759,18 @@
                     <option value="ПЛ">ПЛ</option>
                     <option value="ИГРОК">Игрок</option>
                 </select>
-                <select id="pProfa" class="input-dark" onchange="addProfaFromSelect(this)">
-                    <option value="">+ Добавить профу...</option>
-                    <optgroup label="🔵 Маги">
-                        <option value="Archmage">Archmage (Сорк)</option>
-                        <option value="Mystic Muse">Mystic Muse (ММ)</option>
-                        <option value="Storm Screamer">Storm Screamer (СХ)</option>
-                        <option value="Soultaker">Soultaker (Некр)</option>
-                        <option value="Arcana Lord">Arcana Lord (Кот)</option>
-                        <option value="Elemental Master">Elemental Master (Конь)</option>
-                        <option value="Spectral Master">Spectral Master (Суммон)</option>
-                    </optgroup>
-                    <optgroup label="💚 Поддержка">
-                        <option value="Cardinal">Cardinal (Биш)</option>
-                        <option value="Eva's Saint (EE)">Eva's Saint (ЕЕ)</option>
-                        <option value="Shillien Saint (SE)">Shillien Saint (СЕ)</option>
-                        <option value="Dominator">Dominator (Овер)</option>
-                        <option value="Doomcryer">Doomcryer (Варк)</option>
-                        <option value="Hierophant">Hierophant (ПП)</option>
-                        <option value="Sword Muse">Sword Muse (СВС)</option>
-                        <option value="Spectral Dancer">Spectral Dancer (БД)</option>
-                    </optgroup>
-                    <optgroup label="🏹 Лучники">
-                        <option value="Sagittarius">Sagittarius (Хавк)</option>
-                        <option value="Moonlight Sentinel">Moonlight Sentinel (Сырок)</option>
-                        <option value="Ghost Sentinel">Ghost Sentinel (ФР)</option>
-                    </optgroup>
-                    <optgroup label="🗡️ Кинжалы">
-                        <option value="Adventurer">Adventurer (ТХ)</option>
-                        <option value="Wind Rider">Wind Rider (ПВ)</option>
-                        <option value="Ghost Hunter">Ghost Hunter (АВ)</option>
-                        <option value="АВ/ПВ">АВ/ПВ (2ая профа)</option>
-                    </optgroup>
-                    <optgroup label="🛡️ Танки">
-                        <option value="Phoenix Knight">Phoenix Knight (Паладин)</option>
-                        <option value="Hell Knight">Hell Knight (ДА)</option>
-                        <option value="Eva's Templar">Eva's Templar (ТК)</option>
-                        <option value="Shillien Templar">Shillien Templar (ШК)</option>
-                    </optgroup>
-                    <optgroup label="⚔️ Воины">
-                        <option value="Duelist">Duelist (Глад)</option>
-                        <option value="Dreadnought">Dreadnought (ВЛ)</option>
-                        <option value="Grand Khavatari">Grand Khavatari (Тир)</option>
-                        <option value="Titan">Titan (Дестр)</option>
-                        <option value="Fortune Seeker">Fortune Seeker (Спойл)</option>
-                        <option value="Maestro">Maestro (Крафтер)</option>
-                        <option value="Doombringer">Doombringer (Берс)</option>
-                        <option value="Judicator">Judicator (Джуд)</option>
-                    </optgroup>
-                    <optgroup label="🐾 Другие">
-                        <option value="Soulhound">Soulhound (СБ)</option>
-                        <option value="Trickster">Trickster (Арба)</option>
-                    </optgroup>
-                </select>
+                <div id="pProfaDropWrap" style="position:relative">
+                    <div onclick="toggleProfaDropdown()" class="input-dark" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">
+                        <span style="color:#64748b">+ Добавить профу...</span>
+                        <span style="color:#475569">▾</span>
+                    </div>
+                    <div id="pProfaDrop" style="display:none;position:absolute;top:100%;left:0;right:0;background:#12171f;border:1px solid #6366f1;border-radius:10px;z-index:60;max-height:350px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.7);margin-top:4px">
+                        <div style="padding:8px;border-bottom:1px solid #1e2530">
+                            <input id="pProfaSearch" type="text" placeholder="Поиск: биш, cardinal, епископ, хилер..." style="width:100%;background:#0b0e14;border:1px solid #2d3748;border-radius:8px;padding:8px 12px;color:#e2e8f0;font-size:13px;outline:none" oninput="filterProfaDropdown(this.value)">
+                        </div>
+                        <div id="pProfaList2" style="overflow-y:auto;max-height:290px"></div>
+                    </div>
+                </div>
                 <!-- Выбранные профы -->
                 <div id="pProfaList" style="display:flex;flex-wrap:wrap;gap:6px;min-height:24px"></div>
                 <select id="pPac" class="input-dark"></select>
@@ -1661,6 +1620,93 @@
                     ${profaIconHtml(pf, 16)}
                     <button onclick="removeProfaFromList(${i})" style="background:none;border:none;color:#475569;cursor:pointer;font-size:12px;padding:0;line-height:1" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#475569'">×</button>
                 </span>`).join('');
+        }
+
+        // ===== КАСТОМНЫЙ ДРОПДАУН ПРОФ С ПОИСКОМ =====
+        const PROFA_DROPDOWN_GROUPS = [
+            { label: '🔵 Маги', items: ['Archmage','Mystic Muse','Storm Screamer','Soultaker','Arcana Lord','Elemental Master','Spectral Master'] },
+            { label: '💚 Поддержка', items: ['Cardinal',"Eva's Saint (EE)","Shillien Saint (SE)",'Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'] },
+            { label: '🏹 Лучники', items: ['Sagittarius','Moonlight Sentinel','Ghost Sentinel'] },
+            { label: '🗡️ Кинжалы', items: ['Adventurer','Wind Rider','Ghost Hunter'] },
+            { label: '🛡️ Танки', items: ['Phoenix Knight','Hell Knight',"Eva's Templar",'Shillien Templar'] },
+            { label: '⚔️ Воины', items: ['Duelist','Dreadnought','Grand Khavatari','Titan','Fortune Seeker','Maestro','Doombringer','Judicator'] },
+            { label: '🐾 Другие', items: ['Soulhound','Trickster'] },
+        ];
+
+        function toggleProfaDropdown() {
+            const drop = document.getElementById('pProfaDrop');
+            if (drop.style.display === 'none') {
+                drop.style.display = 'block';
+                renderProfaDropdown('');
+                setTimeout(() => document.getElementById('pProfaSearch')?.focus(), 50);
+                // Close on outside click
+                setTimeout(() => document.addEventListener('click', _closeProfaDrop, true), 10);
+            } else {
+                drop.style.display = 'none';
+            }
+        }
+        function _closeProfaDrop(e) {
+            const wrap = document.getElementById('pProfaDropWrap');
+            if (wrap && !wrap.contains(e.target)) {
+                document.getElementById('pProfaDrop').style.display = 'none';
+                document.removeEventListener('click', _closeProfaDrop, true);
+            }
+        }
+
+        function filterProfaDropdown(query) {
+            renderProfaDropdown(query.toLowerCase().trim());
+        }
+
+        function renderProfaDropdown(q) {
+            const el = document.getElementById('pProfaList2');
+            if (!el) return;
+            const qAlt = switchKeyboardLayout(q);
+            let html = '';
+            PROFA_DROPDOWN_GROUPS.forEach(group => {
+                const matchedItems = group.items.filter(pf => {
+                    if (!q) return true;
+                    const info = PROFA_INFO[pf] || {};
+                    const searchable = [
+                        pf, info.ru||'', info.short||'', info.ru2||'', info.en2||'', info.role||''
+                    ].join(' ').toLowerCase();
+                    return searchable.includes(q) || (qAlt && searchable.includes(qAlt));
+                });
+                if (matchedItems.length === 0) return;
+                html += '<div style="padding:6px 12px;font-size:10px;font-weight:800;text-transform:uppercase;color:#475569;border-top:1px solid #1e2530">' + group.label + '</div>';
+                matchedItems.forEach(pf => {
+                    const info = PROFA_INFO[pf] || {};
+                    const icon = profaIconHtml(pf, 22);
+                    const shortName = info.short || '';
+                    const ruName = info.ru || '';
+                    const ru2 = info.ru2 || '';
+                    html += '<div onclick="selectProfaFromDrop(\'' + pf.replace(/'/g, "\\'") + '\')" style="display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid #1e253044;transition:background .1s" onmouseover="this.style.background=\'#6366f122\'" onmouseout="this.style.background=\'\'">';
+                    html += icon;
+                    html += '<div style="flex:1;min-width:0">';
+                    html += '<div style="font-size:13px;font-weight:700;color:#e2e8f0">' + pf + ' <span style="color:#f59e0b;font-size:11px">(' + shortName + ')</span></div>';
+                    html += '<div style="font-size:10px;color:#64748b">' + ruName + (ru2 ? ' · 2кл: ' + ru2 : '') + '</div>';
+                    html += '</div></div>';
+                });
+            });
+            if (!html) html = '<div style="padding:16px;text-align:center;color:#475569;font-size:12px">Ничего не найдено</div>';
+            el.innerHTML = html;
+        }
+
+        function selectProfaFromDrop(profa) {
+            document.getElementById('pProfaDrop').style.display = 'none';
+            document.getElementById('pProfaSearch').value = '';
+            document.removeEventListener('click', _closeProfaDrop, true);
+            // Add to the profas list (same logic as old addProfaFromSelect)
+            const listEl = document.getElementById('pProfaList');
+            const existing = listEl.querySelectorAll('[data-profa]');
+            const already = Array.from(existing).some(el => el.dataset.profa === profa);
+            if (already) return;
+            const isFirst = existing.length === 0;
+            const chip = document.createElement('span');
+            chip.dataset.profa = profa;
+            chip.style.cssText = 'display:inline-flex;align-items:center;gap:5px;background:#1e2530;border-radius:8px;padding:5px 10px;font-size:12px;color:#a5b4fc;border:1px solid ' + (isFirst ? '#6366f1' : '#2d3748');
+            const info = PROFA_INFO[profa] || {};
+            chip.innerHTML = (isFirst ? '<span style="font-size:9px;background:#6366f1;color:white;padding:1px 5px;border-radius:4px;font-weight:800">ОСНОВНАЯ</span> ' : '') + profaIconHtml(profa, 20) + ' ' + profa + ' (' + (info.short||'') + ') <span onclick="this.parentElement.remove()" style="cursor:pointer;color:#475569;margin-left:4px">×</span>';
+            listEl.appendChild(chip);
         }
 
         function addProfaFromSelect(sel) {
@@ -6118,10 +6164,10 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                                         }
                                     }
                                 }
-                                return `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="openPlayerProfile('${fp.name.replace(/'/g,"\'")}')">
+                                return `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
                                     ${profaHtml}
-                                    <span style="font-weight:800;font-size:15px;color:#e2e8f0">${fp.name}</span>
-                                    ${packLabel ? `<span style="font-size:10px;background:#1e2530;color:#94a3b8;padding:2px 8px;border-radius:4px">пак: ${packLabel}</span>` : ''}
+                                    <span style="font-weight:800;font-size:15px;color:#e2e8f0;cursor:pointer;border-bottom:1px dashed #475569" onclick="openPlayerProfile('${fp.name.replace(/'/g,"\'")}')">${fp.name}</span>
+                                    ${packLabel ? `<span onclick="event.stopPropagation();(function(){var cid='lc_${dateStr.replace(/-/g,'')}';var c=document.getElementById(cid);if(c){c.style.display='block';var tp=document.getElementById('tp_${dateStr.replace(/-/g,'')}');if(tp)tp.style.display='none';var btn=document.getElementById('lb_${dateStr.replace(/-/g,'')}');if(btn)btn.textContent='▲ Скрыть паки';kmOpenPacksState[cid]=true;setTimeout(function(){var items=c.querySelectorAll('[onclick*=openPlayerProfile]');c.scrollIntoView({behavior:'smooth',block:'center'});},100)}})()" style="font-size:10px;background:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;cursor:pointer;border:1px solid #2563eb44" title="Нажми чтобы раскрыть пак">📦 пак: ${packLabel}</span>` : ''}
                                     <div style="display:flex;gap:16px;font-size:14px;font-weight:700">
                                         <span style="color:#f59e0b">⚔️ ${fp.kills||0}</span>
                                         <span style="color:#ef4444">💀 ${fp.deaths||0}</span>
