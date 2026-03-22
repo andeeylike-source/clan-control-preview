@@ -2272,7 +2272,16 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                 );
                 const inProfaStat = !activeProfaForProfile
                     || allProfasList.length <= 1
-                    || (assignedProfa ? profaMatches : false);
+                    || (function() {
+                        // Если есть явный оверрайд — проверяем его
+                        if (assignedProfa) return profaMatches;
+                        // Нет оверрайда — проверяем kmProfa (включает fallback на ростер)
+                        if (!kmProfa) return false;
+                        const nkp = kmProfa.toLowerCase().trim();
+                        return nkp === normActive ||
+                            nkp.includes(normActive.split(' (')[0].toLowerCase()) ||
+                            normActive.includes(nkp.split(' (')[0].toLowerCase());
+                    })();
                 return {
                     date: d,
                     present: wasPresent,          // для явки — всегда
@@ -2515,9 +2524,19 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                             ${player.pac && player.pac !== 'СОЛО' ? `<span class="pac-tag">${player.pac}</span>` : '<span style="font-size:10px;color:#475569;background:#1e2530;padding:2px 8px;border-radius:4px">СОЛО</span>'}
                             ${allProfasList.map((pf,i) => {
                                 const kmCount = allDates.filter(d => {
-                                    const ap = playerProfaByDate[normKey] && playerProfaByDate[normKey][d];
-                                    if (!ap) return false;
-                                    const a = ap.toLowerCase().trim(), b = pf.toLowerCase().trim();
+                                    // Проверяем что игрок был на этом КМ
+                                    const snap = appliedStatsByDate[d];
+                                    if (!snap || !snap.players) return false;
+                                    const wasPresent = snap.players.some(sp => normalizeNick(sp.name) === normKey || normalizeNick(resolveAlias(sp.name)) === normKey);
+                                    if (!wasPresent) return false;
+                                    // Какая профа на этот КМ?
+                                    let dayProfa = playerProfaByDate[normKey] && playerProfaByDate[normKey][d];
+                                    if (!dayProfa) {
+                                        // Нет явного оверрайда — пробуем из ростера (основная профа)
+                                        dayProfa = player.profa;
+                                    }
+                                    if (!dayProfa || dayProfa === '—') return false;
+                                    const a = dayProfa.toLowerCase().trim(), b = pf.toLowerCase().trim();
                                     return a === b || a.includes(b.split(' (')[0].toLowerCase()) || b.includes(a.split(' (')[0].toLowerCase());
                                 }).length;
                                 const countLabel = kmCount > 0 ? `<span style="font-size:9px;background:#6366f133;padding:1px 5px;border-radius:3px;margin-left:2px;color:#a5b4fc">${kmCount} КМ</span>` : `<span style="font-size:9px;color:#475569;margin-left:2px">0 КМ</span>`;
@@ -2907,7 +2926,7 @@ function getClass2IconByClass3(c3) { return CLASS3_TO_CLASS2_ICON[c3] || null; }
                                             if (normalizeNick(k) === normKey && playerProfaByDate[k][d]) { kmProfa = playerProfaByDate[k][d]; break; }
                                         }
                                     }
-                                    if (!kmProfa) kmProfa = pf; // default
+                                    if (!kmProfa) kmProfa = player.profa || pf; // fallback на ростерную профу
                                     const normKm = kmProfa.toLowerCase().trim();
                                     if (normKm === normPf || normKm.includes(normPf.split(' (')[0].toLowerCase()) || normPf.includes(normKm.split(' (')[0].toLowerCase())) {
                                         kills += me.kills||0;
