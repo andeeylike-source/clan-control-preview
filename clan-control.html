@@ -1735,11 +1735,45 @@
                 profas,
                 pac: document.getElementById('pPac').value
             };
+
+
+
+
+
             if(id) {
                 const idx = roster.findIndex(p => p.id == id);
                 const wasNew = roster[idx].isNew;
+                const oldName = roster[idx].name;
                 roster[idx] = { ...roster[idx], ...data };
                 if (wasNew && data.pac && data.pac !== 'СОЛО') roster[idx].isNew = false;
+                // Если имя изменилось — синхронизируем историю КМ
+                if (oldName && name && oldName !== name) {
+                    nickAliases[oldName.toLowerCase()] = name;
+                    nickAliases[normalizeNick(oldName)] = name;
+                    Object.values(appliedStatsByDate).forEach(function(snap) {
+                        (snap.players || []).forEach(function(p) {
+                            if (p.name && p.name.toLowerCase() === oldName.toLowerCase()) p.name = name;
+                            if (p._rawName && p._rawName.toLowerCase() === oldName.toLowerCase()) p._rawName = name;
+                        });
+                        Object.values(snap.screenPlayersMap || {}).forEach(function(arr) {
+                            arr.forEach(function(p) {
+                                if (p.name && p.name.toLowerCase() === oldName.toLowerCase()) p.name = name;
+                            });
+                        });
+                        Object.keys(snap.packLeaders || {}).forEach(function(k) {
+                            if (snap.packLeaders[k] && snap.packLeaders[k].toLowerCase() === oldName.toLowerCase()) snap.packLeaders[k] = name;
+                        });
+                        (snap.commandChannel || []).forEach(function(cc) {
+                            if (cc.leader && cc.leader.toLowerCase() === oldName.toLowerCase()) cc.leader = name;
+                        });
+                    });
+                    const oldKey = normalizeNick(oldName);
+                    const newKey = normalizeNick(name);
+                    if (playerProfaByDate[oldKey]) {
+                        playerProfaByDate[newKey] = { ...(playerProfaByDate[newKey]||{}), ...playerProfaByDate[oldKey] };
+                        delete playerProfaByDate[oldKey];
+                    }
+                }
             } else {
                 roster.push({ id: Date.now(), ...data, attendance: 0 });
             }
@@ -4344,7 +4378,7 @@ function getClass2IconByClass3(c3) {
             'Storm Screamer': { ru:'Повелитель Бури', short:'СХ', ru2:'Заклинатель Ветра', en2:'Spellhowler', role:'Маг' },
             'Soultaker': { ru:'Пожиратель Душ', short:'Некр', ru2:'Некромант', en2:'Necromancer', role:'Маг' },
             'Arcana Lord': { ru:'Чернокнижник', short:'Кот', ru2:'Чернокнижник', en2:'Warlock', role:'Маг' },
-            'Elemental Master': { ru:'Повелитель Элементалей', short:'Конь', ru2:'Призыватель', en2:'Elemental Summoner', role:'Маг' },
+            'Elemental Master': { ru:'Повелитель Элементалей', short:'Конь', ru2:'Призыватель/Последователь Стихий', en2:'Elemental Summoner', role:'Маг' },
             'Spectral Master': { ru:'Призрачный Лорд', short:'ФС', ru2:'Последователь Тьмы', en2:'Phantom Summoner', role:'Маг' },
             'Cardinal': { ru:'Кардинал', short:'Биш', ru2:'Епископ', en2:'Bishop', role:'Хилер' },
             "Eva's Saint (EE)": { ru:'Мудрец Евы', short:'ЕЕ', ru2:'Мудрец Евы', en2:'Elven Elder', role:'Хилер' },
@@ -4368,7 +4402,7 @@ function getClass2IconByClass3(c3) {
             'Dreadnought': { ru:'Полководец', short:'ВЛ', ru2:'Копейщик', en2:'Warlord', role:'Воин' },
             'Grand Khavatari': { ru:'Аватар', short:'Тир', ru2:'Отшельник/Тиран', en2:'Tyrant', role:'Воин' },
             'Titan': { ru:'Титан', short:'Дестр', ru2:'Разрушитель', en2:'Destroyer', role:'Воин' },
-            'Fortune Seeker': { ru:'Кладоискатель', short:'Спойл', ru2:'Собиратель', en2:'Bounty Hunter', role:'Гном' },
+            'Fortune Seeker': { ru:'Кладоискатель', short:'Спойл', ru2:'Собиратель/Охотник за наградой', en2:'Bounty Hunter', role:'Гном' },
             'Maestro': { ru:'Маэстро', short:'Крафтер', ru2:'Кузнец', en2:'Warsmith', role:'Гном' },
             'Doombringer': { ru:'Разрушитель', short:'Берс', ru2:'Берсерк', en2:'Berserker', role:'Камаэль' },
             'Judicator': { ru:'Инспектор', short:'Джуд', ru2:'Инспектор', en2:'Inspector', role:'Камаэль' },
@@ -7742,18 +7776,32 @@ function getClass2IconByClass3(c3) {
             if (btn) btn.textContent = '▲ Скрыть паки';
             kmOpenPacksState[cid] = true;
 
-            // Expand ALL individual pack sections (they have display:none;padding:8px)
-            const packSections = c.querySelectorAll('div[style*="display:none"][style*="padding:8px"]');
-            packSections.forEach(function(sec) {
-                sec.style.display = 'block';
-                // Update arrow
-                const header = sec.previousElementSibling;
-                if (header) { const arr = header.querySelector('.arr'); if (arr) arr.textContent = '▲'; }
-            });
-
-            // Find and highlight the player
+            // Find the pack section containing the player, open only that one
             setTimeout(function() {
                 const normTarget = normalizeNick(playerName);
+                // First pass: find which pack section contains the player
+                const allPackSections = c.querySelectorAll('div[style*="padding:8px"]');
+                let targetSection = null;
+                allPackSections.forEach(function(sec) {
+                    const links = sec.querySelectorAll('.player-nick-link');
+                    links.forEach(function(el) {
+                        if (normalizeNick(el.textContent.trim()) === normTarget) targetSection = sec;
+                    });
+                });
+                // Open only the target pack section
+                if (targetSection) {
+                    targetSection.style.display = 'block';
+                    const header = targetSection.previousElementSibling;
+                    if (header) { const arr = header.querySelector('.arr'); if (arr) arr.textContent = '▲'; }
+                } else {
+                    // Fallback: open all
+                    allPackSections.forEach(function(sec) {
+                        sec.style.display = 'block';
+                        const header = sec.previousElementSibling;
+                        if (header) { const arr = header.querySelector('.arr'); if (arr) arr.textContent = '▲'; }
+                    });
+                }
+
                 const links = c.querySelectorAll('.player-nick-link');
                 let found = null;
                 links.forEach(function(el) {
