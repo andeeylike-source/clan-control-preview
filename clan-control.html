@@ -1698,18 +1698,11 @@
             document.getElementById('pProfaDrop').style.display = 'none';
             document.getElementById('pProfaSearch').value = '';
             document.removeEventListener('click', _closeProfaDrop, true);
-            // Add to the profas list (same logic as old addProfaFromSelect)
-            const listEl = document.getElementById('pProfaList');
-            const existing = listEl.querySelectorAll('[data-profa]');
-            const already = Array.from(existing).some(el => el.dataset.profa === profa);
-            if (already) return;
-            const isFirst = existing.length === 0;
-            const chip = document.createElement('span');
-            chip.dataset.profa = profa;
-            chip.style.cssText = 'display:inline-flex;align-items:center;gap:5px;background:#1e2530;border-radius:8px;padding:5px 10px;font-size:12px;color:#a5b4fc;border:1px solid ' + (isFirst ? '#6366f1' : '#2d3748');
-            const info = PROFA_INFO[profa] || {};
-            chip.innerHTML = (isFirst ? '<span style="font-size:9px;background:#6366f1;color:white;padding:1px 5px;border-radius:4px;font-weight:800">ОСНОВНАЯ</span> ' : '') + profaIconHtml(profa, 20) + ' ' + profa + ' (' + (info.short||'') + ') <span onclick="this.parentElement.remove()" style="cursor:pointer;color:#475569;margin-left:4px">×</span>';
-            listEl.appendChild(chip);
+            // Добавляем в массив pProfaCurrent (который читает savePlayer)
+            if (!pProfaCurrent.includes(profa)) {
+                pProfaCurrent.push(profa);
+            }
+            renderPProfaList();
         }
 
         function addProfaFromSelect(sel) {
