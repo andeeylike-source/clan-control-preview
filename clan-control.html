@@ -221,22 +221,52 @@
         }
 
         /* =============================================
-           SEGMENTED TOGGLE
+           FLOAT TOGGLE
         ============================================= */
-        .seg-toggle {
+        .flip-toggle {
+            position: relative;
             display: inline-flex; align-items: center;
-            background: var(--bg3); border-radius: 9px;
-            padding: 3px; border: 1px solid var(--border); gap: 2px;
+            min-width: 74px; height: 34px;
+            padding: 3px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--bg3);
+            cursor: pointer;
+            transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
         }
-        .seg-toggle-btn {
-            background: none; border: none; border-radius: 6px;
-            padding: 5px 11px; font-size: 11px; font-weight: 700;
-            cursor: pointer; color: var(--text4);
-            transition: all 0.2s; font-family: 'Inter', sans-serif;
-            white-space: nowrap; letter-spacing: 0.02em;
+        .flip-toggle:hover { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(201,168,76,0.08); }
+        .flip-toggle-track {
+            position: absolute; inset: 3px;
+            border-radius: 7px;
+            background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+            pointer-events: none;
         }
-        .seg-toggle-btn.active { background: var(--accent); color: #080e0c; box-shadow: 0 1px 6px rgba(201,168,76,0.3); }
-        .seg-toggle-btn:not(.active):hover { color: var(--text2); background: var(--border); }
+        .flip-toggle-thumb {
+            position: absolute; top: 3px; left: 3px;
+            width: calc(50% - 3px); height: calc(100% - 6px);
+            border-radius: 7px;
+            background: var(--accent);
+            box-shadow: 0 1px 6px rgba(201,168,76,0.3);
+            transition: transform 0.22s ease;
+            pointer-events: none;
+        }
+        .flip-toggle[data-state="right"] .flip-toggle-thumb { transform: translateX(100%); }
+        .flip-toggle-option {
+            position: relative; z-index: 1;
+            width: 50%; height: 100%;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 800; letter-spacing: 0.02em;
+            color: var(--text4);
+            transition: color 0.2s;
+            user-select: none;
+            white-space: nowrap;
+        }
+        .flip-toggle[data-state="left"] .flip-toggle-option:first-child,
+        .flip-toggle[data-state="right"] .flip-toggle-option:last-child { color: #080e0c; }
+        .flip-toggle[data-state="left"] .flip-toggle-option:last-child,
+        .flip-toggle[data-state="right"] .flip-toggle-option:first-child { color: var(--text4); }
 
         /* =============================================
            LAYOUT
@@ -501,14 +531,18 @@
     <div class="login-line login-line-3"></div>
     <div class="login-wrap">
         <div class="login-top-bar">
-            <div class="seg-toggle">
-                <button class="seg-toggle-btn active" id="loginThemeDark" onclick="setTheme('dark')">🌙</button>
-                <button class="seg-toggle-btn" id="loginThemeLight" onclick="setTheme('light')">☀️</button>
-            </div>
-            <div class="seg-toggle">
-                <button class="seg-toggle-btn active" id="loginLangRu" onclick="setLang('ru')">RU</button>
-                <button class="seg-toggle-btn" id="loginLangEn" onclick="setLang('en')">EN</button>
-            </div>
+            <button class="flip-toggle" id="loginThemeToggle" type="button" onclick="toggleTheme()" aria-label="Переключить тему">
+                <span class="flip-toggle-track"></span>
+                <span class="flip-toggle-thumb"></span>
+                <span class="flip-toggle-option">🌙</span>
+                <span class="flip-toggle-option">☀️</span>
+            </button>
+            <button class="flip-toggle" id="loginLangToggle" type="button" onclick="toggleLang()" aria-label="Переключить язык">
+                <span class="flip-toggle-track"></span>
+                <span class="flip-toggle-thumb"></span>
+                <span class="flip-toggle-option">RU</span>
+                <span class="flip-toggle-option">EN</span>
+            </button>
         </div>
         <div class="login-card">
             <div class="login-card-top-line"></div>
@@ -548,14 +582,18 @@
     <div class="topbar-right">
         <div class="topbar-clan" id="topbarClan" style="display:none"></div>
         <div class="topbar-divider"></div>
-        <div class="seg-toggle">
-            <button class="seg-toggle-btn active" id="themeDark" onclick="setTheme('dark')">🌙</button>
-            <button class="seg-toggle-btn" id="themeLight" onclick="setTheme('light')">☀️</button>
-        </div>
-        <div class="seg-toggle">
-            <button class="seg-toggle-btn active" id="langRu" onclick="setLang('ru')">RU</button>
-            <button class="seg-toggle-btn" id="langEn" onclick="setLang('en')">EN</button>
-        </div>
+        <button class="flip-toggle" id="themeToggle" type="button" onclick="toggleTheme()" aria-label="Переключить тему">
+            <span class="flip-toggle-track"></span>
+            <span class="flip-toggle-thumb"></span>
+            <span class="flip-toggle-option">🌙</span>
+            <span class="flip-toggle-option">☀️</span>
+        </button>
+        <button class="flip-toggle" id="langToggle" type="button" onclick="toggleLang()" aria-label="Переключить язык">
+            <span class="flip-toggle-track"></span>
+            <span class="flip-toggle-thumb"></span>
+            <span class="flip-toggle-option">RU</span>
+            <span class="flip-toggle-option">EN</span>
+        </button>
         <div class="topbar-divider"></div>
         <div class="topbar-icon-btn" onclick="showPage('settings')" title="Настройки">⚙️</div>
         <div class="topbar-user">
@@ -1088,21 +1126,37 @@
             };
             window._loginEmail = '';
 
+            function syncFlipToggle(ids, isRight) {
+                ids.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    el.dataset.state = isRight ? 'right' : 'left';
+                });
+            }
+
             window.setTheme = function(t) {
                 localStorage.setItem('cc_theme', t);
                 document.body.classList.toggle('light', t === 'light');
-                ['themeDark','loginThemeDark'].forEach(id => { const el = document.getElementById(id); if(el) el.classList.toggle('active', t==='dark'); });
-                ['themeLight','loginThemeLight'].forEach(id => { const el = document.getElementById(id); if(el) el.classList.toggle('active', t==='light'); });
+                syncFlipToggle(['themeToggle','loginThemeToggle'], t === 'light');
+            };
+
+            window.toggleTheme = function() {
+                const current = localStorage.getItem('cc_theme') || 'dark';
+                setTheme(current === 'dark' ? 'light' : 'dark');
             };
 
             window.setLang = function(l) {
                 localStorage.setItem('cc_lang', l);
                 const t = TEXTS[l] || TEXTS.ru;
-                ['langRu','loginLangRu'].forEach(id => { const el = document.getElementById(id); if(el) el.classList.toggle('active', l==='ru'); });
-                ['langEn','loginLangEn'].forEach(id => { const el = document.getElementById(id); if(el) el.classList.toggle('active', l==='en'); });
+                syncFlipToggle(['langToggle','loginLangToggle'], l === 'en');
                 const s = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
                 s('loginSubtitle', t.sub); s('loginEmailLabel', t.emailLabel); s('loginClanLabel', t.clanLabel);
                 s('loginBtnText1', t.btn1); s('loginBtnText2', t.btn2); s('loginHintText', t.hint1);
+            };
+
+            window.toggleLang = function() {
+                const current = localStorage.getItem('cc_lang') || 'ru';
+                setLang(current === 'ru' ? 'en' : 'ru');
             };
 
             window.loginGoStep2 = function() {
