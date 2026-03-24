@@ -8,10 +8,34 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         
+        :root {
+            --bg-primary: #0b0e14;
+            --bg-secondary: #12171f;
+            --bg-tertiary: #1a1f29;
+            --border-color: #1e2530;
+            --text-primary: #ffffff;
+            --text-muted: #94a3b8;
+            --accent: #14b8a6;
+            --accent-strong: #0d9488;
+            --accent-soft: #14b8a622;
+        }
+
+        body[data-theme="light"] {
+            --bg-primary: #eef3f1;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #ecf2ef;
+            --border-color: #c8d8d1;
+            --text-primary: #10231f;
+            --text-muted: #476c62;
+            --accent: #0f766e;
+            --accent-strong: #115e59;
+            --accent-soft: #0f766e1a;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #0b0e14;
-            color: #ffffff;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
             margin: 0;
             display: flex;
             height: 100vh;
@@ -20,8 +44,8 @@
 
         .sidebar {
             width: 240px;
-            background-color: #12171f;
-            border-right: 1px solid #1e2530;
+            background-color: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
             padding: 20px;
@@ -31,7 +55,7 @@
             flex: 1;
             padding: 40px;
             overflow-y: auto;
-            background: linear-gradient(135deg, #0b0e14 0%, #12171f 100%);
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
             visibility: hidden;
         }
         .main-content.ready {
@@ -44,16 +68,16 @@
             padding: 12px 16px;
             border-radius: 8px;
             margin-bottom: 8px;
-            color: #94a3b8;
+            color: var(--text-muted);
             text-decoration: none;
             transition: all 0.2s;
             cursor: pointer;
         }
 
-        .nav-item:hover { background-color: #1a1f29; color: #ffffff; }
-        .nav-item.active { background-color: #1e2530; color: #6366f1; font-weight: 600; }
+        .nav-item:hover { background-color: var(--bg-tertiary); color: var(--text-primary); }
+        .nav-item.active { background-color: var(--border-color); color: var(--accent); font-weight: 600; }
 
-        .card { background-color: #12171f; border: 1px solid #1e2530; border-radius: 12px; padding: 24px; }
+        .card { background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; }
 
         table { width: 100%; border-collapse: collapse; }
         th { color: #64748b; font-size: 11px; text-transform: uppercase; padding: 16px; text-align: left; border-bottom: 1px solid #1e2530; cursor: pointer; }
@@ -67,8 +91,8 @@
         .pac-tag { background: #1e2530; padding: 4px 12px; border-radius: 6px; font-size: 11px; color: #94a3b8; border: 1px solid #2d3748; text-transform: uppercase; }
         *:hover > .km-edit-btn, span:hover .km-edit-btn { opacity: 1 !important; }
 
-        .btn-primary { background-color: #6366f1; color: #ffffff; padding: 10px 20px; border-radius: 10px; font-weight: 600; transition: all 0.2s; border: none; cursor: pointer; }
-        .btn-primary:hover { background-color: #4f46e5; }
+        .btn-primary { background-color: var(--accent); color: #ffffff; padding: 10px 20px; border-radius: 10px; font-weight: 600; transition: all 0.2s; border: none; cursor: pointer; }
+        .btn-primary:hover { background-color: var(--accent-strong); }
 
         .modal-overlay {
             display: none;
@@ -83,8 +107,8 @@
 
         .input-dark {
             width: 100%;
-            background-color: #0b0e14;
-            border: 1px solid #1e2530;
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
             border-radius: 10px;
             padding: 12px;
             color: white;
@@ -92,7 +116,73 @@
             box-sizing: border-box;
         }
 
-        .input-dark:focus { border-color: #6366f1; }
+        .input-dark:focus { border-color: var(--accent); }
+
+        .auth-overlay {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at 20% 20%, #0b3b3426 0%, transparent 30%), linear-gradient(135deg, #05070a 0%, #0b1418 60%, #0f201d 100%);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .auth-overlay.open { display: flex; }
+        .auth-card {
+            width: min(480px, 94vw);
+            border-radius: 18px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 20px 60px rgba(0,0,0,.6), 0 0 0 1px #14b8a622 inset;
+            padding: 28px;
+        }
+        .auth-subtitle { color: var(--text-muted); font-size: 13px; margin-top: 6px; }
+        .auth-step { display: none; }
+        .auth-step.active { display: block; }
+        .status-hint {
+            margin-top: 12px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 12px;
+            border: 1px solid #14b8a655;
+            background: var(--accent-soft);
+            color: var(--text-primary);
+        }
+        .dual-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .toggle-switch {
+            position: relative;
+            width: 46px;
+            height: 24px;
+            border-radius: 30px;
+            background: #334155;
+            border: 1px solid #475569;
+            cursor: pointer;
+            transition: background .2s;
+            flex-shrink: 0;
+        }
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #fff;
+            transition: transform .2s;
+        }
+        .toggle-switch.active {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+        .toggle-switch.active::after { transform: translateX(22px); }
 
         .autocomplete-suggestions {
             position: absolute;
@@ -409,6 +499,31 @@
     </style>
 </head>
 <body>
+    <div id="authOverlay" class="auth-overlay">
+        <div class="auth-card">
+            <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#14b8a6;font-weight:800">Clan Control Secure Entry</div>
+            <h2 id="authTitle" style="font-size:28px;font-weight:900;margin:8px 0 0">Вход по email</h2>
+            <p id="authSubtitle" class="auth-subtitle">Шаг 1/2: введи email и получи magic-link.</p>
+
+            <div id="authStepEmail" class="auth-step active" style="margin-top:20px">
+                <input id="authEmailInput" type="email" class="input-dark" placeholder="name@example.com">
+                <button id="authSendBtn" onclick="sendMagicLink()" class="btn-primary" style="width:100%;margin-top:12px">Отправить ссылку</button>
+                <div id="authEmailStatus" class="status-hint" style="display:none"></div>
+            </div>
+
+            <div id="authStepConfirm" class="auth-step" style="margin-top:20px">
+                <div class="status-hint" id="authConfirmText">Мы отправили ссылку на <b id="authMaskedEmail"></b>. Открой почту и вернись сюда.</div>
+                <button onclick="confirmMagicLink()" class="btn-primary" style="width:100%;margin-top:12px">Я подтвердил вход</button>
+                <button onclick="resetAuthFlow()" style="width:100%;margin-top:8px;background:none;border:1px solid var(--border-color);color:var(--text-muted);padding:10px 14px;border-radius:10px;cursor:pointer">Изменить email</button>
+            </div>
+
+            <div id="clanNameBlock" class="auth-step" style="margin-top:20px">
+                <label for="clanNameInput" style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px">Название клана</label>
+                <input id="clanNameInput" type="text" class="input-dark" placeholder="Например: Night Owls">
+                <button onclick="saveClanNameAndFinish()" class="btn-primary" style="width:100%;margin-top:12px">Продолжить</button>
+            </div>
+        </div>
+    </div>
 
     <aside class="sidebar">
         <h2 class="text-blue-500 font-black text-xl tracking-tighter uppercase">Clan Control</h2>
@@ -428,6 +543,18 @@
         </nav>
         <div style="margin-top:auto;padding-top:12px;border-top:1px solid #1e2530;display:flex;flex-direction:column;gap:2px">
             <div style="font-size:9px;font-weight:800;color:#334155;text-transform:uppercase;letter-spacing:.1em;padding:4px 16px 4px">Система</div>
+            <div style="padding:8px 16px;display:flex;flex-direction:column;gap:8px">
+                <div class="dual-toggle">
+                    <span id="themeLabelLeft">🌙 Dark</span>
+                    <button id="themeToggle" class="toggle-switch active" type="button" onclick="toggleTheme()" aria-label="Theme toggle"></button>
+                    <span id="themeLabelRight">☀️ Light</span>
+                </div>
+                <div class="dual-toggle">
+                    <span>RU</span>
+                    <button id="langToggle" class="toggle-switch" type="button" onclick="toggleLanguage()" aria-label="Language toggle"></button>
+                    <span>EN</span>
+                </div>
+            </div>
             <div onclick="showPage('settings')" id="nav-settings" class="nav-item">⚙️ Настройки</div>
             <button onclick="exportData()" title="Скачать резервную копию всех данных" style="display:flex;align-items:center;gap:8px;background:none;border:none;color:#475569;border-radius:8px;padding:10px 16px;font-size:13px;cursor:pointer;transition:all .2s;width:100%;text-align:left;font-family:inherit" onmouseover="this.style.background='#1a1f29';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='#475569'">💾 Бэкап данных</button>
             <!-- Индикатор автосохранения -->
@@ -6906,6 +7033,11 @@ function getClass2IconByClass3(c3) {
 
         // ===== LOCAL STORAGE =====
         const LS_KEY = 'clanControl_v1';
+        const APP_PREFS_KEY = 'cc_ui_prefs_v1';
+        const AUTH_SESSION_KEY = 'cc_auth_session_v1';
+        const CLAN_NAME_KEY = 'cc_clan_name_v1';
+        let uiPrefs = { theme: 'dark', lang: 'ru' };
+        let authSession = { email: '', confirmedAt: '' };
 
         function saveToStorage() {
             // Показываем индикатор сохранения
@@ -6937,6 +7069,132 @@ function getClass2IconByClass3(c3) {
             } catch(e) {
                 console.warn('localStorage save failed:', e);
             }
+        }
+
+        function loadUiPrefs() {
+            try {
+                const raw = localStorage.getItem(APP_PREFS_KEY);
+                if (!raw) return;
+                const parsed = JSON.parse(raw);
+                uiPrefs.theme = parsed.theme === 'light' ? 'light' : 'dark';
+                uiPrefs.lang = parsed.lang === 'en' ? 'en' : 'ru';
+            } catch (e) {
+                console.warn('ui prefs load failed', e);
+            }
+        }
+        function persistUiPrefs() {
+            localStorage.setItem(APP_PREFS_KEY, JSON.stringify(uiPrefs));
+        }
+        function applyTheme() {
+            document.body.setAttribute('data-theme', uiPrefs.theme);
+            const isLight = uiPrefs.theme === 'light';
+            document.getElementById('themeToggle')?.classList.toggle('active', !isLight);
+        }
+        function applyLanguage() {
+            const isEn = uiPrefs.lang === 'en';
+            const title = document.querySelector('.sidebar h2');
+            if (title) title.textContent = 'Clan Control';
+            const settingsNav = document.getElementById('nav-settings');
+            if (settingsNav) settingsNav.innerHTML = isEn ? '⚙️ Settings' : '⚙️ Настройки';
+            const exportBtn = document.querySelector('button[onclick="exportData()"]');
+            if (exportBtn && exportBtn.title) {
+                exportBtn.title = isEn ? 'Download backup data' : 'Скачать резервную копию всех данных';
+            }
+            const authTitle = document.getElementById('authTitle');
+            const authSubtitle = document.getElementById('authSubtitle');
+            if (authTitle) authTitle.textContent = isEn ? 'Sign in by email' : 'Вход по email';
+            if (authSubtitle) authSubtitle.textContent = isEn
+                ? 'Step 1/2: enter email and get a magic link.'
+                : 'Шаг 1/2: введи email и получи magic-link.';
+            const authSendBtn = document.getElementById('authSendBtn');
+            if (authSendBtn) authSendBtn.textContent = isEn ? 'Send sign-in link' : 'Отправить ссылку';
+        }
+        function toggleTheme() {
+            uiPrefs.theme = uiPrefs.theme === 'dark' ? 'light' : 'dark';
+            applyTheme();
+            persistUiPrefs();
+        }
+        function toggleLanguage() {
+            uiPrefs.lang = uiPrefs.lang === 'ru' ? 'en' : 'ru';
+            document.getElementById('langToggle')?.classList.toggle('active', uiPrefs.lang === 'en');
+            applyLanguage();
+            persistUiPrefs();
+        }
+        function maskEmail(email) {
+            const [name, domain] = email.split('@');
+            if (!name || !domain) return email;
+            const visible = name.slice(0, 2);
+            return `${visible}${'*'.repeat(Math.max(1, name.length - 2))}@${domain}`;
+        }
+        function showAuthStep(stepId) {
+            ['authStepEmail', 'authStepConfirm', 'clanNameBlock'].forEach(id => {
+                document.getElementById(id)?.classList.toggle('active', id === stepId);
+            });
+        }
+        function sendMagicLink() {
+            const emailInput = document.getElementById('authEmailInput');
+            const status = document.getElementById('authEmailStatus');
+            const email = (emailInput?.value || '').trim().toLowerCase();
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                status.style.display = 'block';
+                status.textContent = uiPrefs.lang === 'en'
+                    ? 'Please enter a valid email.'
+                    : 'Введите корректный email.';
+                return;
+            }
+            authSession.email = email;
+            if (status) {
+                status.style.display = 'block';
+                status.textContent = uiPrefs.lang === 'en'
+                    ? 'Magic link sent. Check your mailbox.'
+                    : 'Ссылка отправлена. Проверь почту.';
+            }
+            const masked = document.getElementById('authMaskedEmail');
+            if (masked) masked.textContent = maskEmail(email);
+            showAuthStep('authStepConfirm');
+        }
+        function resetAuthFlow() {
+            showAuthStep('authStepEmail');
+        }
+        function finishAuth() {
+            document.getElementById('authOverlay')?.classList.remove('open');
+            const clanName = localStorage.getItem(CLAN_NAME_KEY);
+            const subtitle = document.getElementById('dashSubtitle');
+            if (subtitle && clanName) subtitle.textContent = `Клан: ${clanName}`;
+        }
+        function confirmMagicLink() {
+            authSession.confirmedAt = new Date().toISOString();
+            sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(authSession));
+            const clanName = localStorage.getItem(CLAN_NAME_KEY);
+            if (!clanName) {
+                showAuthStep('clanNameBlock');
+                return;
+            }
+            finishAuth();
+        }
+        function saveClanNameAndFinish() {
+            const input = document.getElementById('clanNameInput');
+            const clanName = (input?.value || '').trim();
+            if (!clanName) return;
+            localStorage.setItem(CLAN_NAME_KEY, clanName);
+            finishAuth();
+        }
+        function ensureAuthGate() {
+            const raw = sessionStorage.getItem(AUTH_SESSION_KEY);
+            if (raw) {
+                try {
+                    const data = JSON.parse(raw);
+                    if (data?.email && data?.confirmedAt) {
+                        authSession = data;
+                        finishAuth();
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('auth session parse failed', e);
+                }
+            }
+            document.getElementById('authOverlay')?.classList.add('open');
+            showAuthStep('authStepEmail');
         }
 
         function loadFromStorage() {
@@ -6985,6 +7243,21 @@ function getClass2IconByClass3(c3) {
             URL.revokeObjectURL(url);
         }
 
+        function validateImportFormat(d) {
+            if (!d || typeof d !== 'object') throw new Error('Неверный формат файла.');
+            if (!Array.isArray(d.roster)) throw new Error('Неверный формат: roster должен быть массивом.');
+            if (d.archive !== undefined && !Array.isArray(d.archive)) throw new Error('Неверный формат: archive должен быть массивом.');
+            if (d.packs !== undefined && !Array.isArray(d.packs)) throw new Error('Неверный формат: packs должен быть массивом.');
+            if (d.manualEvents !== undefined && !Array.isArray(d.manualEvents)) throw new Error('Неверный формат: manualEvents должен быть массивом.');
+            const objectKeys = ['eventStatuses', 'eventOverrides', 'nickAliases', 'exhaustedKeys', 'appliedStatsByDate', 'playerNotes', 'playerProfaByDate', 'valueWeights'];
+            objectKeys.forEach((key) => {
+                if (d[key] !== undefined && (typeof d[key] !== 'object' || Array.isArray(d[key]))) {
+                    throw new Error(`Неверный формат: ${key} должен быть объектом.`);
+                }
+            });
+            return true;
+        }
+
         function importData(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -6996,7 +7269,7 @@ function getClass2IconByClass3(c3) {
                 try {
                     const json = JSON.parse(e.target.result);
                     const d = json.data || json;
-                    if (!d.roster) throw new Error('Неверный формат — нет ростера');
+                    validateImportFormat(d);
                     showConfirm(
                         '📥 Импортировать данные?',
                         `Файл от ${json.exportedAt ? new Date(json.exportedAt).toLocaleString('ru-RU') : 'неизвестно'}. Игроков: ${d.roster.length}, КМ дней: ${Object.keys(d.appliedStatsByDate||{}).length}.\n\nТекущие данные будут заменены!`,
@@ -8395,6 +8668,10 @@ function getClass2IconByClass3(c3) {
         }
 
         window.onload = () => {
+            loadUiPrefs();
+            applyTheme();
+            applyLanguage();
+            document.getElementById('langToggle')?.classList.toggle('active', uiPrefs.lang === 'en');
             loadFromStorage();
             loadNotifySettings();
             loadActionLog();
@@ -8474,6 +8751,7 @@ function getClass2IconByClass3(c3) {
             document.querySelector('.main-content').classList.add('ready');
             // Показываем онбординг новым пользователям
             showOnboardingIfNeeded();
+            ensureAuthGate();
         };
     </script>
     <!-- DATE PICKER POPUP -->
