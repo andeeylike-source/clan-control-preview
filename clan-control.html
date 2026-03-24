@@ -34,20 +34,24 @@
         }
 
         body.light {
-            --bg:        #f0f4f1;
-            --bg2:       #ffffff;
-            --bg3:       #f6f9f7;
-            --bg4:       #edf3ef;
-            --border:    #d4e0d8;
-            --border2:   #b8ccbe;
-            --text:      #0d1a12;
-            --text2:     #1e3328;
-            --text3:     #4a7058;
-            --text4:     #6a9078;
-            --text5:     #9ab8a4;
-            --shadow:    rgba(0,0,0,0.08);
-            --glow:      rgba(201,168,76,0.05);
-            --input-bg:  #f6f9f7;
+            --bg:        #f3eadc;
+            --bg2:       #fbf4ea;
+            --bg3:       #f0e2cf;
+            --bg4:       #e7d3b6;
+            --border:    #c8ab7a;
+            --border2:   #a88755;
+            --text:      #2a1d10;
+            --text2:     #4b3420;
+            --text3:     #6e5232;
+            --text4:     #8c6b42;
+            --text5:     #b08d61;
+            --accent:    #b88a3c;
+            --accent-h:  #9c7128;
+            --accent-s:  #d8b16a;
+            --accent2-s: #3f8f5f;
+            --shadow:    rgba(74, 50, 20, 0.12);
+            --glow:      rgba(184,138,60,0.12);
+            --input-bg:  #fff8ef;
         }
 
         *, *::before, *::after { box-sizing: border-box; }
@@ -516,6 +520,41 @@
         .info-modal-close:hover { background: var(--border2); color: var(--text2); }
         .info-q-btn { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: var(--border); border: 1px solid var(--border2); color: var(--text5); font-size: 10px; font-weight: 900; cursor: pointer; transition: all .15s; flex-shrink: 0; margin-left: 5px; vertical-align: middle; font-family: monospace; line-height: 1; }
         .info-q-btn:hover { background: rgba(201,168,76,0.12); border-color: var(--accent); color: var(--accent-s); }
+    
+        body.light .text-slate-500,
+        body.light .text-slate-400,
+        body.light .text-slate-600 { color: var(--text3) !important; }
+
+        body.light .bg-slate-800,
+        body.light .bg-slate-700,
+        body.light .bg-slate-600 {
+            background: var(--bg3) !important;
+            color: var(--text) !important;
+            border-color: var(--border) !important;
+        }
+
+        body.light input,
+        body.light textarea,
+        body.light select {
+            color: var(--text) !important;
+            border-color: var(--border) !important;
+            background: var(--input-bg) !important;
+        }
+
+        body.light .topbar,
+        body.light #topbar,
+        body.light .sidebar,
+        body.light .dash-card,
+        body.light .card,
+        body.light .panel,
+        body.light .stat-card {
+            border-color: var(--border) !important;
+        }
+
+        body.light [style*="color:#475569"] { color: var(--text3) !important; }
+        body.light [style*="color:#94a3b8"] { color: var(--text3) !important; }
+        body.light [style*="color:#64748b"] { color: var(--text3) !important; }
+
     </style>
 </head>
 <body>
@@ -1120,10 +1159,132 @@
            UI — Login, Theme, Language
         ============================================= */
         (function() {
+            
             const TEXTS = {
-                ru: { sub: 'Инструмент офицера клана для отслеживания КМ-статистики', emailLabel: 'Введи email', clanLabel: 'Название клана', btn1: 'Продолжить →', btn2: 'Войти в Clan Control →', hint1: 'MVP — введи любой email' },
-                en: { sub: 'Clan officer toolkit for tracking war statistics', emailLabel: 'Enter your email', clanLabel: 'Clan name or tag', btn1: 'Continue →', btn2: 'Enter Clan Control →', hint1: 'MVP mode — enter any email' }
+                ru: {
+                    docTitle: 'Clan Control v12',
+                    loginSubtitle: 'Инструмент офицера клана для отслеживания КМ-статистики',
+                    emailLabel: 'Введи email',
+                    clanLabel: 'Название клана',
+                    btn1: 'Продолжить →',
+                    btn2: 'Войти в Clan Control →',
+                    hint1: 'MVP — введи любой email',
+                    hint2: 'Можно изменить позже в настройках',
+                    back: '← Назад',
+                    emailPlaceholder: 'your@email.com',
+                    clanPlaceholder: '[TAG] или название',
+                    topbarSettingsTitle: 'Настройки',
+                    topbarLogoutTitle: 'Выйти',
+                    themeAria: 'Переключить тему',
+                    langAria: 'Переключить язык'
+                },
+                en: {
+                    docTitle: 'Clan Control v12',
+                    loginSubtitle: 'Clan officer toolkit for tracking war statistics',
+                    emailLabel: 'Enter your email',
+                    clanLabel: 'Clan name',
+                    btn1: 'Continue →',
+                    btn2: 'Enter Clan Control →',
+                    hint1: 'MVP mode — enter any email',
+                    hint2: 'You can change this later in settings',
+                    back: '← Back',
+                    emailPlaceholder: 'your@email.com',
+                    clanPlaceholder: '[TAG] or clan name',
+                    topbarSettingsTitle: 'Settings',
+                    topbarLogoutTitle: 'Log out',
+                    themeAria: 'Toggle theme',
+                    langAria: 'Toggle language'
+                }
             };
+
+            const TEXT_NODE_MAP = {
+                en: {
+                    'Аналитика': 'Analytics',
+                    'Управление': 'Management',
+                    'Система': 'System',
+                    '🏠 Дашборд': '🏠 Dashboard',
+                    '📊 Статистика': '📊 Statistics',
+                    '📅 Календарь КМ': '📅 War Calendar',
+                    '📋 История КМ': '📋 War History',
+                    '👥 Клан': '👥 Clan',
+                    '⚔️ Рейд Паки': '⚔️ Raid Packs',
+                    '🗄️ Архив': '🗄️ Archive',
+                    '⚙️ Настройки': '⚙️ Settings',
+                    '💾 Бэкап данных': '💾 Backup data',
+                    'Сохранено': 'Saved',
+                    'Дашборд': 'Dashboard',
+                    '🔔 Предупреждения': '🔔 Warnings',
+                    '👁 Обратить внимание': '👁 Needs attention',
+                    '🏆 Топ-5 ценных': '🏆 Top 5 valuable',
+                    '📈 Растут': '📈 Rising',
+                    '📉 Падают': '📉 Falling',
+                    '💎 Редкие таланты': '💎 Rare talents',
+                    'Ходят редко, но когда приходят — играют лучше многих': 'They attend rarely, but when they do, they perform better than many others',
+                    'Календарь КМ': 'War Calendar',
+                    'прошло': 'past',
+                    'выполнено': 'done',
+                    'впереди': 'upcoming',
+                    '🔑 API ключи': '🔑 API keys',
+                    '🔗 Алиасы ников': '🔗 Nick aliases',
+                    'Настройки уведомления при завершении анализа скриншотов.': 'Notification settings after screenshot analysis is complete.',
+                    '+ Добавить ключ': '+ Add key',
+                    '💾 Сохранить ключи': '💾 Save keys',
+                    '🧪 Проверить': '🧪 Check',
+                    '🔄 Сбросить счётчик': '🔄 Reset counter',
+                    'Popup уведомление': 'Popup notification',
+                    'Звук уведомления': 'Sound notification',
+                    '239 игроков · 3 КМ': '239 players · 3 wars'
+                },
+                ru: {
+                    'Analytics': 'Аналитика',
+                    'Management': 'Управление',
+                    'System': 'Система',
+                    '🏠 Dashboard': '🏠 Дашборд',
+                    '📊 Statistics': '📊 Статистика',
+                    '📅 War Calendar': '📅 Календарь КМ',
+                    '📋 War History': '📋 История КМ',
+                    '👥 Clan': '👥 Клан',
+                    '⚔️ Raid Packs': '⚔️ Рейд Паки',
+                    '🗄️ Archive': '🗄️ Архив',
+                    '⚙️ Settings': '⚙️ Настройки',
+                    '💾 Backup data': '💾 Бэкап данных',
+                    'Saved': 'Сохранено',
+                    'Dashboard': 'Дашборд',
+                    '🔔 Warnings': '🔔 Предупреждения',
+                    '👁 Needs attention': '👁 Обратить внимание',
+                    '🏆 Top 5 valuable': '🏆 Топ-5 ценных',
+                    '📈 Rising': '📈 Растут',
+                    '📉 Falling': '📉 Падают',
+                    '💎 Rare talents': '💎 Редкие таланты',
+                    'They attend rarely, but when they do, they perform better than many others': 'Ходят редко, но когда приходят — играют лучше многих',
+                    'War Calendar': 'Календарь КМ',
+                    'past': 'прошло',
+                    'done': 'выполнено',
+                    'upcoming': 'впереди',
+                    '🔑 API keys': '🔑 API ключи',
+                    '🔗 Nick aliases': '🔗 Алиасы ников',
+                    'Notification settings after screenshot analysis is complete.': 'Настройки уведомления при завершении анализа скриншотов.',
+                    '+ Add key': '+ Добавить ключ',
+                    '💾 Save keys': '💾 Сохранить ключи',
+                    '🧪 Check': '🧪 Проверить',
+                    '🔄 Reset counter': '🔄 Сбросить счётчик',
+                    'Popup notification': 'Popup уведомление',
+                    'Sound notification': 'Звук уведомления',
+                    '239 players · 3 wars': '239 игроков · 3 КМ'
+                }
+            };
+
+            const ATTRIBUTE_MAP = {
+                ru: {
+                    loginEmailInput: { placeholder: 'your@email.com' },
+                    loginClanInput: { placeholder: '[TAG] или название' }
+                },
+                en: {
+                    loginEmailInput: { placeholder: 'your@email.com' },
+                    loginClanInput: { placeholder: '[TAG] or clan name' }
+                }
+            };
+
             window._loginEmail = '';
 
             function syncFlipToggle(ids, isRight) {
@@ -1132,6 +1293,85 @@
                     if (!el) return;
                     el.dataset.state = isRight ? 'right' : 'left';
                 });
+            }
+
+            function applyElementAttributes(lang) {
+                const attrMap = ATTRIBUTE_MAP[lang] || {};
+                Object.entries(attrMap).forEach(([id, attrs]) => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    Object.entries(attrs).forEach(([attr, value]) => el.setAttribute(attr, value));
+                });
+            }
+
+            function translateDirectTextNodes(root, lang) {
+                const map = TEXT_NODE_MAP[lang] || {};
+                const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+                    acceptNode(node) {
+                        if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                        const parent = node.parentElement;
+                        if (!parent) return NodeFilter.FILTER_REJECT;
+                        const tag = parent.tagName;
+                        if (['SCRIPT', 'STYLE', 'CODE', 'PRE'].includes(tag)) return NodeFilter.FILTER_REJECT;
+                        return NodeFilter.FILTER_ACCEPT;
+                    }
+                });
+                const nodes = [];
+                while (walker.nextNode()) nodes.push(walker.currentNode);
+                nodes.forEach(node => {
+                    const raw = node.nodeValue;
+                    const trimmed = raw.trim();
+                    if (!map[trimmed]) return;
+                    const leading = raw.match(/^\s*/)[0];
+                    const trailing = raw.match(/\s*$/)[0];
+                    node.nodeValue = leading + map[trimmed] + trailing;
+                });
+            }
+
+            function applyStaticTranslations(lang) {
+                const t = TEXTS[lang] || TEXTS.ru;
+                document.documentElement.lang = lang;
+                document.title = t.docTitle;
+
+                const s = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+                s('loginSubtitle', t.loginSubtitle);
+                s('loginEmailLabel', t.emailLabel);
+                s('loginClanLabel', t.clanLabel);
+                s('loginBtnText1', t.btn1);
+                s('loginBtnText2', t.btn2);
+                s('loginHintText', t.hint1);
+
+                const hints = document.querySelectorAll('.login-hint');
+                if (hints[1]) hints[1].textContent = t.hint2;
+                const backs = document.querySelectorAll('.login-back');
+                if (backs[0]) backs[0].textContent = t.back;
+
+                applyElementAttributes(lang);
+                translateDirectTextNodes(document.body, lang);
+
+                const topbarSettings = document.querySelector(".topbar-icon-btn[onclick=\"showPage('settings')\"]");
+                if (topbarSettings) topbarSettings.title = t.topbarSettingsTitle;
+                const topbarLogout = document.querySelector(".topbar-icon-btn[onclick=\"loginLogout()\"]");
+                if (topbarLogout) topbarLogout.title = t.topbarLogoutTitle;
+
+                const themeToggle = document.getElementById('themeToggle');
+                const loginThemeToggle = document.getElementById('loginThemeToggle');
+                const langToggle = document.getElementById('langToggle');
+                const loginLangToggle = document.getElementById('loginLangToggle');
+                if (themeToggle) themeToggle.setAttribute('aria-label', t.themeAria);
+                if (loginThemeToggle) loginThemeToggle.setAttribute('aria-label', t.themeAria);
+                if (langToggle) langToggle.setAttribute('aria-label', t.langAria);
+                if (loginLangToggle) loginLangToggle.setAttribute('aria-label', t.langAria);
+            }
+
+            let translationObserver = null;
+            function ensureTranslationObserver() {
+                if (translationObserver) return;
+                translationObserver = new MutationObserver(() => {
+                    const current = localStorage.getItem('cc_lang') || 'ru';
+                    applyStaticTranslations(current);
+                });
+                translationObserver.observe(document.body, { childList: true, subtree: true, characterData: false });
             }
 
             window.setTheme = function(t) {
@@ -1147,17 +1387,16 @@
 
             window.setLang = function(l) {
                 localStorage.setItem('cc_lang', l);
-                const t = TEXTS[l] || TEXTS.ru;
                 syncFlipToggle(['langToggle','loginLangToggle'], l === 'en');
-                const s = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
-                s('loginSubtitle', t.sub); s('loginEmailLabel', t.emailLabel); s('loginClanLabel', t.clanLabel);
-                s('loginBtnText1', t.btn1); s('loginBtnText2', t.btn2); s('loginHintText', t.hint1);
+                applyStaticTranslations(l);
+                ensureTranslationObserver();
             };
 
             window.toggleLang = function() {
                 const current = localStorage.getItem('cc_lang') || 'ru';
                 setLang(current === 'ru' ? 'en' : 'ru');
             };
+
 
             window.loginGoStep2 = function() {
                 const inp = document.getElementById('loginEmailInput');
