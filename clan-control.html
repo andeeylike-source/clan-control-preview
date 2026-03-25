@@ -35,21 +35,21 @@
 
         body.light {
             --bg:        #ede5d8;
-            --bg2:       #f7f0e6;
-            --bg3:       #e8dece;
-            --bg4:       #ddd0be;
-            --border:    #b8956a;
-            --border2:   #9c7a52;
-            --text:      #2c1a0e;
-            --text2:     #3d2510;
-            --text3:     #6b4226;
-            --text4:     #8c6040;
-            --text5:     #b8956a;
+            --bg2:       #f7f1e8;
+            --bg3:       #e4d9c8;
+            --bg4:       #d8ccb8;
+            --border:    #b8946a;
+            --border2:   #9c7a50;
+            --text:      #1e0f04;
+            --text2:     #2e1a08;
+            --text3:     #5a3a1a;
+            --text4:     #7a5530;
+            --text5:     #a07848;
             --accent:    #c9a84c;
             --accent-h:  #b8922e;
-            --accent-s:  #e8c97a;
-            --shadow:    rgba(60,30,10,0.15);
-            --glow:      rgba(180,120,60,0.1);
+            --accent-s:  #e8c86a;
+            --shadow:    rgba(60,30,5,0.18);
+            --glow:      rgba(180,120,40,0.12);
             --input-bg:  #faf5ed;
         }
 
@@ -80,45 +80,29 @@
         body.light .sidebar,
         body.light .topbar,
         body.light .day-modal-card,
-        body.light .drawer-card {
-            color: var(--text);
-        }
-
-        /* Explicit text elements in light mode */
-        body.light label,
+        body.light .drawer-card,
+        body.light table,
+        body.light tr,
+        body.light td,
+        body.light th,
+        body.light div,
+        body.light span,
         body.light p,
         body.light h1,
         body.light h2,
         body.light h3,
         body.light h4,
         body.light h5,
-        body.light h6 {
-            color: var(--text);
-        }
-
-        /* Buttons in light mode should NOT get forced color — they have their own */
+        body.light h6,
+        body.light label,
         body.light button {
-            /* inherit from component */
-        }
-
-        /* Table cells */
-        body.light table,
-        body.light tr,
-        body.light td,
-        body.light th {
             color: var(--text);
-        }
-
-        /* Generic div/span only if not a button/badge child */
-        body.light div,
-        body.light span {
-            color: inherit;
         }
 
         body.light input,
         body.light textarea,
         body.light select {
-            color: var(--text) !important;
+            color: #000 !important;
             background: var(--input-bg) !important;
             border-color: var(--border) !important;
         }
@@ -129,115 +113,12 @@
         body.light .sidebar,
         body.light .topbar,
         body.light .day-modal-card,
-        body.light .drawer-card {
+        body.light .drawer-card,
+        body.light table,
+        body.light tr,
+        body.light td,
+        body.light th {
             border-color: var(--border) !important;
-        }
-
-        /* Profile stat cards in light mode — warm surface, NOT dark */
-        body.light .profile-stat-card {
-            background: var(--bg2) !important;
-            border-color: var(--border) !important;
-        }
-
-        /* Topbar logo text must be visible */
-        body.light .topbar-logo {
-            color: var(--text) !important;
-        }
-
-        /* Table row hover: warm brown, not dark blue */
-        body.light tr:hover td {
-            background: var(--bg4) !important;
-        }
-
-        /* Badge overrides for light mode */
-        body.light .badge-игрок {
-            background: var(--bg3);
-            color: var(--text3);
-            border-color: var(--border);
-        }
-        body.light .pac-tag {
-            background: var(--bg3);
-            color: var(--text3);
-            border-color: var(--border);
-        }
-
-        /* Flip-toggle active option text stays dark (on gold thumb) */
-        body.light .flip-toggle[data-state="left"] .flip-toggle-option:first-child,
-        body.light .flip-toggle[data-state="right"] .flip-toggle-option:last-child {
-            color: #2c1a0e !important;
-        }
-        body.light .flip-toggle[data-state="left"] .flip-toggle-option:last-child,
-        body.light .flip-toggle[data-state="right"] .flip-toggle-option:first-child {
-            color: var(--text4) !important;
-        }
-
-        /* Nav item hover in light */
-        body.light .nav-item:hover {
-            background-color: var(--bg4) !important;
-            color: var(--text) !important;
-        }
-        body.light .nav-item.active {
-            background: linear-gradient(90deg, rgba(201,168,76,0.18), transparent) !important;
-            border-left-color: var(--accent) !important;
-            color: #8c5a10 !important;
-        }
-
-        /* Sidebar section label */
-        body.light .sidebar-section-label {
-            color: var(--text4) !important;
-        }
-
-        /* Pack cards */
-        body.light .pack-card {
-            background: var(--bg2) !important;
-            border-color: var(--border) !important;
-        }
-        body.light .pack-card:hover {
-            border-color: var(--border2) !important;
-        }
-
-        /* Dashboard alerts */
-        body.light .dash-alert {
-            background: var(--bg2) !important;
-        }
-        body.light .dash-alert:hover {
-            background: var(--bg3) !important;
-        }
-
-        /* Member list items */
-        body.light .member-list-item {
-            background: var(--bg2) !important;
-            border-color: var(--border) !important;
-        }
-
-        /* Event chips in light mode */
-        body.light .event-epic {
-            background: rgba(201,168,76,0.15) !important;
-            color: #8c5a10 !important;
-            border-color: rgba(201,168,76,0.4) !important;
-        }
-
-        /* Next event indicator */
-        body.light #dashNextEvent {
-            background: rgba(140,90,16,0.1) !important;
-            border-color: rgba(140,90,16,0.25) !important;
-            color: #8c5a10 !important;
-        }
-
-        /* Info modal in light */
-        body.light .info-modal-box {
-            background: var(--bg2) !important;
-            border-color: var(--border) !important;
-        }
-
-        /* Autocomplete */
-        body.light .autocomplete-suggestions {
-            background: var(--bg2) !important;
-            border-color: var(--accent) !important;
-        }
-        body.light .suggestion-item {
-            border-color: var(--border) !important;
-            color: var(--text2) !important;
         }
 
         /* =============================================
@@ -359,8 +240,6 @@
 
         .topbar-logo { font-size: 15px; font-weight: 900; letter-spacing: -0.3px; color: var(--text); white-space: nowrap; margin-right: auto; }
         .topbar-logo span { color: var(--accent); }
-        body.light .topbar-logo { color: var(--text) !important; }
-        body.light .topbar-logo span { color: var(--accent) !important; }
         .topbar-right { display: flex; align-items: center; gap: 6px; }
 
         .topbar-icon-btn {
@@ -497,7 +376,7 @@
         table { width: 100%; border-collapse: collapse; }
         th { color: var(--text4); font-size: 11px; text-transform: uppercase; padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--border); cursor: pointer; letter-spacing: 0.05em; }
         td { padding: 13px 16px; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text2); }
-        tr:hover td { background: var(--bg3); transition: background 0.12s; }
+        tr:hover td { background: var(--bg3); }
 
         .badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 8px; text-transform: uppercase; }
         .badge-кл { background: rgba(201,168,76,0.15); color: var(--accent-s); border: 1px solid rgba(201,168,76,0.25); }
@@ -669,7 +548,7 @@
 
         .player-nick-link { cursor: pointer; color: inherit; text-decoration: none; border-bottom: 1px dashed var(--border2); transition: color 0.15s, border-color 0.15s; }
         .player-nick-link:hover { color: var(--accent-s); border-color: var(--accent-s); }
-        .profile-stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
+        .profile-stat-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
         .profile-stat-val { font-size: 22px; font-weight: 900; color: var(--text); }
         .profile-stat-label { font-size: 10px; color: var(--text4); text-transform: uppercase; font-weight: 700; letter-spacing: .06em; margin-top: 4px; }
         .trend-up   { color: var(--accent2-s); }
@@ -693,173 +572,113 @@
         .info-modal-close { position: absolute; top: 16px; right: 16px; background: var(--border); border: none; color: var(--text4); border-radius: 8px; width: 30px; height: 30px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all .15s; }
         .info-modal-close:hover { background: var(--border2); color: var(--text2); }
         .info-q-btn { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: var(--border); border: 1px solid var(--border2); color: var(--text5); font-size: 10px; font-weight: 900; cursor: pointer; transition: all .15s; flex-shrink: 0; margin-left: 5px; vertical-align: middle; font-family: monospace; line-height: 1; }
+        .info-q-btn:hover { background: rgba(201,168,76,0.12); border-color: var(--accent); color: var(--accent-s); }
+
         /* =============================================
-           LIGHT THEME — INLINE STYLE OVERRIDES
-           Hardcoded dark hex values in inline styles
-           need explicit light mode overrides here.
+           LIGHT THEME — COMPREHENSIVE OVERRIDES
         ============================================= */
 
-        /* Roster period picker bar */
-        body.light #page-roster .flex.gap-3 > div:first-child,
-        body.light [style*="#12171f"] {
-            background: var(--bg3) !important;
-            border-color: var(--border) !important;
-        }
-        body.light [style*="#12171f"] span,
-        body.light [style*="color:#64748b"],
-        body.light [style*="color: #64748b"] {
-            color: var(--text4) !important;
-        }
-        body.light [style*="color:#475569"],
-        body.light [style*="color: #475569"] {
-            color: var(--text3) !important;
-        }
-        body.light [style*="color:#e2e8f0"],
-        body.light [style*="color: #e2e8f0"] {
-            color: var(--text) !important;
-        }
-        body.light [style*="color:#94a3b8"],
-        body.light [style*="color: #94a3b8"] {
-            color: var(--text3) !important;
-        }
+        /* Row hover using CSS var */
+        .cc-hover-row:hover td { background: var(--bg3) !important; }
 
-        /* Import button — was dark blue, now warm brown */
-        body.light [style*="background:#1e3a5f"],
-        body.light [style*="background: #1e3a5f"] {
-            background: var(--border) !important;
-            color: var(--bg2) !important;
-        }
+        /* Font weight boost in light mode for readability */
+        body.light td, body.light th { font-weight: 500; }
+        body.light .nav-item { font-weight: 500; }
 
-        /* Stats period/pack filter boxes */
-        body.light [style*="background:#12171f"],
-        body.light [style*="background: #12171f"] {
-            background: var(--bg3) !important;
-            border-color: var(--border) !important;
-        }
-
-        /* CC absence report box */
-        body.light #page-stats > div[style*="#12171f"],
-        body.light #page-stats [style*="background:#12171f"] {
-            background: var(--bg2) !important;
-            border-color: var(--border) !important;
-        }
-
-        /* Threshold buttons in CC report */
-        body.light [style*="background:#1e2530"] {
-            background: var(--bg4) !important;
-            border-color: var(--border) !important;
-            color: var(--text3) !important;
-        }
-
-        /* Calendar nav buttons */
-        body.light [style*="bg-slate-800"] {
-            background: var(--bg4) !important;
-            color: var(--text) !important;
-        }
-
-        /* Dashboard next event badge */
-        body.light #dashNextEvent[style] {
-            background: rgba(140,90,16,0.12) !important;
-            border-color: rgba(140,90,16,0.3) !important;
-            color: #7a4d0a !important;
-        }
-
-        /* Sidebar section labels hardcoded */
-        body.light .sidebar-section-label {
-            color: var(--text4) !important;
-        }
-
-        /* Calendar buttons */
-        body.light button[class*="bg-slate-800"] {
-            background: var(--bg4) !important;
-            color: var(--text) !important;
-            border: 1px solid var(--border);
-        }
-
-        /* Pack detail back button */
-        body.light [class*="text-slate-500"][onclick*="showPage('packs')"] {
-            color: var(--text3) !important;
-        }
-        body.light [class*="text-slate-500"][onclick*="showPage('packs')"]:hover {
-            color: var(--text) !important;
-        }
-
-        /* Pack detail separators */
-        body.light [class*="bg-slate-800"].h-6.w-px {
-            background: var(--border) !important;
-        }
-
-        /* Info modal formula box */
-        body.light .info-modal-formula {
-            background: var(--bg3) !important;
-            border-color: var(--border) !important;
-        }
-
-        /* Login screen background */
-        body.light #loginScreen {
-            background: var(--bg) !important;
-        }
-
-        /* Select elements inside sections */
-        body.light select {
-            background: var(--bg3) !important;
-            border-color: var(--border) !important;
-            color: var(--text3) !important;
-        }
-
-        /* Row hover via JS-generated class */
-        .km-hover-row:hover td { background: var(--bg3) !important; }
-
-        /* Topbar in light mode */
+        /* Topbar */
+        body.light .topbar-logo { color: var(--text) !important; }
+        body.light .topbar-logo span { color: var(--accent) !important; }
         body.light .topbar-icon-btn { background: var(--bg3) !important; border-color: var(--border) !important; color: var(--text3) !important; }
-        body.light .topbar-icon-btn:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
+        body.light .topbar-icon-btn:hover { border-color: var(--accent) !important; color: var(--accent) !important; background: var(--bg2) !important; }
         body.light .topbar-user { background: var(--bg3) !important; border-color: var(--border) !important; }
-        body.light .topbar-clan { background: rgba(201,168,76,0.15) !important; border-color: rgba(201,168,76,0.35) !important; color: #7a4d0a !important; }
+        body.light .topbar-clan { background: rgba(201,168,76,0.2) !important; border-color: rgba(180,130,40,0.5) !important; color: #7a4800 !important; font-weight: 700 !important; }
 
-        /* Settings page buttons */
-        body.light button[style*="#1e2530"], body.light button[style*="1e3a5f"], body.light button[style*="1a1f29"] { background: var(--bg3) !important; border: 1px solid var(--border) !important; color: var(--text2) !important; }
-        body.light label[style*="#1e3a5f"], body.light label[style*="#1a3a1a"] { background: var(--bg4) !important; color: var(--text2) !important; }
-        body.light code[style*="#1e2530"] { background: var(--bg4) !important; color: var(--text3) !important; }
+        /* Flip toggle text on gold pill */
+        body.light .flip-toggle[data-state="left"] .flip-toggle-option:first-child,
+        body.light .flip-toggle[data-state="right"] .flip-toggle-option:last-child { color: #1e0f04 !important; font-weight: 800 !important; }
+        body.light .flip-toggle[data-state="left"] .flip-toggle-option:last-child,
+        body.light .flip-toggle[data-state="right"] .flip-toggle-option:first-child { color: var(--text4) !important; }
+
+        /* Sidebar */
+        body.light .sidebar { background: var(--bg2) !important; border-right-color: var(--border) !important; }
+        body.light .sidebar-section-label { color: var(--text4) !important; font-weight: 800 !important; }
+        body.light .nav-item { color: var(--text3) !important; }
+        body.light .nav-item:hover { background: var(--bg3) !important; color: var(--text) !important; }
+        body.light .nav-item.active { background: linear-gradient(90deg, rgba(201,168,76,0.25), transparent) !important; border-left-color: var(--accent) !important; color: #7a4800 !important; font-weight: 700 !important; }
+
+        /* Cards & tables */
+        body.light .card { background: var(--bg2) !important; border-color: var(--border) !important; }
+        body.light td, body.light th { color: var(--text) !important; border-color: var(--border) !important; }
+        body.light tr:hover td { background: var(--bg3) !important; }
+        body.light .dash-card { background: var(--bg2) !important; border-color: var(--border) !important; }
+        body.light .dash-card:hover { border-color: var(--accent) !important; }
+        body.light .dash-card-title { color: var(--text4) !important; font-weight: 800 !important; }
+
+        /* Calendar — rich colors in light mode */
+        body.light .calendar-header-cell { background: var(--bg3) !important; color: var(--text3) !important; font-weight: 800 !important; border-color: var(--border) !important; }
+        body.light .calendar-day { background: var(--bg2) !important; border-color: var(--border) !important; }
+        body.light .calendar-day:hover { background: var(--bg3) !important; }
+        body.light .calendar-day.other-month { background: var(--bg3) !important; opacity: 0.45 !important; }
+        body.light .calendar-day.today { background: var(--bg) !important; outline-color: rgba(201,168,76,0.6) !important; }
+        body.light .calendar-grid { border-color: var(--border) !important; background: var(--border) !important; }
+        body.light .day-number { color: var(--text2) !important; font-weight: 700 !important; }
+        body.light .event-epic   { background: rgba(201,168,76,0.22) !important; color: #7a4800 !important; border-color: rgba(180,130,30,0.5) !important; font-weight: 700 !important; }
+        body.light .event-siege  { background: rgba(200,60,60,0.15) !important; color: #8a1f1f !important; border-color: rgba(200,60,60,0.4) !important; font-weight: 700 !important; }
+        body.light .event-tv     { background: rgba(40,100,200,0.12) !important; color: #1a4a8a !important; border-color: rgba(40,100,200,0.35) !important; font-weight: 700 !important; }
+        body.light .event-manual { background: rgba(30,150,80,0.15) !important; color: #1a5c30 !important; border-color: rgba(30,150,80,0.4) !important; font-weight: 700 !important; }
+        body.light .km-stat-badge { background: var(--bg4) !important; color: var(--text4) !important; }
+        body.light .dot-past  { background: #cc2222 !important; }
+        body.light .dot-done  { background: #1a8a3a !important; }
+        body.light .dot-future { background: #1a5ab8 !important; }
+
+        /* Profile prf-cards */
+        body.light .prf-card { background: var(--bg2) !important; border-color: var(--border) !important; }
+        body.light .profile-stat-card { background: var(--bg2) !important; border-color: var(--border) !important; }
+        body.light .prf-section-title { color: var(--text4) !important; font-weight: 800 !important; }
+        body.light .prf-val-label { color: var(--text4) !important; font-weight: 700 !important; }
+        body.light .km-row:hover { background: var(--bg3) !important; }
+        body.light .km-bar-wrap { background: var(--bg4) !important; }
+
+        /* Pack cards */
+        body.light .pack-card { background: var(--bg2) !important; border-color: var(--border) !important; }
+        body.light .pack-card:hover { border-color: var(--accent) !important; }
+        body.light .member-list-item { background: var(--bg2) !important; border-color: var(--border) !important; }
+
+        /* Badges — pac-tag, role badges */
+        body.light .pac-tag { background: var(--bg3) !important; color: var(--text3) !important; border-color: var(--border) !important; font-weight: 700 !important; }
+        body.light .badge-игрок { background: var(--bg3) !important; color: var(--text3) !important; border-color: var(--border) !important; }
+        body.light .badge-кл { background: rgba(201,168,76,0.2) !important; color: #7a4800 !important; border-color: rgba(180,130,40,0.4) !important; }
+
+        /* Alerts */
+        body.light .dash-alert { background: var(--bg2) !important; }
+        body.light .dash-alert:hover { background: var(--bg3) !important; }
+
+        /* Inputs */
+        body.light input, body.light textarea, body.light select {
+            color: var(--text) !important; background: var(--input-bg) !important; border-color: var(--border) !important;
+        }
+        body.light input::placeholder, body.light textarea::placeholder { color: var(--text5) !important; }
+
+        /* All hardcoded dark inline bg overrides */
+        body.light [style*="background:#12171f"] { background: var(--bg3) !important; border-color: var(--border) !important; }
+        body.light [style*="background:#1e2530"] { background: var(--bg3) !important; border-color: var(--border) !important; }
+        body.light [style*="background:#1a1f29"] { background: var(--bg3) !important; }
+        body.light [style*="background:#0b0e14"] { background: var(--bg4) !important; }
+        body.light [style*="background:#1e3a5f"] { background: var(--border) !important; color: var(--bg2) !important; }
+        body.light [style*="background:#1a3a1a"] { background: var(--bg4) !important; color: var(--text2) !important; }
+        body.light [style*="color:#64748b"]  { color: var(--text4) !important; }
+        body.light [style*="color:#475569"]  { color: var(--text3) !important; }
+        body.light [style*="color:#94a3b8"]  { color: var(--text3) !important; }
+        body.light [style*="color:#e2e8f0"]  { color: var(--text)  !important; }
+        body.light [style*="color:#a5b4fc"]  { color: #3a5ab0 !important; }
+        body.light [style*="color:#60a5fa"]  { color: #1a4a8a !important; }
+        body.light .text-slate-500, body.light .text-slate-400 { color: var(--text3) !important; }
+        body.light .text-slate-600 { color: var(--text2) !important; }
 
         /* Profa dropdown */
         body.light #pProfaDrop { background: var(--bg2) !important; border-color: var(--accent) !important; }
         body.light #pProfaSearch { background: var(--bg3) !important; border-color: var(--border) !important; color: var(--text) !important; }
         body.light #promptProfaList { background: var(--bg3) !important; border-color: var(--border) !important; }
-
-        /* Minibar & sticky footer */
-        body.light #dayMinibar { background: var(--bg2) !important; border-color: var(--accent) !important; }
-        body.light [style*="position:sticky"][style*="bottom:0"] { background: var(--bg2) !important; }
-
-        /* Inline dark pills */
-        body.light [style*="background:#1e2530"] { background: var(--bg3) !important; border-color: var(--border) !important; color: var(--text3) !important; }
-        body.light [style*="background:#0b0e14"] { background: var(--bg4) !important; }
-        body.light [style*="background:#12171f"] { background: var(--bg3) !important; border-color: var(--border) !important; }
-        body.light [style*="background:#1a1f29"] { background: var(--bg3) !important; }
-
-        /* CC report active threshold button */
-        body.light [style*="background:#6366f1"][style*="border-radius:6px"] { background: var(--accent) !important; border-color: var(--accent) !important; color: #2c1a0e !important; }
-
-        /* Flip toggle text */
-        body.light .flip-toggle[data-state="left"] .flip-toggle-option:first-child, body.light .flip-toggle[data-state="right"] .flip-toggle-option:last-child { color: #2c1a0e !important; }
-        body.light .flip-toggle[data-state="left"] .flip-toggle-option:last-child, body.light .flip-toggle[data-state="right"] .flip-toggle-option:first-child { color: var(--text4) !important; }
-        body.light .login-step-num { color: #2c1a0e !important; }
-
-        /* Pack & member cards */
-        body.light .pack-card { background: var(--bg2) !important; border-color: var(--border) !important; }
-        body.light .pack-card:hover { border-color: var(--accent) !important; }
-        body.light .member-list-item { background: var(--bg2) !important; border-color: var(--border) !important; }
-
-        /* Calendar buttons */
-        body.light button[class*="bg-slate-800"] { background: var(--bg4) !important; color: var(--text) !important; border: 1px solid var(--border); }
-
-        /* Dashboard */
-        body.light .dash-alert { background: var(--bg2) !important; }
-        body.light .dash-alert:hover { background: var(--bg3) !important; }
-        body.light .dash-card { background: var(--bg2) !important; border-color: var(--border) !important; }
-        body.light .dash-card:hover { border-color: var(--border2) !important; }
-
-        /* Profile cards — force light background */
-        body.light .prf-card { background: var(--bg2) !important; border-color: var(--border) !important; }
 
         /* Event & info modals */
         body.light .event-modal-card { background: var(--bg2) !important; border-color: var(--border) !important; }
@@ -868,11 +687,38 @@
         body.light .info-modal-title { color: var(--text) !important; }
         body.light .info-modal-body  { color: var(--text3) !important; }
         body.light .info-modal-close { background: var(--bg4) !important; color: var(--text3) !important; }
-        body.light .info-modal-close:hover { background: var(--border) !important; color: var(--text) !important; }
 
-        /* Text colors by slate class */
-        body.light .text-slate-500, body.light .text-slate-400 { color: var(--text3) !important; }
-        body.light .text-slate-600 { color: var(--text2) !important; }
+        /* Autocomplete */
+        body.light .autocomplete-suggestions { background: var(--bg2) !important; border-color: var(--accent) !important; }
+        body.light .suggestion-item { border-bottom-color: var(--border) !important; color: var(--text2) !important; }
+
+        /* Settings buttons */
+        body.light button[style*="#1e2530"], body.light button[style*="#1a1f29"],
+        body.light button[style*="#1e3a5f"] { background: var(--bg3) !important; border-color: var(--border) !important; color: var(--text2) !important; }
+        body.light code[style*="#1e2530"] { background: var(--bg4) !important; color: var(--text3) !important; }
+
+        /* Calendar nav buttons */
+        body.light button[class*="bg-slate-800"] { background: var(--bg4) !important; color: var(--text) !important; border: 1px solid var(--border) !important; }
+
+        /* Next event badge */
+        body.light #dashNextEvent { background: rgba(180,130,40,0.15) !important; border-color: rgba(180,130,40,0.4) !important; color: #7a4800 !important; }
+
+        /* Login */
+        body.light .login-step-num { color: #1e0f04 !important; }
+
+        /* Minibar */
+        body.light #dayMinibar { background: var(--bg2) !important; border-color: var(--accent) !important; }
+
+        /* dp-popup (datepicker) */
+        body.light .dp-popup { background: var(--bg2) !important; border-color: var(--border) !important; }
+        body.light .dp-btn { background: var(--bg3) !important; border-color: var(--border2) !important; color: var(--text2) !important; }
+        body.light .dp-day { color: var(--text3) !important; }
+        body.light .dp-day:hover { background: var(--bg4) !important; color: var(--text) !important; }
+        body.light .dp-day.today { color: var(--accent) !important; font-weight: 800 !important; }
+        body.light .dp-day.selected { background: var(--accent) !important; color: #1e0f04 !important; }
+        body.light .dp-day.in-range { background: rgba(201,168,76,0.2) !important; color: #7a4800 !important; }
+        body.light .dp-month-btn, body.light .dp-year-btn { background: var(--bg3) !important; color: var(--text3) !important; }
+        body.light .dp-month-btn.selected, body.light .dp-year-btn.selected { background: var(--accent) !important; color: #1e0f04 !important; }
     </style>
 </head>
 <body>
@@ -1141,11 +987,11 @@
                     <div onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:8px">
                         <span style="font-size:11px;color:#64748b">Порог:</span>
                         <div style="display:flex;gap:4px">
-                            <button onclick="setCcThreshold(3)" id="ccBtn3" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">3</button>
-                            <button onclick="setCcThreshold(4)" id="ccBtn4" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">4</button>
-                            <button onclick="setCcThreshold(5)" id="ccBtn5" style="background:#6366f1;border:1px solid #6366f1;color:#fff;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">5</button>
-                            <button onclick="setCcThreshold(6)" id="ccBtn6" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">6</button>
-                            <button onclick="setCcThreshold(7)" id="ccBtn7" style="background:#1e2530;border:1px solid #2d3748;color:#64748b;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">7</button>
+                            <button onclick="setCcThreshold(3)" id="ccBtn3" style="background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">3</button>
+                            <button onclick="setCcThreshold(4)" id="ccBtn4" style="background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">4</button>
+                            <button onclick="setCcThreshold(5)" id="ccBtn5" style="background:var(--accent);border:1px solid var(--accent);color:#1e0f04;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">5</button>
+                            <button onclick="setCcThreshold(6)" id="ccBtn6" style="background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">6</button>
+                            <button onclick="setCcThreshold(7)" id="ccBtn7" style="background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">7</button>
                         </div>
                         <span style="font-size:11px;color:#64748b">КМ подряд</span>
                     </div>
@@ -2383,7 +2229,7 @@
             }
 
             body.innerHTML = sorted.map(p => `
-                <tr class="km-hover-row transition-colors group" onclick="openPlayerProfile('${p.name}')" style="cursor:pointer">
+                <tr class="cc-hover-row transition-colors group" onclick="openPlayerProfile('${p.name}')" style="cursor:pointer">
                     <td>
                         <span class="font-bold text-slate-200">${p.name}</span> <span class="badge badge-${p.rank.toLowerCase()}">${p.rank}</span>
                     </td>
@@ -2500,7 +2346,7 @@
                 return;
             }
             body.innerHTML = archive.map(p => `
-                <tr class="km-hover-row">
+                <tr class="cc-hover-row">
                     <td class="font-bold text-slate-200">${p.name}</td>
                     <td style="white-space:nowrap">${
                         (p.profas && p.profas.length > 1)
@@ -2819,7 +2665,7 @@
                             <p class="text-slate-500 text-xs">Участников: ${members.length}</p>
                         </div>
                         <div class="text-[11px] text-slate-500 flex flex-wrap gap-1">
-                            ${members.slice(0, 5).map(m => `<span class="bg-[#0b0e14] px-2 py-0.5 rounded">${m.name}</span>`).join('')}
+                            ${members.slice(0, 5).map(m => `<span style="background:var(--bg4);color:var(--text2);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px">${m.name}</span>`).join('')}
                             ${members.length > 5 ? `<span class="text-[9px]">+${members.length - 5}</span>` : ''}
                         </div>
                     </div>
@@ -3438,13 +3284,13 @@ function getClass2IconByClass3(c3) {
 
             el.innerHTML = `
             <style>
-                .prf-section-title { font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text4);margin-bottom:14px; }
-                .prf-card { background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px; }
+                .prf-section-title { font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#475569;margin-bottom:14px; }
+                .prf-card { background:#12171f;border:1px solid #1e2530;border-radius:14px;padding:20px; }
                 .prf-val-big { font-size:28px;font-weight:900;line-height:1; }
-                .prf-val-label { font-size:9px;font-weight:700;text-transform:uppercase;color:var(--text4);letter-spacing:.08em;margin-top:5px; }
+                .prf-val-label { font-size:9px;font-weight:700;text-transform:uppercase;color:#475569;letter-spacing:.08em;margin-top:5px; }
                 .km-row { display:grid;grid-template-columns:60px 1fr 52px 52px 80px 80px;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;font-size:12px;transition:background .15s;cursor:default; }
-                .km-row:hover { background:var(--bg3); }
-                .km-bar-wrap { height:6px;background:var(--bg4);border-radius:3px;overflow:hidden; }
+                .km-row:hover { background:#1a1f29; }
+                .km-bar-wrap { height:6px;background:#1e2530;border-radius:3px;overflow:hidden; }
                 .km-bar-fill { height:100%;border-radius:3px;transition:width .3s; }
             </style>
 
@@ -4285,9 +4131,9 @@ function getClass2IconByClass3(c3) {
             [3,4,5,6,7].forEach(i => {
                 const btn = document.getElementById('ccBtn' + i);
                 if (!btn) return;
-                btn.style.background = i === n ? '#6366f1' : '#1e2530';
-                btn.style.borderColor = i === n ? '#6366f1' : '#2d3748';
-                btn.style.color = i === n ? '#fff' : '#64748b';
+                btn.style.background = i === n ? 'var(--accent)' : 'var(--bg3)';
+                btn.style.borderColor = i === n ? 'var(--accent)' : 'var(--border)';
+                btn.style.color = i === n ? '#1e0f04' : 'var(--text3)';
             });
             renderCcAbsenceReport();
         }
@@ -4300,9 +4146,9 @@ function getClass2IconByClass3(c3) {
             [3,4,5,6,7].forEach(i => {
                 const btn = document.getElementById('ccBtn' + i);
                 if (!btn) return;
-                btn.style.background = i === ccThreshold ? '#6366f1' : '#1e2530';
-                btn.style.borderColor = i === ccThreshold ? '#6366f1' : '#2d3748';
-                btn.style.color = i === ccThreshold ? '#fff' : '#64748b';
+                btn.style.background = i === ccThreshold ? 'var(--accent)' : 'var(--bg3)';
+                btn.style.borderColor = i === ccThreshold ? 'var(--accent)' : 'var(--border)';
+                btn.style.color = i === ccThreshold ? '#1e0f04' : 'var(--text3)';
             });
 
             // Все даты КМ с данными CC, отсортированные
