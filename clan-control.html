@@ -2410,7 +2410,7 @@
                     </td>
                     <td class="text-right">
                         <div class="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onclick="event.stopPropagation();editPlayer(${p.id})" class="text-orange-400" title="${_elang==='en'?'Edit':'Редактировать'}">✏️</button>
+                            <button onclick="event.stopPropagation();editPlayer(${p.id})" class="text-orange-400" title="${localStorage.getItem('cc_lang')==='en'?'Edit':'Редактировать'}">✏️</button>
                             <button onclick="event.stopPropagation();moveToArchive(${p.id})" class="text-slate-500 hover:text-red-400" title="В архив">🗑️</button>
                         </div>
                     </td>
