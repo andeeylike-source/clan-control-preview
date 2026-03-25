@@ -12,17 +12,17 @@
            CSS ПЕРЕМЕННЫЕ
         ============================================= */
         :root {
-            --bg:        #080e0c;
-            --bg2:       #0d1510;
-            --bg3:       #131f18;
-            --bg4:       #1a2a20;
-            --border:    #1e3028;
-            --border2:   #2a4035;
-            --text:      #e8f0eb;
-            --text2:     #c5d8cb;
-            --text3:     #7a9e88;
-            --text4:     #4d7060;
-            --text5:     #2d4a38;
+            --bg:        #0a0f0d;
+            --bg2:       #0f1a14;
+            --bg3:       #162218;
+            --bg4:       #1e2e22;
+            --border:    #274035;
+            --border2:   #375248;
+            --text:      #edf5f0;
+            --text2:     #c8dcd0;
+            --text3:     #8ab09a;
+            --text4:     #557a66;
+            --text5:     #304d3c;
             --accent:    #c9a84c;
             --accent-h:  #b8922e;
             --accent-s:  #e8c97a;
@@ -240,14 +240,9 @@
 
         .topbar-clan {
             font-size: 10px; font-weight: 800; color: var(--accent-s);
-            background: rgba(201,168,76,0.12); border: 1px solid rgba(201,168,76,0.3);
-            border-radius: 7px; padding: 4px 10px; text-transform: uppercase;
+            background: rgba(201,168,76,0.12); border: 1px solid rgba(201,168,76,0.35);
+            border-radius: 7px; padding: 4px 12px; text-transform: uppercase;
             letter-spacing: 0.06em; white-space: nowrap;
-        }
-        body.light .topbar-clan {
-            color: #6a3c00 !important;
-            background: rgba(201,168,76,0.2) !important;
-            border-color: rgba(170,120,30,0.5) !important;
         }
 
         .topbar-user {
@@ -565,47 +560,53 @@
         .info-q-btn { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: var(--border); border: 1px solid var(--border2); color: var(--text5); font-size: 10px; font-weight: 900; cursor: pointer; transition: all .15s; flex-shrink: 0; margin-left: 5px; vertical-align: middle; font-family: monospace; line-height: 1; }
         .info-q-btn:hover { background: rgba(201,168,76,0.12); border-color: var(--accent); color: var(--accent-s); }
 
-        /* ── GLOBAL FIXES ─────────────────────────────────── */
+        /* ── GLOBAL ─────────────────────────────────────────── */
         .cc-hover-row:hover td { background: var(--bg3) !important; }
+        tr:hover td { background: var(--bg3); transition: background 0.1s; }
 
-        /* ── LIGHT THEME ──────────────────────────────────── */
+        /* ── DARK THEME: richer borders, no blue tinge ────────── */
+        .prf-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+        .profile-stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
+        .card { background-color: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+        .dash-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+        .pack-card { background-color: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+        .event-modal-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 28px; }
+        .event-item-row { background: var(--bg3); border-radius: 10px; padding: 12px 16px; margin-bottom: 8px; border: 1px solid var(--border); }
+        td { border-bottom: 1px solid var(--border); }
+        th { border-bottom: 1px solid var(--border); }
+
+        /* ── LIGHT THEME ─────────────────────────────────────── */
         body.light td { font-weight: 500 !important; color: var(--text) !important; }
         body.light th { color: var(--text4) !important; font-weight: 800 !important; border-color: var(--border) !important; }
         body.light tr:hover td { background: var(--bg3) !important; }
 
-        /* Topbar */
         body.light .topbar-logo { color: var(--text) !important; }
         body.light .topbar-logo span { color: var(--accent) !important; }
         body.light .topbar-icon-btn { background: var(--bg3) !important; border-color: var(--border) !important; color: var(--text3) !important; }
         body.light .topbar-icon-btn:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
         body.light .topbar-user { background: var(--bg3) !important; border-color: var(--border) !important; }
         body.light .topbar-user-email { color: var(--text2) !important; }
-        body.light .topbar-divider { background: var(--border) !important; }
+        body.light .topbar-clan { background: rgba(201,168,76,0.2) !important; border-color: rgba(180,140,50,0.5) !important; color: #6a3c00 !important; }
 
-        /* Flip toggle text */
         body.light .flip-toggle[data-state="left"] .flip-toggle-option:first-child,
         body.light .flip-toggle[data-state="right"] .flip-toggle-option:last-child { color: #1e0f04 !important; font-weight: 800 !important; }
         body.light .flip-toggle[data-state="left"] .flip-toggle-option:last-child,
         body.light .flip-toggle[data-state="right"] .flip-toggle-option:first-child { color: var(--text4) !important; }
 
-        /* Sidebar */
         body.light .sidebar { background: var(--bg2) !important; border-right-color: var(--border) !important; }
         body.light .sidebar-section-label { color: var(--text4) !important; font-weight: 800 !important; }
         body.light .nav-item { color: var(--text3) !important; font-weight: 500 !important; }
         body.light .nav-item:hover { background: var(--bg3) !important; color: var(--text) !important; }
         body.light .nav-item.active { background: linear-gradient(90deg, rgba(201,168,76,0.22), transparent) !important; border-left-color: var(--accent) !important; color: #6a3c00 !important; font-weight: 700 !important; }
 
-        /* Cards */
         body.light .card { background: var(--bg2) !important; border-color: var(--border) !important; }
         body.light .dash-card { background: var(--bg2) !important; border-color: var(--border) !important; }
         body.light .dash-card:hover { border-color: var(--accent) !important; }
         body.light .dash-card-title { color: var(--text4) !important; font-weight: 800 !important; }
         body.light .dash-big-num { color: var(--text) !important; }
-        body.light .dash-sub { color: var(--text4) !important; }
         body.light .dash-alert { background: var(--bg2) !important; }
         body.light .dash-alert:hover { background: var(--bg3) !important; }
 
-        /* Calendar */
         body.light .calendar-grid { border-color: var(--border) !important; background: var(--border) !important; }
         body.light .calendar-header-cell { background: var(--bg3) !important; color: var(--text3) !important; font-weight: 800 !important; }
         body.light .calendar-day { background: var(--bg2) !important; }
@@ -620,60 +621,57 @@
         body.light .dot-past   { background: #c0181a !important; }
         body.light .dot-done   { background: #16a34a !important; }
         body.light .dot-future { background: #1650b0 !important; }
-
-        /* Green accents in light */
         body.light .trend-up   { color: #16a34a !important; font-weight: 700 !important; }
         body.light .toggle-done-btn.done { background: #16a34a !important; border-color: #16a34a !important; }
         body.light .text-emerald-400 { color: #16a34a !important; }
         body.light .text-red-400 { color: #b91c1c !important; }
         body.light .text-yellow-400 { color: #92400e !important; }
 
-        /* Profile */
         body.light .prf-card { background: var(--bg2) !important; border-color: var(--border) !important; }
         body.light .prf-section-title { color: var(--text4) !important; font-weight: 800 !important; }
         body.light .prf-val-label { color: var(--text4) !important; font-weight: 700 !important; }
-        body.light .prf-val-big { color: var(--text) !important; }
         body.light .profile-stat-card { background: var(--bg2) !important; border-color: var(--border) !important; }
         body.light .km-row:hover { background: var(--bg3) !important; }
         body.light .km-bar-wrap { background: var(--bg4) !important; }
 
-        /* Badges & tags */
         body.light .pac-tag { background: var(--bg3) !important; color: var(--text3) !important; border-color: var(--border) !important; font-weight: 700 !important; }
         body.light .badge-игрок { background: var(--bg3) !important; color: var(--text3) !important; border-color: var(--border) !important; font-weight: 700 !important; }
         body.light .badge-кл { background: rgba(201,168,76,0.2) !important; color: #6a3c00 !important; border-color: rgba(180,140,40,0.4) !important; }
-
-        /* Pack cards */
         body.light .pack-card { background: var(--bg2) !important; border-color: var(--border) !important; }
         body.light .pack-card:hover { border-color: var(--accent) !important; }
         body.light .member-list-item { background: var(--bg2) !important; border-color: var(--border) !important; }
 
-        /* Inputs */
-        body.light input, body.light textarea, body.light select {
-            color: var(--text) !important; background: var(--input-bg) !important; border-color: var(--border) !important;
-        }
+        body.light input, body.light textarea, body.light select { color: var(--text) !important; background: var(--input-bg) !important; border-color: var(--border) !important; }
         body.light input::placeholder, body.light textarea::placeholder { color: var(--text5) !important; }
         body.light .input-dark { background: var(--input-bg) !important; border-color: var(--border) !important; color: var(--text) !important; }
 
-        /* Settings weight labels */
-        body.light #page-settings label,
-        body.light #valueWeightsConfig span { font-weight: 600 !important; color: var(--text2) !important; }
-        body.light #valueWeightsConfig input { font-weight: 700 !important; }
+        body.light [style*="color:#475569"]  { color: var(--text3) !important; }
+        body.light [style*="color:#64748b"]  { color: var(--text4) !important; }
+        body.light [style*="color:#94a3b8"]  { color: var(--text3) !important; }
+        body.light [style*="color:#e2e8f0"]  { color: var(--text)  !important; }
+        body.light [style*="color:#a5b4fc"]  { color: #2a4ab8 !important; }
+        body.light .text-slate-500, body.light .text-slate-400 { color: var(--text3) !important; }
+        body.light .text-slate-600 { color: var(--text2) !important; }
 
-        /* Autocomplete */
-        body.light .autocomplete-suggestions { background: var(--bg2) !important; border-color: var(--accent) !important; }
-        body.light .suggestion-item { border-bottom-color: var(--border) !important; color: var(--text2) !important; }
+        body.light [style*="background:#12171f"] { background: var(--bg3) !important; border-color: var(--border) !important; }
+        body.light [style*="background:#1e2530"] { background: var(--bg3) !important; border-color: var(--border) !important; }
+        body.light [style*="background:#1a1f29"] { background: var(--bg3) !important; }
+        body.light [style*="background:#0b0e14"] { background: var(--bg4) !important; }
+        body.light [style*="background:#1e3a5f"] { background: var(--border2) !important; color: var(--bg2) !important; }
+        body.light [style*="background:#1a3a1a"] { background: rgba(20,120,60,0.18) !important; color: #0d5c28 !important; }
 
-        /* Modals */
         body.light .event-modal-card { background: var(--bg2) !important; border-color: var(--border) !important; }
         body.light .event-item-row { background: var(--bg3) !important; border-color: var(--border) !important; }
         body.light .day-modal-card { background: var(--bg2) !important; border-color: var(--border) !important; }
+        body.light #dayDropZone { border-color: var(--border2) !important; }
         body.light .info-modal-box { background: var(--bg2) !important; border-color: var(--border) !important; }
         body.light .info-modal-title { color: var(--text) !important; }
         body.light .info-modal-body  { color: var(--text3) !important; }
         body.light .info-modal-formula { background: var(--bg3) !important; border-color: var(--border) !important; }
         body.light .info-modal-close { background: var(--bg4) !important; color: var(--text3) !important; }
 
-        /* Datepicker */
+        body.light .autocomplete-suggestions { background: var(--bg2) !important; border-color: var(--accent) !important; }
+        body.light .suggestion-item { border-bottom-color: var(--border) !important; color: var(--text2) !important; }
         body.light .dp-popup { background: var(--bg2) !important; border-color: var(--border) !important; }
         body.light .dp-btn { background: var(--bg3) !important; border-color: var(--border2) !important; color: var(--text2) !important; }
         body.light .dp-day { color: var(--text3) !important; }
@@ -684,34 +682,13 @@
         body.light .dp-month-btn, body.light .dp-year-btn { background: var(--bg3) !important; color: var(--text3) !important; }
         body.light .dp-month-btn.selected, body.light .dp-year-btn.selected { background: var(--accent) !important; color: #1e0f04 !important; }
 
-        /* All hardcoded dark bg selectors */
-        body.light [style*="background:#12171f"] { background: var(--bg3) !important; border-color: var(--border) !important; }
-        body.light [style*="background:#1e2530"] { background: var(--bg3) !important; border-color: var(--border) !important; }
-        body.light [style*="background:#1a1f29"] { background: var(--bg3) !important; }
-        body.light [style*="background:#0b0e14"] { background: var(--bg4) !important; }
-        body.light [style*="background:#1e3a5f"] { background: var(--border2) !important; color: var(--bg2) !important; }
-        body.light [style*="color:#475569"]  { color: var(--text3) !important; }
-        body.light [style*="color:#64748b"]  { color: var(--text4) !important; }
-        body.light [style*="color:#94a3b8"]  { color: var(--text3) !important; }
-        body.light [style*="color:#e2e8f0"]  { color: var(--text)  !important; }
-        body.light [style*="color:#a5b4fc"]  { color: #2a4ab8 !important; }
-        body.light [style*="color:#f8fafc"]  { color: var(--text) !important; }
-        body.light .text-slate-500, body.light .text-slate-400 { color: var(--text3) !important; }
-        body.light .text-slate-600 { color: var(--text2) !important; }
-
-        /* Next event + misc */
         body.light #dashNextEvent { background: rgba(180,130,40,0.15) !important; border-color: rgba(180,130,40,0.4) !important; color: #6a3c00 !important; }
         body.light .login-step-num { color: #1e0f04 !important; }
         body.light .login-card { background: var(--bg2) !important; border-color: var(--border) !important; }
         body.light .player-nick-link { color: var(--text) !important; border-bottom-color: var(--border2) !important; }
         body.light .player-nick-link:hover { color: var(--accent-h) !important; }
-        body.light button[class*="bg-slate-800"] { background: var(--bg4) !important; color: var(--text) !important; border: 1px solid var(--border) !important; }
-        body.light .p-2.bg-slate-800 { background: var(--bg4) !important; color: var(--text) !important; border: 1px solid var(--border) !important; }
-
-        /* History search input */
+        body.light button[class*="bg-slate-800"], body.light .p-2.bg-slate-800 { background: var(--bg4) !important; color: var(--text) !important; border: 1px solid var(--border) !important; }
         body.light #kmHistorySearch { background: var(--bg3) !important; border-color: var(--border) !important; color: var(--text) !important; }
-
-        /* Profa dropdown */
         body.light #pProfaDrop { background: var(--bg2) !important; border-color: var(--accent) !important; }
         body.light #pProfaSearch { background: var(--bg3) !important; border-color: var(--border) !important; color: var(--text) !important; }
         body.light #promptProfaList { background: var(--bg3) !important; border-color: var(--border) !important; }
@@ -1090,15 +1067,10 @@
                 <div id="apiKeyStatus" style="display:none;margin-top:12px;font-size:13px;padding:10px;border-radius:8px"></div>
             </div>
             <div class="card mb-6">
-                <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:0" onclick="(function(){var b=document.getElementById('aliasesBody');var t=document.getElementById('aliasesToggle');var open=b.style.display!=='none';b.style.display=open?'none':'';t.textContent=open?'▼ Показать':'▲ Свернуть'})()">
-                    <h2 class="text-lg font-bold">🔗 Алиасы ников</h2>
-                    <span id="aliasesToggle" style="font-size:11px;color:var(--text4);font-weight:600;padding:2px 8px;border:1px solid var(--border);border-radius:6px">▲ Свернуть</span>
-                </div>
-                <div id="aliasesBody">
-                    <p class="text-slate-500 text-sm mb-4" style="margin-top:12px">Если AI читает ник неправильно — укажи соответствие. Например: <code style="background:var(--bg4);padding:1px 6px;border-radius:4px;font-size:11px;color:var(--text3)">НигативВ → НигатиВ</code></p>
-                    <div id="aliasesList" class="space-y-2 mb-4"></div>
-                    <button onclick="addAliasRow()" style="background:none;border:1px dashed var(--border2);color:var(--text4);border-radius:10px;padding:10px;width:100%;cursor:pointer;font-size:13px;transition:all .2s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent-s)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text4)'">+ Добавить алиас</button>
-                </div>
+                <h2 class="text-lg font-bold mb-2">🔗 Алиасы ников</h2>
+                <p class="text-slate-500 text-sm mb-4">Если AI читает ник неправильно — укажи соответствие. Например: <code style="background:#1e2530;padding:1px 6px;border-radius:4px;font-size:11px">НигативВ → НигатиВ</code></p>
+                <div id="aliasesList" class="space-y-2 mb-4"></div>
+                <button onclick="addAliasRow()" style="background:none;border:1px dashed #2d3748;color:#64748b;border-radius:10px;padding:10px;width:100%;cursor:pointer;font-size:13px;transition:all .2s" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#64748b'">+ Добавить алиас</button>
             </div>
                         <div class="card mb-6">
                 <h2 class="text-lg font-bold mb-2">⚖️ Веса ценности</h2>
@@ -1123,8 +1095,8 @@
                 <h2 class="text-lg font-bold mb-2">💾 Экспорт / Импорт данных</h2>
                 <p class="text-slate-500 text-sm mb-4">Сохраняй данные в файл и загружай обратно. Удобно для резервного копирования и переноса.</p>
                 <div class="flex gap-3 flex-wrap">
-                    <button onclick="exportData()" style="background:#1e3a5f;color:#60a5fa;border:none;padding:10px 20px;border-radius:10px;cursor:pointer;font-weight:600">📤 Экспорт в JSON</button>
-                    <label style="background:#1a3a1a;color:#4ade80;border:none;padding:10px 20px;border-radius:10px;cursor:pointer;font-weight:600">
+                    <button onclick="exportData()" style="background:rgba(201,168,76,0.15);color:var(--accent-s);border:1px solid rgba(201,168,76,0.3);padding:10px 20px;border-radius:10px;cursor:pointer;font-weight:600">📤 Экспорт в JSON</button>
+                    <label style="background:rgba(30,140,80,0.15);color:#4ade80;border:1px solid rgba(30,140,80,0.3);padding:10px 20px;border-radius:10px;cursor:pointer;font-weight:600">
                         📥 Импорт из JSON
                         <input type="file" accept=".json" onchange="importData(event)" style="display:none">
                     </label>
@@ -1546,16 +1518,16 @@
                     '#f8fafc': '#1e0f04'
                 };
                 document.querySelectorAll('[style]').forEach(el => {
-                    const original = el.dataset.ccOriginalStyle || el.getAttribute('style') || '';
+                    // Save display/visibility set at runtime before any rewrite
+                    const cur = el.getAttribute('style') || '';
+                    const curDisp = cur.match(/(?:^|;)\s*display\s*:\s*([^;!]+)/);
+                    const curVis  = cur.match(/(?:^|;)\s*visibility\s*:\s*([^;!]+)/);
+                    const original = el.dataset.ccOriginalStyle || cur;
                     if (!el.dataset.ccOriginalStyle) el.dataset.ccOriginalStyle = original;
                     if (!isLight) {
-                        // Restore original but preserve display/visibility set after init
-                        const cur = el.getAttribute('style') || '';
-                        const dispMatch = cur.match(/display\s*:\s*([^;!]+)/);
-                        const visMatch = cur.match(/visibility\s*:\s*([^;!]+)/);
                         el.setAttribute('style', original);
-                        if (dispMatch) el.style.display = dispMatch[1].trim();
-                        if (visMatch) el.style.visibility = visMatch[1].trim();
+                        if (curDisp) el.style.display = curDisp[1].trim();
+                        if (curVis)  el.style.visibility = curVis[1].trim();
                         return;
                     }
                     let updated = original;
@@ -1566,13 +1538,10 @@
                         .replace(/color:\s*#(?:cbd5e1|d1d5db|9ca3af|6b7280)/gi, 'color:var(--text3)')
                         .replace(/border:\s*1px dashed #5c4326/gi, 'border:1px dashed var(--border)')
                         .replace(/border:\s*1px solid #5c4326/gi, 'border:1px solid var(--border)');
-                    // Preserve runtime display/visibility
-                    const cur = el.getAttribute('style') || '';
-                    const dispMatch = cur.match(/display\s*:\s*([^;!]+)/);
-                    const visMatch = cur.match(/visibility\s*:\s*([^;!]+)/);
                     el.setAttribute('style', updated);
-                    if (dispMatch) el.style.display = dispMatch[1].trim();
-                    if (visMatch) el.style.visibility = visMatch[1].trim();
+                    // Restore runtime display/visibility
+                    if (curDisp) el.style.display = curDisp[1].trim();
+                    if (curVis)  el.style.visibility = curVis[1].trim();
                 });
             }
 
@@ -1673,7 +1642,7 @@
                 document.getElementById('appLayout').classList.remove('hidden');
                 const av = document.getElementById('topbarAvatar'); if(av) av.textContent = (email[0]||'?').toUpperCase();
                 const em = document.getElementById('topbarEmail'); if(em) em.textContent = email;
-                const cb = document.getElementById('topbarClan'); if(cb){ if(clan){cb.textContent=clan;cb.style.display='';}else cb.style.display='none'; }
+                const cb = document.getElementById('topbarClan'); if(cb){ if(clan){cb.textContent=clan;cb.style.display='';cb.dataset.ccOriginalStyle='';/* don't let normalize hide it */}else cb.style.display='none'; }
             }
 
             // INIT
@@ -2247,7 +2216,7 @@
                         <span class="font-bold" style="color:var(--text)">${p.name}</span> <span class="badge badge-${p.rank.toLowerCase()}">${p.rank}</span>
                     </td>
                     <td>${p.isNew ? '<span class="text-[9px] bg-emerald-500 text-black font-black px-1.5 py-0.5 rounded uppercase">NEW</span>' : '<span style="color:#475569;font-size:11px">—</span>'}</td>
-                    <td onclick="event.stopPropagation();toggleVerified(${p.id})" style="cursor:pointer;text-align:center;font-size:16px" title="Нажми чтобы отметить как проверенный">${p.verified ? '✅' : '<span style="color:var(--text4);font-size:14px">○</span>'}</td>
+                    <td onclick="event.stopPropagation();toggleVerified(${p.id})" style="cursor:pointer;text-align:center;font-size:16px" title="Нажми чтобы отметить как проверенный">${p.verified ? '✅' : '<span style="color:#2d3748;font-size:14px">○</span>'}</td>
                     <td onclick="event.stopPropagation();editPlayer(${p.id})" style="cursor:pointer" title="Нажми чтобы изменить профу" class="text-slate-400 text-xs">${(p.profas && p.profas.length > 0 ? p.profas : (p.profa && p.profa !== '—' ? [p.profa] : [])).map((pf,i) => `<span style="display:inline-flex;align-items:center;gap:5px;background:#1e2530;border-radius:6px;padding:4px 9px;margin-right:4px;${i===0?'color:#a5b4fc':'color:#64748b'}">${profaIconHtml(pf, 22)}<span onclick="event.stopPropagation();showProfaInfo(this.dataset.pf)" data-pf="${pf}" style="cursor:help;color:#475569;font-size:9px;margin-left:8px;padding:2px 4px">?</span></span>`).join('') || '<span style="color:#6366f155;font-size:11px;border:1px dashed #2d3748;padding:3px 8px;border-radius:6px">+ профа</span>'}</td>
                     <td onclick="event.stopPropagation()"><span class="pac-tag" onclick="event.stopPropagation();openPackFromRoster('${p.id}')" title="Нажми чтобы изменить пак" style="cursor:pointer" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='';this.style.color=''">${p.pac}</span></td>
                     <td class="${p.attendance < 50 ? 'text-red-400' : p.attendance < 70 ? 'text-yellow-400' : 'text-emerald-400'} font-bold">${totalDates > 0 ? p.attendance + '%' : '—'}</td>
@@ -3406,7 +3375,7 @@ function getClass2IconByClass3(c3) {
                     ['⚔️', totalKills, 'Убийства', '#f59e0b', null],
                     ['💀', totalDeaths, 'Смерти', '#ef4444', null],
                     ['⚡', kda, 'KDA', '#a78bfa', 'kda'],
-                    ['🗡️', fmtNum(totalPvp), 'PvP урон', '#818cf8', null],
+                    ['🗡️', fmtNum(totalPvp), 'PvP урон', '#4db88a', null],
                     ['🐉', fmtNum(totalPve), 'PvE урон', '#22c55e', null],
                 ].map(([icon,val,label,color,tipKey]) => `
                 <div class="prf-card" style="text-align:center;position:relative;overflow:hidden">
@@ -3438,7 +3407,7 @@ function getClass2IconByClass3(c3) {
                             <div style="display:flex;gap:16px">
                                 <div><div style="font-size:18px;font-weight:900;color:#f59e0b">${bestKm.kills}</div><div style="font-size:9px;color:#475569;font-weight:700;text-transform:uppercase">убийств</div></div>
                                 <div><div style="font-size:18px;font-weight:900;color:#ef4444">${bestKm.deaths}</div><div style="font-size:9px;color:#475569;font-weight:700;text-transform:uppercase">смертей</div></div>
-                                <div><div style="font-size:18px;font-weight:900;color:#818cf8">${fmtNum(bestKm.pvp_dmg)}</div><div style="font-size:9px;color:#475569;font-weight:700;text-transform:uppercase">pvp урон</div></div>
+                                <div><div style="font-size:18px;font-weight:900;color:#4db88a">${fmtNum(bestKm.pvp_dmg)}</div><div style="font-size:9px;color:#475569;font-weight:700;text-transform:uppercase">pvp урон</div></div>
                             </div>` : '<div style="color:#475569;font-size:13px">Нет данных</div>'}
                         </div>
                         <div class="prf-card">
@@ -3448,7 +3417,7 @@ function getClass2IconByClass3(c3) {
                             <div style="display:flex;gap:16px">
                                 <div><div style="font-size:18px;font-weight:900;color:#f59e0b">${worstKm.kills}</div><div style="font-size:9px;color:#475569;font-weight:700;text-transform:uppercase">убийств</div></div>
                                 <div><div style="font-size:18px;font-weight:900;color:#ef4444">${worstKm.deaths}</div><div style="font-size:9px;color:#475569;font-weight:700;text-transform:uppercase">смертей</div></div>
-                                <div><div style="font-size:18px;font-weight:900;color:#818cf8">${fmtNum(worstKm.pvp_dmg)}</div><div style="font-size:9px;color:#475569;font-weight:700;text-transform:uppercase">pvp урон</div></div>
+                                <div><div style="font-size:18px;font-weight:900;color:#4db88a">${fmtNum(worstKm.pvp_dmg)}</div><div style="font-size:9px;color:#475569;font-weight:700;text-transform:uppercase">pvp урон</div></div>
                             </div>` : '<div style="color:#475569;font-size:13px">Нет данных</div>'}
                         </div>
                         <div class="prf-card">
@@ -4006,7 +3975,7 @@ function getClass2IconByClass3(c3) {
                         <!-- Мини-карточки показателей -->
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px;text-align:left">
                             ${radarLabels.map((lb,i) => {
-                                const colors = ['#f59e0b','#a78bfa','#818cf8','#6366f1','#22c55e','#ef4444'];
+                                const colors = ['#f59e0b','#a78bfa','#4db88a','#6366f1','#22c55e','#ef4444'];
                                 return `<div style="background:#0b0e14;border-radius:6px;padding:5px 8px">
                                     <div style="font-size:9px;color:#475569;font-weight:700;text-transform:uppercase">${lb}</div>
                                     <div style="font-size:14px;font-weight:900;color:${colors[i]||'#94a3b8'}">${radarScores[i]}</div>
@@ -6879,7 +6848,7 @@ function getClass2IconByClass3(c3) {
                         <div style="background:#0b0e14;border:1px solid #2d3748;border-radius:8px;padding:10px 14px;margin-bottom:6px">
                             <div style="display:flex;justify-content:space-between;align-items:center">
                                 <div>
-                                    <span style="font-weight:800;font-size:14px">${p.name}</span>
+                                    <span style="font-weight:600;font-size:14px">${p.name}</span>
                                     <span style="font-size:10px;color:#475569;margin-left:8px">${p.pac || 'СОЛО'}</span>
                                 </div>
                                 <button onclick="keepOnlyThis('${p.id}', '${key}')"
@@ -7258,10 +7227,10 @@ function getClass2IconByClass3(c3) {
 
                     return `<div style="border:1px solid #1e2530;border-radius:10px;margin-bottom:6px;overflow:hidden">
                         <div onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='block'?'none':'block';this.querySelector('.arr').textContent=b.style.display==='block'?'▲':'▼'"
-                             style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#1a1f29;cursor:pointer">
+                             style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg3);cursor:pointer">
                             <div style="display:flex;align-items:center;gap:10px">
                                 ${(() => { const lr = roster.find(r => normalizeNick(r.name) === normalizeNick(cc.leader)); const lp = lr ? (lr.profa || '—') : '—'; return lp && lp !== '—' ? profaIconHtml(lp, 24) : ''; })()}
-                                <span class="player-nick-link" onclick="openPlayerProfile('${cc.leader.replace(/'/g,"\\'")}')" style="font-weight:800;font-size:13px;cursor:pointer">${cc.leader}</span>
+                                <span class="player-nick-link" onclick="openPlayerProfile('${cc.leader.replace(/'/g,"\\'")}')" style="font-weight:600;font-size:13px;cursor:pointer">${cc.leader}</span>
                                 ${packName ? `<span style="font-size:9px;background:#1e2530;color:#94a3b8;padding:1px 6px;border-radius:3px;text-transform:uppercase">${packName}</span>` : ''}
                                 <span style="font-size:10px;color:#64748b">👥 ${partyPlayers.length > 0 ? partyPlayers.length : (cc.members||0)}</span>
                                 ${hasDiscrepancy ? `<span title="Расхождение с командным каналом" style="font-size:11px">⚠️</span>` : ''}
@@ -8917,7 +8886,7 @@ function getClass2IconByClass3(c3) {
             if (valEl) {
                 valEl.innerHTML = playerValues.slice(0,5).map((p,i) => {
                     const c = p.value>=70?'#22c55e':p.value>=40?'#f59e0b':'#ef4444';
-                    return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #1e2530;cursor:pointer" onclick="openPlayerProfile(\''+p.name.replace(/'/g,"\\'")+'\')">#'+(i+1)+' <span style="font-weight:700;color:#e2e8f0;flex:1">'+p.name+'</span><span style="font-weight:900;color:'+c+'">'+p.value+'</span></div>';
+                    return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="openPlayerProfile(\''+p.name.replace(/'/g,"\\'")+'\')">#'+(i+1)+' <span style="font-weight:700;color:#e2e8f0;flex:1">'+p.name+'</span><span style="font-weight:900;color:'+c+'">'+p.value+'</span></div>';
                 }).join('');
             }
 
@@ -8974,7 +8943,7 @@ function getClass2IconByClass3(c3) {
                 if (gems.length > 0) {
                     gemsEl.innerHTML = gems.slice(0, 5).map((g, i) => {
                         const profaHtml = g.profa && g.profa !== '—' ? profaIconHtml(g.profa, 18) : '';
-                        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #1e2530;cursor:pointer" onclick="openPlayerProfile(\'' + g.name.replace(/'/g, "\\'") + '\')">' +
+                        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="openPlayerProfile(\'' + g.name.replace(/'/g, "\\'") + '\')">' +
                             profaHtml +
                             '<div style="flex:1;min-width:0">' +
                                 '<div style="font-weight:700;color:#e2e8f0;font-size:13px">' + g.name + ' <span style="color:#f59e0b;font-size:10px">' + g.att + '% явка · ' + g.kmCount + ' КМ</span></div>' +
