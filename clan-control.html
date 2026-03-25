@@ -2577,15 +2577,15 @@
         }
 
         // ===== КАСТОМНЫЙ ДРОПДАУН ПРОФ С ПОИСКОМ =====
-        const PROFA_DROPDOWN_GROUPS = [
-            { label: '🔵 Маги', items: ['Archmage','Mystic Muse','Storm Screamer','Soultaker','Arcana Lord','Elemental Master','Spectral Master'] },
-            { label: '💚 Поддержка', items: ['Cardinal',"Eva's Saint (EE)","Shillien Saint (SE)",'Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'] },
-            { label: '🏹 Лучники', items: ['Sagittarius','Moonlight Sentinel','Ghost Sentinel'] },
-            { label: '🗡️ Кинжалы', items: ['Adventurer','Wind Rider','Ghost Hunter','АВ/ПВ'] },
-            { label: '🛡️ Танки', items: ['Phoenix Knight','Hell Knight',"Eva's Templar",'Shillien Templar'] },
-            { label: '⚔️ Воины', items: ['Duelist','Dreadnought','Grand Khavatari','Titan','Fortune Seeker','Maestro','Doombringer','Judicator'] },
-            { label: '🐾 Другие', items: ['Soulhound','Trickster'] },
-        ];
+        function getProfaDropdownGroups() { return [
+            { label: t('🔵 Маги','🔵 Mages'), items: ['Archmage','Mystic Muse','Storm Screamer','Soultaker','Arcana Lord','Elemental Master','Spectral Master'] },
+            { label: t('💚 Поддержка','💚 Support'), items: ['Cardinal',"Eva's Saint (EE)","Shillien Saint (SE)",'Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'] },
+            { label: t('🏹 Лучники','🏹 Archers'), items: ['Sagittarius','Moonlight Sentinel','Ghost Sentinel'] },
+            { label: t('🗡️ Кинжалы','🗡️ Daggers'), items: ['Adventurer','Wind Rider','Ghost Hunter','АВ/ПВ'] },
+            { label: t('🛡️ Танки','🛡️ Tanks'), items: ['Phoenix Knight','Hell Knight',"Eva's Templar",'Shillien Templar'] },
+            { label: t('⚔️ Воины','⚔️ Warriors'), items: ['Duelist','Dreadnought','Grand Khavatari','Titan','Fortune Seeker','Maestro','Doombringer','Judicator'] },
+            { label: t('🐾 Другие','🐾 Other'), items: ['Soulhound','Trickster'] },
+        ]; }
 
         function toggleProfaDropdown() {
             const drop = document.getElementById('pProfaDrop');
@@ -2616,7 +2616,7 @@
             if (!el) return;
             const qAlt = switchKeyboardLayout(q);
             let html = '';
-            PROFA_DROPDOWN_GROUPS.forEach(group => {
+            getProfaDropdownGroups().forEach(group => {
                 const matchedItems = group.items.filter(pf => {
                     if (!q) return true;
                     const info = PROFA_INFO[pf] || {};
@@ -5395,13 +5395,15 @@ function getClass2IconByClass3(c3) {
         function showProfaInfo(profa) {
             const info = PROFA_INFO[profa] || PROFA_INFO[profa.split(' (')[0]];
             if (!info) return;
+            const roleMap = { 'Маг':'Mage','Хилер':'Healer','Баффер':'Buffer','Хилер/Баффер':'Healer/Buffer','Танк':'Tank','Воин':'Warrior','Лучник':'Archer','Кинжал':'Dagger','Другой':'Other' };
+            const roleDisplay = t(info.role, roleMap[info.role] || info.role);
             const rows = [
-                ['3-я профа (англ)', profa],
-                ['Русское название', info.ru],
-                ['Сокращение', info.short],
-                ['Роль', info.role],
-                ['2-я профа (рус)', info.ru2],
-                ['2-я профа (англ)', info.en2],
+                [t('3-я профа (англ)','3rd class (EN)'), profa],
+                [t('Русское название','Russian name'), info.ru],
+                [t('Сокращение','Short'), info.short],
+                [t('Роль','Role'), roleDisplay],
+                [t('2-я профа (рус)','2nd class (RU)'), info.ru2],
+                [t('2-я профа (англ)','2nd class (EN)'), info.en2],
             ];
             const bodyHtml = rows.map(function(r) {
                 return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e2530"><span style="color:#64748b;font-size:12px">' + r[0] + '</span><span style="color:#e2e8f0;font-weight:700;font-size:12px;text-align:right">' + r[1] + '</span></div>';
@@ -5414,7 +5416,7 @@ function getClass2IconByClass3(c3) {
                 
                 document.body.appendChild(modal);
             }
-            modal.innerHTML = '<div class="info-modal-bg" onclick="document.getElementById(\'profaInfoModal\').classList.remove(\'open\')"></div><div class="info-modal-box"><button class="info-modal-close" onclick="this.closest(\'.info-modal-overlay\').classList.remove(\'open\')">✕</button><div class="info-modal-icon">🎭</div><div class="info-modal-title">' + (info.short || profa) + '</div><div class="info-modal-sub">' + profa + ' · ' + info.role + '</div><div class="info-modal-body">' + bodyHtml + '</div></div>';
+            modal.innerHTML = '<div class="info-modal-bg" onclick="document.getElementById(\'profaInfoModal\').classList.remove(\'open\')"></div><div class="info-modal-box"><button class="info-modal-close" onclick="this.closest(\'.info-modal-overlay\').classList.remove(\'open\')">✕</button><div class="info-modal-icon">🎭</div><div class="info-modal-title">' + (info.short || profa) + '</div><div class="info-modal-sub">' + profa + ' · ' + roleDisplay + '</div><div class="info-modal-body">' + bodyHtml + '</div></div>';
             modal.classList.add('open');
         }
 
@@ -7621,7 +7623,7 @@ function getClass2IconByClass3(c3) {
             q = q.toLowerCase().trim();
             const qAlt = switchKeyboardLayout(q);
             let html = '';
-            PROFA_DROPDOWN_GROUPS.forEach(function(group) {
+            getProfaDropdownGroups().forEach(function(group) {
                 const matched = group.items.filter(function(pf) {
                     if (!q) return true;
                     const info = PROFA_INFO[pf] || {};
