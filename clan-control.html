@@ -865,7 +865,7 @@
         <section id="page-dashboard" class="page-section">
             <div class="flex justify-between items-center mb-6" style="flex-wrap:wrap;gap:10px">
                 <div>
-                    <h1 class="text-3xl font-bold">Дашборд</h1>
+                    <h1 class="text-3xl font-bold">Дашборд</h1><!-- i18n: Дашборд / Dashboard -->
                     <div id="dashSubtitle" class="text-slate-500 text-sm mt-1"></div>
                 </div>
                 <div id="dashNextEvent" style="background:#6366f122;border:1px solid #6366f144;border-radius:10px;padding:10px 16px;font-size:12px;color:#a5b4fc;font-weight:600;cursor:pointer" onclick="showPage('calendar')"></div>
@@ -1004,7 +1004,7 @@
 
             <!-- ОТЧЁТ: НЕ ПОПАЛИ В CC -->
             <div style="background:#12171f;border:1px solid #1e2530;border-radius:12px;padding:20px;margin-bottom:24px">
-                <div onclick="var el=document.getElementById('ccAbsenceReport');var btn=document.getElementById('ccToggleBtn');if(el.style.display==='none'){el.style.display='';btn.textContent='▲ Свернуть'}else{el.style.display='none';btn.textContent='▼ Показать'}" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;cursor:pointer">
+                <div onclick="var el=document.getElementById('ccAbsenceReport');var btn=document.getElementById('ccToggleBtn');var _tl=localStorage.getItem('cc_lang')||'ru';if(el.style.display==='none'){el.style.display='';btn.textContent=_tl==='en'?'▲ Collapse':'▲ Свернуть'}else{el.style.display='none';btn.textContent=_tl==='en'?'▼ Show':'▼ Показать'}" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;cursor:pointer">
                     <div>
                         <div style="font-size:13px;font-weight:800;color:#e2e8f0">⚠️ Не попали в CC подряд <span id="ccToggleBtn" style="font-size:10px;color:#475569;margin-left:8px">▼ Показать</span></div>
                         <div style="font-size:11px;color:#475569;margin-top:2px">Игроки из ростера которые отсутствовали в Командном канале N+ КМ подряд</div>
@@ -1462,7 +1462,48 @@
                 ['Чт', 'Thu'],
                 ['Пт', 'Fri'],
                 ['Сб', 'Sat'],
-                ['Вс', 'Sun']
+                ['Вс', 'Sun'],
+                // Stats tab
+                ['Начало', 'Start'],
+                ['Конец', 'End'],
+                ['▼ Показать', '▼ Show'],
+                ['▲ Свернуть', '▲ Collapse'],
+                ['Порог:', 'Threshold:'],
+                ['КМ подряд', 'wars in a row'],
+                ['Соло', 'Solo'],
+                ['Все время', 'All time'],
+                ['КМ дней:', 'War days:'],
+                ['начало', 'start'],
+                ['сегодня', 'today'],
+                ['никогда', 'never'],
+                ['Последний раз:', 'Last seen:'],
+                ['Нет данных КМ за выбранный период', 'No war data for selected period'],
+                ['Статистика пуста за выбранный период', 'No statistics for selected period'],
+                ['Загрузи скриншоты КМ или измени период', 'Upload war screenshots or change the period'],
+                ['Нет игроков с пропусками', 'No players with'],
+                ['КМ подряд', 'wars in a row'],
+                ['⚔️ Статистика по пакам', '⚔️ Pack statistics'],
+                ['📋 Личная статистика', '📋 Personal statistics'],
+                ['📊 Анализ по боссам / событиям', '📊 Analysis by bosses / events'],
+                ['⚔️ Убийства (клан)', '⚔️ Kills (clan)'],
+                ['💀 Смерти (клан)', '💀 Deaths (clan)'],
+                ['🗡️ PvP урон', '🗡️ PvP damage'],
+                ['🐉 PvE урон', '🐉 PvE damage'],
+                ['🏆 Топ KDA', '🏆 Top KDA'],
+                ['⚔️ Топ убийств', '⚔️ Top kills'],
+                ['🗡️ Топ PvP урон', '🗡️ Top PvP damage'],
+                ['💀 Топ смертей', '💀 Top deaths'],
+                ['Убийства', 'Kills'],
+                ['Смерти', 'Deaths'],
+                ['PvP урон', 'PvP damage'],
+                ['PvE урон', 'PvE damage'],
+                ['Игроков', 'Players'],
+                ['✅ Сильные:', '✅ Strong:'],
+                ['⚠️ Слабые:', '⚠️ Weak:'],
+                ['КМ · avg', 'wars · avg'],
+                ['⚠️ Не попали в CC подряд', '⚠️ Missing CC in a row'],
+                ['Игроки из ростера которые отсутствовали в Командном канале N+ КМ подряд', 'Roster players absent from Clan Channel for N+ consecutive wars'],
+                ['КМ+', 'wars+']
             ];
 
             const UI_ATTRS = {
@@ -1652,6 +1693,10 @@
                 s('loginSubtitle', t.sub); s('loginEmailLabel', t.emailLabel); s('loginClanLabel', t.clanLabel);
                 s('loginBtnText1', t.btn1); s('loginBtnText2', t.btn2); s('loginHintText', t.hint1);
                 applyStaticTranslations(l);
+                const dashPage = document.getElementById('page-dashboard');
+                if (dashPage && dashPage.classList.contains('active')) renderDashboard();
+                const statsPage = document.getElementById('page-stats');
+                if (statsPage && statsPage.classList.contains('active') && typeof renderStats === 'function') renderStats();
                 normalizeLightThemeInlineStyles();
             };
 
@@ -4214,7 +4259,8 @@ function getClass2IconByClass3(c3) {
                 .sort();
 
             if (allDates.length === 0) {
-                el.innerHTML = '<div style="color:#475569;font-size:12px">Нет данных КМ за выбранный период</div>';
+                const _ccl = localStorage.getItem('cc_lang') || 'ru';
+                el.innerHTML = `<div style="color:#475569;font-size:12px">${_ccl === 'en' ? 'No war data for selected period' : 'Нет данных КМ за выбранный период'}</div>`;
                 return;
             }
 
@@ -4278,9 +4324,11 @@ function getClass2IconByClass3(c3) {
                     return streak >= t;
                 }).length;
                 if (count === 0) return '';
+                const _ccbl = localStorage.getItem('cc_lang') || 'ru';
+                const _warsLabel = _ccbl === 'en' ? 'wars+' : 'КМ+';
                 return `<div onclick="setCcThreshold(${t})" style="background:${t===ccThreshold?'#6366f122':'#0b0e14'};border:1px solid ${t===ccThreshold?'#6366f1':'#1e2530'};border-radius:8px;padding:8px 14px;cursor:pointer;transition:all .15s;text-align:center;min-width:60px">
                     <div style="font-size:20px;font-weight:900;color:${count>0?'#ef4444':'#22c55e'}">${count}</div>
-                    <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase">${t}+ КМ</div>
+                    <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase">${t}+ ${_warsLabel === 'wars+' ? 'wars' : 'КМ'}</div>
                 </div>`;
             }).filter(Boolean).join('');
 
@@ -4296,18 +4344,20 @@ function getClass2IconByClass3(c3) {
             }).sort((a,b) => b._streak - a._streak);
 
             if (absentPlayers.length === 0 && summaryHtml === '') {
-                el.innerHTML = '<div style="color:#22c55e;font-size:12px;font-weight:700">✅ Нет игроков с пропусками ' + ccThreshold + '+ КМ подряд</div>';
+                const _ccnl = localStorage.getItem('cc_lang') || 'ru';
+                el.innerHTML = `<div style="color:#22c55e;font-size:12px;font-weight:700">✅ ${_ccnl === 'en' ? 'No players with ' + ccThreshold + '+ consecutive wars missed' : 'Нет игроков с пропусками ' + ccThreshold + '+ КМ подряд'}</div>`;
                 return;
             }
 
+            const _cclang = localStorage.getItem('cc_lang') || 'ru';
             const playersHtml = absentPlayers.length === 0
-                ? `<div style="color:#22c55e;font-size:12px;font-weight:700;margin-top:12px">✅ Нет игроков с пропусками ${ccThreshold}+ КМ подряд</div>`
+                ? `<div style="color:#22c55e;font-size:12px;font-weight:700;margin-top:12px">✅ ${_cclang === 'en' ? 'No players with ' + ccThreshold + '+ consecutive wars missed' : 'Нет игроков с пропусками ' + ccThreshold + '+ КМ подряд'}</div>`
                 : `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
                 ${absentPlayers.map(ph => {
                     const streak = ph._streak;
                     const color = streak >= 7 ? '#ef4444' : streak >= 5 ? '#f59e0b' : '#94a3b8';
                     const lastSeen = ph.dates.slice().reverse().find(d => d.present);
-                    const lastSeenStr = lastSeen ? fmtDate(lastSeen.date) : 'никогда';
+                    const lastSeenStr = lastSeen ? fmtDate(lastSeen.date) : (_cclang === 'en' ? 'never' : 'никогда');
                     // Последние даты как пиктограммы
                     const last8 = ph.dates.slice(-8);
                     const dotHtml = last8.map(d => `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${d.present?'#22c55e':'#ef4444'};margin:0 1px" title="${fmtDate(d.date)}:${d.present?'✅':'❌'}"></span>`).join('');
@@ -4321,7 +4371,7 @@ function getClass2IconByClass3(c3) {
                             ${ph.pac !== 'СОЛО' ? `<span class="pac-tag" style="font-size:9px;padding:1px 6px">${ph.pac}</span>` : ''}
                         </div>
                         <div style="margin-bottom:4px">${dotHtml}</div>
-                        <div style="font-size:10px;color:#475569">Последний раз: ${lastSeenStr}</div>
+                        <div style="font-size:10px;color:#475569">${_cclang === 'en' ? 'Last seen:' : 'Последний раз:'} ${lastSeenStr}</div>
                     </div>`;
                 }).join('')}
             </div>`;
@@ -4348,20 +4398,28 @@ function getClass2IconByClass3(c3) {
 
             // Метка периода
             if (labelEl) {
+                const _sl = localStorage.getItem('cc_lang') || 'ru';
                 if (statsDateFrom || statsDateTo) {
-                    labelEl.textContent = `Период: ${statsDateFrom||'начало'} — ${statsDateTo||'сегодня'} · КМ дней: ${allDates.length}`;
+                    const _start = statsDateFrom || (_sl === 'en' ? 'start' : 'начало');
+                    const _end   = statsDateTo   || (_sl === 'en' ? 'today' : 'сегодня');
+                    const _warDays = _sl === 'en' ? 'War days:' : 'КМ дней:';
+                    const _period  = _sl === 'en' ? 'Period:' : 'Период:';
+                    labelEl.textContent = `${_period} ${_start} — ${_end} · ${_warDays} ${allDates.length}`;
                 } else {
-                    labelEl.textContent = `Все время · КМ дней: ${allDates.length}`;
+                    labelEl.textContent = _sl === 'en'
+                        ? `All time · War days: ${allDates.length}`
+                        : `Все время · КМ дней: ${allDates.length}`;
                 }
             }
 
             // Обновляем список паков в фильтре
             const packFilterEl = document.getElementById('statsPackFilter');
             if (packFilterEl) {
+                const _sfl = localStorage.getItem('cc_lang') || 'ru';
                 const currentPacFilter = packFilterEl.value;
                 const pacNames = [...new Set(roster.map(r => r.pac).filter(p => p && p !== 'СОЛО'))].sort();
-                packFilterEl.innerHTML = '<option value="">Все паки</option>'
-                    + '<option value="СОЛО">Соло</option>'
+                packFilterEl.innerHTML = `<option value="">${_sfl === 'en' ? 'All packs' : 'Все паки'}</option>`
+                    + `<option value="СОЛО">${_sfl === 'en' ? 'Solo' : 'Соло'}</option>`
                     + pacNames.map(p => `<option value="${p}" ${p===currentPacFilter?'selected':''}>${p}</option>`).join('');
             }
             const activePacFilter = packFilterEl ? packFilterEl.value : '';
@@ -4383,10 +4441,11 @@ function getClass2IconByClass3(c3) {
             }
 
             if (players.length === 0) {
+                const _esl = localStorage.getItem('cc_lang') || 'ru';
                 el.innerHTML = `<div class="card text-center py-16 text-slate-600">
                     <div class="text-4xl mb-4">📭</div>
-                    <p class="text-lg font-medium">Статистика пуста за выбранный период</p>
-                    <p class="text-sm mt-2">Загрузи скриншоты КМ или измени период</p>
+                    <p class="text-lg font-medium">${_esl === 'en' ? 'No statistics for selected period' : 'Статистика пуста за выбранный период'}</p>
+                    <p class="text-sm mt-2">${_esl === 'en' ? 'Upload war screenshots or change the period' : 'Загрузи скриншоты КМ или измени период'}</p>
                 </div>`;
                 return;
             }
@@ -4445,16 +4504,16 @@ function getClass2IconByClass3(c3) {
 
             const packTableHtml = packList.length === 0 ? '' : `
                 <div style="background:#12171f;border:1px solid #1e2530;border-radius:12px;padding:20px;margin-bottom:20px">
-                    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#64748b;margin-bottom:14px">⚔️ Статистика по пакам</div>
+                    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#64748b;margin-bottom:14px">⚔️ ${(localStorage.getItem('cc_lang')||'ru')==='en'?'Pack statistics':'Статистика по пакам'}</div>
                     <table style="width:100%;border-collapse:collapse">
                         <thead><tr>
-                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:8px 14px;text-align:left;border-bottom:1px solid #1e2530">Пак</th>
-                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:8px 14px;text-align:center;border-bottom:1px solid #1e2530">Игроков</th>
+                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:8px 14px;text-align:left;border-bottom:1px solid #1e2530">${(localStorage.getItem('cc_lang')||'ru')==='en'?'Pack':'Пак'}</th>
+                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:8px 14px;text-align:center;border-bottom:1px solid #1e2530">${(localStorage.getItem('cc_lang')||'ru')==='en'?'Players':'Игроков'}</th>
                             <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:8px 14px;text-align:center;border-bottom:1px solid #1e2530">KDA</th>
-                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:8px 14px;text-align:center;border-bottom:1px solid #1e2530">Убийства</th>
-                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:8px 14px;text-align:center;border-bottom:1px solid #1e2530">Смерти</th>
-                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:8px 14px;text-align:center;border-bottom:1px solid #1e2530">PvP урон</th>
-                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:8px 14px;text-align:center;border-bottom:1px solid #1e2530">PvE урон</th>
+                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:8px 14px;text-align:center;border-bottom:1px solid #1e2530">${(localStorage.getItem('cc_lang')||'ru')==='en'?'Kills':'Убийства'}</th>
+                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:8px 14px;text-align:center;border-bottom:1px solid #1e2530">${(localStorage.getItem('cc_lang')||'ru')==='en'?'Deaths':'Смерти'}</th>
+                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:8px 14px;text-align:center;border-bottom:1px solid #1e2530">${(localStorage.getItem('cc_lang')||'ru')==='en'?'PvP damage':'PvP урон'}</th>
+                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:8px 14px;text-align:center;border-bottom:1px solid #1e2530">${(localStorage.getItem('cc_lang')||'ru')==='en'?'PvE damage':'PvE урон'}</th>
                         </tr></thead>
                         <tbody>
                             ${packList.sort((a,b)=>b.kills-a.kills).map(pk=>`
@@ -4471,9 +4530,11 @@ function getClass2IconByClass3(c3) {
                     </table>
                 </div>`;
 
+            const _rl = localStorage.getItem('cc_lang') || 'ru';
+            const _isEn = _rl === 'en';
             el.innerHTML = `
                 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">
-                    ${[['⚔️ Убийства (клан)', totalKills, '#f59e0b'],['💀 Смерти (клан)', totalDeaths, '#ef4444'],['🗡️ PvP урон', totalPvp.toLocaleString(), '#6366f1'],['🐉 PvE урон', totalPve.toLocaleString(), '#22c55e']].map(([label,val,color])=>`
+                    ${[[_isEn?'⚔️ Kills (clan)':'⚔️ Убийства (клан)', totalKills, '#f59e0b'],[_isEn?'💀 Deaths (clan)':'💀 Смерти (клан)', totalDeaths, '#ef4444'],[_isEn?'🗡️ PvP damage':'🗡️ PvP урон', totalPvp.toLocaleString(), '#6366f1'],[_isEn?'🐉 PvE damage':'🐉 PvE урон', totalPve.toLocaleString(), '#22c55e']].map(([label,val,color])=>`
                     <div style="background:#12171f;border:1px solid #1e2530;border-radius:12px;padding:20px;text-align:center">
                         <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:8px">${label}</div>
                         <div style="font-size:24px;font-weight:900;color:${color}">${val}</div>
@@ -4481,24 +4542,24 @@ function getClass2IconByClass3(c3) {
                 </div>
                 ${packTableHtml}
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
-                    ${topCard('🏆 Топ KDA', '#a78bfa', topKda, 'kda', false)}
-                    ${topCard('⚔️ Топ убийств', '#f59e0b', topKills, 'kills', false)}
-                    ${topCard('🗡️ Топ PvP урон', '#6366f1', topPvp, 'pvp_dmg', true)}
-                    ${topCard('💀 Топ смертей', '#ef4444', topDeaths, 'deaths', false)}
+                    ${topCard(_isEn?'🏆 Top KDA':'🏆 Топ KDA', '#a78bfa', topKda, 'kda', false)}
+                    ${topCard(_isEn?'⚔️ Top kills':'⚔️ Топ убийств', '#f59e0b', topKills, 'kills', false)}
+                    ${topCard(_isEn?'🗡️ Top PvP damage':'🗡️ Топ PvP урон', '#6366f1', topPvp, 'pvp_dmg', true)}
+                    ${topCard(_isEn?'💀 Top deaths':'💀 Топ смертей', '#ef4444', topDeaths, 'deaths', false)}
                 </div>
                 <div style="background:#12171f;border:1px solid #1e2530;border-radius:12px;padding:20px">
-                    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#64748b;margin-bottom:14px">📋 Личная статистика</div>
+                    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#64748b;margin-bottom:14px">📋 ${_isEn?'Personal statistics':'Личная статистика'}</div>
                     <div style="overflow-x:auto">
                     <table style="width:100%;border-collapse:collapse">
                         <thead><tr>
-                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('name')">Ник</th>
-                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid #1e2530">Пак</th>
-                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:center;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('attendance')">КМ%</th>
+                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('name')">${_isEn?'Nickname':'Ник'}</th>
+                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid #1e2530">${_isEn?'Pack':'Пак'}</th>
+                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:center;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('attendance')">${_isEn?'War %':'КМ%'}</th>
                             <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:center;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('kda')">KDA</th>
-                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:center;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('kills')">Убийства</th>
-                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:center;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('deaths')">Смерти</th>
-                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:center;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('pvp_dmg')">PvP урон</th>
-                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:center;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('pve_dmg')">PvE урон</th>
+                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:center;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('kills')">${_isEn?'Kills':'Убийства'}</th>
+                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:center;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('deaths')">${_isEn?'Deaths':'Смерти'}</th>
+                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:center;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('pvp_dmg')">${_isEn?'PvP damage':'PvP урон'}</th>
+                            <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:center;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('pve_dmg')">${_isEn?'PvE damage':'PvE урон'}</th>
                         </tr></thead>
                         <tbody id="statsTableBody"></tbody>
                     </table>
@@ -4756,7 +4817,9 @@ function getClass2IconByClass3(c3) {
             const bosses = Object.entries(data).filter(([,v]) => v.dates.length > 0);
             if (bosses.length === 0) { el.innerHTML = ''; return; }
 
-            el.innerHTML = '<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#475569;letter-spacing:.08em;margin-bottom:12px">📊 Анализ по боссам / событиям</div>' +
+            const _bal = localStorage.getItem('cc_lang') || 'ru';
+            const _baEn = _bal === 'en';
+            el.innerHTML = `<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#475569;letter-spacing:.08em;margin-bottom:12px">📊 ${_baEn ? 'Analysis by bosses / events' : 'Анализ по боссам / событиям'}</div>` +
                 '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px">' +
                 bosses.map(([boss, d]) => {
                     const n = d.dates.length;
@@ -4772,7 +4835,9 @@ function getClass2IconByClass3(c3) {
                     const worstClasses = classPerf.slice(-2).filter(c=>parseFloat(c.kda)<1);
 
                     // Роли
-                    const roleLabels = {dps:'⚔️ ДД', healer:'💊 Хил', tank:'🛡️ Танк'};
+                    const roleLabels = _baEn
+                        ? {dps:'⚔️ DD', healer:'💊 Heal', tank:'🛡️ Tank'}
+                        : {dps:'⚔️ ДД', healer:'💊 Хил', tank:'🛡️ Танк'};
                     const roleHtml = ['dps','healer','tank'].map(r => {
                         const rd = d.byRole[r];
                         if (rd.n === 0) return '';
@@ -4782,15 +4847,16 @@ function getClass2IconByClass3(c3) {
 
                     let insights = '';
                     if (topClasses.length > 0) {
-                        insights += '<div style="font-size:11px;color:#22c55e;margin-top:6px">✅ Сильные: ' + topClasses.map(c=>c.cls+' (KDA '+c.kda+')').join(', ') + '</div>';
+                        insights += `<div style="font-size:11px;color:#22c55e;margin-top:6px">✅ ${_baEn ? 'Strong:' : 'Сильные:'} ` + topClasses.map(c=>c.cls+' (KDA '+c.kda+')').join(', ') + '</div>';
                     }
                     if (worstClasses.length > 0) {
-                        insights += '<div style="font-size:11px;color:#ef4444;margin-top:3px">⚠️ Слабые: ' + worstClasses.map(c=>c.cls+' (KDA '+c.kda+')').join(', ') + '</div>';
+                        insights += `<div style="font-size:11px;color:#ef4444;margin-top:3px">⚠️ ${_baEn ? 'Weak:' : 'Слабые:'} ` + worstClasses.map(c=>c.cls+' (KDA '+c.kda+')').join(', ') + '</div>';
                     }
 
+                    const _warsWord = _baEn ? 'wars' : 'КМ';
                     return '<div style="background:#12171f;border:1px solid #1e2530;border-radius:12px;padding:16px">' +
                         '<div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:6px">'+boss+'</div>' +
-                        '<div style="font-size:11px;color:#64748b;margin-bottom:8px">'+n+' КМ · avg ⚔️'+avgK+' 💀'+avgD+' · KDA '+kda+'</div>' +
+                        `<div style="font-size:11px;color:#64748b;margin-bottom:8px">${n} ${_warsWord} · avg ⚔️${avgK} 💀${avgD} · KDA ${kda}</div>` +
                         '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">'+roleHtml+'</div>' +
                         insights +
                     '</div>';
@@ -8705,6 +8771,9 @@ function getClass2IconByClass3(c3) {
         };
 
         // ===== ДАШБОРД =====
+        function getLang() { return localStorage.getItem('cc_lang') || 'ru'; }
+        function t(ru, en) { return getLang() === 'en' ? en : ru; }
+
         function renderDashboard() {
             const allDates = Object.keys(appliedStatsByDate).sort();
             const totalKm = allDates.length;
@@ -8719,15 +8788,15 @@ function getClass2IconByClass3(c3) {
                 const ds = localDateStr(d);
                 const evs = getAllEventsForDate(ds).filter(e => getEventStatus(ds, e.key) !== 'done');
                 if (evs.length > 0) {
-                    const dayLabel = i === 0 ? 'Сегодня' : i === 1 ? 'Завтра' : d.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
+                    const dayLabel = i === 0 ? t('Сегодня','Today') : i === 1 ? t('Завтра','Tomorrow') : d.toLocaleDateString(getLang()==='en'?'en-US':'ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
                     nextEvent = { label: dayLabel, event: evs[0] }; break;
                 }
             }
             const nextEl = document.getElementById('dashNextEvent');
-            if (nextEl) nextEl.innerHTML = nextEvent ? '⏭ ' + nextEvent.label + ': <b>' + nextEvent.event.title + '</b>' + (nextEvent.event.time ? ' в ' + nextEvent.event.time : '') : '✅ Нет событий';
+            if (nextEl) nextEl.innerHTML = nextEvent ? '⏭ ' + nextEvent.label + ': <b>' + nextEvent.event.title + '</b>' + (nextEvent.event.time ? ' ' + t('в','at') + ' ' + nextEvent.event.time : '') : '✅ ' + t('Нет событий','No upcoming events');
 
             const subtitle = document.getElementById('dashSubtitle');
-            if (subtitle) subtitle.textContent = totalPlayers + ' игроков · ' + totalKm + ' КМ';
+            if (subtitle) subtitle.textContent = totalPlayers + ' ' + t('игроков','players') + ' · ' + totalKm + ' ' + t('КМ','wars');
 
             // Активных из РОСТЕРА (пересечение с последними КМ)
             const lastN = allDates.slice(-Math.min(3, totalKm));
@@ -8741,10 +8810,10 @@ function getClass2IconByClass3(c3) {
             const navCards = document.getElementById('dashNavCards');
             if (navCards) {
                 const nd = [
-                    { icon:'👥', num: totalPlayers, sub:'Клан' + (newPlayers > 0 ? ' · +' + newPlayers + ' new' : ''), color:'#6366f1', page:'roster' },
-                    { icon:'📅', num: totalKm > 0 ? allDates[allDates.length-1].split('-').slice(1).reverse().join('.') : '—', sub:'Календарь · ' + totalKm + ' КМ', color:'#3b82f6', page:'calendar' },
-                    { icon:'⚔️', num: packs.length, sub:'Рейд Паки', color:'#a78bfa', page:'packs' },
-                    { icon:'📊', num: activeCount + '/' + totalPlayers, sub:'Активных (' + lastN.length + ' КМ)', color: activeCount < totalPlayers * 0.5 ? '#ef4444' : '#22c55e', page:'stats' },
+                    { icon:'👥', num: totalPlayers, sub: t('Клан','Clan') + (newPlayers > 0 ? ' · +' + newPlayers + ' new' : ''), color:'#6366f1', page:'roster' },
+                    { icon:'📅', num: totalKm > 0 ? allDates[allDates.length-1].split('-').slice(1).reverse().join('.') : '—', sub: t('Календарь · ','Calendar · ') + totalKm + ' ' + t('КМ','wars'), color:'#3b82f6', page:'calendar' },
+                    { icon:'⚔️', num: packs.length, sub: t('Рейд Паки','Raid Packs'), color:'#a78bfa', page:'packs' },
+                    { icon:'📊', num: activeCount + '/' + totalPlayers, sub: t('Активных','Active') + ' (' + lastN.length + ' ' + t('КМ','wars') + ')', color: activeCount < totalPlayers * 0.5 ? '#ef4444' : '#22c55e', page:'stats' },
                 ];
                 navCards.innerHTML = nd.map(c => '<div class="dash-card" style="cursor:pointer;display:flex;align-items:center;gap:14px;padding:16px 18px" onclick="showPage(\'' + c.page + '\')">' + '<span style="font-size:24px">' + c.icon + '</span><div><div style="font-size:18px;font-weight:900;color:' + c.color + '">' + c.num + '</div><div style="font-size:11px;color:#64748b">' + c.sub + '</div></div></div>').join('');
             }
@@ -8830,7 +8899,7 @@ function getClass2IconByClass3(c3) {
             const totalDates = allDates.length;
             const statsMap = calcStatsForPeriod('', '');
             const items = [];
-            if (totalDates === 0) { el.innerHTML = '<div style="color:#475569;font-size:12px;padding:8px 0">Загрузи скриншоты КМ</div>'; return; }
+            if (totalDates === 0) { el.innerHTML = '<div style="color:#475569;font-size:12px;padding:8px 0">' + t('Загрузи скриншоты КМ','Upload war screenshots') + '</div>'; return; }
 
             const tanks=['Phoenix Knight','Hell Knight','Eva\'s Templar','Shillien Templar'];
             const healers=['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'];
@@ -8851,12 +8920,12 @@ function getClass2IconByClass3(c3) {
                 });
             });
             const nomads = Object.entries(pp).filter(([,s])=>s.size>=2).map(([nk,s])=>{ const r=roster.find(x=>normalizeNick(x.name)===nk); const ps=statsMap[nk]; return {name:r?r.name:nk,packs:[...s].map(lnk=>{const lr=roster.find(x=>normalizeNick(x.name)===lnk);return lr?lr.name:lnk;}),kills:ps?.kills||0}; }).sort((a,b)=>b.kills-a.kills);
-            nomads.slice(0,2).forEach(mp => { if(mp.kills>5) items.push({icon:'🔀',type:'info',title:mp.name+' — кочевник',text:'В паках: '+mp.packs.slice(0,3).join(', '), player:mp.name}); });
+            nomads.slice(0,2).forEach(mp => { if(mp.kills>5) items.push({icon:'🔀',type:'info',title:mp.name+' — '+t('кочевник','nomad'),text:t('В паках: ','In packs: ')+mp.packs.slice(0,3).join(', '), player:mp.name}); });
 
             // ДД с 0 убийств
             const allPS = roster.map(p=>{const nk=normalizeNick(p.name);const ps=statsMap[nk];if(!ps) return null;const pr=allDates.filter(d=>{const s=appliedStatsByDate[d];return s&&s.players&&s.players.some(sp=>normalizeNick(resolveAlias(sp.name))===nk||normalizeNick(sp.name)===nk);}).length;return{name:p.name,kills:ps.kills||0,deaths:ps.deaths||0,att:Math.round(pr/totalDates*100),profa:p.profa,pac:p.pac};}).filter(Boolean);
             const deadW = allPS.filter(p=>p.kills===0&&p.att>30&&!isSup(p.profa));
-            if(deadW.length>0) items.push({icon:'⚠️',type:'warn',title:deadW.length+' ДД с 0 убийств',text:deadW.slice(0,4).map(p=>p.name).join(', ')+(deadW.length>4?' +'+(deadW.length-4):''), players:deadW.map(p=>p.name), listType:'deadweight'});
+            if(deadW.length>0) items.push({icon:'⚠️',type:'warn',title:deadW.length+' '+t('ДД с 0 убийств','DPS with 0 kills'),text:deadW.slice(0,4).map(p=>p.name).join(', ')+(deadW.length>4?' +'+(deadW.length-4):''), players:deadW.map(p=>p.name), listType:'deadweight'});
 
             // MVP
             const dps=allPS.filter(p=>!isSup(p.profa)&&p.kills>3).map(p=>({...p,kda:p.kills/Math.max(p.deaths,1)})).sort((a,b)=>b.kda-a.kda);
@@ -8864,13 +8933,13 @@ function getClass2IconByClass3(c3) {
 
             // Надёжные саппорты
             const relSup = allPS.filter(p=>isSup(p.profa)&&p.att>=80);
-            if(relSup.length>0) items.push({icon:'💊',type:'good',title:relSup.length+' надёжных саппортов',text:relSup.slice(0,4).map(p=>p.name).join(', ')+'. Явка 80%+', players:relSup.map(p=>p.name), listType:'supports'});
+            if(relSup.length>0) items.push({icon:'💊',type:'good',title:relSup.length+' '+t('надёжных саппортов','reliable supports'),text:relSup.slice(0,4).map(p=>p.name).join(', ')+'. '+t('Явка','Attendance')+' 80%+', players:relSup.map(p=>p.name), listType:'supports'});
 
             // Сильные СОЛО
             const gs = allPS.filter(p=>p.pac==='СОЛО'&&p.kills>8&&p.att>=50);
-            if(gs.length>0) items.push({icon:'💎',type:'info',title:gs.length+' сильных СОЛО',text:gs.slice(0,3).map(p=>p.name+' ('+p.kills+'⚔️)').join(', ')+'. Стоит забрать в пак.', players:gs.map(p=>p.name), listType:'solostrong'});
+            if(gs.length>0) items.push({icon:'💎',type:'info',title:gs.length+' '+t('сильных СОЛО','strong SOLO'),text:gs.slice(0,3).map(p=>p.name+' ('+p.kills+'⚔️)').join(', ')+'. '+t('Стоит забрать в пак.','Consider moving to a pack.'), players:gs.map(p=>p.name), listType:'solostrong'});
 
-            if(items.length===0){el.innerHTML='<div style="color:#22c55e;font-size:13px;padding:12px 0">✅ Всё хорошо.</div>';return;}
+            if(items.length===0){el.innerHTML='<div style="color:#22c55e;font-size:13px;padding:12px 0">✅ '+t('Всё хорошо.','All good.')+'</div>';return;}
             const tc={info:'#3b82f6',warn:'#f59e0b',good:'#22c55e'};
             el.innerHTML = items.map(a=>{
                 const click = a.player ? ' onclick="openPlayerProfile(\''+a.player.replace(/'/g,"\\'")+'\');"' : (a.players ? ' onclick="showAttentionList(\''+a.listType+'\')" style="cursor:pointer;border-left-color:'+(tc[a.type]||'#3b82f6')+'"' : ' style="border-left-color:'+(tc[a.type]||'#3b82f6')+'"');
@@ -8885,7 +8954,7 @@ function getClass2IconByClass3(c3) {
             const totalDates = allDates.length;
 
             if (totalDates === 0) {
-                alerts.push({ type: 'info', icon: '📸', title: 'Нет данных КМ', text: 'Загрузи скриншоты КМ через Календарь чтобы начать анализ.' });
+                alerts.push({ type: 'info', icon: '📸', title: t('Нет данных КМ','No war data'), text: t('Загрузи скриншоты КМ через Календарь чтобы начать анализ.','Upload war screenshots via the Calendar to start analysis.') });
             }
 
             // Серии пропусков
@@ -8900,7 +8969,7 @@ function getClass2IconByClass3(c3) {
                         if (!present) streak++; else break;
                     }
                     if (streak >= 3) {
-                        alerts.push({ type: 'danger', icon: '🚨', title: p.name + ' — ' + streak + ' пропусков подряд', text: 'Отсутствует на последних ' + streak + ' КМ. Нужно связаться.', player: p.name });
+                        alerts.push({ type: 'danger', icon: '🚨', title: p.name + ' — ' + streak + ' ' + t('пропусков подряд','missed in a row'), text: t('Отсутствует на последних','Absent for the last') + ' ' + streak + ' ' + t('КМ. Нужно связаться.','wars. Contact them.'), player: p.name });
                     }
                 });
             }
@@ -8908,7 +8977,7 @@ function getClass2IconByClass3(c3) {
             // Игроки без профы
             const noProfa = roster.filter(p => !p.profa || p.profa === '—' || p.profa === '');
             if (noProfa.length > 0) {
-                alerts.push({ type: 'warn', icon: '🎭', title: noProfa.length + ' игроков без профы', text: noProfa.slice(0,5).map(p=>p.name).join(', ') + (noProfa.length > 5 ? ' +' + (noProfa.length-5) : '') });
+                alerts.push({ type: 'warn', icon: '🎭', title: noProfa.length + ' ' + t('игроков без профы','players without class'), text: noProfa.slice(0,5).map(p=>p.name).join(', ') + (noProfa.length > 5 ? ' +' + (noProfa.length-5) : '') });
             }
 
             // Пак без танка или хилера (если есть данные)
@@ -8919,10 +8988,10 @@ function getClass2IconByClass3(c3) {
                 const hasTank = members.some(m => m.profa && tankProfas.some(t => m.profa.includes(t.split(' ')[0])));
                 const hasHeal = members.some(m => m.profa && healProfas.some(h => m.profa.includes(h.split(' ')[0])));
                 if (members.length >= 3 && !hasTank) {
-                    alerts.push({ type: 'warn', icon: '🛡️', title: 'Пак ' + pack.name + ' без танка', text: 'Нет игрока с профой танка в составе.' });
+                    alerts.push({ type: 'warn', icon: '🛡️', title: t('Пак','Pack') + ' ' + pack.name + ' ' + t('без танка','has no tank'), text: t('Нет игрока с профой танка в составе.','No tank class player in the pack.') });
                 }
                 if (members.length >= 3 && !hasHeal) {
-                    alerts.push({ type: 'warn', icon: '💊', title: 'Пак ' + pack.name + ' без хилера', text: 'Нет кардинала/бишопа в составе пака.' });
+                    alerts.push({ type: 'warn', icon: '💊', title: t('Пак','Pack') + ' ' + pack.name + ' ' + t('без хилера','has no healer'), text: t('Нет кардинала/бишопа в составе пака.','No Cardinal/Bishop in the pack.') });
                 }
             });
 
@@ -8937,7 +9006,7 @@ function getClass2IconByClass3(c3) {
                     });
                 });
                 if (newNeverSeen.length > 0) {
-                    alerts.push({ type: 'info', icon: '🆕', title: newNeverSeen.length + ' новичков ни разу не были на КМ', text: newNeverSeen.map(p=>p.name).join(', ') });
+                    alerts.push({ type: 'info', icon: '🆕', title: newNeverSeen.length + ' ' + t('новичков ни разу не были на КМ','new members never attended a war'), text: newNeverSeen.map(p=>p.name).join(', ') });
                 }
             }
 
@@ -8947,7 +9016,7 @@ function getClass2IconByClass3(c3) {
                 const cnt0 = appliedStatsByDate[last2[0]]?.players?.length || 0;
                 const cnt1 = appliedStatsByDate[last2[1]]?.players?.length || 0;
                 if (cnt1 > cnt0 && cnt1 > cnt0 * 1.1) {
-                    alerts.push({ type: 'good', icon: '📈', title: 'Явка растёт!', text: 'Последний КМ: ' + cnt1 + ' чел. (было ' + cnt0 + ')' });
+                    alerts.push({ type: 'good', icon: '📈', title: t('Явка растёт!','Attendance is growing!'), text: t('Последний КМ:','Last war:') + ' ' + cnt1 + ' ' + t('чел.','players') + ' (' + t('было','was') + ' ' + cnt0 + ')' });
                 }
             }
 
@@ -8957,7 +9026,7 @@ function getClass2IconByClass3(c3) {
             const el = document.getElementById('dashAlerts');
             if (!el) return;
             if (alerts.length === 0) {
-                el.innerHTML = '<div style="color:#22c55e;font-size:13px;padding:12px 0">✅ Всё в порядке, предупреждений нет.</div>';
+                el.innerHTML = '<div style="color:#22c55e;font-size:13px;padding:12px 0">✅ ' + t('Всё в порядке, предупреждений нет.','All clear, no alerts.') + '</div>';
                 return;
             }
             const typeClass = { danger: '', warn: 'dash-alert-warn', info: 'dash-alert-info', good: 'dash-alert-good' };
@@ -8999,7 +9068,7 @@ function getClass2IconByClass3(c3) {
                 function rl(el2,list,isUp) { if(!el2) return; if(!list.length){el2.innerHTML='<div style="color:#475569;font-size:12px;padding:8px 0">—</div>';return;} el2.innerHTML=list.slice(0,5).map((g,i)=>'<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #1e2530;cursor:pointer;font-size:13px" onclick="openPlayerProfile(\''+g.name.replace(/'/g,"\\'")+'\')">#'+(i+1)+' <span style="font-weight:700;color:#e2e8f0;flex:1">'+g.name+'</span><span style="font-weight:700;color:'+(isUp?'#22c55e':'#ef4444')+'">'+(isUp?'+':'')+g.diff+' ⚔️</span></div>').join(''); }
                 rl(growEl, diffs.filter(g=>g.diff>0).sort((a,b)=>b.diff-a.diff), true);
                 rl(fallEl, diffs.filter(g=>g.diff<0).sort((a,b)=>a.diff-b.diff), false);
-            } else { if(growEl) growEl.innerHTML='<div style="color:#475569;font-size:12px">Нужно 2+ КМ</div>'; if(fallEl) fallEl.innerHTML='<div style="color:#475569;font-size:12px">Нужно 2+ КМ</div>'; }
+            } else { if(growEl) growEl.innerHTML='<div style="color:#475569;font-size:12px">'+t('Нужно 2+ КМ','Need 2+ wars')+'</div>'; if(fallEl) fallEl.innerHTML='<div style="color:#475569;font-size:12px">'+t('Нужно 2+ КМ','Need 2+ wars')+'</div>'; }
 
             // Редкие таланты — играют редко (<50% явки) но показывают высокие результаты на КМ
             const gemsEl = document.getElementById('dashRareGems');
@@ -9023,15 +9092,15 @@ function getClass2IconByClass3(c3) {
                         // Формируем описание
                         let desc = '';
                         if (role === 'dps') {
-                            desc = avgK + ' убийств/КМ, KDA ' + kda;
+                            desc = avgK + ' ' + t('убийств/КМ','kills/war') + ', KDA ' + kda;
                             if (pvp > 200) desc += ', ' + pvp.toLocaleString() + ' PvP';
                         } else if (role === 'healer') {
                             const avgD = vd.kmCount > 0 ? (deaths / vd.kmCount).toFixed(0) : 0;
-                            desc = 'Живучий саппорт, ' + avgD + ' смертей/КМ';
+                            desc = t('Живучий саппорт,','Sturdy support,') + ' ' + avgD + ' ' + t('смертей/КМ','deaths/war');
                         } else {
                             const avgD = vd.kmCount > 0 ? (deaths / vd.kmCount).toFixed(0) : 0;
-                            desc = 'Танк, ' + avgD + ' смертей/КМ';
-                            if (kills > 0) desc += ', ' + avgK + ' убийств';
+                            desc = t('Танк,','Tank,') + ' ' + avgD + ' ' + t('смертей/КМ','deaths/war');
+                            if (kills > 0) desc += ', ' + avgK + ' ' + t('убийств','kills');
                         }
                         return { name: p.name, att, avgScore, kmCount: vd.kmCount, desc, profa: p.profa };
                     }
@@ -9044,7 +9113,7 @@ function getClass2IconByClass3(c3) {
                         return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="openPlayerProfile(\'' + g.name.replace(/'/g, "\\'") + '\')">' +
                             profaHtml +
                             '<div style="flex:1;min-width:0">' +
-                                '<div style="font-weight:700;color:#e2e8f0;font-size:13px">' + g.name + ' <span style="color:#f59e0b;font-size:10px">' + g.att + '% явка · ' + g.kmCount + ' КМ</span></div>' +
+                                '<div style="font-weight:700;color:#e2e8f0;font-size:13px">' + g.name + ' <span style="color:#f59e0b;font-size:10px">' + g.att + '% ' + t('явка','attendance') + ' · ' + g.kmCount + ' ' + t('КМ','wars') + '</span></div>' +
                                 '<div style="font-size:11px;color:#94a3b8">' + g.desc + '</div>' +
                             '</div>' +
                             '</div>';
@@ -9053,7 +9122,7 @@ function getClass2IconByClass3(c3) {
                     gemsEl.innerHTML = '<div style="color:#475569;font-size:12px;padding:8px 0">—</div>';
                 }
             } else if (gemsEl) {
-                gemsEl.innerHTML = '<div style="color:#475569;font-size:12px">Нужно 2+ КМ</div>';
+                gemsEl.innerHTML = '<div style="color:#475569;font-size:12px">' + t('Нужно 2+ КМ','Need 2+ wars') + '</div>';
             }
         }
 
