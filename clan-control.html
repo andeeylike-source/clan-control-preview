@@ -34,23 +34,24 @@
         }
 
         body.light {
-            --bg:        #ede5d8;
-            --bg2:       #f7f1e8;
-            --bg3:       #e4d9c8;
-            --bg4:       #d8ccb8;
-            --border:    #b8946a;
-            --border2:   #9c7a50;
-            --text:      #1e0f04;
-            --text2:     #2e1a08;
-            --text3:     #5a3a1a;
-            --text4:     #7a5530;
-            --text5:     #a07848;
-            --accent:    #c9a84c;
-            --accent-h:  #b8922e;
-            --accent-s:  #e8c86a;
-            --shadow:    rgba(60,30,5,0.18);
-            --glow:      rgba(180,120,40,0.12);
-            --input-bg:  #faf5ed;
+            --bg:        #f4efe6;
+            --bg2:       #fbf7f1;
+            --bg3:       #efe6d8;
+            --bg4:       #e3d4bf;
+            --border:    #8a6742;
+            --border2:   #5f4428;
+            --text:      #18120c;
+            --text2:     #24180e;
+            --text3:     #5c4329;
+            --text4:     #7a5a38;
+            --text5:     #9d7a51;
+            --accent:    #b88a44;
+            --accent-h:  #9a6d2f;
+            --accent-s:  #d4ab63;
+            --accent2-s: #1f9d55;
+            --shadow:    rgba(41,26,12,0.14);
+            --glow:      rgba(139,94,52,0.12);
+            --input-bg:  #fffdf9;
         }
 
         *, *::before, *::after { box-sizing: border-box; }
@@ -719,6 +720,208 @@
         body.light .dp-day.in-range { background: rgba(201,168,76,0.2) !important; color: #7a4800 !important; }
         body.light .dp-month-btn, body.light .dp-year-btn { background: var(--bg3) !important; color: var(--text3) !important; }
         body.light .dp-month-btn.selected, body.light .dp-year-btn.selected { background: var(--accent) !important; color: #1e0f04 !important; }
+    
+        /* =============================================
+           PREMIUM LIGHT MODE FIXES
+        ============================================= */
+        .topbar-logo .brand-dark { color: var(--text); }
+        .topbar-logo .brand-accent { color: var(--accent); }
+        body.light .topbar-logo { color: var(--text) !important; letter-spacing: -0.02em; }
+        body.light .topbar-logo .brand-dark { color: #16110c !important; }
+        body.light .topbar-logo .brand-accent { color: #8b6234 !important; }
+        body.light .topbar-clan {
+            display: inline-flex !important;
+            align-items: center;
+            min-height: 34px;
+            padding: 0 14px;
+            border-radius: 10px;
+            border: 1px solid #6a4b2c !important;
+            background: linear-gradient(180deg, #fff7ea 0%, #f2e3ca 100%) !important;
+            color: #6d4c25 !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.65);
+        }
+        body.light .flip-toggle {
+            border-color: #7a5735 !important;
+            background: linear-gradient(180deg, #fffdf8 0%, #f2e7d7 100%) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+        }
+        body.light .flip-toggle-thumb {
+            background: linear-gradient(180deg, #caa24f 0%, #b07b2d 100%) !important;
+            box-shadow: 0 1px 8px rgba(113,73,27,.22);
+        }
+        body.light .nav-item.active {
+            background: linear-gradient(90deg, rgba(184,138,68,.18), rgba(184,138,68,.05)) !important;
+            color: #5f4428 !important;
+            border-left: 3px solid #8a6742 !important;
+        }
+        body.light .card,
+        body.light .pack-card,
+        body.light .member-list-item,
+        body.light .profile-stat-card,
+        body.light .event-modal-card,
+        body.light .info-modal-box,
+        body.light .day-modal-card,
+        body.light .drawer-card,
+        body.light .dp-popup,
+        body.light table,
+        body.light .calendar-grid {
+            background: var(--bg2) !important;
+            border-color: var(--border) !important;
+            box-shadow: 0 10px 30px rgba(83,58,28,.04);
+        }
+        body.light tr:hover td,
+        body.light .cc-hover-row:hover td,
+        body.light .member-list-item:hover,
+        body.light .calendar-day:hover {
+            background: #efe2cf !important;
+        }
+        body.light tr.selected td,
+        body.light tr.active td {
+            background: #e6d4ba !important;
+        }
+        body.light td:first-child,
+        body.light .player-nick-link,
+        body.light .font-bold,
+        body.light h1,
+        body.light h2,
+        body.light h3 { color: #17120d !important; }
+        body.light .player-nick-link { border-bottom-color: #8a6742 !important; }
+        body.light .player-nick-link:hover { color: #8b6234 !important; border-bottom-color: #8b6234 !important; }
+        body.light .badge-кл,
+        body.light .badge-пл,
+        body.light .badge-игрок,
+        body.light .pac-tag {
+            background: #f6ecde !important;
+            border: 1px solid #8a6742 !important;
+            color: #6a4b2c !important;
+            font-weight: 700 !important;
+        }
+        body.light .event-chip,
+        body.light .event-item-row {
+            border-radius: 12px;
+        }
+        body.light .event-manual {
+            background: rgba(31,157,85,.14) !important;
+            color: #167344 !important;
+            border-color: rgba(31,157,85,.32) !important;
+        }
+        body.light .dot-done { background: #16a34a !important; }
+        body.light .toggle-done-btn.done {
+            background: #7fd39a !important;
+            border-color: #7fd39a !important;
+            color: #ffffff !important;
+        }
+        body.light .event-modal-card,
+        body.light .info-modal-box {
+            background: #fbf7f1 !important;
+            border: 1px solid #8a6742 !important;
+        }
+        body.light .event-item-row {
+            background: #f7efe4 !important;
+            border: 1px solid #d3b189 !important;
+        }
+        body.light .event-item-row span,
+        body.light .event-item-row div,
+        body.light .section-label,
+        body.light .day-number,
+        body.light .dp-month-label,
+        body.light .dp-dow,
+        body.light .dp-day,
+        body.light .event-time { color: #5f4428 !important; }
+        body.light .btn-primary,
+        body.light button[onclick*="save"],
+        body.light button[onclick*="Save"] {
+            background: linear-gradient(180deg, #cfad54 0%, #b88a44 100%) !important;
+            color: #1a140d !important;
+            border: 1px solid #8a6742 !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.5);
+        }
+        body.light .btn-primary:hover { background: linear-gradient(180deg, #d7b666 0%, #c28d3c 100%) !important; }
+        body.light input,
+        body.light textarea,
+        body.light select,
+        body.light .input-dark {
+            background: #fffdf9 !important;
+            border: 1px solid #b59065 !important;
+            color: #18120c !important;
+        }
+        body.light input::placeholder,
+        body.light textarea::placeholder { color: #9d7a51 !important; }
+        body.light .calendar-grid { background: #ccb08d !important; }
+        body.light .calendar-header-cell {
+            background: #f1e4d2 !important;
+            color: #6d4c25 !important;
+            border-bottom: 1px solid #b59065 !important;
+        }
+        body.light .calendar-day {
+            background: #fbf7f1 !important;
+            min-height: 104px;
+        }
+        body.light .calendar-day.today {
+            background: #fff4df !important;
+            outline: 1px solid rgba(184,138,68,.55) !important;
+        }
+        body.light .event-epic {
+            background: rgba(201,168,76,.18) !important;
+            color: #7a531d !important;
+            border-color: rgba(184,138,68,.45) !important;
+        }
+        body.light .pack-card:hover {
+            border-color: #8a6742 !important;
+            transform: translateY(-1px);
+            box-shadow: 0 10px 24px rgba(83,58,28,.08);
+        }
+        body.light .member-list-item.clickable {
+            cursor: pointer;
+            transition: background .15s ease, border-color .15s ease;
+        }
+        body.light .member-list-item.clickable:hover {
+            background: #efe2cf !important;
+            border-color: #8a6742 !important;
+        }
+        body.light [style*="background:#12171f"],
+        body.light [style*="background:#1e2530"],
+        body.light [style*="background:#0b0e14"],
+        body.light [style*="background:#1a1f29"] {
+            background: #f4eadc !important;
+            color: #24180e !important;
+            border-color: #8a6742 !important;
+        }
+        body.light [style*="color:#e2e8f0"],
+        body.light [style*="color:#94a3b8"],
+        body.light [style*="color:#64748b"],
+        body.light [style*="color:#475569"] { color: #5c4329 !important; }
+        body.light [style*="color:#60a5fa"],
+        body.light [style*="color:#a5b4fc"] { color: #8b6234 !important; }
+        body.light [style*="background:#6366f122"],
+        body.light [style*="background:#6366f1"] {
+            background: #f3e7d4 !important;
+            color: #6d4c25 !important;
+            border-color: #8a6742 !important;
+        }
+        body.light .prf-card,
+        body.light .km-row,
+        body.light .km-bar-wrap,
+        body.light .dash-card,
+        body.light .dash-alert {
+            background: var(--bg2) !important;
+            border-color: var(--border) !important;
+        }
+        body.light .prf-section-title,
+        body.light .prf-val-label,
+        body.light .dash-card-title,
+        body.light .profile-stat-label { color: #6d4c25 !important; }
+        body.light #valueWeightsConfig label,
+        body.light #valueWeightsConfig .font-semibold,
+        body.light #valueWeightsConfig .font-bold,
+        body.light #valueWeightsConfig span,
+        body.light #valueWeightsConfig div { color: #24180e !important; }
+        body.light #valueWeightsConfig input {
+            font-weight: 800 !important;
+            color: #18120c !important;
+            border-color: #8a6742 !important;
+        }
+
     </style>
 </head>
 <body>
@@ -781,9 +984,9 @@
      TOPBAR
      ============================================= -->
 <div id="topbar" class="hidden">
-    <div class="topbar-logo">⚔️ Clan<span>Control</span></div>
+    <div class="topbar-logo" id="topbarLogo">⚔️ <span class="brand-dark">Clan</span><span class="brand-accent">Control</span></div>
     <div class="topbar-right">
-        <div class="topbar-clan" id="topbarClan" style="display:none"></div>
+        <div class="topbar-clan" id="topbarClan">CLAN</div>
         <div class="topbar-divider"></div>
         <button class="flip-toggle" id="themeToggle" type="button" onclick="toggleTheme()" aria-label="Переключить тему">
             <span class="flip-toggle-track"></span>
@@ -1050,7 +1253,7 @@
                 </div>
                 <div class="space-y-6">
                     <div class="card sticky top-10">
-                        <h3 class="text-sm font-black text-slate-500 uppercase tracking-widest mb-4">Добавить СОЛО</h3>
+                        <h3 class="text-sm font-black text-slate-500 uppercase tracking-widest mb-4">Добавить игрока</h3>
                         <div class="relative">
                             <input id="detailPlayerSearchInput" type="text" class="input-dark" placeholder="Ник..." onfocus="handleDetailSearch('')" oninput="handleDetailSearch(this.value)">
                             <div id="detailSearchSuggestions" class="autocomplete-suggestions hidden"></div>
@@ -1392,6 +1595,29 @@
                 ['Распустить группу', 'Disband group'],
                 ['Участники', 'Members'],
                 ['Добавить СОЛО', 'Add SOLO'],
+                ['Добавить игрока', 'Add player'],
+                ['Свернуть', 'Collapse'],
+                ['Прошедший день', 'Past day'],
+                ['КМ события', 'War events'],
+                ['+ Добавить событие', '+ Add event'],
+                ['📸 Скриншоты КМ', '📸 War screenshots'],
+                ['Нажми или перетащи скриншоты (до 25 шт.)', 'Click or drag screenshots (up to 25)'],
+                ['Явка', 'Attendance'],
+                ['Рейтинг класса', 'Class rating'],
+                ['Рейтинг клана', 'Clan rating'],
+                ['Живучесть', 'Survivability'],
+                ['PvP урон', 'PvP damage'],
+                ['PvE урон', 'PvE damage'],
+                ['Веса ценности', 'Value weights'],
+                ['Настрой формулу расчёта "ценности" для каждой роли. Сумма весов должна быть 100%.', 'Set the value formula for each role. Total weights must equal 100%.'],
+                ['Показывать всплывающее уведомление', 'Show popup notification'],
+                ['Звуковое уведомление', 'Sound notification'],
+                ['Экспорт / Импорт данных', 'Export / Import data'],
+                ['Сохраняй данные в файл и загружай обратно. Удобно для резервного копирования и переноса.', 'Save data to a file and import it back. Useful for backup and transfer.'],
+                ['Данные', 'Data'],
+                ['Сбросить все данные приложения (ростер, статистика, события). Ключи сохранятся.', 'Reset all app data (roster, statistics, events). Keys will remain saved.'],
+                ['Показать онбординг', 'Show onboarding'],
+
                 ['Ник...', 'Nickname...'],
                 ['📋 История КМ', '📋 War History'],
                 ['🔍 Поиск игрока по КМам...', '🔍 Search player in wars...'],
@@ -1573,9 +1799,9 @@
                         const lang = localStorage.getItem('cc_lang') || 'ru';
                         applyStaticTranslations(lang);
                         normalizeLightThemeInlineStyles();
-                    }, 0);
+                    }, 120);
                 });
-                observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+                observer.observe(document.body, { childList: true, subtree: true });
             }
 
             window._loginEmail = '';
@@ -1654,13 +1880,27 @@
                 document.getElementById('loginScreen').classList.remove('hidden');
             };
 
+            function updateTopbarClan() {
+                const cb = document.getElementById('topbarClan');
+                if (!cb) return;
+                const savedClan = (sessionStorage.getItem('cc_clan') || localStorage.getItem('cc_clan') || '').trim();
+                const inputClan = ((document.getElementById('loginClanInput') || {}).value || '').trim();
+                const clan = (savedClan || inputClan || 'CLAN').toUpperCase();
+                cb.textContent = clan;
+                cb.style.display = '';
+            }
+
             function _showApp(email, clan) {
                 document.getElementById('loginScreen').classList.add('hidden');
                 document.getElementById('topbar').classList.remove('hidden');
                 document.getElementById('appLayout').classList.remove('hidden');
                 const av = document.getElementById('topbarAvatar'); if(av) av.textContent = (email[0]||'?').toUpperCase();
                 const em = document.getElementById('topbarEmail'); if(em) em.textContent = email;
-                const cb = document.getElementById('topbarClan'); if(cb){ if(clan){cb.textContent=clan;cb.style.display='';}else cb.style.display='none'; }
+                if (clan) {
+                    sessionStorage.setItem('cc_clan', clan);
+                    localStorage.setItem('cc_clan', clan);
+                }
+                updateTopbarClan();
             }
 
             // INIT
@@ -1680,6 +1920,11 @@
                 }
             }
         })();
+
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof updateTopbarClan === 'function') updateTopbarClan();
+        });
 
         // ===== ДАННЫЕ =====
         let roster = [
