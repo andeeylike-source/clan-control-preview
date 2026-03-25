@@ -1456,7 +1456,22 @@
                 ['Проверен — ник и профа верны', 'Verified — nickname and class are correct'],
                 ['Введи ник чтобы найти все КМ где участвовал этот игрок', 'Enter a nickname to find all wars where this player participated'],
                 ['Диагностика', 'Diagnostics'],
-                ['Пн', 'Mon'],
+                ['Настрой формулу расчёта "ценности" для каждой роли. Сумма весов должна быть 100%.', 'Set the formula for calculating "value" for each role. The sum of weights must be 100%.'],
+                ['Настройки уведомления при завершении анализа скриншотов.', 'Notification settings when screenshot analysis is complete.'],
+                ['Показывать всплывающее уведомление', 'Show popup notification'],
+                ['Звуковое уведомление', 'Sound notification'],
+                ['Сбросить все данные приложения (ростер, статистика, события). Ключи сохранятся.', 'Reset all application data (roster, statistics, events). Keys will be preserved.'],
+                ['🔔 Уведомления', '🔔 Notifications'],
+                ['💾 Экспорт / Импорт данных', '💾 Export / Import data'],
+                ['🗑️ Данные', '🗑️ Data'],
+                ['⚖️ Веса ценности', '⚖️ Value weights'],
+                ['Сохраняй данные в файл и загружай обратно. Удобно для резервного копирования и переноса.', 'Save data to a file and load it back. Useful for backup and migration.'],
+                ['📤 Экспорт в JSON', '📤 Export to JSON'],
+                ['📥 Импорт из JSON', '📥 Import from JSON'],
+                ['🗑️ Сбросить все данные', '🗑️ Reset all data'],
+                ['📖 Показать онбординг', '📖 Show onboarding'],
+                ['+ Добавить алиас', '+ Add alias'],
+                ['▼ Развернуть', '▼ Expand'],
                 ['Вт', 'Tue'],
                 ['Ср', 'Wed'],
                 ['Чт', 'Thu'],
@@ -1761,6 +1776,18 @@
                 if (statsPage && statsPage.classList.contains('active') && typeof renderStats === 'function') renderStats();
                 const calPage = document.getElementById('page-calendar');
                 if (calPage && calPage.classList.contains('active') && typeof renderCalendar === 'function') renderCalendar();
+                const histPage = document.getElementById('page-screenshots');
+                if (histPage && histPage.classList.contains('active') && typeof renderKmHistory === 'function') renderKmHistory();
+                const packsPage = document.getElementById('page-packs');
+                if (packsPage && packsPage.classList.contains('active') && typeof renderPacks === 'function') renderPacks();
+                const archivePage = document.getElementById('page-archive');
+                if (archivePage && archivePage.classList.contains('active') && typeof renderArchive === 'function') renderArchive();
+                const settingsPage = document.getElementById('page-settings');
+                if (settingsPage && settingsPage.classList.contains('active')) {
+                    if (typeof renderValueWeightsUI === 'function') renderValueWeightsUI();
+                    if (typeof renderAliases === 'function') renderAliases();
+                    if (typeof renderApiKeys === 'function') renderApiKeys();
+                }
                 normalizeLightThemeInlineStyles();
             };
 
@@ -1833,6 +1860,10 @@
                 }
             }
         })();
+
+        // ===== ПЕРЕВОДЧИК =====
+        function getLang() { return localStorage.getItem('cc_lang') || 'ru'; }
+        function t(ru, en) { return getLang() === 'en' ? en : ru; }
 
         // ===== ДАННЫЕ =====
         let roster = [
@@ -2288,7 +2319,7 @@
             document.getElementById('dayModal').style.display = 'none';
             const bar = document.getElementById('dayMinibar');
             bar.style.display = 'flex';
-            document.getElementById('minibarSub').innerText = 'Нажми чтобы развернуть';
+            document.getElementById('minibarSub').innerText = t('Нажми чтобы развернуть','Click to expand');
         }
 
         function expandDayModal() {
@@ -2502,7 +2533,7 @@
             const body = document.getElementById('archiveBody');
             if (!body) return;
             if (archive.length === 0) {
-                body.innerHTML = '<tr><td colspan="3" class="text-center py-10 text-slate-600 italic">Архив пуст</td></tr>';
+                body.innerHTML = '<tr><td colspan="3" class="text-center py-10 text-slate-600 italic">' + t('Архив пуст','Archive is empty') + '</td></tr>';
                 return;
             }
             body.innerHTML = archive.map(p => `
@@ -2514,8 +2545,8 @@
                             : profaIconHtml(p.profa, 22)
                     }</td>
                     <td class="text-right flex gap-3 justify-end">
-                        <button onclick="restoreFromArchive(${p.id})" class="text-emerald-500 font-bold hover:underline">Восстановить</button>
-                        <button onclick="deleteFromArchive(${p.id})" class="text-red-500 font-bold hover:underline">Удалить</button>
+                        <button onclick="restoreFromArchive(${p.id})" class="text-emerald-500 font-bold hover:underline">${t('Восстановить','Restore')}</button>
+                        <button onclick="deleteFromArchive(${p.id})" class="text-red-500 font-bold hover:underline">${t('Удалить','Delete')}</button>
                     </td>
                 </tr>
             `).join('');
@@ -2822,7 +2853,7 @@
                     <div class="pack-card" onclick="openPackDetail(${pack.id})">
                         <div class="mb-4">
                             <h4 class="text-lg font-bold uppercase">${pack.name}</h4>
-                            <p class="text-slate-500 text-xs">Участников: ${members.length}</p>
+                            <p class="text-slate-500 text-xs">${t('Участников:','Members:')} ${members.length}</p>
                         </div>
                         <div class="text-[11px] text-slate-500 flex flex-wrap gap-1">
                             ${members.slice(0, 5).map(m => `<span style="background:var(--bg4);color:var(--text2);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600">${m.name}</span>`).join('')}
@@ -2834,7 +2865,7 @@
         }
 
         function createNewPack() {
-            showPrompt("Новый Рейд Пак", "Введите название группы...", (name) => {
+            showPrompt(t("Новый Рейд Пак","New Raid Pack"), t("Введите название группы...","Enter group name..."), (name) => {
                 if (name) { packs.push({ id: Date.now(), name: name.toUpperCase() }); saveToStorage(); renderPacks(); }
             });
         }
@@ -2873,7 +2904,7 @@
         }
 
         function confirmDeleteCurrentPack() {
-            showConfirm("Роспуск группы", "Все участники станут СОЛО-игроками.", () => {
+            showConfirm(t("Роспуск группы","Disband group"), t("Все участники станут СОЛО-игроками.","All members will become SOLO players."), () => {
                 const pack = packs.find(p => p.id === currentActivePackId);
                 roster.forEach(p => { if(p.pac === pack.name) p.pac = "СОЛО"; });
                 packs = packs.filter(p => p.id !== currentActivePackId);
@@ -5060,7 +5091,7 @@ function getClass2IconByClass3(c3) {
             const resultsEl = document.getElementById('clanImportResults');
             statusEl.style.display = 'block';
             statusEl.style.cssText = 'display:block;background:#1e1b4b;border:1px solid #6366f144;color:#a5b4fc;font-size:12px;padding:10px 14px;border-radius:8px;margin-top:10px';
-            statusEl.textContent = '⏳ Анализирую ' + files.length + ' скриншотов клана...';
+            statusEl.textContent = '⏳ ' + t('Анализирую','Analyzing') + ' ' + files.length + ' ' + t('скриншотов клана...','clan screenshots...');
             resultsEl.style.display = 'none';
 
             const apiKey = getNextApiKey();
@@ -5159,7 +5190,7 @@ function getClass2IconByClass3(c3) {
 
             if (allParsed.length === 0) {
                 statusEl.style.cssText = 'display:block;background:#7f1d1d22;border:1px solid #ef444444;color:#f87171;font-size:12px;padding:10px 14px;border-radius:8px;margin-top:10px';
-                statusEl.textContent = '❌ Не удалось распознать игроков. Проверь качество скриншотов.';
+                statusEl.textContent = t('❌ Не удалось распознать игроков. Проверь качество скриншотов.','❌ Could not recognize players. Check screenshot quality.');
                 return;
             }
 
@@ -5234,7 +5265,7 @@ function getClass2IconByClass3(c3) {
             });
 
             statusEl.style.cssText = 'display:block;background:#14532d22;border:1px solid #22c55e44;color:#4ade80;font-size:12px;padding:10px 14px;border-radius:8px;margin-top:10px';
-            statusEl.textContent = '✅ Распознано: ' + unique.length + ' игроков. Новых: ' + newPlayers.length + '. Уже в ростере: ' + existing.length + (lowLevel.length > 0 ? '. Отсеяно по уровню (<' + minLevel + '): ' + lowLevel.length : '');
+            statusEl.textContent = '✅ ' + t('Распознано:','Recognized:') + ' ' + unique.length + ' ' + t('игроков. Новых:','players. New:') + ' ' + newPlayers.length + '. ' + t('Уже в ростере:','Already in roster:') + ' ' + existing.length + (lowLevel.length > 0 ? '. ' + t('Отсеяно по уровню (<','Filtered by level (<') + minLevel + '): ' + lowLevel.length : '');
 
             // Показываем результаты
             resultsEl.style.display = 'block';
@@ -5482,7 +5513,7 @@ function getClass2IconByClass3(c3) {
                     loaded++;
                     if (loaded === toAdd.length) {
                         renderDayScreenshotPreviews(dateStr);
-                        setDayStatus('success', `✅ Добавлено ${toAdd.length} скриншотов (всего: ${dayScreenshots[dateStr].length})`);
+                        setDayStatus('success', `✅ ${t('Добавлено','Added')} ${toAdd.length} ${t('скриншотов (всего:','screenshots (total:')} ${dayScreenshots[dateStr].length})`);
                         updateAnalyzeBlock(dateStr);
                         renderCalendar();
                         if (document.getElementById('page-screenshots').classList.contains('active')) renderScreenshotArchive();
@@ -5771,9 +5802,9 @@ function getClass2IconByClass3(c3) {
 
             const btn = document.getElementById('analyzeBtn');
             btn.disabled = true;
-            btn.innerText = '⏳ Анализирую...';
+            btn.innerText = t('⏳ Анализирую...','⏳ Analyzing...');
             document.getElementById('dayAnalyzeResults').style.display = 'none';
-            setDayStatus('loading', `⏳ Анализирую ${shots.length} скриншотов...`);
+            setDayStatus('loading', `⏳ ${t('Анализирую','Analyzing')} ${shots.length} ${t('скриншотов...','screenshots...')}`);
             // Показываем прогресс-бар
             let progBar = document.getElementById('analyzeProgressWrap');
             if (!progBar) {
@@ -5787,8 +5818,8 @@ function getClass2IconByClass3(c3) {
             progBar.style.display = 'block';
 
             // Обновляем минибар но НЕ сворачиваем автоматически
-            document.getElementById('minibarText').innerText = `⏳ Анализирую 0 из ${shots.length}...`;
-            document.getElementById('minibarSub').innerText = 'Нажми чтобы развернуть';
+            document.getElementById('minibarText').innerText = `⏳ ${t('Анализирую','Analyzing')} 0 ${t('из','of')} ${shots.length}...`;
+            document.getElementById('minibarSub').innerText = t('Нажми чтобы развернуть','Click to expand');
 
             const allPlayers = {};
             let firstError = null;
@@ -5853,7 +5884,7 @@ function getClass2IconByClass3(c3) {
                     // Пауза между запросами чтобы не превышать rate limit
                     if (i > 0) await new Promise(r => setTimeout(r, 2000));
                     setDayStatus('loading', `⏳ Обрабатываю ${i + 1} из ${shots.length}...`);
-                    document.getElementById('minibarText').innerText = `⏳ Обрабатываю ${i + 1} из ${shots.length}...`;
+                    document.getElementById('minibarText').innerText = `⏳ ${t('Обрабатываю','Processing')} ${i + 1} ${t('из','of')} ${shots.length}...`;
                     const pct = Math.round(((i + 1) / shots.length) * 100);
                     const pb = document.getElementById('analyzeProgressBar');
                     if (pb) pb.style.width = pct + '%';
@@ -6119,12 +6150,12 @@ function getClass2IconByClass3(c3) {
             }
 
             if (firstError && dayLastParsed.length === 0) {
-                setDayStatus('error', `❌ Ошибка API: ${firstError}`);
+                setDayStatus('error', `❌ ${t('Ошибка API:','API error:')} ${firstError}`);
                 return;
             }
 
             if (dayLastParsed.length === 0) {
-                setDayStatus('error', '❌ Не удалось распознать игроков. Попробуй ещё раз или проверь качество скриншотов.');
+                setDayStatus('error', t('❌ Не удалось распознать игроков. Попробуй ещё раз или проверь качество скриншотов.','❌ Could not recognize players. Try again or check screenshot quality.'));
                 return;
             }
 
@@ -6156,7 +6187,7 @@ function getClass2IconByClass3(c3) {
             });
             dayLastParsed = Object.values(merged);
 
-            setDayStatus('loading', `✅ Распознано ${dayLastParsed.length} игроков. Проверяю похожие ники...`);
+            setDayStatus('loading', `✅ ${t('Распознано','Recognized')} ${dayLastParsed.length} ${t('игроков. Проверяю похожие ники...','players. Checking similar nicknames...')}`);
 
             // Проверяем похожие ники — пользователь подтверждает
             checkSimilarNicks(dayLastParsed, () => {
@@ -6164,7 +6195,7 @@ function getClass2IconByClass3(c3) {
                 document.getElementById('dayAnalyzeResults').style.display = '';
 
                 // Формируем итоговый счётчик
-                let statusMsg = `✅ Готово: ${dayLastParsed.length} уникальных игроков из ${shots.length} скриншотов`;
+                let statusMsg = `✅ ${t('Готово:','Done:')} ${dayLastParsed.length} ${t('уникальных игроков из','unique players from')} ${shots.length} ${t('скриншотов','screenshots')}`;
                 if (expectedTotal) {
                     const diff = expectedTotal - dayLastParsed.length;
                     if (diff > 0) {
@@ -6174,13 +6205,13 @@ function getClass2IconByClass3(c3) {
                     }
                 }
                 if (skippedScreenshots.length > 0) {
-                    statusMsg += ` | Пропущено скриншотов: ${skippedScreenshots.length} — №${skippedScreenshots.map(s => s.num + ' (' + s.reason + ')').join(', №')}`;
+                    statusMsg += ` | ${t('Пропущено скриншотов:','Skipped screenshots:')} ${skippedScreenshots.length} — №${skippedScreenshots.map(s => s.num + ' (' + s.reason + ')').join(', №')}`;
                 }
                 setDayStatus(skippedScreenshots.length > 0 || (expectedTotal && expectedTotal > dayLastParsed.length) ? 'warning' : 'success', statusMsg);
 
                 // Авторазворот — показываем результат
                 expandDayModal();
-                document.getElementById('minibarText').innerText = `✅ ${dayLastParsed.length} игроков`;
+                document.getElementById('minibarText').innerText = `✅ ${dayLastParsed.length} ${t('игроков','players')}`;
 
                 // Уведомление о завершении
                 notifyAnalysisComplete(dayLastParsed.length);
@@ -7189,7 +7220,7 @@ function getClass2IconByClass3(c3) {
             if (!el) return;
 
             // Показываем лоадер сразу
-            el.innerHTML = '<div style="text-align:center;padding:32px;color:#475569"><div style="font-size:24px;margin-bottom:8px">⏳</div>Загрузка...</div>';
+            el.innerHTML = '<div style="text-align:center;padding:32px;color:#475569"><div style="font-size:24px;margin-bottom:8px">⏳</div>' + t('Загрузка...','Loading...') + '</div>';
 
             // Отложенный рендер чтобы UI не зависал
             setTimeout(() => { _doRenderKmHistory(el); }, 10);
@@ -7211,8 +7242,8 @@ function getClass2IconByClass3(c3) {
             if (allDates.length === 0) {
                 el.innerHTML = `<div class="card text-center py-16 text-slate-600">
                     <div class="text-4xl mb-4">📭</div>
-                    <p class="text-lg font-medium">История пуста</p>
-                    <p class="text-sm mt-2">Отмечай события в Календаре КМ — они появятся здесь</p>
+                    <p class="text-lg font-medium">${t('История пуста','History is empty')}</p>
+                    <p class="text-sm mt-2">${t('Отмечай события в Календаре КМ — они появятся здесь','Mark events in the War Calendar — they will appear here')}</p>
                 </div>`;
                 return;
             }
@@ -7234,7 +7265,7 @@ function getClass2IconByClass3(c3) {
                 }
                 const [y,m,d] = dateStr.split('-');
                 const dateObj = new Date(Number(y), Number(m)-1, Number(d));
-                const dateFormatted = dateObj.toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'});
+                const dateFormatted = dateObj.toLocaleDateString(getLang() === 'en' ? 'en-GB' : 'ru-RU', {day:'numeric', month:'long', year:'numeric'});
 
                 // События дня
                 const events = getAllEventsForDate(dateStr);
@@ -7245,7 +7276,7 @@ function getClass2IconByClass3(c3) {
                         const ov = eventOverrides[dateStr + '|override|' + e.key];
                         return ov ? ov.title : e.title;
                     }).join(' · ')
-                    : (appliedStatsByDate[dateStr] ? 'КМ' : '');
+                    : (appliedStatsByDate[dateStr] ? t('КМ','War') : '');
 
                 // Данные из применённой статистики за этот день
                 const dayData = appliedStatsByDate[dateStr];
@@ -7281,7 +7312,7 @@ function getClass2IconByClass3(c3) {
 
                 const topPreviewHtml = topKills.length > 0 ? `
                     <div id="${topPreviewId}" style="display:${kmOpenPacksState[containerId]?'none':'flex'};margin-top:8px;flex-wrap:wrap;gap:6px">
-                        <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:6px">🏆 Топ убийств</div>
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:6px">🏆 ${t('Топ убийств','Top Kills')}</div>
                         <div style="display:flex;flex-wrap:wrap;gap:6px">
                         ${topKills.map((p,i) => `<div style="background:#1a1f29;border:1px solid #1e2530;border-radius:8px;padding:5px 10px;font-size:12px;display:flex;align-items:center;gap:6px">
                             <span>${medals[i]}</span>
@@ -7370,9 +7401,9 @@ function getClass2IconByClass3(c3) {
                         const notInRoster = !inRoster;
                         const pacLabel = inRoster && inRoster.pac === 'СОЛО' ? 'соло' : (inRoster ? inRoster.pac : '');
                         const badgeHtml = notInRoster
-                            ? `<span title="Не в ростере — нажми ✏️ чтобы исправить ник" style="color:#f87171;font-size:10px;margin-left:4px">⚠️ не в ростере</span>`
-                            : (inRoster.pac === 'СОЛО' ? `<span style="font-size:9px;color:#64748b;background:#1e2530;padding:1px 5px;border-radius:3px;margin-left:5px">соло</span>` : '');
-                        const editBtn = `<button onclick="kmRenamePlayer('${dateStr}','${p.name.replace(/'/g,"\\'")}',this)" title="Исправить ник" style="background:none;border:none;color:#475569;cursor:pointer;font-size:11px;padding:0 4px;line-height:1;margin-left:4px;opacity:0;transition:opacity .15s" class="km-edit-btn">✏️</button>`;
+                            ? `<span title="${t('Не в ростере — нажми ✏️ чтобы исправить ник','Not in roster — click ✏️ to fix nickname')}" style="color:#f87171;font-size:10px;margin-left:4px">⚠️ ${t('не в ростере','not in roster')}</span>`
+                            : (inRoster.pac === 'СОЛО' ? `<span style="font-size:9px;color:#64748b;background:#1e2530;padding:1px 5px;border-radius:3px;margin-left:5px">${t('соло','solo')}</span>` : '');
+                        const editBtn = `<button onclick="kmRenamePlayer('${dateStr}','${p.name.replace(/'/g,"\\'")}',this)" title="${t('Исправить ник','Fix nickname')}" style="background:none;border:none;color:#475569;cursor:pointer;font-size:11px;padding:0 4px;line-height:1;margin-left:4px;opacity:0;transition:opacity .15s" class="km-edit-btn">✏️</button>`;
                         const normPKey = normalizeNick(p.name);
                         const savedKmProfa = (playerProfaByDate[normPKey] && playerProfaByDate[normPKey][dateStr]) || null;
                         const memberProfa = savedKmProfa || (inRoster ? (inRoster.profa || '—') : '—');
@@ -7384,7 +7415,7 @@ function getClass2IconByClass3(c3) {
                         const allProfaKeys = Object.keys(PROFA_ICONS || {});
                         const otherProfas = allProfaKeys.filter(pf => !mProfas.includes(pf));
                         const menuProfas = [...mProfas, ...otherProfas];
-                        const profaSwitchHtml = inRoster ? '<button onclick="openKmProfaPicker(this,\'' + dateStr + '\',\'' + encodeURIComponent(normPKey) + '\')" title="Сменить профу" style="background:#1e2530;border:none;color:#64748b;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer;margin-left:4px">🎭▾</button>'
+                        const profaSwitchHtml = inRoster ? '<button onclick="openKmProfaPicker(this,\'' + dateStr + '\',\'' + encodeURIComponent(normPKey) + '\')" title="' + t('Сменить профу','Change class') + '" style="background:#1e2530;border:none;color:#64748b;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer;margin-left:4px">🎭▾</button>'
                         : '';
                         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:#0b0e14;border-radius:6px;margin-bottom:4px;font-size:12px">
                             <span style="font-weight:600;display:flex;align-items:center;gap:6px">${memberProfaHtml}<span class="player-nick-link" onclick="openPlayerProfile('${p.name.replace(/'/g,"\\'")}')" style="cursor:pointer">${p.name}</span>${badgeHtml}${profaSwitchHtml}${editBtn}</span>
@@ -7395,7 +7426,7 @@ function getClass2IconByClass3(c3) {
                                 <span style="color:#4ade80;font-weight:700">🐉 ${(p.pve_dmg||0).toLocaleString()}</span>
                             </span>
                         </div>`;
-                    }).join('') : `<div style="font-size:11px;color:#475569;padding:6px 12px;font-style:italic">— список игроков появится после нового анализа скринов</div>`;
+                    }).join('') : `<div style="font-size:11px;color:#475569;padding:6px 12px;font-style:italic">— ${t('список игроков появится после нового анализа скринов','player list will appear after new screenshot analysis')}</div>`;
 
                     // Считаем суммарную стату из участников (не из cmdChannel — там суммарная группы)
                     const sumKills   = partyPlayers.reduce((s,p)=>s+(p.kills||0),0);
@@ -7423,11 +7454,11 @@ function getClass2IconByClass3(c3) {
                     const hasDiscrepancy = partyPlayers.length > 0 && (diffKills !== 0 || diffDeaths !== 0 || diffPvp !== 0);
                     const discrepancyHtml = hasDiscrepancy ? `
                         <div style="background:#78350f22;border:1px solid #f59e0b44;border-radius:6px;padding:6px 10px;margin-top:6px;font-size:11px;color:#fbbf24">
-                            ⚠️ Расхождение с командным каналом:
+                            ⚠️ ${t('Расхождение с командным каналом:','Discrepancy with command channel:')}
                             ${diffKills !== 0 ? `<span style="margin-left:8px">⚔️ ${diffKills > 0 ? '+' : ''}${diffKills}</span>` : ''}
                             ${diffDeaths !== 0 ? `<span style="margin-left:8px">💀 ${diffDeaths > 0 ? '+' : ''}${diffDeaths}</span>` : ''}
                             ${diffPvp !== 0 ? `<span style="margin-left:8px">🗡️ ${diffPvp > 0 ? '+' : ''}${diffPvp.toLocaleString()}</span>` : ''}
-                            <span style="color:#94a3b8;margin-left:8px">(КК: ⚔️${ccKills} 💀${ccDeaths})</span>
+                            <span style="color:#94a3b8;margin-left:8px">(${t('КК:','CC:')} ⚔️${ccKills} 💀${ccDeaths})</span>
                         </div>` : '';
 
                     return `<div style="border:1px solid #1e2530;border-radius:10px;margin-bottom:6px;overflow:hidden">
@@ -7438,7 +7469,7 @@ function getClass2IconByClass3(c3) {
                                 <span class="player-nick-link" onclick="openPlayerProfile('${cc.leader.replace(/'/g,"\\'")}')" style="font-weight:600;font-size:13px;cursor:pointer">${cc.leader}</span>
                                 ${packName ? `<span style="font-size:9px;background:#1e2530;color:#94a3b8;padding:1px 6px;border-radius:3px;text-transform:uppercase">${packName}</span>` : ''}
                                 <span style="font-size:10px;color:#64748b">👥 ${partyPlayers.length > 0 ? partyPlayers.length : (cc.members||0)}</span>
-                                ${hasDiscrepancy ? `<span title="Расхождение с командным каналом" style="font-size:11px">⚠️</span>` : ''}
+                                ${hasDiscrepancy ? `<span title="${t('Расхождение с командным каналом','Discrepancy with command channel')}" style="font-size:11px">⚠️</span>` : ''}
                             </div>
                             <div style="display:flex;gap:12px;font-size:12px;align-items:center">
                                 <span style="color:#fbbf24;font-weight:700">⚔️ ${dispKills}</span>
@@ -7466,7 +7497,7 @@ function getClass2IconByClass3(c3) {
                     });
                     if (foundPlayers.length > 0) {
                         searchHighlightHtml = `<div style="background:#6366f111;border:1px solid #6366f133;border-radius:10px;padding:12px 16px;margin-bottom:12px">
-                            <div style="font-size:10px;color:#6366f1;font-weight:700;text-transform:uppercase;margin-bottom:8px">🔍 Найден: ${foundPlayers.length > 1 ? foundPlayers.length + ' совпадений' : ''}</div>
+                            <div style="font-size:10px;color:#6366f1;font-weight:700;text-transform:uppercase;margin-bottom:8px">🔍 ${t('Найден','Found')}: ${foundPlayers.length > 1 ? foundPlayers.length + ' ' + t('совпадений','matches') : ''}</div>
                             ${foundPlayers.map(fp => {
                                 const kda = ((fp.kills||0) / Math.max(fp.deaths||1, 1)).toFixed(2);
                                 const rp = roster.find(r => normalizeNick(r.name) === normalizeNick(fp.name));
@@ -7483,7 +7514,7 @@ function getClass2IconByClass3(c3) {
                                 return `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
                                     ${profaHtml}
                                     <span style="font-weight:800;font-size:15px;color:#e2e8f0;cursor:pointer;border-bottom:1px dashed #475569" onclick="openPlayerProfile('${fp.name.replace(/'/g,"\'")}')">${fp.name}</span>
-                                    ${packLabel ? `<span onclick="event.stopPropagation();openPackAndHighlight('${dateStr}','${fp.name.replace(/'/g,"\\'")}')" style="font-size:10px;background:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;cursor:pointer;border:1px solid #2563eb44" title="Нажми чтобы раскрыть пак и подсветить игрока">📦 пак: ${packLabel}</span>` : ''}
+                                    ${packLabel ? `<span onclick="event.stopPropagation();openPackAndHighlight('${dateStr}','${fp.name.replace(/'/g,"\\'")}')" style="font-size:10px;background:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;cursor:pointer;border:1px solid #2563eb44" title="${t('Нажми чтобы раскрыть пак и подсветить игрока','Click to expand pack and highlight player')}">📦 ${t('пак','pack')}: ${packLabel}</span>` : ''}
                                     <div style="display:flex;gap:16px;font-size:14px;font-weight:700">
                                         <span style="color:#f59e0b">⚔️ ${fp.kills||0}</span>
                                         <span style="color:#ef4444">💀 ${fp.deaths||0}</span>
@@ -7503,7 +7534,7 @@ function getClass2IconByClass3(c3) {
                         <div>
                             <div style="font-size:18px;font-weight:800">${dateFormatted}</div>
                             <div style="font-size:12px;color:#f59e0b;font-weight:700;text-transform:uppercase;margin-top:2px">⚔️ ${eventLabel}</div>
-                            ${recognized > 0 ? `<div style="font-size:11px;color:#64748b;margin-top:3px">👥 ${recognized} игроков${missing > 0 ? ` · <span style="color:#f87171">⚠️ не хватает ${missing}</span>` : ''}</div>` : ''}
+                            ${recognized > 0 ? `<div style="font-size:11px;color:#64748b;margin-top:3px">👥 ${recognized} ${t('игроков','players')}${missing > 0 ? ` · <span style="color:#f87171">⚠️ ${t('не хватает','missing')} ${missing}</span>` : ''}</div>` : ''}
                             ${hasTotals ? `<div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap">
                                 <span style="font-size:13px;font-weight:700;color:#fbbf24">⚔️ ${totalKills.toLocaleString()}</span>
                                 <span style="font-size:13px;font-weight:700;color:#f87171">💀 ${totalDeaths.toLocaleString()}</span>
@@ -7511,28 +7542,28 @@ function getClass2IconByClass3(c3) {
                                 <span style="font-size:13px;font-weight:700;color:#4ade80">🐉 ${totalPve.toLocaleString()}</span>
                             </div>` : ''}
                         </div>
-                        <button onclick="openCalendarDay('${dateStr}')" title="Открыть день в календаре — загрузить скриншоты или переанализировать" style="background:none;border:1px solid #2d3748;color:#94a3b8;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#94a3b8'">📅 Загрузить скриншоты</button>
+                        <button onclick="openCalendarDay('${dateStr}')" title="${t('Открыть день в календаре — загрузить скриншоты или переанализировать','Open day in calendar — upload or re-analyze')}" style="background:none;border:1px solid #2d3748;color:#94a3b8;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#94a3b8'">📅 ${t('Загрузить скриншоты','Upload screenshots')}</button>
                     </div>
                     ${hasCommandChannel ? `
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                            <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700">⚔️ Лидеры паков</div>
+                            <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700">⚔️ ${t('Лидеры паков','Pack Leaders')}</div>
                             <button id="${btnId}" onclick="(function(btn){
                                 var c=document.getElementById('${containerId}');
                                 var tp=document.getElementById('${topPreviewId}');
                                 var open=c.style.display!=='none';
                                 c.style.display=open?'none':'block';
                                 if(tp) tp.style.display=open?'flex':'none';
-                                btn.textContent=open?'▼ Показать паки':'▲ Скрыть паки';
+                                btn.textContent=open?'▼ '+t('Показать паки','Show packs'):'▲ '+t('Скрыть паки','Hide packs');
                                 kmOpenPacksState['${containerId}']=!open;
                             })(this)"
-                            style="background:#1e2530;border:1px solid #2d3748;color:#94a3b8;border-radius:8px;padding:4px 12px;font-size:11px;cursor:pointer">${kmOpenPacksState[containerId]?'▲ Скрыть паки':'▼ Показать паки'}</button>
+                            style="background:#1e2530;border:1px solid #2d3748;color:#94a3b8;border-radius:8px;padding:4px 12px;font-size:11px;cursor:pointer">${kmOpenPacksState[containerId]?'▲ '+t('Скрыть паки','Hide packs'):'▼ '+t('Показать паки','Show packs')}</button>
                         </div>
                         ${topPreviewHtml}
                         <div id="${containerId}" style="display:${kmOpenPacksState[containerId]?'block':'none'}">
                         ${leadersHtml}
                         </div>
                     ` : topKills.length > 0 ? `
-                        <div style="font-size:11px;color:#64748b;margin-bottom:8px;text-transform:uppercase;font-weight:700">🏆 Топ убийств</div>
+                        <div style="font-size:11px;color:#64748b;margin-bottom:8px;text-transform:uppercase;font-weight:700">🏆 ${t('Топ убийств','Top Kills')}</div>
                         <div style="display:flex;flex-wrap:wrap;gap:6px">
                             ${topKills.map((p,i) => `<div style="background:#1a1f29;border:1px solid #1e2530;border-radius:8px;padding:5px 10px;font-size:12px;display:flex;align-items:center;gap:6px">
                                 <span>${medals[i]}</span>
@@ -7541,12 +7572,12 @@ function getClass2IconByClass3(c3) {
                                 <span style="color:#f87171;font-weight:600">💀${p.deaths||0}</span>
                             </div>`).join('')}
                         </div>
-                    ` : '<div style="color:#475569;font-size:13px">Статистика не загружена</div>'}
+                    ` : `<div style="color:#475569;font-size:13px">${t('Статистика не загружена','Statistics not loaded')}</div>`}
                 </div>`;
             }).filter(Boolean).join('') || `<div class="card text-center py-16 text-slate-600">
                     <div class="text-4xl mb-4">📭</div>
-                    <p class="text-lg font-medium">История пуста</p>
-                    <p class="text-sm mt-2">Отмечай события в Календаре КМ — они появятся здесь</p>
+                    <p class="text-lg font-medium">${t('История пуста','History is empty')}</p>
+                    <p class="text-sm mt-2">${t('Отмечай события в Календаре КМ — они появятся здесь','Mark events in the War Calendar — they will appear here')}</p>
                 </div>`;
         }
 
@@ -7562,7 +7593,7 @@ function getClass2IconByClass3(c3) {
             const picker = document.createElement('div');
             picker.id = 'kmProfaPicker';
             picker.style.cssText = 'position:fixed;top:' + (rect.bottom + 4) + 'px;left:' + rect.left + 'px;background:#1a1f29;border:1px solid #6366f1;border-radius:10px;z-index:9999;width:300px;max-height:380px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.7)';
-            picker.innerHTML = '<div style="padding:8px;border-bottom:1px solid #1e2530"><input id="kmProfaPickerSearch" type="text" placeholder="Поиск: биш, cardinal, хилер..." style="width:100%;background:#0b0e14;border:1px solid #2d3748;border-radius:8px;padding:6px 10px;color:#e2e8f0;font-size:12px;outline:none" oninput="filterKmProfaPicker(this.value)"></div><div id="kmProfaPickerList" style="overflow-y:auto;max-height:320px"></div>';
+            picker.innerHTML = '<div style="padding:8px;border-bottom:1px solid #1e2530"><input id="kmProfaPickerSearch" type="text" placeholder="' + t('Поиск: биш, cardinal, хилер...','Search: bishop, cardinal, healer...') + '" style="width:100%;background:#0b0e14;border:1px solid #2d3748;border-radius:8px;padding:6px 10px;color:#e2e8f0;font-size:12px;outline:none" oninput="filterKmProfaPicker(this.value)"></div><div id="kmProfaPickerList" style="overflow-y:auto;max-height:320px"></div>';
             document.body.appendChild(picker);
             // Adjust if offscreen
             const pr = picker.getBoundingClientRect();
@@ -7605,7 +7636,7 @@ function getClass2IconByClass3(c3) {
                     html += '<div onclick="event.stopPropagation();setKmProfa(\'' + dateStr + '\',decodeURIComponent(\'' + encodeURIComponent(normPKey) + '\'),decodeURIComponent(\'' + enc + '\'));document.getElementById(\'kmProfaPicker\')?.remove()" style="display:flex;align-items:center;gap:6px;padding:6px 10px;cursor:pointer;font-size:11px;border-bottom:1px solid #1e253044;transition:background .1s" onmouseover="this.style.background=\'#6366f122\'" onmouseout="this.style.background=\'\'">' + profaIconHtml(pf, 18) + '</div>';
                 });
             });
-            if (!html) html = '<div style="padding:16px;text-align:center;color:#475569;font-size:11px">Не найдено</div>';
+            if (!html) html = '<div style="padding:16px;text-align:center;color:#475569;font-size:11px">' + t('Не найдено','Not found') + '</div>';
             el.innerHTML = html;
         }
 
@@ -7639,7 +7670,7 @@ function getClass2IconByClass3(c3) {
                         data-profa="${pf}">
                         ${profaIconHtml(pf,16)} ${label} ${isSelected ? '✓' : ''}
                     </div>`;
-                }).join('') || '<div style="padding:10px 12px;color:#475569;font-size:12px">Ничего не найдено</div>';
+                }).join('') || '<div style="padding:10px 12px;color:#475569;font-size:12px">' + t('Ничего не найдено','Nothing found') + '</div>';
             }
 
             window._kmSelectProfa = (pf, el) => {
@@ -7948,7 +7979,7 @@ function getClass2IconByClass3(c3) {
                     const d = json.data || json;
                     if (!d.roster) throw new Error('Неверный формат — нет ростера');
                     showConfirm(
-                        '📥 Импортировать данные?',
+                        t('📥 Импортировать данные?','📥 Import data?'),
                         `Файл от ${json.exportedAt ? new Date(json.exportedAt).toLocaleString('ru-RU') : 'неизвестно'}. Игроков: ${d.roster.length}, КМ дней: ${Object.keys(d.appliedStatsByDate||{}).length}.\n\nТекущие данные будут заменены!`,
                         () => {
                             if (d.roster)             roster             = d.roster;
@@ -7966,7 +7997,7 @@ function getClass2IconByClass3(c3) {
                             saveToStorage();
                             renderRoster(); renderCalendar(); renderPacks();
                             st.style.cssText = 'display:block;background:#14532d22;border:1px solid #22c55e44;color:#4ade80;font-size:13px;padding:10px;border-radius:8px';
-                            st.innerText = `✅ Импортировано! Игроков: ${roster.length}, КМ дней: ${Object.keys(appliedStatsByDate).length}`;
+                            st.innerText = `✅ ${t('Импортировано! Игроков:','Imported! Players:')} ${roster.length}, ${t('КМ дней:','War days:')} ${Object.keys(appliedStatsByDate).length}`;
                             setTimeout(() => st.style.display = 'none', 5000);
                         }, true
                     );
@@ -8007,7 +8038,7 @@ function getClass2IconByClass3(c3) {
             if (!list) return;
             const entries = Object.entries(nickAliases);
             if (entries.length === 0) {
-                list.innerHTML = '<p style="color:#475569;font-size:13px">Алиасов нет</p>';
+                list.innerHTML = '<p style="color:#475569;font-size:13px">' + t('Алиасов нет','No aliases') + '</p>';
                 return;
             }
             list.innerHTML = entries.map(([from, to]) => `
@@ -8032,14 +8063,14 @@ function getClass2IconByClass3(c3) {
             if (open) {
                 body.style.maxHeight = body.scrollHeight + 400 + 'px';
                 body.style.opacity = '1';
-                if (btn) btn.textContent = '▲ Свернуть';
+                if (btn) btn.textContent = '▲ ' + t('Свернуть','Collapse');
                 if (badge) badge.textContent = '';
                 localStorage.setItem('aliases_expanded', 'true');
             } else {
                 body.style.maxHeight = '0px';
                 body.style.opacity = '0';
-                if (btn) btn.textContent = '▼ Развернуть (' + count + ')';
-                if (badge) badge.textContent = count + ' ' + (count === 1 ? 'алиас' : count < 5 ? 'алиаса' : 'алиасов');
+                if (btn) btn.textContent = '▼ ' + t('Развернуть','Expand') + ' (' + count + ')';
+                if (badge) badge.textContent = count + ' ' + t(count === 1 ? 'алиас' : count < 5 ? 'алиаса' : 'алиасов', 'alias' + (count === 1 ? '' : 'es'));
                 localStorage.setItem('aliases_expanded', 'false');
             }
         }
@@ -8050,8 +8081,8 @@ function getClass2IconByClass3(c3) {
         }
 
         function addAliasRow() {
-            showPrompt('Добавить алиас', 'Введи в формате: НигативВ→НигатиВ', (val) => {
-                if (!val || !val.includes('→')) { alert('Формат: ОткудаНик→КудаНик'); return; }
+            showPrompt(t('Добавить алиас','Add alias'), t('Введи в формате: НигативВ→НигатиВ','Enter format: OldNick→NewNick'), (val) => {
+                if (!val || !val.includes('→')) { alert(t('Формат: ОткудаНик→КудаНик','Format: FromNick→ToNick')); return; }
                 const [from, to] = val.split('→').map(s => s.trim());
                 if (from && to) {
                     nickAliases[from.toLowerCase()] = to;
@@ -8845,9 +8876,6 @@ function getClass2IconByClass3(c3) {
         };
 
         // ===== ДАШБОРД =====
-        function getLang() { return localStorage.getItem('cc_lang') || 'ru'; }
-        function t(ru, en) { return getLang() === 'en' ? en : ru; }
-
         function renderDashboard() {
             const allDates = Object.keys(appliedStatsByDate).sort();
             const totalKm = allDates.length;
@@ -9205,11 +9233,11 @@ function getClass2IconByClass3(c3) {
             const container = document.getElementById('valueWeightsConfig');
             if (!container) return;
             const roles = [
-                { key: 'dps', label: '⚔️ ДД (Воин/Маг/Лучник/Кинжал)', fields: ['presence','classRank','kda','clanRank','pvp','pve'] },
-                { key: 'healer', label: '💊 Хилер/Баффер', fields: ['presence','classRank','kda','deaths'] },
-                { key: 'tank', label: '🛡️ Танк', fields: ['presence','deaths','classRank','kda'] },
+                { key: 'dps', label: t('⚔️ ДД (Воин/Маг/Лучник/Кинжал)','⚔️ DD (Warrior/Mage/Archer/Dagger)'), fields: ['presence','classRank','kda','clanRank','pvp','pve'] },
+                { key: 'healer', label: t('💊 Хилер/Баффер','💊 Healer/Buffer'), fields: ['presence','classRank','kda','deaths'] },
+                { key: 'tank', label: t('🛡️ Танк','🛡️ Tank'), fields: ['presence','deaths','classRank','kda'] },
             ];
-            const fieldNames = { presence:'Явка', classRank:'Рейтинг класса', kda:'KDA', clanRank:'Рейтинг клана', pvp:'PvP урон', pve:'PvE урон', deaths:'Живучесть' };
+            const fieldNames = { presence:t('Явка','Attendance'), classRank:t('Рейтинг класса','Class rating'), kda:'KDA', clanRank:t('Рейтинг клана','Clan rating'), pvp:t('PvP урон','PvP damage'), pve:t('PvE урон','PvE damage'), deaths:t('Живучесть','Survivability') };
             container.innerHTML = roles.map(r => {
                 const w = valueWeights[r.key];
                 const total = r.fields.reduce((s,f) => s + (w[f]||0), 0);
