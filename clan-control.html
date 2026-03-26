@@ -1183,13 +1183,13 @@
                 <input type="hidden" id="editId">
                 <input id="pName" type="text" class="input-dark" placeholder="Ник">
                 <select id="pRank" class="input-dark">
-                    <option value="КЛ">КЛ</option>
-                    <option value="ПЛ">ПЛ</option>
-                    <option value="ИГРОК">Игрок</option>
+                    <option value="КЛ" data-ru="КЛ" data-en="CL">КЛ</option>
+                    <option value="ПЛ" data-ru="ПЛ" data-en="PL">ПЛ</option>
+                    <option value="ИГРОК" data-ru="Игрок" data-en="Player">Игрок</option>
                 </select>
                 <div id="pProfaDropWrap" style="position:relative">
                     <div onclick="toggleProfaDropdown()" class="input-dark" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">
-                        <span style="color:#64748b">+ Добавить профу...</span>
+                        <span id="pProfaAddLabel" style="color:#64748b">+ Добавить профу...</span>
                         <span style="color:#475569">▾</span>
                     </div>
                     <div id="pProfaDrop" style="display:none;position:absolute;top:100%;left:0;right:0;background:#12171f;border:1px solid #6366f1;border-radius:10px;z-index:60;max-height:350px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.7);margin-top:4px">
@@ -1203,8 +1203,8 @@
                 <div id="pProfaList" style="display:flex;flex-wrap:wrap;gap:6px;min-height:24px"></div>
                 <select id="pPac" class="input-dark"></select>
                 <div class="flex justify-end gap-3 mt-6">
-                    <button onclick="closePlayerModal()" class="px-6 py-2 bg-slate-800 rounded-lg">Отмена</button>
-                    <button onclick="savePlayer()" class="btn-primary">Сохранить</button>
+                    <button id="pModalCancelBtn" onclick="closePlayerModal()" class="px-6 py-2 bg-slate-800 rounded-lg">Отмена</button>
+                    <button id="pModalSaveBtn" onclick="savePlayer()" class="btn-primary">Сохранить</button>
                 </div>
             </div>
         </div>
@@ -1424,6 +1424,12 @@
                 ['Информация', 'Info'],
                 ['Распустить группу', 'Disband group'],
                 ['Участники', 'Members'],
+                ['Новый игрок', 'New player'],
+                ['Редактировать:', 'Edit:'],
+                ['СОЛО', 'Solo'],
+                ['КЛ', 'CL'],
+                ['ПЛ', 'PL'],
+                ['+ Добавить профу...', '+ Add class...'],
                 ['Добавить СОЛО', 'Add SOLO'],
                 ['Ник...', 'Nickname...'],
                 ['📋 История КМ', '📋 War History'],
@@ -1592,6 +1598,8 @@
                 placeholder: {
                     '[TAG] или название': '[TAG] or clan name',
                     'Поиск по нику...': 'Search by nickname...',
+                    'Ник': 'Nickname',
+                    'Поиск: биш, cardinal, епископ, хилер...': 'Search: bishop, cardinal, healer...',
                     'Ник...': 'Nickname...',
                     '🔍 Поиск игрока по КМам...': '🔍 Search player in wars...',
                     'Введи название...': 'Enter name...',
@@ -1754,6 +1762,9 @@
                 localStorage.setItem('cc_theme', t);
                 document.body.classList.toggle('light', t === 'light');
                 syncFlipToggle(['themeToggle','loginThemeToggle'], t === 'light');
+                // refresh player modal if open
+                const pm = document.getElementById('playerModal');
+                if (pm && pm.style.display === 'flex' && typeof refreshPlayerModalLang === 'function') refreshPlayerModalLang();
                 normalizeLightThemeInlineStyles();
             };
 
@@ -2486,7 +2497,8 @@
             if(!p) return;
             updatePackSelect();
             document.getElementById('editId').value = p.id;
-            document.getElementById('modalTitle').innerText = "Редактировать: " + p.name;
+            document.getElementById('modalTitle').innerText = t('Редактировать:','Edit:') + ' ' + p.name;
+            refreshPlayerModalLang();
             document.getElementById('pName').value = p.name;
             document.getElementById('pRank').value = p.rank;
             document.getElementById('pPac').value = p.pac;
@@ -2641,7 +2653,7 @@
                     html += '</div></div>';
                 });
             });
-            if (!html) html = '<div style="padding:16px;text-align:center;color:#475569;font-size:12px">Ничего не найдено</div>';
+            if (!html) html = '<div style="padding:16px;text-align:center;color:#475569;font-size:12px">' + t('Ничего не найдено','Nothing found') + '</div>';
             el.innerHTML = html;
         }
 
@@ -4300,13 +4312,54 @@ function getClass2IconByClass3(c3) {
         function updatePackSelect() {
             const select = document.getElementById('pPac');
             const allOptions = ["СОЛО", ...packs.map(p => p.name)];
-            select.innerHTML = allOptions.map(opt => `<option value="${opt}">${opt}</option>`).join('');
+            select.innerHTML = allOptions.map(opt => {
+                const label = opt === "СОЛО" ? t("СОЛО","Solo") : opt;
+                return `<option value="${opt}">${label}</option>`;
+            }).join('');
         }
 
+
+        // ── i18n: refresh player modal strings when language changes ──
+        function refreshPlayerModalLang() {
+            const el = id => document.getElementById(id);
+            // placeholder Ник / Nickname
+            const pn = el('pName');
+            if (pn) pn.placeholder = t('Ник','Nickname');
+            // + Добавить профу label
+            const lbl = el('pProfaAddLabel');
+            if (lbl) lbl.textContent = t('+ Добавить профу...','+ Add class...');
+            // profa search placeholder
+            const ps = el('pProfaSearch');
+            if (ps) ps.placeholder = t('Поиск: биш, cardinal, епископ, хилер...','Search: bishop, cardinal, healer...');
+            // Cancel / Save
+            const cancelBtn = el('pModalCancelBtn');
+            if (cancelBtn) cancelBtn.textContent = t('Отмена','Cancel');
+            const saveBtn = el('pModalSaveBtn');
+            if (saveBtn) saveBtn.textContent = t('Сохранить','Save');
+            // rank option labels
+            const pRank = el('pRank');
+            if (pRank) {
+                const map = { 'КЛ': t('КЛ','CL'), 'ПЛ': t('ПЛ','PL'), 'ИГРОК': t('Игрок','Player') };
+                Array.from(pRank.options).forEach(opt => {
+                    if (map[opt.value]) opt.text = map[opt.value];
+                });
+            }
+            // pPac СОЛО option label
+            const pPac = el('pPac');
+            if (pPac) {
+                Array.from(pPac.options).forEach(opt => {
+                    if (opt.value === 'СОЛО') opt.text = t('СОЛО','Solo');
+                });
+            }
+            // re-render profa dropdown if open
+            const drop = el('pProfaDrop');
+            if (drop && drop.style.display !== 'none') renderProfaDropdown(el('pProfaSearch')?.value || '');
+        }
         function openPlayerModal() {
             updatePackSelect();
             document.getElementById('editId').value = "";
-            document.getElementById('modalTitle').innerText = "Новый игрок";
+            document.getElementById('modalTitle').innerText = t('Новый игрок','New player');
+            refreshPlayerModalLang();
             document.getElementById('pName').value = "";
             document.getElementById('pRank').value = "ИГРОК";
             document.getElementById('pPac').value = "СОЛО";
