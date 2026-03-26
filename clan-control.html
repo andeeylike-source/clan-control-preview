@@ -1931,6 +1931,7 @@
             btn.className = isDanger
                 ? "bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg text-sm font-bold"
                 : "bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg text-sm font-bold";
+            btn.textContent = t('Подтвердить', 'Confirm');
             confirmCallback = callback;
             document.getElementById('confirmModal').style.display = 'flex';
         }
@@ -2598,7 +2599,7 @@
             if (!el) return;
             el.innerHTML = pProfaCurrent.map((pf, i) => `
                 <span style="display:inline-flex;align-items:center;gap:5px;background:#1e2530;border:1px solid #2d3748;border-radius:6px;padding:3px 10px;font-size:11px;color:#e2e8f0">
-                    ${i === 0 ? '<span style="font-size:8px;background:#6366f1;color:#fff;padding:1px 4px;border-radius:3px;font-weight:700">ОСНОВНАЯ</span>' : ''}
+                    ${i === 0 ? '<span style="font-size:8px;background:#6366f1;color:#fff;padding:1px 4px;border-radius:3px;font-weight:700">' + t('ОСНОВНАЯ','MAIN') + '</span>' : ''}
                     ${profaIconHtml(pf, 16)}
                     <button onclick="removeProfaFromList(${i})" style="background:none;border:none;color:#475569;cursor:pointer;font-size:12px;padding:0;line-height:1" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#475569'">×</button>
                 </span>`).join('');
@@ -3611,7 +3612,7 @@ function getClass2IconByClass3(c3) {
                     </div>
                 </div>
                 <div style="display:flex;gap:8px;flex-shrink:0">
-                    <button onclick="editPlayer(${player.id})" style="background:#12171f;border:1px solid #2d3748;color:#64748b;border-radius:10px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#f59e0b';this.style.color='#f59e0b'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#64748b'" title="Редактировать игрока">✏️ Редактировать</button>
+                    <button onclick="editPlayer(${player.id})" style="background:#12171f;border:1px solid #2d3748;color:#64748b;border-radius:10px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#f59e0b';this.style.color='#f59e0b'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#64748b'" title="${t('Редактировать игрока','Edit player')}">✏️ ${t('Редактировать','Edit')}</button>
                     <button onclick="goBackFromProfile()" style="background:#12171f;border:1px solid #1e2530;color:#64748b;border-radius:10px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;flex-shrink:0" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#1e2530';this.style.color='#64748b'">← Назад</button>
                 </div>
             </div>
@@ -8329,8 +8330,14 @@ function getClass2IconByClass3(c3) {
             document.getElementById('dpCalView').style.display = '';
             document.getElementById('dpMonthView').style.display = 'none';
             document.getElementById('dpYearView').style.display = 'none';
-            const months = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+            const months = getLang() === 'en'
+                ? ['January','February','March','April','May','June','July','August','September','October','November','December']
+                : ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
             document.getElementById('dpMonthLabel').textContent = months[dpMonth] + ' ' + dpYear;
+            const dows = getLang() === 'en'
+                ? ['MON','TUE','WED','THU','FRI','SAT','SUN']
+                : ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+            dows.forEach((d,i) => { const el = document.getElementById('dpDow'+i); if(el) el.textContent = d; });
             renderDpDays();
         }
 
@@ -8338,7 +8345,9 @@ function getClass2IconByClass3(c3) {
             document.getElementById('dpCalView').style.display = 'none';
             document.getElementById('dpMonthView').style.display = '';
             document.getElementById('dpYearLabel').textContent = dpYear;
-            const months = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+            const months = getLang() === 'en'
+                ? ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+                : ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
             document.getElementById('dpMonths').innerHTML = months.map((m,i) =>
                 `<button class="dp-month-btn${i===dpMonth?' selected':''}" onclick="dpSelectMonth(${i})">${m}</button>`
             ).join('');
@@ -8415,9 +8424,9 @@ function getClass2IconByClass3(c3) {
             if (dates.length === 0) { document.getElementById('dpShortcuts').innerHTML = ''; return; }
             const first = dates[0], last = dates[dates.length-1];
             document.getElementById('dpShortcuts').innerHTML =
-                `<button class="dp-shortcut" onclick="dpSelectDay('${first}')">Первый КМ</button>` +
-                `<button class="dp-shortcut" onclick="dpSelectDay('${last}')">Последний КМ</button>` +
-                `<button class="dp-shortcut" onclick="dpSelectDay('${new Date().toISOString().slice(0,10)}')">Сегодня</button>`;
+                `<button class="dp-shortcut" onclick="dpSelectDay('${first}')">${t('Первый КМ','First war')}</button>` +
+                `<button class="dp-shortcut" onclick="dpSelectDay('${last}')">${t('Последний КМ','Last war')}</button>` +
+                `<button class="dp-shortcut" onclick="dpSelectDay('${new Date().toISOString().slice(0,10)}')">${t('Сегодня','Today')}</button>`;
         }
 
         function clearPeriod(which) {
@@ -9576,8 +9585,8 @@ function getClass2IconByClass3(c3) {
                 <button class="dp-nav" onclick="dpNavMonth(1)">›</button>
             </div>
             <div class="dp-grid">
-                <div class="dp-dow">Пн</div><div class="dp-dow">Вт</div><div class="dp-dow">Ср</div>
-                <div class="dp-dow">Чт</div><div class="dp-dow">Пт</div><div class="dp-dow">Сб</div><div class="dp-dow">Вс</div>
+                <div class="dp-dow" id="dpDow0"></div><div class="dp-dow" id="dpDow1"></div><div class="dp-dow" id="dpDow2"></div>
+                <div class="dp-dow" id="dpDow3"></div><div class="dp-dow" id="dpDow4"></div><div class="dp-dow" id="dpDow5"></div><div class="dp-dow" id="dpDow6"></div>
                 <div id="dpDays"></div>
             </div>
             <div class="dp-shortcuts" id="dpShortcuts"></div>
