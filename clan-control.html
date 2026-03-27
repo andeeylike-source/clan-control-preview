@@ -638,7 +638,7 @@
         body.light .event-epic   { background: rgba(201,168,76,0.28) !important; color: #6a3c00 !important; border-color: rgba(180,140,40,0.6) !important; font-weight: 700 !important; }
         body.light .event-siege  { background: rgba(180,40,40,0.18) !important; color: #7a1010 !important; border-color: rgba(180,40,40,0.5) !important; font-weight: 700 !important; }
         body.light .event-tv     { background: rgba(30,90,200,0.15) !important; color: #0f3a8a !important; border-color: rgba(30,90,200,0.4) !important; font-weight: 700 !important; }
-        body.light .event-manual { background: rgba(14,110,50,0.18) !important; color: #064e20 !important; border-color: rgba(14,110,50,0.65) !important; font-weight: 700 !important; }
+        body.light .event-manual { background: rgba(14,120,55,0.25) !important; color: #054a1c !important; border-color: rgba(14,120,55,0.7) !important; font-weight: 700 !important; }
         body.light .dot-past   { background: #c0181a !important; }
         body.light .dot-done   { background: #16a34a !important; }
         body.light .dot-future { background: #1650b0 !important; }
@@ -2166,10 +2166,11 @@
                     // Чипы событий
                     eventsHtml = events.map(ev => {
                         const status = getEventStatus(dateStr, ev.key);
-                        const doneClass = status === 'done' ? ' event-done' : '';
+                        const isDone = status === 'done';
+                        const doneClass = isDone ? '' : '';
                         const timeHtml = ev.time ? `<span class="event-time">${ev.time}</span>` : '';
-                        const typeClass = ev.isAuto ? `event-${ev.type}` : 'event-manual';
-                        return `<div class="event-chip ${typeClass}${doneClass}" onclick="event.stopPropagation(); openDayModal('${dateStr}')">${ev.title}${timeHtml}</div>`;
+                        const typeClass = isDone ? 'event-manual' : (ev.isAuto ? `event-${ev.type}` : 'event-manual');
+                        return `<div class="event-chip ${typeClass}" onclick="event.stopPropagation(); openDayModal('${dateStr}')">${ev.title}${timeHtml}</div>`;
                     }).join('');
 
                     // Значок скриншотов
