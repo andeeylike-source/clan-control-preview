@@ -757,6 +757,10 @@
         /* Fix "Upload screenshots" button in KM history cards — handled inline now */
         body.light button[onclick*="openCalendarDay"] { background: rgba(99,102,241,0.10) !important; border-color: rgba(99,102,241,0.4) !important; color: #3730a3 !important; }
         body.light button[onclick*="openCalendarDay"]:hover { background: rgba(99,102,241,0.18) !important; border-color: rgba(99,102,241,0.65) !important; color: #312e81 !important; }
+        /* KM history light theme: event label pill */
+        body.light [style*="f5c542"] { color: #7a4500 !important; background: rgba(180,100,0,0.12) !important; border-color: rgba(180,100,0,0.3) !important; }
+        /* KM history light theme: totals bar */
+        body.light [style*="rgba(255,255,255,0.04)"] { background: rgba(0,0,0,0.04) !important; border-color: rgba(0,0,0,0.08) !important; }
     </style>
 </head>
 <body>
@@ -7590,12 +7594,12 @@ function getClass2IconByClass3(c3) {
                     const diffPvp    = partyPlayers.length > 0 ? ccPvp    - sumPvp    : 0;
                     const hasDiscrepancy = partyPlayers.length > 0 && (diffKills !== 0 || diffDeaths !== 0 || diffPvp !== 0);
                     const discrepancyHtml = hasDiscrepancy ? `
-                        <div style="background:#78350f22;border:1px solid #f59e0b44;border-radius:6px;padding:6px 10px;margin-top:6px;font-size:11px;color:#fbbf24">
+                        <div style="background:rgba(120,53,15,0.35);border:1px solid rgba(245,158,11,0.55);border-radius:6px;padding:8px 12px;margin-top:6px;font-size:12px;color:#fcd34d;font-weight:700">
                             ⚠️ ${t('Расхождение с командным каналом:','Discrepancy with command channel:')}
-                            ${diffKills !== 0 ? `<span style="margin-left:8px">⚔️ ${diffKills > 0 ? '+' : ''}${diffKills}</span>` : ''}
-                            ${diffDeaths !== 0 ? `<span style="margin-left:8px">💀 ${diffDeaths > 0 ? '+' : ''}${diffDeaths}</span>` : ''}
-                            ${diffPvp !== 0 ? `<span style="margin-left:8px">🗡️ ${diffPvp > 0 ? '+' : ''}${diffPvp.toLocaleString()}</span>` : ''}
-                            <span style="color:#94a3b8;margin-left:8px">(${t('КК:','CC:')} ⚔️${ccKills} 💀${ccDeaths})</span>
+                            ${diffKills !== 0 ? `<span style="margin-left:8px;color:#fbbf24">⚔️ ${diffKills > 0 ? '+' : ''}${diffKills}</span>` : ''}
+                            ${diffDeaths !== 0 ? `<span style="margin-left:8px;color:#fca5a5">💀 ${diffDeaths > 0 ? '+' : ''}${diffDeaths}</span>` : ''}
+                            ${diffPvp !== 0 ? `<span style="margin-left:8px;color:#c4b5fd">🗡️ ${diffPvp > 0 ? '+' : ''}${diffPvp.toLocaleString()}</span>` : ''}
+                            <span style="color:#d4a84b;margin-left:8px">(${t('КК:','CC:')} ⚔️${ccKills} 💀${ccDeaths})</span>
                         </div>` : '';
 
                     return `<div style="border:1px solid #1e2530;border-radius:10px;margin-bottom:6px;overflow:hidden">
@@ -7608,11 +7612,11 @@ function getClass2IconByClass3(c3) {
                                 <span style="font-size:10px;color:#64748b">👥 ${partyPlayers.length > 0 ? partyPlayers.length : (cc.members||0)}</span>
                                 ${hasDiscrepancy ? `<span title="${t('Расхождение с командным каналом','Discrepancy with command channel')}" style="font-size:11px">⚠️</span>` : ''}
                             </div>
-                            <div style="display:flex;gap:12px;font-size:12px;align-items:center">
-                                <span style="color:#fbbf24;font-weight:700">⚔️ ${dispKills}</span>
-                                <span style="color:#f87171;font-weight:700">💀 ${dispDeaths}</span>
-                                <span style="color:#a78bfa;font-weight:700">🗡️ ${dispPvp.toLocaleString()}</span>
-                                <span style="color:#4ade80;font-weight:700">🐉 ${dispPve.toLocaleString()}</span>
+                            <div style="display:flex;gap:14px;font-size:13px;align-items:center">
+                                <span style="color:#fcd34d;font-weight:800">⚔️ ${dispKills}</span>
+                                <span style="color:#fca5a5;font-weight:800">💀 ${dispDeaths}</span>
+                                <span style="color:#c4b5fd;font-weight:800">🗡️ ${dispPvp.toLocaleString()}</span>
+                                <span style="color:#6ee7b7;font-weight:800">🐉 ${dispPve.toLocaleString()}</span>
                                 <span class="arr" style="color:#475569;font-size:10px;margin-left:4px">▼</span>
                             </div>
                         </div>
@@ -7670,13 +7674,13 @@ function getClass2IconByClass3(c3) {
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                         <div>
                             <div style="font-size:18px;font-weight:800">${dateFormatted}</div>
-                            <div style="font-size:12px;color:#f59e0b;font-weight:700;text-transform:uppercase;margin-top:2px">⚔️ ${eventLabel}</div>
+                            <div style="font-size:14px;color:#f5c542;font-weight:800;text-transform:uppercase;margin-top:4px;letter-spacing:.04em;background:rgba(245,197,66,0.12);border:1px solid rgba(245,197,66,0.3);border-radius:6px;padding:3px 10px;display:inline-block">⚔️ ${eventLabel}</div>
                             ${recognized > 0 ? `<div style="font-size:11px;color:#64748b;margin-top:3px">👥 ${recognized} ${t('игроков','players')}${missing > 0 ? ` · <span style="color:#f87171">⚠️ ${t('не хватает','missing')} ${missing}</span>` : ''}</div>` : ''}
-                            ${hasTotals ? `<div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap">
-                                <span style="font-size:13px;font-weight:700;color:#fbbf24">⚔️ ${totalKills.toLocaleString()}</span>
-                                <span style="font-size:13px;font-weight:700;color:#f87171">💀 ${totalDeaths.toLocaleString()}</span>
-                                <span style="font-size:13px;font-weight:700;color:#a78bfa">🗡️ ${totalPvp.toLocaleString()}</span>
-                                <span style="font-size:13px;font-weight:700;color:#4ade80">🐉 ${totalPve.toLocaleString()}</span>
+                            ${hasTotals ? `<div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;padding:8px 12px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.06)">
+                                <span style="font-size:15px;font-weight:800;color:#fbbf24">⚔️ ${totalKills.toLocaleString()}</span>
+                                <span style="font-size:15px;font-weight:800;color:#f87171">💀 ${totalDeaths.toLocaleString()}</span>
+                                <span style="font-size:15px;font-weight:800;color:#c4b5fd">🗡️ ${totalPvp.toLocaleString()}</span>
+                                <span style="font-size:15px;font-weight:800;color:#4ade80">🐉 ${totalPve.toLocaleString()}</span>
                             </div>` : ''}
                         </div>
                         <button onclick="openCalendarDay('${dateStr}')" title="${t('Открыть день в календаре — загрузить скриншоты или переанализировать','Open day in calendar — upload or re-analyze')}" style="background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(99,102,241,0.22)';this.style.borderColor='#6366f1';this.style.color='#c7d2fe'" onmouseout="this.style.background='rgba(99,102,241,0.12)';this.style.borderColor='rgba(99,102,241,0.4)';this.style.color='#a5b4fc'">📅 ${t('Загрузить скриншоты','Upload screenshots')}</button>
