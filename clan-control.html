@@ -1075,7 +1075,7 @@
                 </div>
                 <div class="space-y-6">
                     <div class="card sticky top-10">
-                        <h3 class="text-sm font-black uppercase tracking-widest mb-4" style="color:var(--text4)">Добавить игрока</h3>
+                        <h3 id="packDetailAddPlayerLabel" class="text-sm font-black uppercase tracking-widest mb-4" style="color:var(--text4)">Добавить игрока</h3>
                         <div class="relative">
                             <input id="detailPlayerSearchInput" type="text" class="input-dark" placeholder="Ник..." onfocus="handleDetailSearch('')" oninput="handleDetailSearch(this.value)">
                             <div id="detailSearchSuggestions" class="autocomplete-suggestions hidden"></div>
@@ -1229,7 +1229,7 @@
             <input id="promptInput" type="text" class="input-dark mb-6" placeholder="">
             <!-- Доп. блок для смены профы (только в kmRenamePlayer) -->
             <div id="promptProfaBlock" style="display:none;margin-bottom:16px">
-                <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#475569;margin-bottom:8px">Профа на этом КМ</div>
+                <div id="promptProfaLabel" style="font-size:11px;font-weight:700;text-transform:uppercase;color:#475569;margin-bottom:8px">Профа на этом КМ</div>
                 <div id="promptProfaSearch" style="margin-bottom:6px">
                     <input type="text" id="promptProfaInput" class="input-dark" style="font-size:12px;padding:8px 10px" placeholder="Поиск: биш, cardinal, хилер, се...">
                 </div>
@@ -1237,7 +1237,7 @@
                 <div id="promptProfaSelected" style="margin-top:6px;font-size:11px;color:#a5b4fc;min-height:18px"></div>
             </div>
             <div class="flex justify-end gap-3">
-                <button onclick="closePrompt()" class="px-6 py-2 bg-slate-800 rounded-lg text-sm font-medium hover:bg-slate-700">Отмена</button>
+                <button id="promptCancelBtn" onclick="closePrompt()" class="px-6 py-2 bg-slate-800 rounded-lg text-sm font-medium hover:bg-slate-700">Отмена</button>
                 <button id="promptBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg text-sm font-bold">Сохранить</button>
             </div>
         </div>
@@ -1813,6 +1813,8 @@
                 if (histPage && histPage.classList.contains('active') && typeof renderKmHistory === 'function') renderKmHistory();
                 const packsPage = document.getElementById('page-packs');
                 if (packsPage && packsPage.classList.contains('active') && typeof renderPacks === 'function') renderPacks();
+                const packDetailPage = document.getElementById('page-pack-detail');
+                if (packDetailPage && packDetailPage.classList.contains('active')) { const _pdPack = packs.find(p => p.id === currentActivePackId); if (_pdPack) renderDetailMembers(_pdPack.name); if (typeof _updatePackDetailLocale === 'function') _updatePackDetailLocale(); }
                 const archivePage = document.getElementById('page-archive');
                 if (archivePage && archivePage.classList.contains('active') && typeof renderArchive === 'function') renderArchive();
                 const rosterPage = document.getElementById('page-roster');
@@ -1957,6 +1959,15 @@
         let promptCallback = null;
         function showPrompt(title, placeholder, callback, prefill) {
             document.getElementById('promptTitle').innerText = title;
+            // Update locale-dependent static strings in prompt modal
+            const _promptCancel = document.getElementById('promptCancelBtn');
+            if (_promptCancel) _promptCancel.textContent = t('Отмена','Cancel');
+            const _promptSave = document.getElementById('promptBtn');
+            if (_promptSave) _promptSave.textContent = t('Сохранить','Save');
+            const _promptProfaLabel = document.getElementById('promptProfaLabel');
+            if (_promptProfaLabel) _promptProfaLabel.textContent = t('Профа на этом КМ','Class for this war');
+            const _promptProfaInput = document.getElementById('promptProfaInput');
+            if (_promptProfaInput) _promptProfaInput.placeholder = t('Поиск: биш, cardinal, хилер, се...','Search: bishop, cardinal, healer...');
             const input = document.getElementById('promptInput');
             input.placeholder = placeholder;
             input.value = prefill !== undefined ? prefill : "";
@@ -2468,7 +2479,7 @@
                         <span class="font-bold" style="color:var(--text)">${p.name}</span> <span class="badge badge-${p.rank.toLowerCase()}">${rankLabel(p.rank)}</span>
                     </td>
                     <td>${p.isNew ? '<span class="text-[9px] bg-emerald-500 text-black font-black px-1.5 py-0.5 rounded uppercase">NEW</span>' : '<span style="color:#475569;font-size:11px">—</span>'}</td>
-                    <td onclick="event.stopPropagation();toggleVerified(${p.id})" style="cursor:pointer;text-align:center;font-size:16px" title="Нажми чтобы отметить как проверенный">${p.verified ? '✅' : '<span style="color:#2d3748;font-size:14px">○</span>'}</td>
+                    <td onclick="event.stopPropagation();toggleVerified(${p.id})" style="cursor:pointer;text-align:center;font-size:16px" title="${t('Нажми чтобы отметить как проверенного','Click to mark as verified')}">${p.verified ? '✅' : '<span style="color:#2d3748;font-size:14px">○</span>'}</td>
                     <td onclick="event.stopPropagation();editPlayer(${p.id})" style="cursor:pointer" title="${t('Нажми чтобы изменить профу','Click to change class')}" class="text-slate-400 text-xs">${(p.profas && p.profas.length > 0 ? p.profas : (p.profa && p.profa !== '—' ? [p.profa] : [])).map((pf,i) => `<span style="display:inline-flex;align-items:center;gap:5px;background:#1e2530;border-radius:6px;padding:4px 9px;margin-right:4px;${i===0?'color:#a5b4fc':'color:#64748b'}">${profaIconHtml(pf, 22)}<span onclick="event.stopPropagation();showProfaInfo(this.dataset.pf)" data-pf="${pf}" style="cursor:help;color:#475569;font-size:9px;margin-left:8px;padding:2px 4px">?</span></span>`).join('') || '<span style="color:#6366f155;font-size:11px;border:1px dashed #2d3748;padding:3px 8px;border-radius:6px">+ ' + t('профа','class') + '</span>'}</td>
                     <td onclick="event.stopPropagation()"><span class="pac-tag" onclick="event.stopPropagation();openPackFromRoster('${p.id}')" title="${t('Нажми чтобы изменить пак','Click to change pack')}" style="cursor:pointer" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='';this.style.color=''">${p.pac}</span></td>
                     <td class="${p.attendance < 50 ? 'text-red-400' : p.attendance < 70 ? 'text-yellow-400' : 'text-emerald-400'} font-bold">${totalDates > 0 ? p.attendance + '%' : '—'}</td>
@@ -2938,6 +2949,14 @@
             document.getElementById('detailPackNameInput').value = pack.name;
             renderDetailMembers(pack.name);
             showPage('pack-detail');
+            _updatePackDetailLocale();
+        }
+
+        function _updatePackDetailLocale() {
+            const lbl = document.getElementById('packDetailAddPlayerLabel');
+            if (lbl) lbl.textContent = t('Добавить игрока','Add player');
+            const inp = document.getElementById('detailPlayerSearchInput');
+            if (inp) inp.placeholder = t('Ник...','Nickname...');
         }
 
         function renderDetailMembers(packName) {
@@ -3093,7 +3112,7 @@ function profaIconHtml(profa, size) {
     // Иконка 2й профы
     const src2 = getClass2IconByClass3(profa);
     const img2Html = src2
-        ? '<img src="' + src2 + '" title="' + profa + ' (2кл)" style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;vertical-align:middle;border:1px solid #47556944;flex-shrink:0">'
+        ? '<img src="' + src2 + '" title="' + profa + ' (' + t('2й класс','2nd class') + ')" style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;vertical-align:middle;border:1px solid #47556944;flex-shrink:0">'
         : '';
     const imgHtml = src
         ? '<img src="' + src + '" title="' + profa + '" style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;vertical-align:middle;border:1px solid #2d3748;flex-shrink:0">'
@@ -7791,7 +7810,7 @@ function getClass2IconByClass3(c3) {
 
             document.getElementById('promptProfaInput').oninput = function() { renderProfaList(this.value); };
 
-            showPrompt('Исправить ник', 'Введи новый ник', function(newName) {
+            showPrompt(t('Исправить ник','Fix nickname'), t('Введи новый ник','Enter new nickname'), function(newName) {
                 // Скрываем блок профы обратно
                 profaBlock.style.display = 'none';
 
