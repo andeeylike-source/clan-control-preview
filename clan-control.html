@@ -1407,7 +1407,8 @@
                     errAlreadyExists: 'Аккаунт с этим email уже существует. Войди через кнопку «Войти».',
                     errGoogle: 'Не удалось войти через Google. Проверь настройки и попробуй снова.',
                     errGoogleProvider: 'Вход через Google недоступен. Используй email и пароль.',
-                    infoEmailConfirm: 'Аккаунт создан, но в Supabase включено подтверждение email — вход сразу не завершится, пока это не отключено.'
+                    infoEmailConfirm: 'На этот email отправлено письмо для подтверждения. Проверь почту и перейди по ссылке, затем войди.',
+                    infoSignupAmbiguous: 'Не удалось завершить регистрацию. Если аккаунт уже существует — войди через «Войти». Иначе проверь почту на письмо подтверждения.'
                 },
                 en: {
                     sub: 'Clan officer toolkit for tracking war statistics',
@@ -1428,7 +1429,8 @@
                     errAlreadyExists: 'An account with this email already exists. Use Sign In instead.',
                     errGoogle: 'Google sign in failed. Please check your settings and try again.',
                     errGoogleProvider: 'Google sign in is not available. Use email and password.',
-                    infoEmailConfirm: 'Account created, but Supabase email confirmation is enabled — sign-in won\'t complete until that is disabled.'
+                    infoEmailConfirm: 'A confirmation email has been sent. Check your inbox, click the link, then sign in.',
+                    infoSignupAmbiguous: 'Could not complete sign up. If an account already exists — use Sign In. Otherwise check your inbox for a confirmation email.'
                 }
             };
 
@@ -2065,7 +2067,7 @@
                 return p.length >= 8 && /^[\x21-\x7E]+$/.test(p);
             }
 
-            // Classify signUp result: 'success' | 'existing' | 'confirm' | 'error'
+            // Classify signUp result: 'success' | 'existing' | 'confirm' | 'ambiguous' | 'error'
             function _classifySignup(data, error) {
                 // 1) Explicit Supabase error
                 if (error) {
@@ -2079,18 +2081,29 @@
                 if (data && data.session && data.user) {
                     return 'success';
                 }
-                // 3) No session, but user object returned — either email-confirm or obfuscated existing
+                // 3) No session, user object returned — email-confirm, obfuscated existing, or ambiguous
                 if (data && data.user) {
                     const u = data.user;
-                    // Supabase obfuscated existing-email response: user has empty identities array
-                    // A genuinely new user always gets at least one identity entry for "email" provider
-                    const identities = u.identities || (u.user_metadata && u.user_metadata.identities);
+                    const identities = u.identities;
+                    // Supabase obfuscated existing-email: empty identities array
                     if (Array.isArray(identities) && identities.length === 0) {
                         return 'existing';
                     }
-                    // Some Supabase versions: fake user has same created_at / updated_at or very old created_at
-                    // but identities check is the most reliable — fall through to confirm
-                    return 'confirm';
+                    // Has identities with email provider AND user was just created (within last 30s)
+                    // — this is a genuinely new account pending email confirmation
+                    if (Array.isArray(identities) && identities.length > 0) {
+                        const hasEmailIdentity = identities.some(function(id) {
+                            return id.provider === 'email';
+                        });
+                        const createdAt = u.created_at ? new Date(u.created_at).getTime() : 0;
+                        const now = Date.now();
+                        const isRecent = createdAt > 0 && (now - createdAt) < 60000; // within 60s
+                        if (hasEmailIdentity && isRecent) {
+                            return 'confirm';
+                        }
+                    }
+                    // Cannot reliably determine — don't lie to user
+                    return 'ambiguous';
                 }
                 // 4) No data at all — unexpected
                 return 'error';
@@ -2120,6 +2133,9 @@
                             break;
                         case 'confirm':
                             _setLoginHint(t.infoEmailConfirm, true);
+                            break;
+                        case 'ambiguous':
+                            _setLoginHint(t.infoSignupAmbiguous, true);
                             break;
                         default:
                             _setLoginHint(_mapAuthError(error && error.message, t, 'signup'), true);
