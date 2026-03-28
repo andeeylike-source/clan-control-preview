@@ -2322,22 +2322,23 @@
                 _setLoginBusy(false);
             }
 
-            // Reset to login step 1 and show a hint message (used after email confirm callback without session)
             function _resetToLoginStep1WithHint(hintText, prefillEmail) {
                 _authMode = 'login';
                 const step1 = document.getElementById('loginStep1');
                 if (step1) step1.classList.add('active');
                 _renderAuthStep1();
                 _setLoginBusy(false);
-                // Prefill email if available
                 if (prefillEmail) {
                     const eInp = document.getElementById('loginEmailInput');
                     if (eInp) eInp.value = prefillEmail;
                 }
-                _setLoginHint(hintText, false);
+                if (hintText) _setLoginHint(hintText, false);
             }
 
             // Слушаем изменения сессии (hash-flow fallback)
+            // Flag prevents double-handling between onAuthStateChange and the IIFE
+            let _callbackHandled = false;
+
             window._supabase.auth.onAuthStateChange(async (event, session) => {
                 if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session && session.user) {
                     const url = new URL(window.location.href);
@@ -2345,7 +2346,10 @@
                         (window.location.hash && window.location.hash.includes('access_token'))) {
                         history.replaceState(null, '', window.location.pathname);
                     }
-                    await _initWithSupabaseUser(session.user);
+                    if (!_callbackHandled) {
+                        _callbackHandled = true;
+                        await _initWithSupabaseUser(session.user);
+                    }
                 }
             });
 
@@ -2362,46 +2366,65 @@
                         step1.innerHTML = '<div style="text-align:center;padding:20px 0"><div style="font-size:32px;margin-bottom:12px">⏳</div><div style="font-weight:700;color:var(--text)">Входим...</div></div>';
                     }
 
-                    // Timeout safety: если через 10 секунд нет session — показываем hint и возвращаем на login
                     const safetyTimer = setTimeout(() => {
-                        history.replaceState(null, '', window.location.pathname);
-                        const l = localStorage.getItem('cc_lang') || 'ru';
-                        const t = TEXTS[l] || TEXTS.ru;
-                        _resetToLoginStep1WithHint(t.infoEmailConfirmedSignIn, null);
-                    }, 10000);
+                        if (!_callbackHandled) {
+                            _callbackHandled = true;
+                            history.replaceState(null, '', window.location.pathname);
+                            const l = localStorage.getItem('cc_lang') || 'ru';
+                            const t = TEXTS[l] || TEXTS.ru;
+                            _resetToLoginStep1WithHint(t.infoEmailConfirmedSignIn, null);
+                        }
+                    }, 12000);
 
                     try {
-                        let sessionData = null;
-
                         if (code) {
-                            // PKCE flow: обменять code на session
+                            // PKCE flow: обменять code → session; onAuthStateChange сам поймает SIGNED_IN
                             const { data, error } = await window._supabase.auth.exchangeCodeForSession(code);
-                            if (!error && data && data.session) sessionData = data.session;
-                        }
-
-                        if (!sessionData && hasHashTokens) {
-                            // Implicit/hash flow: getSession подхватит из hash автоматически
-                            const { data } = await window._supabase.auth.getSession();
-                            if (data && data.session) sessionData = data.session;
-                        }
-
-                        // Controlled retry: если session не появилась сразу (signup-confirm delay)
-                        if (!sessionData) {
-                            for (let i = 0; i < 4; i++) {
-                                await new Promise(r => setTimeout(r, 800));
-                                const { data } = await window._supabase.auth.getSession();
-                                if (data && data.session) { sessionData = data.session; break; }
+                            history.replaceState(null, '', window.location.pathname);
+                            if (!error && data && data.session && data.session.user) {
+                                clearTimeout(safetyTimer);
+                                if (!_callbackHandled) {
+                                    _callbackHandled = true;
+                                    await _initWithSupabaseUser(data.session.user);
+                                }
+                                return;
                             }
                         }
 
-                        // Очищаем URL от auth-параметров
-                        history.replaceState(null, '', window.location.pathname);
-                        clearTimeout(safetyTimer);
+                        if (hasHashTokens) {
+                            history.replaceState(null, '', window.location.pathname);
+                            const { data } = await window._supabase.auth.getSession();
+                            if (data && data.session && data.session.user) {
+                                clearTimeout(safetyTimer);
+                                if (!_callbackHandled) {
+                                    _callbackHandled = true;
+                                    await _initWithSupabaseUser(data.session.user);
+                                }
+                                return;
+                            }
+                        }
 
-                        if (sessionData && sessionData.user) {
-                            await _initWithSupabaseUser(sessionData.user);
-                        } else {
-                            // Session не получена после callback — это email-confirm flow (Supabase не даёт session сразу)
+                        // Retry: ждём пока onAuthStateChange или сессия появятся сами
+                        for (let i = 0; i < 6; i++) {
+                            await new Promise(r => setTimeout(r, 800));
+                            if (_callbackHandled) { clearTimeout(safetyTimer); return; }
+                            const { data } = await window._supabase.auth.getSession();
+                            if (data && data.session && data.session.user) {
+                                clearTimeout(safetyTimer);
+                                if (!_callbackHandled) {
+                                    _callbackHandled = true;
+                                    history.replaceState(null, '', window.location.pathname);
+                                    await _initWithSupabaseUser(data.session.user);
+                                }
+                                return;
+                            }
+                        }
+
+                        // Сессия не появилась — email confirmation включён в Supabase, auto-login не происходит
+                        clearTimeout(safetyTimer);
+                        if (!_callbackHandled) {
+                            _callbackHandled = true;
+                            history.replaceState(null, '', window.location.pathname);
                             const l = localStorage.getItem('cc_lang') || 'ru';
                             const t = TEXTS[l] || TEXTS.ru;
                             _resetToLoginStep1WithHint(t.infoEmailConfirmedSignIn, null);
@@ -2409,15 +2432,19 @@
                     } catch(e) {
                         clearTimeout(safetyTimer);
                         history.replaceState(null, '', window.location.pathname);
-                        const l = localStorage.getItem('cc_lang') || 'ru';
-                        const t = TEXTS[l] || TEXTS.ru;
-                        _resetToLoginStep1WithHint(t.infoEmailConfirmedSignIn, null);
+                        if (!_callbackHandled) {
+                            _callbackHandled = true;
+                            const l = localStorage.getItem('cc_lang') || 'ru';
+                            const t = TEXTS[l] || TEXTS.ru;
+                            _resetToLoginStep1WithHint(t.infoEmailConfirmedSignIn, null);
+                        }
                     }
                 } else {
                     // Нет callback — проверяем существующую сессию
                     try {
                         const { data: { session } } = await window._supabase.auth.getSession();
                         if (session && session.user) {
+                            _callbackHandled = true;
                             await _initWithSupabaseUser(session.user);
                         }
                     } catch(e) {
