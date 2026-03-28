@@ -2004,24 +2004,63 @@
                 }
             }
 
-            // Слушаем изменения сессии (возврат после magic link)
+            // Слушаем изменения сессии (hash-flow fallback)
             window._supabase.auth.onAuthStateChange(async (event, session) => {
                 if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session && session.user) {
-                    // Убираем hash из URL после auth redirect
-                    if (window.location.hash && window.location.hash.includes('access_token')) {
-                        history.replaceState(null, '', window.location.pathname + window.location.search);
+                    const url = new URL(window.location.href);
+                    if (url.searchParams.has('code') || url.searchParams.has('access_token') ||
+                        (window.location.hash && window.location.hash.includes('access_token'))) {
+                        history.replaceState(null, '', window.location.pathname);
                     }
                     await _initWithSupabaseUser(session.user);
-                } else if (event === 'SIGNED_OUT') {
-                    // Logout уже обработан в loginLogout
                 }
             });
 
-            // Проверяем существующую сессию при загрузке
+            // Главная точка входа — явная обработка auth callback + проверка существующей сессии
             (async () => {
-                const { data: { session } } = await window._supabase.auth.getSession();
-                if (session && session.user) {
-                    await _initWithSupabaseUser(session.user);
+                const url = new URL(window.location.href);
+                const code = url.searchParams.get('code');
+                const hasHashTokens = window.location.hash && window.location.hash.includes('access_token');
+
+                if (code || hasHashTokens) {
+                    // Auth callback — показать промежуточное состояние "Входим..."
+                    const step1 = document.getElementById('loginStep1');
+                    if (step1) {
+                        step1.innerHTML = '<div style="text-align:center;padding:20px 0"><div style="font-size:32px;margin-bottom:12px">⏳</div><div style="font-weight:700;color:var(--text)">Входим...</div></div>';
+                    }
+
+                    try {
+                        let sessionData = null;
+
+                        if (code) {
+                            // PKCE flow: обменять code на session
+                            const { data, error } = await window._supabase.auth.exchangeCodeForSession(code);
+                            if (!error && data && data.session) sessionData = data.session;
+                        }
+
+                        if (!sessionData && hasHashTokens) {
+                            // Implicit/hash flow: getSession подхватит из hash автоматически
+                            const { data } = await window._supabase.auth.getSession();
+                            if (data && data.session) sessionData = data.session;
+                        }
+
+                        // Очищаем URL от auth-параметров
+                        history.replaceState(null, '', window.location.pathname);
+
+                        if (sessionData && sessionData.user) {
+                            await _initWithSupabaseUser(sessionData.user);
+                            return;
+                        }
+                    } catch(e) {
+                        console.error('Auth callback error:', e);
+                        history.replaceState(null, '', window.location.pathname);
+                    }
+                } else {
+                    // Нет callback — проверяем существующую сессию
+                    const { data: { session } } = await window._supabase.auth.getSession();
+                    if (session && session.user) {
+                        await _initWithSupabaseUser(session.user);
+                    }
                 }
             })();
         })();
