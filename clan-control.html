@@ -817,23 +817,9 @@
                 <div class="login-progress-dot done" id="loginDot1"></div>
                 <div class="login-progress-dot" id="loginDot2"></div>
             </div>
-            <!-- Шаг 1 — Email + Password -->
+            <!-- Шаг 1 — Auth (login / signup modes, rendered by JS) -->
             <div class="login-step active" id="loginStep1">
-                <div class="login-step-label"><span class="login-step-num">1</span><span id="loginEmailLabel">Войти или зарегистрироваться</span></div>
-                <input type="email" class="login-input" id="loginEmailInput" placeholder="your@email.com" autocomplete="email">
-                <input type="password" class="login-input" id="loginPasswordInput" placeholder="Пароль" autocomplete="current-password" onkeydown="if(event.key==='Enter') loginSignIn()" style="margin-top:-6px">
-                <div style="display:flex;gap:8px;margin-bottom:8px">
-                    <button class="login-btn" id="loginBtnSignIn" onclick="loginSignIn()" style="flex:1"><span>Войти</span></button>
-                    <button class="login-btn" id="loginBtnSignUp" onclick="loginSignUp()" style="flex:1;background:var(--bg3);color:var(--text);border:1px solid var(--border)"><span>Регистрация</span></button>
-                </div>
-                <div style="text-align:center;margin:10px 0;color:var(--text4);font-size:12px">— или —</div>
-                <!-- Google OAuth — redirect URL в Supabase Dashboard: Authentication > URL Configuration > Redirect URLs -->
-                <!-- Google Cloud Console: Authorized redirect URIs — https://sluqteqisrkdsmcsydlv.supabase.co/auth/v1/callback -->
-                <button class="login-btn" id="loginBtnGoogle" onclick="loginWithGoogle()" style="background:var(--bg3);color:var(--text);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:8px">
-                    <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-                    <span>Войти через Google</span>
-                </button>
-                <p class="login-hint" id="loginHintText" style="margin-top:10px"></p>
+                <!-- populated by _renderAuthStep1() -->
             </div>
             <!-- Шаг 2 — Клан -->
             <div class="login-step" id="loginStep2">
@@ -1402,8 +1388,36 @@
         ============================================= */
         (function() {
             const TEXTS = {
-                ru: { sub: 'Инструмент офицера клана для отслеживания КМ-статистики', emailLabel: 'Введи email', clanLabel: 'Название клана', btn1: 'Продолжить →', btn2: 'Войти в Clan Control →', hint1: 'MVP — введи любой email' },
-                en: { sub: 'Clan officer toolkit for tracking war statistics', emailLabel: 'Enter your email', clanLabel: 'Clan name or tag', btn1: 'Continue →', btn2: 'Enter Clan Control →', hint1: 'MVP mode — enter any email' }
+                ru: {
+                    sub: 'Инструмент офицера клана для отслеживания КМ-статистики',
+                    emailLabel: 'Введи email', clanLabel: 'Название клана',
+                    btn1: 'Продолжить →', btn2: 'Войти в Clan Control →', hint1: '',
+                    // auth i18n
+                    authLabelLogin: 'Вход', authLabelSignup: 'Регистрация',
+                    authEmailPh: 'your@email.com', authPassPh: 'Пароль', authConfirmPh: 'Повторите пароль',
+                    authBtnLogin: 'Войти', authBtnSignup: 'Зарегистрироваться',
+                    authSwitchToSignup: 'Регистрация', authSwitchToLogin: '← Войти',
+                    authGoogle: 'Войти через Google', authOr: '— или —',
+                    errEmail: 'Введи корректный email', errPass: 'Пароль минимум 8 символов',
+                    errConfirm: 'Пароли не совпадают', errEmpty: 'Введи пароль',
+                    errLogin: 'Ошибка входа', errSignup: 'Ошибка регистрации', errGoogle: 'Ошибка Google входа',
+                    infoEmailConfirm: 'Проверь почту — нужно подтвердить email'
+                },
+                en: {
+                    sub: 'Clan officer toolkit for tracking war statistics',
+                    emailLabel: 'Enter your email', clanLabel: 'Clan name or tag',
+                    btn1: 'Continue →', btn2: 'Enter Clan Control →', hint1: '',
+                    // auth i18n
+                    authLabelLogin: 'Sign In', authLabelSignup: 'Create Account',
+                    authEmailPh: 'your@email.com', authPassPh: 'Password', authConfirmPh: 'Confirm password',
+                    authBtnLogin: 'Sign In', authBtnSignup: 'Create Account',
+                    authSwitchToSignup: 'Sign Up', authSwitchToLogin: '← Sign In',
+                    authGoogle: 'Continue with Google', authOr: '— or —',
+                    errEmail: 'Enter a valid email', errPass: 'Password must be at least 8 characters',
+                    errConfirm: 'Passwords do not match', errEmpty: 'Enter your password',
+                    errLogin: 'Sign in error', errSignup: 'Sign up error', errGoogle: 'Google sign in error',
+                    infoEmailConfirm: 'Check your email to confirm your account'
+                }
             };
 
             const UI_PHRASES = [
@@ -1852,7 +1866,9 @@
                 syncFlipToggle(['langToggle','loginLangToggle'], l === 'en');
                 const s = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
                 s('loginSubtitle', t.sub); s('loginEmailLabel', t.emailLabel); s('loginClanLabel', t.clanLabel);
-                s('loginBtnText1', t.btn1); s('loginBtnText2', t.btn2); s('loginHintText', t.hint1);
+                s('loginBtnText1', t.btn1); s('loginBtnText2', t.btn2);
+                // Перерисовать auth-шаг 1 с актуальным языком
+                if (typeof _renderAuthStep1 === 'function') _renderAuthStep1();
                 applyStaticTranslations(l);
                 const dashPage = document.getElementById('page-dashboard');
                 if (dashPage && dashPage.classList.contains('active')) renderDashboard();
@@ -1886,46 +1902,97 @@
                 setLang(current === 'ru' ? 'en' : 'ru');
             };
 
-            // --- AUTH: email+password sign in ---
-            window.loginSignIn = async function() {
+            // --- AUTH UI STATE ---
+            let _authMode = 'login'; // 'login' | 'signup'
+
+            const _GSVG = '<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>';
+
+            // Render step1 auth form based on current mode + language
+            window._renderAuthStep1 = function() {
+                const step1 = document.getElementById('loginStep1');
+                if (!step1) return;
+                const l = localStorage.getItem('cc_lang') || 'ru';
+                const t = TEXTS[l] || TEXTS.ru;
+                const isSignup = _authMode === 'signup';
+                // Preserve entered values across re-renders
+                const prevEmail = (document.getElementById('loginEmailInput') || {}).value || '';
+                const prevPass = (document.getElementById('loginPasswordInput') || {}).value || '';
+                const label = isSignup ? t.authLabelSignup : t.authLabelLogin;
+                const primaryBtn = isSignup ? t.authBtnSignup : t.authBtnLogin;
+                const switchBtn = isSignup ? t.authSwitchToLogin : t.authSwitchToSignup;
+                const switchAct = isSignup ? 'loginSwitchToLogin()' : 'loginSwitchToSignup()';
+                const confirmField = isSignup
+                    ? `<input type="password" class="login-input" id="loginConfirmInput" placeholder="${t.authConfirmPh}" autocomplete="new-password" onkeydown="if(event.key==='Enter')loginSubmitAuth()" style="margin-top:-6px">`
+                    : '';
+                const primaryAct = isSignup ? 'loginSubmitAuth()' : 'loginSignIn()';
+                step1.innerHTML =
+                    `<div class="login-step-label"><span class="login-step-num">1</span><span id="loginEmailLabel">${label}</span></div>` +
+                    `<input type="email" class="login-input" id="loginEmailInput" placeholder="${t.authEmailPh}" autocomplete="email" value="${prevEmail.replace(/"/g,'&quot;')}">` +
+                    `<input type="password" class="login-input" id="loginPasswordInput" placeholder="${t.authPassPh}" autocomplete="${isSignup?'new-password':'current-password'}" onkeydown="if(event.key==='Enter'&&!${isSignup})loginSignIn()" style="margin-top:-6px" value="${prevPass.replace(/"/g,'&quot;')}">` +
+                    confirmField +
+                    `<div style="display:flex;gap:8px;margin-bottom:8px;margin-top:2px">` +
+                        `<button class="login-btn" id="loginBtnPrimary" onclick="${primaryAct}" style="flex:1"><span>${primaryBtn}</span></button>` +
+                        `<button class="login-btn" id="loginBtnSwitch" onclick="${switchAct}" style="flex:1;background:var(--bg3);color:var(--text);border:1px solid var(--border)"><span>${switchBtn}</span></button>` +
+                    `</div>` +
+                    `<div style="text-align:center;margin:10px 0;color:var(--text4);font-size:12px">${t.authOr}</div>` +
+                    `<!-- Google OAuth — Supabase Dashboard > Authentication > URL Configuration > Redirect URLs -->` +
+                    `<!-- Google Cloud Console: Authorized redirect URIs — https://sluqteqisrkdsmcsydlv.supabase.co/auth/v1/callback -->` +
+                    `<button class="login-btn" id="loginBtnGoogle" onclick="loginWithGoogle()" style="background:var(--bg3);color:var(--text);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:8px">${_GSVG}<span>${t.authGoogle}</span></button>` +
+                    `<p class="login-hint" id="loginHintText" style="margin-top:10px"></p>`;
+            };
+
+            window.loginSwitchToSignup = function() { _authMode = 'signup'; _renderAuthStep1(); };
+            window.loginSwitchToLogin  = function() { _authMode = 'login';  _renderAuthStep1(); };
+
+            // Signup submit with full validation
+            window.loginSubmitAuth = async function() {
+                const l = localStorage.getItem('cc_lang') || 'ru';
+                const t = TEXTS[l] || TEXTS.ru;
                 const email = (document.getElementById('loginEmailInput') || {}).value?.trim() || '';
                 const password = (document.getElementById('loginPasswordInput') || {}).value || '';
-                const hint = document.getElementById('loginHintText');
-                if (!email || !email.includes('@')) { _setLoginHint('Введи корректный email', true); return; }
-                if (!password) { _setLoginHint('Введи пароль', true); return; }
+                const confirm = (document.getElementById('loginConfirmInput') || {}).value || '';
+                if (!email || !email.includes('@')) { _setLoginHint(t.errEmail, true); return; }
+                if (password.length < 8) { _setLoginHint(t.errPass, true); return; }
+                if (password !== confirm) { _setLoginHint(t.errConfirm, true); return; }
+                _setLoginBusy(true);
+                try {
+                    const { data, error } = await window._supabase.auth.signUp({ email, password });
+                    if (error) throw error;
+                    if (data.session && data.user) {
+                        await _initWithSupabaseUser(data.user);
+                    } else {
+                        _setLoginHint(t.infoEmailConfirm, false);
+                    }
+                } catch(err) {
+                    _setLoginHint(err.message || t.errSignup, true);
+                } finally { _setLoginBusy(false); }
+            };
+
+            // --- AUTH: email+password sign in ---
+            window.loginSignIn = async function() {
+                const l = localStorage.getItem('cc_lang') || 'ru';
+                const t = TEXTS[l] || TEXTS.ru;
+                const email = (document.getElementById('loginEmailInput') || {}).value?.trim() || '';
+                const password = (document.getElementById('loginPasswordInput') || {}).value || '';
+                if (!email || !email.includes('@')) { _setLoginHint(t.errEmail, true); return; }
+                if (!password) { _setLoginHint(t.errEmpty, true); return; }
                 _setLoginBusy(true);
                 try {
                     const { data, error } = await window._supabase.auth.signInWithPassword({ email, password });
                     if (error) throw error;
                     if (data.user) await _initWithSupabaseUser(data.user);
                 } catch(err) {
-                    _setLoginHint(err.message || 'Ошибка входа', true);
+                    _setLoginHint(err.message || t.errLogin, true);
                 } finally { _setLoginBusy(false); }
             };
 
-            // --- AUTH: email+password sign up ---
-            window.loginSignUp = async function() {
-                const email = (document.getElementById('loginEmailInput') || {}).value?.trim() || '';
-                const password = (document.getElementById('loginPasswordInput') || {}).value || '';
-                if (!email || !email.includes('@')) { _setLoginHint('Введи корректный email', true); return; }
-                if (password.length < 6) { _setLoginHint('Пароль минимум 6 символов', true); return; }
-                _setLoginBusy(true);
-                try {
-                    const { data, error } = await window._supabase.auth.signUp({ email, password });
-                    if (error) throw error;
-                    // Supabase может сразу вернуть session (если email confirm отключён) или нет
-                    if (data.session && data.user) {
-                        await _initWithSupabaseUser(data.user);
-                    } else {
-                        _setLoginHint('Проверь почту — нужно подтвердить email', false);
-                    }
-                } catch(err) {
-                    _setLoginHint(err.message || 'Ошибка регистрации', true);
-                } finally { _setLoginBusy(false); }
-            };
+            // --- AUTH: email+password sign up (legacy, now routed through loginSubmitAuth) ---
+            window.loginSignUp = function() { loginSwitchToSignup(); };
 
             // --- AUTH: Google OAuth ---
             window.loginWithGoogle = async function() {
+                const l = localStorage.getItem('cc_lang') || 'ru';
+                const t = TEXTS[l] || TEXTS.ru;
                 _setLoginBusy(true);
                 try {
                     const { error } = await window._supabase.auth.signInWithOAuth({
@@ -1935,7 +2002,7 @@
                     if (error) throw error;
                     // Supabase перенаправит на Google, затем обратно с code/hash
                 } catch(err) {
-                    _setLoginHint(err.message || 'Ошибка Google входа', true);
+                    _setLoginHint(err.message || t.errGoogle, true);
                     _setLoginBusy(false);
                 }
             };
@@ -1947,7 +2014,7 @@
                 h.style.color = isError ? '#ef4444' : 'var(--text4)';
             }
             function _setLoginBusy(busy) {
-                ['loginBtnSignIn','loginBtnSignUp','loginBtnGoogle'].forEach(id => {
+                ['loginBtnPrimary','loginBtnSwitch','loginBtnGoogle'].forEach(id => {
                     const b = document.getElementById(id);
                     if (b) { b.disabled = busy; b.style.opacity = busy ? '0.6' : ''; }
                 });
@@ -1958,7 +2025,8 @@
                 document.getElementById('loginStep2').classList.remove('active');
                 document.getElementById('loginStep1').classList.add('active');
                 document.getElementById('loginDot2').classList.remove('done');
-                _setLoginHint('', false);
+                _authMode = 'login';
+                _renderAuthStep1();
             };
 
             window.loginFinish = async function() {
@@ -1985,12 +2053,12 @@
                 // Supabase: выйти из аккаунта
                 await window._supabase.auth.signOut();
                 ['cc_user','cc_clan'].forEach(k=>{sessionStorage.removeItem(k);localStorage.removeItem(k);});
-                const e = document.getElementById('loginEmailInput'); if(e) e.value = '';
-                const p = document.getElementById('loginPasswordInput'); if(p) p.value = '';
-                const c = document.getElementById('loginClanInput'); if(c) c.value = '';
                 window._loginEmail = '';
-                loginGoStep1();
+                _authMode = 'login';
+                document.getElementById('loginStep2').classList.remove('active');
                 document.getElementById('loginDot2').classList.remove('done');
+                document.getElementById('loginStep1').classList.add('active');
+                _renderAuthStep1();
                 document.getElementById('topbar').classList.add('hidden');
                 document.getElementById('appLayout').classList.add('hidden');
                 document.getElementById('loginScreen').classList.remove('hidden');
@@ -2011,6 +2079,8 @@
             setTheme(theme);
             setLang(lang);
             ensureTranslationObserver();
+            // Отрисовать auth-экран с правильным языком
+            _renderAuthStep1();
 
             // Инициализация Supabase клиента
             window._supabase = supabase.createClient(
@@ -2053,20 +2123,10 @@
 
             // Вернуть UI на loginStep1 из состояния загрузки (после callback)
             function _resetToLoginStep1() {
+                _authMode = 'login';
                 const step1 = document.getElementById('loginStep1');
-                if (step1) {
-                    step1.classList.add('active');
-                    // Восстановить форму если была заменена loading-state
-                    if (!document.getElementById('loginEmailInput')) {
-                        step1.innerHTML = '<div class="login-step-label"><span class="login-step-num">1</span><span id="loginEmailLabel">Войти или зарегистрироваться</span></div>' +
-                            '<input type="email" class="login-input" id="loginEmailInput" placeholder="your@email.com" autocomplete="email">' +
-                            '<input type="password" class="login-input" id="loginPasswordInput" placeholder="Пароль" autocomplete="current-password" onkeydown="if(event.key===\'Enter\') loginSignIn()" style="margin-top:-6px">' +
-                            '<div style="display:flex;gap:8px;margin-bottom:8px"><button class="login-btn" id="loginBtnSignIn" onclick="loginSignIn()" style="flex:1"><span>Войти</span></button><button class="login-btn" id="loginBtnSignUp" onclick="loginSignUp()" style="flex:1;background:var(--bg3);color:var(--text);border:1px solid var(--border)"><span>Регистрация</span></button></div>' +
-                            '<div style="text-align:center;margin:10px 0;color:var(--text4);font-size:12px">— или —</div>' +
-                            '<button class="login-btn" id="loginBtnGoogle" onclick="loginWithGoogle()" style="background:var(--bg3);color:var(--text);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:8px"><svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg><span>Войти через Google</span></button>' +
-                            '<p class="login-hint" id="loginHintText" style="margin-top:10px"></p>';
-                    }
-                }
+                if (step1) step1.classList.add('active');
+                _renderAuthStep1();
             }
 
             // Слушаем изменения сессии (hash-flow fallback)
