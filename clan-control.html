@@ -1407,8 +1407,9 @@
                     errAlreadyExists: 'Аккаунт с этим email уже существует. Войди через кнопку «Войти».',
                     errGoogle: 'Не удалось войти через Google. Проверь настройки и попробуй снова.',
                     errGoogleProvider: 'Вход через Google недоступен. Используй email и пароль.',
+                    errRateLimit: 'Слишком много попыток. Подожди минуту и попробуй снова.',
                     infoEmailConfirm: 'На этот email отправлено письмо для подтверждения. Проверь почту и перейди по ссылке, затем войди.',
-                    infoSignupAmbiguous: 'Не удалось завершить регистрацию. Если аккаунт уже существует — войди через «Войти». Иначе проверь почту на письмо подтверждения.'
+                    infoSignupAmbiguous: 'Не удалось завершить регистрацию. Если аккаунт уже есть — нажми «Войти». Иначе проверь почту.'
                 },
                 en: {
                     sub: 'Clan officer toolkit for tracking war statistics',
@@ -1429,8 +1430,9 @@
                     errAlreadyExists: 'An account with this email already exists. Use Sign In instead.',
                     errGoogle: 'Google sign in failed. Please check your settings and try again.',
                     errGoogleProvider: 'Google sign in is not available. Use email and password.',
-                    infoEmailConfirm: 'A confirmation email has been sent. Check your inbox, click the link, then sign in.',
-                    infoSignupAmbiguous: 'Could not complete sign up. If an account already exists — use Sign In. Otherwise check your inbox for a confirmation email.'
+                    errRateLimit: 'Too many attempts. Please wait a minute and try again.',
+                    infoEmailConfirm: 'A confirmation email has been sent. Check your inbox and follow the link, then sign in.',
+                    infoSignupAmbiguous: 'Could not complete sign up. If you already have an account — use Sign In. Otherwise check your inbox.'
                 }
             };
 
@@ -1947,6 +1949,7 @@
             function _mapAuthError(msg, t, context) {
                 if (!msg) return context === 'login' ? t.errLogin : context === 'signup' ? t.errSignup : t.errGoogle;
                 const m = msg.toLowerCase();
+                if (m.includes('rate limit') || m.includes('too many') || m.includes('request this once every') || m.includes('security purposes')) return t.errRateLimit;
                 if (m.includes('invalid login') || m.includes('invalid credentials') || m.includes('wrong password') || m.includes('no user found')) return t.errLogin;
                 if (m.includes('already registered') || m.includes('already exists') || m.includes('user already')) return t.errAlreadyExists;
                 if (m.includes('provider') || m.includes('not enabled') || m.includes('unsupported') || m.includes('access denied') || m.includes('oauth')) {
@@ -2067,45 +2070,42 @@
                 return p.length >= 8 && /^[\x21-\x7E]+$/.test(p);
             }
 
-            // Classify signUp result: 'success' | 'existing' | 'confirm' | 'ambiguous' | 'error'
+            // Classify signUp response: 'success' | 'existing' | 'confirm' | 'ambiguous' | 'error'
             function _classifySignup(data, error) {
-                // 1) Explicit Supabase error
+                // 1) Explicit Supabase error object
                 if (error) {
                     const m = (error.message || '').toLowerCase();
                     if (m.includes('already registered') || m.includes('already exists') || m.includes('user already')) {
                         return 'existing';
                     }
+                    // rate limit, network, or other backend error — will be shown via _mapAuthError
                     return 'error';
                 }
-                // 2) Got a session + user — real successful signup
+                // 2) Got a session + user — real successful signup (autoconfirm on)
                 if (data && data.session && data.user) {
                     return 'success';
                 }
-                // 3) No session, user object returned — email-confirm, obfuscated existing, or ambiguous
+                // 3) No session, user object returned — email-confirm or obfuscated existing
                 if (data && data.user) {
                     const u = data.user;
                     const identities = u.identities;
-                    // Supabase obfuscated existing-email: empty identities array
+                    // Supabase obfuscated existing-email: returns user with empty identities []
                     if (Array.isArray(identities) && identities.length === 0) {
                         return 'existing';
                     }
-                    // Has identities with email provider AND user was just created (within last 30s)
-                    // — this is a genuinely new account pending email confirmation
+                    // Has identities with email provider + freshly created → genuine new account
                     if (Array.isArray(identities) && identities.length > 0) {
-                        const hasEmailIdentity = identities.some(function(id) {
-                            return id.provider === 'email';
-                        });
-                        const createdAt = u.created_at ? new Date(u.created_at).getTime() : 0;
-                        const now = Date.now();
-                        const isRecent = createdAt > 0 && (now - createdAt) < 60000; // within 60s
-                        if (hasEmailIdentity && isRecent) {
+                        const hasEmail = identities.some(function(id) { return id.provider === 'email'; });
+                        var createdMs = u.created_at ? new Date(u.created_at).getTime() : 0;
+                        var fresh = createdMs > 0 && (Date.now() - createdMs) < 120000; // 2 min
+                        if (hasEmail && fresh) {
                             return 'confirm';
                         }
                     }
-                    // Cannot reliably determine — don't lie to user
+                    // identities present but can't confirm freshness — ambiguous
                     return 'ambiguous';
                 }
-                // 4) No data at all — unexpected
+                // 4) No data at all
                 return 'error';
             }
 
@@ -2123,7 +2123,8 @@
                 _setLoginBusy(true);
                 try {
                     const { data, error } = await window._supabase.auth.signUp({ email, password });
-                    const result = _classifySignup(data, error);
+                    var result = _classifySignup(data, error);
+                    console.log('[ClanControl] signUp classify:', result, 'error:', error, 'user:', data && data.user && { id: data.user.id, identities: (data.user.identities||[]).length, created: data.user.created_at }, 'session:', !!( data && data.session));
                     switch (result) {
                         case 'success':
                             await _initWithSupabaseUser(data.user);
@@ -2137,11 +2138,12 @@
                         case 'ambiguous':
                             _setLoginHint(t.infoSignupAmbiguous, true);
                             break;
-                        default:
+                        default: // 'error'
                             _setLoginHint(_mapAuthError(error && error.message, t, 'signup'), true);
                             break;
                     }
                 } catch(err) {
+                    console.warn('[ClanControl] signUp exception:', err && err.message);
                     _setLoginHint(_mapAuthError(err && err.message, t, 'signup'), true);
                 } finally { _setLoginBusy(false); }
             };
