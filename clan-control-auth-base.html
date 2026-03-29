@@ -8816,15 +8816,14 @@ function getClass2IconByClass3(c3) {
     // =============================================
     (function() {
 
-        const TEXTS = {
+        var TEXTS = {
             ru: {
                 sub: 'Инструмент офицера клана для отслеживания КМ-статистики',
-                clanLabel: 'Название клана', btn2: 'Войти в Clan Control →',
+                clanLabel: 'Название клана',
                 authLabelLogin: 'Вход', authLabelSignup: 'Регистрация',
                 authEmailPh: 'your@email.com', authPassPh: 'Пароль', authConfirmPh: 'Повторите пароль',
                 authBtnLogin: 'Войти', authBtnSignup: 'Зарегистрироваться',
                 authSwitchToSignup: 'Регистрация', authSwitchToLogin: '← Войти',
-                authShowPass: 'Показать',
                 errEmail: 'Введи корректный email',
                 errPass: 'Пароль: минимум 8 символов, только латиница/цифры/символы, без пробелов',
                 errConfirm: 'Пароли не совпадают', errEmpty: 'Введи пароль',
@@ -8833,26 +8832,25 @@ function getClass2IconByClass3(c3) {
                 errSignup: 'Ошибка регистрации. Попробуй ещё раз.',
                 errAlreadyExists: 'Аккаунт с этим email уже существует. Войди через «Войти».',
                 errRateLimit: 'Слишком много попыток. Подожди минуту и попробуй снова.',
-                infoEmailConfirm: 'На этот email отправлено письмо для подтверждения. Проверь почту и перейди по ссылке, затем войди.',
+                infoEmailConfirm: 'На этот email отправлено письмо. Проверь почту и перейди по ссылке, затем войди.',
                 infoEmailConfirmedSignIn: 'Email подтверждён. Теперь войди с email и паролем.',
-                infoSignupAmbiguous: 'Не удалось завершить регистрацию. Если аккаунт уже есть — нажми «Войти». Иначе проверь почту.',
+                infoSignupAmbiguous: 'Если аккаунт уже есть — нажми «Войти». Иначе проверь почту.',
                 forgotPassword: 'Забыли пароль?',
                 resetTitle: 'Новый пароль', resetPassPh: 'Новый пароль', resetConfirmPh: 'Повторите пароль',
-                resetBtn: 'Сохранить пароль', resetSuccess: 'Пароль успешно изменён. Теперь войди.',
+                resetBtn: 'Сохранить пароль', resetSuccess: 'Пароль изменён. Теперь войди.',
                 forgotTitle: 'Восстановление пароля', forgotEmailPh: 'Email для восстановления',
                 forgotSendBtn: 'Отправить письмо', forgotBack: '← Назад ко входу',
                 forgotSentPrefix: 'Письмо отправлено на ',
                 errResetEmail: 'Введи корректный email для сброса пароля.',
-                errResetSend: 'Не удалось отправить письмо для сброса. Попробуй ещё раз.',
+                errResetSend: 'Не удалось отправить письмо. Попробуй ещё раз.'
             },
             en: {
                 sub: 'Clan officer toolkit for tracking war statistics',
-                clanLabel: 'Clan name or tag', btn2: 'Enter Clan Control →',
+                clanLabel: 'Clan name or tag',
                 authLabelLogin: 'Sign In', authLabelSignup: 'Create Account',
                 authEmailPh: 'your@email.com', authPassPh: 'Password', authConfirmPh: 'Confirm password',
                 authBtnLogin: 'Sign In', authBtnSignup: 'Create Account',
                 authSwitchToSignup: 'Sign Up', authSwitchToLogin: '← Sign In',
-                authShowPass: 'Show',
                 errEmail: 'Enter a valid email',
                 errPass: 'Password: at least 8 characters, ASCII only, no spaces',
                 errConfirm: 'Passwords do not match', errEmpty: 'Enter your password',
@@ -8861,9 +8859,9 @@ function getClass2IconByClass3(c3) {
                 errSignup: 'Sign up failed. Please try again.',
                 errAlreadyExists: 'An account with this email already exists. Use Sign In instead.',
                 errRateLimit: 'Too many attempts. Please wait a minute and try again.',
-                infoEmailConfirm: 'A confirmation email has been sent. Check your inbox and follow the link, then sign in.',
+                infoEmailConfirm: 'Confirmation email sent. Check your inbox and follow the link, then sign in.',
                 infoEmailConfirmedSignIn: 'Email confirmed. Now sign in with your email and password.',
-                infoSignupAmbiguous: 'Could not complete sign up. If you have an account — use Sign In. Otherwise check your inbox.',
+                infoSignupAmbiguous: 'If you have an account — use Sign In. Otherwise check your inbox.',
                 forgotPassword: 'Forgot password?',
                 resetTitle: 'New Password', resetPassPh: 'New password', resetConfirmPh: 'Confirm new password',
                 resetBtn: 'Save Password', resetSuccess: 'Password updated. Please sign in.',
@@ -8871,45 +8869,48 @@ function getClass2IconByClass3(c3) {
                 forgotSendBtn: 'Send Reset Email', forgotBack: '← Back to Sign In',
                 forgotSentPrefix: 'Email sent to ',
                 errResetEmail: 'Enter a valid email to reset your password.',
-                errResetSend: 'Failed to send reset email. Please try again.',
+                errResetSend: 'Failed to send reset email. Please try again.'
             }
         };
 
         window._loginEmail = '';
         window._currentUserId = '';
 
-        const _EYE_ON  = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
-        const _EYE_OFF = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+        var EYE_ON  = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+        var EYE_OFF = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
 
         window._togglePassVis = function(inputId, btnId) {
             var inp = document.getElementById(inputId);
             var btn = document.getElementById(btnId);
             if (!inp || !btn) return;
-            if (inp.type === 'password') { inp.type = 'text'; btn.innerHTML = _EYE_OFF; }
-            else { inp.type = 'password'; btn.innerHTML = _EYE_ON; }
+            if (inp.type === 'password') { inp.type = 'text'; btn.innerHTML = EYE_OFF; }
+            else { inp.type = 'password'; btn.innerHTML = EYE_ON; }
         };
 
-        let _authMode = 'login';
-        const _AUTH_REDIRECT_URL = window.location.origin + window.location.pathname;
+        var _authMode = 'login';
+        var _AUTH_REDIRECT_URL = window.location.origin + window.location.pathname;
 
         function _getLang() { return localStorage.getItem('cc_lang') || 'ru'; }
+        function _T() { var l = _getLang(); return TEXTS[l] || TEXTS.ru; }
 
-        function _passField(id, ph, ac, onkeydown) {
+        function _passField(id, ph, ac, enterFn) {
+            var kd = enterFn ? ('if(event.key===\'Enter\')' + enterFn) : '';
             return '<div style="position:relative;margin-top:-6px">' +
-                '<input type="password" class="login-input" id="' + id + '" placeholder="' + ph + '" autocomplete="' + ac + '" ' +
-                (onkeydown ? 'onkeydown="' + onkeydown + '"' : '') +
+                '<input type="password" class="login-input" id="' + id + '" placeholder="' + ph + '" autocomplete="' + ac + '"' +
+                (kd ? ' onkeydown="' + kd + '"' : '') +
                 ' style="padding-right:40px;width:100%;box-sizing:border-box">' +
-                '<button type="button" onclick="_togglePassVis('' + id + '','' + id + 'Btn')" id="' + id + 'Btn" ' +
-                'style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#64748b;cursor:pointer;padding:2px;line-height:0;opacity:0.6" ' +
-                'onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">' + _EYE_ON + '</button>' +
+                '<button type="button" onclick="_togglePassVis(\'' + id + '\',\'' + id + 'Btn\')" id="' + id + 'Btn"' +
+                ' style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#64748b;cursor:pointer;padding:2px;line-height:0;opacity:0.6"' +
+                ' onmouseover="this.style.opacity=\'1\'" onmouseout="this.style.opacity=\'0.6\'">' + EYE_ON + '</button>' +
                 '</div>';
         }
 
         function _isValidPassword(p) {
-            return p.length >= 8 && /^[\x21-\x7E]+$/.test(p);
+            return p.length >= 8 && /^[!-~]+$/.test(p);
         }
 
-        function _mapAuthError(msg, t, ctx) {
+        function _mapAuthError(msg, ctx) {
+            var t = _T();
             if (!msg) return ctx === 'login' ? t.errLogin : t.errSignup;
             var m = msg.toLowerCase();
             if (m.includes('rate limit') || m.includes('too many') || m.includes('security purposes')) return t.errRateLimit;
@@ -8942,7 +8943,7 @@ function getClass2IconByClass3(c3) {
         }
 
         function _setLoginBusy(busy) {
-            ['loginBtnPrimary','loginBtnSwitch'].forEach(function(id) {
+            ['loginBtnPrimary', 'loginBtnSwitch'].forEach(function(id) {
                 var b = document.getElementById(id);
                 if (b) { b.disabled = busy; b.style.opacity = busy ? '0.6' : ''; }
             });
@@ -8951,8 +8952,7 @@ function getClass2IconByClass3(c3) {
         window._renderAuthStep1 = function() {
             var step1 = document.getElementById('loginStep1');
             if (!step1) return;
-            var l = _getLang();
-            var t = TEXTS[l] || TEXTS.ru;
+            var t = _T();
             var isSignup = _authMode === 'signup';
             var isForgot = _authMode === 'forgot';
             var isReset  = _authMode === 'reset';
@@ -8960,8 +8960,8 @@ function getClass2IconByClass3(c3) {
             if (isReset) {
                 step1.innerHTML =
                     '<div class="login-step-label"><span class="login-step-num">1</span><span>' + t.resetTitle + '</span></div>' +
-                    _passField('loginNewPassInput', t.resetPassPh, 'new-password', '') +
-                    _passField('loginNewConfirmInput', t.resetConfirmPh, 'new-password', 'if(event.key===\'Enter\')loginResetSubmit()') +
+                    _passField('loginNewPassInput', t.resetPassPh, 'new-password', null) +
+                    _passField('loginNewConfirmInput', t.resetConfirmPh, 'new-password', 'loginResetSubmit()') +
                     '<button class="login-btn" id="loginBtnPrimary" onclick="loginResetSubmit()" style="margin-top:8px"><span>' + t.resetBtn + '</span></button>' +
                     '<p class="login-hint" id="loginHintText" style="margin-top:10px"></p>';
                 return;
@@ -8971,34 +8971,39 @@ function getClass2IconByClass3(c3) {
                 var prevE = ((document.getElementById('loginEmailInput') || {}).value || '');
                 step1.innerHTML =
                     '<div class="login-step-label"><span class="login-step-num">1</span><span>' + t.forgotTitle + '</span></div>' +
-                    '<input type="email" class="login-input" id="loginForgotEmailInput" placeholder="' + t.forgotEmailPh + '" autocomplete="email" value="' + prevE.replace(/"/g,'&quot;') + '" onkeydown="if(event.key==='Enter')loginForgotSend()">' +
+                    '<input type="email" class="login-input" id="loginForgotEmailInput" placeholder="' + t.forgotEmailPh + '" autocomplete="email"' +
+                    ' onkeydown="if(event.key===\'Enter\')loginForgotSend()">' +
                     '<button class="login-btn" id="loginBtnPrimary" onclick="loginForgotSend()" style="margin-top:8px"><span>' + t.forgotSendBtn + '</span></button>' +
-                    '<div style="margin-top:8px"><button type="button" onclick="loginSwitchToLogin()" style="background:none;border:none;color:#64748b;font-size:12px;cursor:pointer;padding:0;text-decoration:underline">' + t.forgotBack + '</button></div>' +
+                    '<div style="margin-top:8px"><button type="button" onclick="loginSwitchToLogin()"' +
+                    ' style="background:none;border:none;color:#64748b;font-size:12px;cursor:pointer;padding:0;text-decoration:underline">' + t.forgotBack + '</button></div>' +
                     '<p class="login-hint" id="loginHintText" style="margin-top:10px"></p>';
-                if (prevE) { var fi = document.getElementById('loginForgotEmailInput'); if (fi) fi.value = prevE; }
+                var fi = document.getElementById('loginForgotEmailInput');
+                if (fi && prevE) fi.value = prevE;
                 return;
             }
 
             var prevEmail   = ((document.getElementById('loginEmailInput')    || {}).value || '');
             var prevPass    = ((document.getElementById('loginPasswordInput') || {}).value || '');
             var prevConfirm = ((document.getElementById('loginConfirmInput')  || {}).value || '');
-            var label      = isSignup ? t.authLabelSignup : t.authLabelLogin;
-            var primaryBtn = isSignup ? t.authBtnSignup   : t.authBtnLogin;
-            var switchBtn  = isSignup ? t.authSwitchToLogin : t.authSwitchToSignup;
-            var switchAct  = isSignup ? 'loginSwitchToLogin()' : 'loginSwitchToSignup()';
-            var primaryAct = isSignup ? 'loginSubmitAuth()' : 'loginSignIn()';
-            var passEnter  = isSignup ? '' : 'if(event.key===\'Enter\')loginSignIn()';
+            var label       = isSignup ? t.authLabelSignup : t.authLabelLogin;
+            var primaryBtn  = isSignup ? t.authBtnSignup   : t.authBtnLogin;
+            var switchBtn   = isSignup ? t.authSwitchToLogin : t.authSwitchToSignup;
+            var switchAct   = isSignup ? 'loginSwitchToLogin()' : 'loginSwitchToSignup()';
+            var primaryAct  = isSignup ? 'loginSubmitAuth()' : 'loginSignIn()';
+
             var confirmField = isSignup
-                ? _passField('loginConfirmInput', t.authConfirmPh, 'new-password', 'if(event.key===\'Enter\')loginSubmitAuth()')
+                ? _passField('loginConfirmInput', t.authConfirmPh, 'new-password', 'loginSubmitAuth()')
                 : '';
+
             var forgotLink = !isSignup
-                ? '<div style="text-align:right;margin-top:-2px;margin-bottom:4px"><button type="button" onclick="loginForgotPassword()" style="background:none;border:none;color:#64748b;font-size:12px;cursor:pointer;padding:0;text-decoration:underline">' + t.forgotPassword + '</button></div>'
+                ? '<div style="text-align:right;margin-top:-2px;margin-bottom:4px"><button type="button" onclick="loginForgotPassword()"' +
+                  ' style="background:none;border:none;color:#64748b;font-size:12px;cursor:pointer;padding:0;text-decoration:underline">' + t.forgotPassword + '</button></div>'
                 : '';
 
             step1.innerHTML =
                 '<div class="login-step-label"><span class="login-step-num">1</span><span id="loginEmailLabel">' + label + '</span></div>' +
-                '<input type="email" class="login-input" id="loginEmailInput" placeholder="' + t.authEmailPh + '" autocomplete="email" value="' + prevEmail.replace(/"/g,'&quot;') + '">' +
-                _passField('loginPasswordInput', t.authPassPh, isSignup ? 'new-password' : 'current-password', passEnter) +
+                '<input type="email" class="login-input" id="loginEmailInput" placeholder="' + t.authEmailPh + '" autocomplete="email">' +
+                _passField('loginPasswordInput', t.authPassPh, isSignup ? 'new-password' : 'current-password', isSignup ? null : 'loginSignIn()') +
                 confirmField +
                 forgotLink +
                 '<div style="display:flex;gap:8px;margin-bottom:8px;margin-top:8px">' +
@@ -9007,8 +9012,10 @@ function getClass2IconByClass3(c3) {
                 '</div>' +
                 '<p class="login-hint" id="loginHintText" style="margin-top:10px"></p>';
 
-            var pInp = document.getElementById('loginPasswordInput');
-            if (pInp && prevPass) pInp.value = prevPass;
+            var pInp = document.getElementById('loginEmailInput');
+            if (pInp && prevEmail) pInp.value = prevEmail;
+            var pwInp = document.getElementById('loginPasswordInput');
+            if (pwInp && prevPass) pwInp.value = prevPass;
             var cInp = document.getElementById('loginConfirmInput');
             if (cInp && prevConfirm) cInp.value = prevConfirm;
         };
@@ -9022,7 +9029,7 @@ function getClass2IconByClass3(c3) {
         };
 
         window.loginForgotSend = async function() {
-            var l = _getLang(); var t = TEXTS[l] || TEXTS.ru;
+            var t = _T();
             var email = ((document.getElementById('loginForgotEmailInput') || {}).value || '').trim();
             if (!email || !email.includes('@')) { _setLoginHint(t.errResetEmail, true); return; }
             var btn = document.getElementById('loginBtnPrimary');
@@ -9039,7 +9046,7 @@ function getClass2IconByClass3(c3) {
         };
 
         window.loginResetSubmit = async function() {
-            var l = _getLang(); var t = TEXTS[l] || TEXTS.ru;
+            var t = _T();
             var newPass    = ((document.getElementById('loginNewPassInput')    || {}).value || '');
             var confirmNew = ((document.getElementById('loginNewConfirmInput') || {}).value || '');
             if (!_isValidPassword(newPass)) { _setLoginHint(t.errPass, true); return; }
@@ -9083,7 +9090,7 @@ function getClass2IconByClass3(c3) {
         var _signupCooldownUntil = 0;
 
         window.loginSubmitAuth = async function() {
-            var l = _getLang(); var t = TEXTS[l] || TEXTS.ru;
+            var t = _T();
             var email    = ((document.getElementById('loginEmailInput')    || {}).value || '').trim();
             var password = ((document.getElementById('loginPasswordInput') || {}).value || '');
             var confirm  = ((document.getElementById('loginConfirmInput')  || {}).value || '');
@@ -9115,16 +9122,16 @@ function getClass2IconByClass3(c3) {
                     case 'ambiguous':
                         _setLoginHint(t.infoSignupAmbiguous, false); break;
                     default:
-                        _setLoginHint(_mapAuthError(error && error.message, t, 'signup'), true); break;
+                        _setLoginHint(_mapAuthError(error && error.message, 'signup'), true); break;
                 }
             } catch(err) {
                 _signupCooldownUntil = Date.now() + 62000;
-                _setLoginHint(_mapAuthError(err && err.message, t, 'signup'), true);
+                _setLoginHint(_mapAuthError(err && err.message, 'signup'), true);
             } finally { _setLoginBusy(false); }
         };
 
         window.loginSignIn = async function() {
-            var l = _getLang(); var t = TEXTS[l] || TEXTS.ru;
+            var t = _T();
             var email    = ((document.getElementById('loginEmailInput')    || {}).value || '').trim();
             var password = ((document.getElementById('loginPasswordInput') || {}).value || '');
             if (!email || !email.includes('@')) { _fieldError('loginEmailInput'); _setLoginHint(t.errEmail, true); return; }
@@ -9140,25 +9147,28 @@ function getClass2IconByClass3(c3) {
                     _setLoginHint(t.errLogin, true);
                 }
             } catch(err) {
-                _setLoginHint(_mapAuthError(err && err.message, t, 'login'), true);
+                _setLoginHint(_mapAuthError(err && err.message, 'login'), true);
             } finally { _setLoginBusy(false); }
         };
 
         window.loginGoStep1 = function() {
-            document.getElementById('loginStep2').classList.remove('active');
-            document.getElementById('loginStep1').classList.add('active');
-            document.getElementById('loginDot2').classList.remove('done');
+            var s2 = document.getElementById('loginStep2');
+            var s1 = document.getElementById('loginStep1');
+            var d2 = document.getElementById('loginDot2');
+            if (s2) s2.classList.remove('active');
+            if (s1) s1.classList.add('active');
+            if (d2) d2.classList.remove('done');
             _authMode = 'login';
             _renderAuthStep1();
             _showLoginScreen();
         };
 
         window.loginFinish = async function() {
-            var l = _getLang(); var t = TEXTS[l] || TEXTS.ru;
+            var t = _T();
             var clan = ((document.getElementById('loginClanInput') || {}).value || '').trim();
             if (!clan) {
                 var c = document.getElementById('loginClanInput');
-                if (c) { c.classList.add('error'); setTimeout(function(){c.classList.remove('error');},1400); c.focus(); }
+                if (c) { c.classList.add('error'); setTimeout(function(){c.classList.remove('error');}, 1400); c.focus(); }
                 return;
             }
             var finBtn = document.querySelector('#loginStep2 .login-btn');
@@ -9191,25 +9201,35 @@ function getClass2IconByClass3(c3) {
             window._loginEmail = '';
             window._currentUserId = '';
             _authMode = 'login';
-            document.getElementById('loginStep2').classList.remove('active');
-            document.getElementById('loginDot2').classList.remove('done');
-            document.getElementById('loginStep1').classList.add('active');
+            var s2 = document.getElementById('loginStep2');
+            var d2 = document.getElementById('loginDot2');
+            var s1 = document.getElementById('loginStep1');
+            if (s2) s2.classList.remove('active');
+            if (d2) d2.classList.remove('done');
+            if (s1) s1.classList.add('active');
             _renderAuthStep1();
-            document.getElementById('topbar').classList.add('hidden');
-            document.getElementById('appLayout').classList.add('hidden');
+            var tb = document.getElementById('topbar');
+            var al = document.getElementById('appLayout');
             var ls = document.getElementById('loginScreen');
-            ls.classList.remove('hidden');
-            ls.classList.add('visible');
+            if (tb) tb.classList.add('hidden');
+            if (al) al.classList.add('hidden');
+            if (ls) { ls.classList.remove('hidden'); ls.classList.add('visible'); }
         };
 
         function _showApp(email, clan) {
             var ls = document.getElementById('loginScreen');
+            var tb = document.getElementById('topbar');
+            var al = document.getElementById('appLayout');
             if (ls) ls.classList.add('hidden');
-            document.getElementById('topbar').classList.remove('hidden');
-            document.getElementById('appLayout').classList.remove('hidden');
-            var av = document.getElementById('topbarAvatar'); if (av) av.textContent = (email[0]||'?').toUpperCase();
-            var em2 = document.getElementById('topbarEmail'); if (em2) em2.textContent = email;
-            var cb = document.getElementById('topbarClan'); if (cb) { if (clan) { cb.textContent = clan; cb.style.display = ''; } else { cb.style.display = 'none'; } }
+            if (tb) tb.classList.remove('hidden');
+            if (al) al.classList.remove('hidden');
+            var av = document.getElementById('topbarAvatar');
+            if (av) av.textContent = (email[0] || '?').toUpperCase();
+            var em2 = document.getElementById('topbarEmail');
+            if (em2) em2.textContent = email;
+            var cb = document.getElementById('topbarClan');
+            if (cb) { if (clan) { cb.textContent = clan; cb.style.display = ''; } else { cb.style.display = 'none'; } }
+            window._loginEmail = email;
             if (typeof _basaInit === 'function') _basaInit();
         }
 
@@ -9229,6 +9249,7 @@ function getClass2IconByClass3(c3) {
         }
 
         var _authInitDone = false;
+
         async function _safeInitUser(user) {
             if (_authInitDone) return;
             _authInitDone = true;
@@ -9248,16 +9269,16 @@ function getClass2IconByClass3(c3) {
                 _showApp(user.email, profile.clan_name);
             } else {
                 _showLoginScreen();
-                document.getElementById('loginStep1').classList.remove('active');
-                document.getElementById('loginStep2').classList.add('active');
-                document.getElementById('loginDot2').classList.add('done');
-                var c = document.getElementById('loginClanInput'); if (c) c.focus();
+                var s1 = document.getElementById('loginStep1');
+                var s2 = document.getElementById('loginStep2');
+                var d2 = document.getElementById('loginDot2');
+                if (s1) s1.classList.remove('active');
+                if (s2) s2.classList.add('active');
+                if (d2) d2.classList.add('done');
+                var ci = document.getElementById('loginClanInput');
+                if (ci) ci.focus();
             }
         }
-
-        window._supabase.auth.onAuthStateChange(async function(event, session) {
-            // Only handle TOKEN_REFRESHED silently
-        });
 
         // Main auth entry point
         (async function() {
@@ -9273,12 +9294,12 @@ function getClass2IconByClass3(c3) {
 
             if (code || hasHashTokens) {
                 var step1 = document.getElementById('loginStep1');
-                if (step1) step1.innerHTML = '<div style="text-align:center;padding:20px 0"><div style="font-size:32px;margin-bottom:12px">⏳</div><div style="font-weight:700;color:#e2e8f0">Входим...</div></div>';
+                if (step1) step1.innerHTML = '<div style="text-align:center;padding:20px 0"><div style="font-size:32px;margin-bottom:12px">\u23F3</div><div style="font-weight:700;color:#e2e8f0">\u0412\u0445\u043e\u0434\u0438\u043c...</div></div>';
 
                 var safetyTimer = setTimeout(function() {
                     if (!_authInitDone) {
                         history.replaceState(null, '', window.location.pathname);
-                        var l = _getLang(); var t = TEXTS[l] || TEXTS.ru;
+                        var t = _T();
                         _resetToLoginStep1WithHint(t.infoEmailConfirmedSignIn);
                     }
                 }, 12000);
@@ -9312,13 +9333,13 @@ function getClass2IconByClass3(c3) {
                             await _safeInitUser(session.user);
                         }
                     } else {
-                        var l2 = _getLang(); var t2 = TEXTS[l2] || TEXTS.ru;
+                        var t2 = _T();
                         _resetToLoginStep1WithHint(t2.infoEmailConfirmedSignIn);
                     }
                 } catch(e) {
                     clearTimeout(safetyTimer);
                     history.replaceState(null, '', window.location.pathname);
-                    var l3 = _getLang(); var t3 = TEXTS[l3] || TEXTS.ru;
+                    var t3 = _T();
                     _resetToLoginStep1WithHint(t3.infoEmailConfirmedSignIn);
                 }
             } else {
@@ -9336,20 +9357,14 @@ function getClass2IconByClass3(c3) {
             }
         })();
 
+        // Init auth UI on load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() { _renderAuthStep1(); });
+        } else {
+            _renderAuthStep1();
+        }
+
     })(); // end auth IIFE
     </script>
-<script>
-// Initialize auth UI after DOM is ready
-(function() {
-    function initAuthUI() {
-        if (typeof _renderAuthStep1 === 'function') _renderAuthStep1();
-    }
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initAuthUI);
-    } else {
-        initAuthUI();
-    }
-})();
-</script>
 </body>
 </html>
