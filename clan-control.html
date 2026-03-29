@@ -1399,26 +1399,253 @@
         
         .calendar-hero::after { opacity: var(--cb-overlay-opacity, 0.55) !important; }
 /* ===== CALENDAR ADMIN BUILDER CSS ===== */
-        .cb-field { margin-bottom:10px; }
-        .cb-field label, .cb-range label, .cb-toggle label { display:block;font-size:11px;color:var(--text3);margin-bottom:3px; }
-        .cb-field input, .cb-field textarea { width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;outline:none; }
-        .cb-field input:focus, .cb-field textarea:focus { border-color:var(--accent); }
-        .cb-range { margin-bottom:10px; }
-        .cb-range input[type=range] { width:100%;accent-color:var(--accent); }
-        .cb-range span { color:var(--accent);font-weight:600;float:right; }
-        .cb-toggle { margin-bottom:6px; }
-        .cb-toggle input[type=checkbox] { accent-color:var(--accent);margin-right:6px; }
-        .cb-btn { width:100%;padding:8px 0;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--bg2);color:var(--text2);transition:all .15s; }
-        .cb-btn:hover { border-color:var(--accent);color:var(--accent); }
-        .cb-btn-primary { background:rgba(201,168,76,0.12);border-color:rgba(201,168,76,0.4);color:#c9a84c; }
-        .cb-btn-primary:hover { background:rgba(201,168,76,0.25); }
-        .cb-btn-publish { background:rgba(34,197,94,0.12);border-color:rgba(34,197,94,0.4);color:#22c55e; }
-        .cb-btn-publish:hover { background:rgba(34,197,94,0.25); }
-        .cb-btn-danger { border-color:rgba(239,68,68,0.3);color:#ef4444; }
-        .cb-btn-danger:hover { background:rgba(239,68,68,0.1); }
-        .cb-btn-sm { padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid var(--border);background:var(--bg2);color:var(--text3);transition:all .15s; }
-        .cb-btn-sm:hover { border-color:var(--accent);color:var(--accent); }
-        body.light .cb-field input, body.light .cb-field textarea { color:#222!important;background:var(--bg2)!important;border-color:var(--border)!important; }
+        #calBuilderOpenBtn {
+            display:none;
+            position:absolute;
+            top:14px !important;
+            right:14px !important;
+            z-index:20;
+            background:rgba(201,168,76,0.14) !important;
+            border:1px solid rgba(201,168,76,0.34) !important;
+            color:var(--accent-s) !important;
+            padding:9px 16px !important;
+            border-radius:12px !important;
+            font-size:12px !important;
+            font-weight:700 !important;
+            cursor:pointer;
+            backdrop-filter:blur(10px);
+            box-shadow:0 8px 24px rgba(0,0,0,0.18);
+            transition:all .18s ease;
+        }
+        #calBuilderOpenBtn:hover {
+            background:rgba(201,168,76,0.22) !important;
+            border-color:rgba(201,168,76,0.48) !important;
+            color:#fff2cf !important;
+            transform:translateY(-1px);
+        }
+
+        #calBuilderDrawer {
+            width:min(420px,100vw) !important;
+            background:linear-gradient(180deg, rgba(7,12,10,0.98), rgba(10,18,12,0.98)) !important;
+            border-left:1px solid rgba(201,168,76,0.16) !important;
+            box-shadow:-18px 0 42px rgba(0,0,0,0.42) !important;
+            color:var(--text) !important;
+        }
+        #calBuilderDrawer::-webkit-scrollbar { width: 8px; }
+        #calBuilderDrawer::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.28); border-radius: 999px; }
+        #calBuilderDrawer > div:first-child {
+            background:linear-gradient(180deg, rgba(10,15,12,0.98), rgba(10,15,12,0.92)) !important;
+            border-bottom:1px solid rgba(201,168,76,0.12) !important;
+            padding:18px 20px 14px !important;
+            backdrop-filter:blur(10px);
+        }
+        #calBuilderBody { padding:16px 18px 22px !important; }
+        #calBuilderDrawer details {
+            margin-bottom:12px !important;
+            padding:0 14px 14px !important;
+            border-radius:16px;
+            border:1px solid rgba(201,168,76,0.10);
+            background:rgba(255,255,255,0.02);
+            box-shadow:inset 0 1px 0 rgba(255,255,255,0.02);
+        }
+        #calBuilderDrawer details[open] {
+            border-color:rgba(201,168,76,0.18);
+            background:rgba(255,255,255,0.03);
+        }
+        #calBuilderDrawer details > summary {
+            list-style:none;
+            display:flex;
+            align-items:center;
+            gap:8px;
+            padding:14px 0 12px !important;
+            margin:0 !important;
+            font-size:13px !important;
+            font-weight:800 !important;
+            color:var(--text2) !important;
+            cursor:pointer;
+            user-select:none;
+        }
+        #calBuilderDrawer details > summary::-webkit-details-marker { display:none; }
+        #calBuilderDrawer details > summary::marker { content:''; }
+        #calBuilderStatus {
+            font-size:11px !important;
+            color:var(--text4) !important;
+            margin-top:6px !important;
+        }
+
+        .cb-field { margin-bottom:14px; }
+        .cb-field label, .cb-range label, .cb-toggle label {
+            display:block;
+            font-size:12px;
+            font-weight:700;
+            color:var(--text2);
+            margin-bottom:6px;
+            line-height:1.35;
+        }
+        .cb-field input,
+        .cb-field textarea,
+        #calBuilderDrawer input[type=file] {
+            width:100%;
+            appearance:none;
+            -webkit-appearance:none;
+            background:linear-gradient(180deg, rgba(18,27,20,0.95), rgba(12,18,14,0.95)) !important;
+            border:1px solid rgba(201,168,76,0.16) !important;
+            border-radius:12px;
+            padding:10px 12px;
+            color:var(--text) !important;
+            font-size:13px;
+            outline:none;
+            box-shadow:none !important;
+            transition:border-color .16s ease, box-shadow .16s ease, background .16s ease;
+        }
+        .cb-field textarea {
+            min-height:88px;
+            resize:vertical;
+            line-height:1.55;
+        }
+        .cb-field input:focus,
+        .cb-field textarea:focus,
+        #calBuilderDrawer input[type=file]:focus {
+            border-color:rgba(201,168,76,0.42) !important;
+            box-shadow:0 0 0 3px rgba(201,168,76,0.10) !important;
+        }
+        #calBuilderDrawer input::placeholder,
+        #calBuilderDrawer textarea::placeholder { color:var(--text5); }
+        #calBuilderDrawer input:-webkit-autofill,
+        #calBuilderDrawer textarea:-webkit-autofill {
+            -webkit-text-fill-color: var(--text) !important;
+            -webkit-box-shadow: 0 0 0 1000px rgba(18,27,20,0.95) inset !important;
+            box-shadow: 0 0 0 1000px rgba(18,27,20,0.95) inset !important;
+        }
+
+        #calBuilderDrawer input[type=file] {
+            padding:10px 12px !important;
+            color:var(--text3) !important;
+            cursor:pointer;
+        }
+        #calBuilderDrawer input[type=file]::file-selector-button {
+            margin-right:12px;
+            padding:8px 12px;
+            border-radius:10px;
+            border:1px solid rgba(201,168,76,0.26);
+            background:rgba(201,168,76,0.12);
+            color:var(--accent-s);
+            font-weight:700;
+            cursor:pointer;
+            transition:all .16s ease;
+        }
+        #calBuilderDrawer input[type=file]::file-selector-button:hover {
+            background:rgba(201,168,76,0.2);
+            border-color:rgba(201,168,76,0.38);
+            color:#fff2cf;
+        }
+
+        .cb-range { margin-bottom:14px; }
+        .cb-range label { margin-bottom:8px; }
+        .cb-range input[type=range] { width:100%; accent-color:var(--accent); cursor:pointer; }
+        .cb-range span { color:var(--accent-s); font-weight:700; float:right; }
+
+        .cb-toggle { margin-bottom:10px; }
+        .cb-toggle label {
+            display:flex;
+            align-items:center;
+            gap:10px;
+            margin-bottom:0;
+            color:var(--text2);
+            cursor:pointer;
+        }
+        .cb-toggle input[type=checkbox] {
+            accent-color:var(--accent);
+            margin:0;
+            width:16px;
+            height:16px;
+            flex-shrink:0;
+        }
+
+        .cb-btn {
+            width:100%;
+            padding:11px 12px;
+            border-radius:12px;
+            font-size:13px;
+            font-weight:700;
+            cursor:pointer;
+            border:1px solid rgba(201,168,76,0.12);
+            background:rgba(255,255,255,0.02);
+            color:var(--text2);
+            transition:all .16s ease;
+        }
+        .cb-btn:hover {
+            border-color:rgba(201,168,76,0.32);
+            color:#fff2cf;
+            background:rgba(201,168,76,0.06);
+            transform:translateY(-1px);
+        }
+        .cb-btn-primary {
+            background:rgba(201,168,76,0.12);
+            border-color:rgba(201,168,76,0.32);
+            color:var(--accent-s);
+        }
+        .cb-btn-primary:hover { background:rgba(201,168,76,0.2); }
+        .cb-btn-publish {
+            background:rgba(34,197,94,0.12);
+            border-color:rgba(34,197,94,0.32);
+            color:#7fe5a7;
+        }
+        .cb-btn-publish:hover { background:rgba(34,197,94,0.18); border-color:rgba(34,197,94,0.45); color:#d9ffe6; }
+        .cb-btn-danger {
+            border-color:rgba(239,68,68,0.22);
+            color:#f29b9b;
+            background:rgba(239,68,68,0.05);
+        }
+        .cb-btn-danger:hover { background:rgba(239,68,68,0.12); color:#ffd6d6; }
+        .cb-btn-sm {
+            padding:8px 12px;
+            border-radius:10px;
+            font-size:12px;
+            cursor:pointer;
+            border:1px solid rgba(201,168,76,0.14);
+            background:rgba(255,255,255,0.02);
+            color:var(--text2);
+            transition:all .15s ease;
+        }
+        .cb-btn-sm:hover { border-color:rgba(201,168,76,0.32); color:#fff2cf; background:rgba(201,168,76,0.06); }
+
+        body.light #calBuilderOpenBtn {
+            background:rgba(201,168,76,0.16) !important;
+            color:#7a5c2e !important;
+            border-color:rgba(160,128,80,0.36) !important;
+            box-shadow:0 8px 24px rgba(60,30,5,0.10);
+        }
+        body.light #calBuilderDrawer {
+            background:linear-gradient(180deg, rgba(250,246,239,0.98), rgba(240,235,224,0.98)) !important;
+            border-left-color:rgba(160,128,80,0.26) !important;
+            box-shadow:-18px 0 42px rgba(60,30,5,0.12) !important;
+        }
+        body.light #calBuilderDrawer > div:first-child {
+            background:linear-gradient(180deg, rgba(250,246,239,0.98), rgba(247,241,231,0.94)) !important;
+            border-bottom-color:rgba(160,128,80,0.18) !important;
+        }
+        body.light #calBuilderDrawer details {
+            background:rgba(255,255,255,0.52);
+            border-color:rgba(160,128,80,0.22);
+            box-shadow:none;
+        }
+        body.light .cb-field input,
+        body.light .cb-field textarea,
+        body.light #calBuilderDrawer input[type=file] {
+            color:var(--text) !important;
+            background:var(--bg2) !important;
+            border-color:var(--border) !important;
+            -webkit-text-fill-color: var(--text) !important;
+        }
+        body.light #calBuilderDrawer input:-webkit-autofill,
+        body.light #calBuilderDrawer textarea:-webkit-autofill {
+            -webkit-text-fill-color: var(--text) !important;
+            -webkit-box-shadow: 0 0 0 1000px var(--bg2) inset !important;
+            box-shadow: 0 0 0 1000px var(--bg2) inset !important;
+        }
+        body.light .cb-btn { background:rgba(255,255,255,0.7); border-color:rgba(160,128,80,0.18); color:var(--text2); }
+        body.light .cb-btn:hover { color:#6a3c00; border-color:rgba(160,128,80,0.34); background:rgba(201,168,76,0.10); }
 
 </style>
 </head>
@@ -1616,68 +1843,68 @@
                 <section id="page-calendar" class="page-section">
 
             
-            <button id="calBuilderOpenBtn" onclick="openCalendarBuilder()" style="display:none;position:absolute;top:12px;right:12px;z-index:20;background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.4);color:#c9a84c;padding:6px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;backdrop-filter:blur(6px);transition:all .2s" onmouseover="this.style.background='rgba(201,168,76,0.3)'" onmouseout="this.style.background='rgba(201,168,76,0.15)'">&#9881; Edit Calendar</button>
+            <button id="calBuilderOpenBtn" onclick="openCalendarBuilder()" style="display:none;position:absolute;top:12px;right:12px;z-index:20;background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.4);color:#c9a84c;padding:6px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;backdrop-filter:blur(6px);transition:all .2s" onmouseover="this.style.background='rgba(201,168,76,0.3)'" onmouseout="this.style.background='rgba(201,168,76,0.15)'">&#9881; Редактор календаря</button>
 
             <!-- ADMIN BUILDER DRAWER -->
             <div id="calBuilderDrawer" style="display:none;position:fixed;top:0;right:0;width:380px;height:100vh;background:var(--bg);border-left:1px solid var(--border);z-index:9999;overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,0.4);padding:0">
                 <div style="position:sticky;top:0;background:var(--bg);z-index:2;padding:16px 20px 12px;border-bottom:1px solid var(--border)">
                     <div style="display:flex;justify-content:space-between;align-items:center">
-                        <div style="font-size:15px;font-weight:700;color:var(--accent)">&#9881; Calendar Builder</div>
+                        <div style="font-size:15px;font-weight:700;color:var(--accent)">&#9881; Редактор календаря</div>
                         <button onclick="closeCalendarBuilder()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px">&times;</button>
                     </div>
-                    <div id="calBuilderStatus" style="font-size:11px;color:var(--text4);margin-top:4px">Draft</div>
+                    <div id="calBuilderStatus" style="font-size:11px;color:var(--text4);margin-top:4px">Черновик</div>
                 </div>
                 <div style="padding:16px 20px" id="calBuilderBody">
                     <!-- TEXT SECTION -->
-                    <details open style="margin-bottom:14px"><summary style="font-size:12px;font-weight:700;color:var(--text2);cursor:pointer;margin-bottom:8px">&#9998; Text</summary>
-                        <div class="cb-field"><label>Eyebrow</label><input id="cb_eyebrow" oninput="cbDraftChange('eyebrow',this.value)"></div>
-                        <div class="cb-field"><label>Hero Title</label><input id="cb_heroTitle" oninput="cbDraftChange('heroTitle',this.value)"></div>
-                        <div class="cb-field"><label>Description</label><textarea id="cb_heroText" rows="2" oninput="cbDraftChange('heroText',this.value)"></textarea></div>
-                        <div class="cb-field"><label>Chip 1</label><input id="cb_chip1" oninput="cbDraftChange('chip1',this.value)"></div>
-                        <div class="cb-field"><label>Chip 2</label><input id="cb_chip2" oninput="cbDraftChange('chip2',this.value)"></div>
-                        <div class="cb-field"><label>Chip 3</label><input id="cb_chip3" oninput="cbDraftChange('chip3',this.value)"></div>
-                        <div class="cb-field"><label>Summary Card 1 Label</label><input id="cb_sumLabel1" oninput="cbDraftChange('sumLabel1',this.value)"></div>
-                        <div class="cb-field"><label>Summary Card 2 Label</label><input id="cb_sumLabel2" oninput="cbDraftChange('sumLabel2',this.value)"></div>
-                        <div class="cb-field"><label>Summary Card 3 Label</label><input id="cb_sumLabel3" oninput="cbDraftChange('sumLabel3',this.value)"></div>
+                    <details open style="margin-bottom:14px"><summary style="font-size:12px;font-weight:700;color:var(--text2);cursor:pointer;margin-bottom:8px">&#9998; Текст</summary>
+                        <div class="cb-field"><label>Верхняя метка</label><input id="cb_eyebrow" oninput="cbDraftChange('eyebrow',this.value)"></div>
+                        <div class="cb-field"><label>Заголовок баннера</label><input id="cb_heroTitle" oninput="cbDraftChange('heroTitle',this.value)"></div>
+                        <div class="cb-field"><label>Описание</label><textarea id="cb_heroText" rows="2" oninput="cbDraftChange('heroText',this.value)"></textarea></div>
+                        <div class="cb-field"><label>Чип 1</label><input id="cb_chip1" oninput="cbDraftChange('chip1',this.value)"></div>
+                        <div class="cb-field"><label>Чип 2</label><input id="cb_chip2" oninput="cbDraftChange('chip2',this.value)"></div>
+                        <div class="cb-field"><label>Чип 3</label><input id="cb_chip3" oninput="cbDraftChange('chip3',this.value)"></div>
+                        <div class="cb-field"><label>Подпись карточки 1</label><input id="cb_sumLabel1" oninput="cbDraftChange('sumLabel1',this.value)"></div>
+                        <div class="cb-field"><label>Подпись карточки 2</label><input id="cb_sumLabel2" oninput="cbDraftChange('sumLabel2',this.value)"></div>
+                        <div class="cb-field"><label>Подпись карточки 3</label><input id="cb_sumLabel3" oninput="cbDraftChange('sumLabel3',this.value)"></div>
                     </details>
                     <!-- IMAGE SECTION -->
-                    <details style="margin-bottom:14px"><summary style="font-size:12px;font-weight:700;color:var(--text2);cursor:pointer;margin-bottom:8px">&#128247; Image</summary>
+                    <details style="margin-bottom:14px"><summary style="font-size:12px;font-weight:700;color:var(--text2);cursor:pointer;margin-bottom:8px">&#128247; Изображение</summary>
                         <div class="cb-field">
-                            <label>Hero Background</label>
+                            <label>Фон шапки</label>
                             <input type="file" id="cb_heroImageFile" accept="image/*" onchange="cbHandleImageUpload(this)" style="font-size:11px">
                             <div style="display:flex;gap:6px;margin-top:6px">
-                                <button class="cb-btn-sm" onclick="cbRemoveImage()">Remove / Default</button>
+                                <button class="cb-btn-sm" onclick="cbRemoveImage()">Удалить / По умолчанию</button>
                             </div>
                             <div id="cb_imagePreview" style="margin-top:8px;border-radius:6px;overflow:hidden;max-height:120px"></div>
                         </div>
                     </details>
                     <!-- LAYOUT SECTION -->
-                    <details style="margin-bottom:14px"><summary style="font-size:12px;font-weight:700;color:var(--text2);cursor:pointer;margin-bottom:8px">&#128208; Layout</summary>
-                        <div class="cb-range"><label>Hero Height <span id="cb_v_heroHeight"></span></label><input type="range" id="cb_heroHeight" min="140" max="400" step="2" oninput="cbDraftRange('heroHeight',this.value)"></div>
-                        <div class="cb-range"><label>BG Size <span id="cb_v_heroBgSize"></span></label><input type="range" id="cb_heroBgSize" min="80" max="180" step="1" oninput="cbDraftRange('heroBgSize',this.value)"></div>
-                        <div class="cb-range"><label>BG Position X <span id="cb_v_heroPosX"></span></label><input type="range" id="cb_heroPosX" min="0" max="100" step="1" oninput="cbDraftRange('heroPosX',this.value)"></div>
-                        <div class="cb-range"><label>BG Position Y <span id="cb_v_heroPosY"></span></label><input type="range" id="cb_heroPosY" min="0" max="100" step="1" oninput="cbDraftRange('heroPosY',this.value)"></div>
-                        <div class="cb-range"><label>Title Size <span id="cb_v_heroTitleSize"></span></label><input type="range" id="cb_heroTitleSize" min="20" max="60" step="1" oninput="cbDraftRange('heroTitleSize',this.value)"></div>
-                        <div class="cb-range"><label>Text Width <span id="cb_v_heroContentMax"></span></label><input type="range" id="cb_heroContentMax" min="280" max="800" step="10" oninput="cbDraftRange('heroContentMax',this.value)"></div>
-                        <div class="cb-range"><label>Overlay Opacity <span id="cb_v_overlayOpacity"></span></label><input type="range" id="cb_overlayOpacity" min="0" max="100" step="1" oninput="cbDraftRange('overlayOpacity',this.value)"></div>
-                        <div class="cb-range"><label>Hero Border Radius <span id="cb_v_heroBorderRadius"></span></label><input type="range" id="cb_heroBorderRadius" min="0" max="32" step="1" oninput="cbDraftRange('heroBorderRadius',this.value)"></div>
-                        <div class="cb-range"><label>Bottom Margin <span id="cb_v_heroMarginBottom"></span></label><input type="range" id="cb_heroMarginBottom" min="0" max="48" step="2" oninput="cbDraftRange('heroMarginBottom',this.value)"></div>
-                        <div class="cb-range"><label>Sidebar Width % <span id="cb_v_sidebarRatio"></span></label><input type="range" id="cb_sidebarRatio" min="20" max="45" step="1" oninput="cbDraftRange('sidebarRatio',this.value)"></div>
+                    <details style="margin-bottom:14px"><summary style="font-size:12px;font-weight:700;color:var(--text2);cursor:pointer;margin-bottom:8px">&#128208; Макет</summary>
+                        <div class="cb-range"><label>Высота шапки <span id="cb_v_heroHeight"></span></label><input type="range" id="cb_heroHeight" min="140" max="400" step="2" oninput="cbDraftRange('heroHeight',this.value)"></div>
+                        <div class="cb-range"><label>Размер изображения <span id="cb_v_heroBgSize"></span></label><input type="range" id="cb_heroBgSize" min="80" max="180" step="1" oninput="cbDraftRange('heroBgSize',this.value)"></div>
+                        <div class="cb-range"><label>Сдвиг изображения X <span id="cb_v_heroPosX"></span></label><input type="range" id="cb_heroPosX" min="0" max="100" step="1" oninput="cbDraftRange('heroPosX',this.value)"></div>
+                        <div class="cb-range"><label>Сдвиг изображения Y <span id="cb_v_heroPosY"></span></label><input type="range" id="cb_heroPosY" min="0" max="100" step="1" oninput="cbDraftRange('heroPosY',this.value)"></div>
+                        <div class="cb-range"><label>Размер заголовка <span id="cb_v_heroTitleSize"></span></label><input type="range" id="cb_heroTitleSize" min="20" max="60" step="1" oninput="cbDraftRange('heroTitleSize',this.value)"></div>
+                        <div class="cb-range"><label>Ширина текста <span id="cb_v_heroContentMax"></span></label><input type="range" id="cb_heroContentMax" min="280" max="800" step="10" oninput="cbDraftRange('heroContentMax',this.value)"></div>
+                        <div class="cb-range"><label>Затемнение <span id="cb_v_overlayOpacity"></span></label><input type="range" id="cb_overlayOpacity" min="0" max="100" step="1" oninput="cbDraftRange('overlayOpacity',this.value)"></div>
+                        <div class="cb-range"><label>Скругление шапки <span id="cb_v_heroBorderRadius"></span></label><input type="range" id="cb_heroBorderRadius" min="0" max="32" step="1" oninput="cbDraftRange('heroBorderRadius',this.value)"></div>
+                        <div class="cb-range"><label>Отступ снизу <span id="cb_v_heroMarginBottom"></span></label><input type="range" id="cb_heroMarginBottom" min="0" max="48" step="2" oninput="cbDraftRange('heroMarginBottom',this.value)"></div>
+                        <div class="cb-range"><label>Ширина сайдбара <span id="cb_v_sidebarRatio"></span></label><input type="range" id="cb_sidebarRatio" min="20" max="45" step="1" oninput="cbDraftRange('sidebarRatio',this.value)"></div>
                     </details>
                     <!-- VISIBILITY SECTION -->
-                    <details style="margin-bottom:14px"><summary style="font-size:12px;font-weight:700;color:var(--text2);cursor:pointer;margin-bottom:8px">&#128065; Visibility</summary>
-                        <div class="cb-toggle"><label><input type="checkbox" id="cb_showSummary" onchange="cbDraftToggle('showSummary',this.checked)"> Summary Cards</label></div>
-                        <div class="cb-toggle"><label><input type="checkbox" id="cb_showUpcoming" onchange="cbDraftToggle('showUpcoming',this.checked)"> Upcoming Events</label></div>
-                        <div class="cb-toggle"><label><input type="checkbox" id="cb_showRecurring" onchange="cbDraftToggle('showRecurring',this.checked)"> Weekly Templates</label></div>
-                        <div class="cb-toggle"><label><input type="checkbox" id="cb_showHeroMeta" onchange="cbDraftToggle('showHeroMeta',this.checked)"> Hero Meta (right panel)</label></div>
+                    <details style="margin-bottom:14px"><summary style="font-size:12px;font-weight:700;color:var(--text2);cursor:pointer;margin-bottom:8px">&#128065; Видимость</summary>
+                        <div class="cb-toggle"><label><input type="checkbox" id="cb_showSummary" onchange="cbDraftToggle('showSummary',this.checked)"> Карточки сводки</label></div>
+                        <div class="cb-toggle"><label><input type="checkbox" id="cb_showUpcoming" onchange="cbDraftToggle('showUpcoming',this.checked)"> Ближайшие события</label></div>
+                        <div class="cb-toggle"><label><input type="checkbox" id="cb_showRecurring" onchange="cbDraftToggle('showRecurring',this.checked)"> Шаблоны недели</label></div>
+                        <div class="cb-toggle"><label><input type="checkbox" id="cb_showHeroMeta" onchange="cbDraftToggle('showHeroMeta',this.checked)"> Правая инфо-панель</label></div>
                     </details>
                     <!-- ACTIONS -->
-                    <details open style="margin-bottom:14px"><summary style="font-size:12px;font-weight:700;color:var(--text2);cursor:pointer;margin-bottom:8px">&#128190; Publish</summary>
+                    <details open style="margin-bottom:14px"><summary style="font-size:12px;font-weight:700;color:var(--text2);cursor:pointer;margin-bottom:8px">&#128190; Публикация</summary>
                         <div style="display:flex;flex-direction:column;gap:8px">
-                            <button class="cb-btn cb-btn-primary" onclick="cbSaveDraft()">Save Draft</button>
-                            <button class="cb-btn cb-btn-publish" onclick="cbPublish()">&#127881; Publish</button>
-                            <button class="cb-btn" onclick="cbResetDraft()">Reset Draft → Published</button>
-                            <button class="cb-btn cb-btn-danger" onclick="cbRestoreDefaults()">Restore Factory Defaults</button>
+                            <button class="cb-btn cb-btn-primary" onclick="cbSaveDraft()">Сохранить черновик</button>
+                            <button class="cb-btn cb-btn-publish" onclick="cbPublish()">&#127881; Опубликовать</button>
+                            <button class="cb-btn" onclick="cbResetDraft()">Сбросить черновик → опубликованное</button>
+                            <button class="cb-btn cb-btn-danger" onclick="cbRestoreDefaults()">Вернуть заводские настройки</button>
                         </div>
                     </details>
                 </div>
@@ -11404,7 +11631,7 @@ function getClass2IconByClass3(c3) {
         // ===== CALENDAR ADMIN BUILDER v1 =====
         const CB_ADMIN_EMAILS = ['pivo.news@gmail.com'];
         const CB_DEFAULTS = {
-            eyebrow:'WAR CALENDAR', heroTitle:'War Table Calendar',
+            eyebrow:'КАЛЕНДАРЬ КМ', heroTitle:'War Table календарь',
             heroText:'Календарь стал компактнее: арт работает как обложка раздела, а не как шумный фон под таблицы.',
             chip1:'', chip2:'', chip3:'',
             sumLabel1:'', sumLabel2:'', sumLabel3:'',
@@ -11534,6 +11761,12 @@ function getClass2IconByClass3(c3) {
         }
 
         // ---- Drawer UI helpers ----
+        function cbFormatRangeValue(key, v) {
+            if (v == null || Number.isNaN(v)) return '';
+            if (['heroHeight','heroTitleSize','heroContentMax','heroBorderRadius','heroMarginBottom'].includes(key)) return v + 'px';
+            return v + '%';
+        }
+
         function cbPopulateDrawer(cfg) {
             if (!cfg) return;
             const s = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
@@ -11541,17 +11774,17 @@ function getClass2IconByClass3(c3) {
             s('cb_chip1', cfg.chip1); s('cb_chip2', cfg.chip2); s('cb_chip3', cfg.chip3);
             s('cb_sumLabel1', cfg.sumLabel1); s('cb_sumLabel2', cfg.sumLabel2); s('cb_sumLabel3', cfg.sumLabel3);
 
-            const r = (id, val, vId) => { const el = document.getElementById(id); if (el) { el.value = val; } const v = document.getElementById(vId); if (v) v.textContent = val; };
-            r('cb_heroHeight', cfg.heroHeight, 'cb_v_heroHeight');
-            r('cb_heroBgSize', cfg.heroBgSize, 'cb_v_heroBgSize');
-            r('cb_heroPosX', cfg.heroPosX, 'cb_v_heroPosX');
-            r('cb_heroPosY', cfg.heroPosY, 'cb_v_heroPosY');
-            r('cb_heroTitleSize', cfg.heroTitleSize, 'cb_v_heroTitleSize');
-            r('cb_heroContentMax', cfg.heroContentMax, 'cb_v_heroContentMax');
-            r('cb_overlayOpacity', cfg.overlayOpacity, 'cb_v_overlayOpacity');
-            r('cb_heroBorderRadius', cfg.heroBorderRadius, 'cb_v_heroBorderRadius');
-            r('cb_heroMarginBottom', cfg.heroMarginBottom, 'cb_v_heroMarginBottom');
-            r('cb_sidebarRatio', cfg.sidebarRatio, 'cb_v_sidebarRatio');
+            const r = (id, val, vId, key) => { const el = document.getElementById(id); if (el) { el.value = val; } const v = document.getElementById(vId); if (v) v.textContent = cbFormatRangeValue(key, val); };
+            r('cb_heroHeight', cfg.heroHeight, 'cb_v_heroHeight', 'heroHeight');
+            r('cb_heroBgSize', cfg.heroBgSize, 'cb_v_heroBgSize', 'heroBgSize');
+            r('cb_heroPosX', cfg.heroPosX, 'cb_v_heroPosX', 'heroPosX');
+            r('cb_heroPosY', cfg.heroPosY, 'cb_v_heroPosY', 'heroPosY');
+            r('cb_heroTitleSize', cfg.heroTitleSize, 'cb_v_heroTitleSize', 'heroTitleSize');
+            r('cb_heroContentMax', cfg.heroContentMax, 'cb_v_heroContentMax', 'heroContentMax');
+            r('cb_overlayOpacity', cfg.overlayOpacity, 'cb_v_overlayOpacity', 'overlayOpacity');
+            r('cb_heroBorderRadius', cfg.heroBorderRadius, 'cb_v_heroBorderRadius', 'heroBorderRadius');
+            r('cb_heroMarginBottom', cfg.heroMarginBottom, 'cb_v_heroMarginBottom', 'heroMarginBottom');
+            r('cb_sidebarRatio', cfg.sidebarRatio, 'cb_v_sidebarRatio', 'sidebarRatio');
 
             const c = (id, val) => { const el = document.getElementById(id); if (el) el.checked = val !== false; };
             c('cb_showSummary', cfg.showSummary); c('cb_showUpcoming', cfg.showUpcoming);
@@ -11563,7 +11796,7 @@ function getClass2IconByClass3(c3) {
             const v = parseInt(val);
             if (_cbDraft) { _cbDraft[key] = v; cbApplyConfig(_cbDraft); }
             const vEl = document.getElementById('cb_v_' + key);
-            if (vEl) vEl.textContent = v;
+            if (vEl) vEl.textContent = cbFormatRangeValue(key, v);
         }
         function cbDraftToggle(key, val) { if (_cbDraft) { _cbDraft[key] = val; cbApplyConfig(_cbDraft); } }
 
@@ -11591,7 +11824,7 @@ function getClass2IconByClass3(c3) {
         function cbSaveDraft() {
             cbSaveDraftToStorage();
             const st = document.getElementById('calBuilderStatus');
-            if (st) { st.textContent = 'Draft saved ✓'; setTimeout(() => st.textContent = 'Draft', 2000); }
+            if (st) { st.textContent = 'Черновик сохранён ✓'; setTimeout(() => st.textContent = 'Черновик', 2000); }
         }
 
         async function cbPublish() {
@@ -11606,7 +11839,7 @@ function getClass2IconByClass3(c3) {
                 await cbDeleteImage('published_hero_image');
             }
             const st = document.getElementById('calBuilderStatus');
-            if (st) { st.textContent = 'Published! 🎉'; setTimeout(() => st.textContent = 'Draft', 2500); }
+            if (st) { st.textContent = 'Опубликовано! 🎉'; setTimeout(() => st.textContent = 'Черновик', 2500); }
         }
 
         function cbResetDraft() {
@@ -11616,7 +11849,7 @@ function getClass2IconByClass3(c3) {
             cbPopulateDrawer(_cbDraft);
             cbApplyConfig(_cbDraft);
             const st = document.getElementById('calBuilderStatus');
-            if (st) { st.textContent = 'Draft reset to published'; setTimeout(() => st.textContent = 'Draft', 2000); }
+            if (st) { st.textContent = 'Черновик сброшен к опубликованной версии'; setTimeout(() => st.textContent = 'Черновик', 2200); }
         }
 
         function cbRestoreDefaults() {
@@ -11624,6 +11857,8 @@ function getClass2IconByClass3(c3) {
             cbSaveDraftToStorage();
             cbPopulateDrawer(_cbDraft);
             cbApplyConfig(_cbDraft);
+            const st = document.getElementById('calBuilderStatus');
+            if (st) { st.textContent = 'Заводские настройки восстановлены'; setTimeout(() => st.textContent = 'Черновик', 2200); }
         }
 
         function openCalendarBuilder() {
