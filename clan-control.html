@@ -406,9 +406,9 @@
         /* Long-scroll: main sections always visible, stacked vertically */
         .page-section { display: block; min-height: 100vh; padding-bottom: 48px; border-bottom: 1px solid var(--border); }
         .page-section:last-child { border-bottom: none; }
-        /* Overlay/detail views: hidden until shown */
-        #page-profile, #page-pack-detail, #page-screenshots { display: none !important; min-height: unset !important; border-bottom: none !important; }
-        #page-profile.active, #page-pack-detail.active, #page-screenshots.active { display: block !important; }
+        /* Only true overlay/detail views hidden by default */
+        #page-profile, #page-pack-detail { display: none !important; min-height: unset !important; border-bottom: none !important; }
+        #page-profile.active, #page-pack-detail.active { display: block !important; }
 
         .pack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
         .pack-card { background-color: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: all 0.2s; cursor: pointer; position: relative; overflow: hidden; }
@@ -928,8 +928,55 @@
                 <div class="dash-card"><div class="dash-card-title">💎 Редкие таланты</div><div style="font-size:10px;color:#475569;margin-bottom:6px">Ходят редко, но когда приходят — играют лучше многих</div><div id="dashRareGems"></div></div>
             </div>
         </section>
+        
+        <section id="page-stats" class="page-section">
+            <div class="flex justify-between items-center mb-2" style="flex-wrap:wrap;gap:10px">
+                <h1 class="text-3xl font-bold">Статистика КМ</h1>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <!-- Фильтр по паку -->
+                    <select id="statsPackFilter" onchange="renderStats()" style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:8px 14px;color:var(--text3);font-size:12px;cursor:pointer;outline:none">
+                        <option value="">Все паки</option>
+                    </select>
+                    <!-- Период -->
+                    <div style="display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:8px 14px">
+                        <span style="font-size:12px;color:#64748b">Период:</span>
+                        <div class="dp-wrap"><button class="dp-btn" id="statsFromBtn" onclick="openDatePicker('statsFrom',this)">Начало</button></div>
+                        <span style="color:#475569;font-size:12px">—</span>
+                        <div class="dp-wrap"><button class="dp-btn" id="statsToBtn" onclick="openDatePicker('statsTo',this)">Конец</button></div>
+                        <button onclick="clearPeriod('stats')" style="background:none;border:none;color:#475569;cursor:pointer;font-size:11px;padding:2px 6px;border-radius:4px" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#475569'">Сбросить</button>
+                    </div>
+                </div>
+            </div>
+            <p id="statsPeriodLabel" class="text-slate-500 text-sm mb-6"></p>
 
-<!-- КАЛЕНДАРЬ -->
+            <!-- ОТЧЁТ: НЕ ПОПАЛИ В CC -->
+            <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:24px">
+                <div onclick="var el=document.getElementById('ccAbsenceReport');var btn=document.getElementById('ccToggleBtn');var _tl=localStorage.getItem('cc_lang')||'ru';if(el.style.display==='none'){el.style.display='';btn.textContent=_tl==='en'?'▲ Collapse':'▲ Свернуть'}else{el.style.display='none';btn.textContent=_tl==='en'?'▼ Show':'▼ Показать'}" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;cursor:pointer">
+                    <div>
+                        <div style="font-size:13px;font-weight:800;color:#e2e8f0">⚠️ Не попали в CC подряд <span id="ccToggleBtn" style="font-size:10px;color:#475569;margin-left:8px">▼ Показать</span></div>
+                        <div style="font-size:11px;color:#475569;margin-top:2px">Игроки из ростера которые отсутствовали в Командном канале N+ КМ подряд</div>
+                    </div>
+                    <div onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:8px">
+                        <span style="font-size:11px;color:#64748b">Порог:</span>
+                        <div style="display:flex;gap:4px">
+                            <button onclick="setCcThreshold(3)" id="ccBtn3" style="background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">3</button>
+                            <button onclick="setCcThreshold(4)" id="ccBtn4" style="background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">4</button>
+                            <button onclick="setCcThreshold(5)" id="ccBtn5" style="background:var(--accent);border:1px solid var(--accent-h);color:#1e0f04;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">5</button>
+                            <button onclick="setCcThreshold(6)" id="ccBtn6" style="background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">6</button>
+                            <button onclick="setCcThreshold(7)" id="ccBtn7" style="background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">7</button>
+                        </div>
+                        <span style="font-size:11px;color:#64748b">КМ подряд</span>
+                    </div>
+                </div>
+                <div id="ccAbsenceReport" style="display:none"></div>
+            </div>
+
+            <div id="statsContent"></div>
+        
+            <!-- АНАЛИЗ ПО БОССАМ -->
+            <div id="bossAnalysis" style="margin-top:24px"></div>
+</section>
+        
         <section id="page-calendar" class="page-section">
             <div class="flex justify-between items-center mb-8">
                 <div class="flex items-center gap-4">
@@ -949,8 +996,25 @@
             <div id="calendarSummary" style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap"></div>
             <div class="calendar-grid" id="calendarGrid"></div>
         </section>
-
-        <!-- РОСТЕР -->
+        
+        <section id="page-screenshots" class="page-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                <h1 class="text-3xl font-bold">📋 История КМ</h1>
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                    <!-- Поиск по игроку -->
+                    <div style="position:relative">
+                        <input type="text" id="kmHistorySearch" placeholder="🔍 Поиск игрока по КМам..."
+                            title="Введи ник чтобы найти все КМ где участвовал этот игрок"
+                            style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:8px 14px;color:var(--text);font-size:13px;outline:none;width:240px;transition:border-color .2s"
+                            onfocus="this.style.borderColor='#6366f1'"
+                            onblur="this.style.borderColor='var(--border2)'">
+                    </div>
+                    <button onclick="debugSnapshotData()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer" title="Диагностика">🔍 Диагностика</button>
+                </div>
+            </div>
+            <div id="kmHistoryContent"></div>
+        </section>
+        
         <section id="page-roster" class="page-section">
             <div class="flex justify-between items-center mb-4">
                 <div>
@@ -1008,8 +1072,7 @@
                 </table>
             </div>
         </section>
-
-        <!-- РЕЙД ПАКИ -->
+        
         <section id="page-packs" class="page-section">
             <div class="flex justify-between items-center mb-8">
                 <h1 class="text-3xl font-bold">Рейд Паки</h1>
@@ -1017,62 +1080,7 @@
             </div>
             <div id="packsGrid" class="pack-grid"></div>
         </section>
-
-        <!-- СТАТИСТИКА -->
-        <section id="page-stats" class="page-section">
-            <div class="flex justify-between items-center mb-2" style="flex-wrap:wrap;gap:10px">
-                <h1 class="text-3xl font-bold">Статистика КМ</h1>
-                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                    <!-- Фильтр по паку -->
-                    <select id="statsPackFilter" onchange="renderStats()" style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:8px 14px;color:var(--text3);font-size:12px;cursor:pointer;outline:none">
-                        <option value="">Все паки</option>
-                    </select>
-                    <!-- Период -->
-                    <div style="display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:8px 14px">
-                        <span style="font-size:12px;color:#64748b">Период:</span>
-                        <div class="dp-wrap"><button class="dp-btn" id="statsFromBtn" onclick="openDatePicker('statsFrom',this)">Начало</button></div>
-                        <span style="color:#475569;font-size:12px">—</span>
-                        <div class="dp-wrap"><button class="dp-btn" id="statsToBtn" onclick="openDatePicker('statsTo',this)">Конец</button></div>
-                        <button onclick="clearPeriod('stats')" style="background:none;border:none;color:#475569;cursor:pointer;font-size:11px;padding:2px 6px;border-radius:4px" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#475569'">Сбросить</button>
-                    </div>
-                </div>
-            </div>
-            <p id="statsPeriodLabel" class="text-slate-500 text-sm mb-6"></p>
-
-            <!-- ОТЧЁТ: НЕ ПОПАЛИ В CC -->
-            <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:24px">
-                <div onclick="var el=document.getElementById('ccAbsenceReport');var btn=document.getElementById('ccToggleBtn');var _tl=localStorage.getItem('cc_lang')||'ru';if(el.style.display==='none'){el.style.display='';btn.textContent=_tl==='en'?'▲ Collapse':'▲ Свернуть'}else{el.style.display='none';btn.textContent=_tl==='en'?'▼ Show':'▼ Показать'}" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;cursor:pointer">
-                    <div>
-                        <div style="font-size:13px;font-weight:800;color:#e2e8f0">⚠️ Не попали в CC подряд <span id="ccToggleBtn" style="font-size:10px;color:#475569;margin-left:8px">▼ Показать</span></div>
-                        <div style="font-size:11px;color:#475569;margin-top:2px">Игроки из ростера которые отсутствовали в Командном канале N+ КМ подряд</div>
-                    </div>
-                    <div onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:8px">
-                        <span style="font-size:11px;color:#64748b">Порог:</span>
-                        <div style="display:flex;gap:4px">
-                            <button onclick="setCcThreshold(3)" id="ccBtn3" style="background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">3</button>
-                            <button onclick="setCcThreshold(4)" id="ccBtn4" style="background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">4</button>
-                            <button onclick="setCcThreshold(5)" id="ccBtn5" style="background:var(--accent);border:1px solid var(--accent-h);color:#1e0f04;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">5</button>
-                            <button onclick="setCcThreshold(6)" id="ccBtn6" style="background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">6</button>
-                            <button onclick="setCcThreshold(7)" id="ccBtn7" style="background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">7</button>
-                        </div>
-                        <span style="font-size:11px;color:#64748b">КМ подряд</span>
-                    </div>
-                </div>
-                <div id="ccAbsenceReport" style="display:none"></div>
-            </div>
-
-            <div id="statsContent"></div>
         
-            <!-- АНАЛИЗ ПО БОССАМ -->
-            <div id="bossAnalysis" style="margin-top:24px"></div>
-</section>
-
-        <!-- ПРОФИЛЬ ИГРОКА -->
-        <section id="page-profile" class="page-section">
-            <div id="profileContent"></div>
-        </section>
-
-        <!-- АРХИВ -->
         <section id="page-archive" class="page-section">
             <h1 class="text-3xl font-bold mb-8">Архив игроков</h1>
             <div class="card overflow-x-auto">
@@ -1088,8 +1096,11 @@
                 </table>
             </div>
         </section>
-
-        <!-- ДЕТАЛИ ПАКА -->
+        
+        <section id="page-profile" class="page-section">
+            <div id="profileContent"></div>
+        </section>
+        
         <section id="page-pack-detail" class="page-section">
             <div class="flex items-center gap-4 mb-8">
                 <button onclick="showPage('packs')" class="text-slate-500 hover:text-white flex items-center gap-2 font-medium">← Назад</button>
@@ -1121,26 +1132,7 @@
                 </div>
             </div>
         </section>
-        <!-- ИСТОРИЯ КМ -->
-        <section id="page-screenshots" class="page-section">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
-                <h1 class="text-3xl font-bold">📋 История КМ</h1>
-                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                    <!-- Поиск по игроку -->
-                    <div style="position:relative">
-                        <input type="text" id="kmHistorySearch" placeholder="🔍 Поиск игрока по КМам..."
-                            title="Введи ник чтобы найти все КМ где участвовал этот игрок"
-                            style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:8px 14px;color:var(--text);font-size:13px;outline:none;width:240px;transition:border-color .2s"
-                            onfocus="this.style.borderColor='#6366f1'"
-                            onblur="this.style.borderColor='var(--border2)'">
-                    </div>
-                    <button onclick="debugSnapshotData()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer" title="Диагностика">🔍 Диагностика</button>
-                </div>
-            </div>
-            <div id="kmHistoryContent"></div>
-        </section>
-
-        <!-- НАСТРОЙКИ -->
+        
         <section id="page-settings" class="page-section">
             <h1 class="text-3xl font-bold mb-8">⚙️ Настройки</h1>
             <div class="card mb-6">
@@ -2412,12 +2404,10 @@
                 document.getElementById('loginScreen').classList.add('hidden');
                 document.getElementById('topbar').classList.remove('hidden');
                 document.getElementById('appLayout').classList.remove('hidden');
-                const av = document.getElementById('topbarAvatar'); if(av) av.textContent = (email[0]||'?').toUpperCase();
-                const em = document.getElementById('topbarEmail'); if(em) em.textContent = email;
-                const cb = document.getElementById('topbarClan'); if(cb){ if(clan){cb.textContent=clan;cb.style.display='';cb.dataset.ccOriginalStyle='';}else cb.style.display='none'; }
-                if (window._currentUserId && typeof reloadDataForUser === 'function') {
-                    reloadDataForUser(window._currentUserId);
-                }
+                var av = document.getElementById('topbarAvatar'); if(av) av.textContent = (email[0]||'?').toUpperCase();
+                var em2 = document.getElementById('topbarEmail'); if(em2) em2.textContent = email;
+                var cb = document.getElementById('topbarClan'); if(cb){ if(clan){cb.textContent=clan;cb.style.display='';cb.dataset.ccOriginalStyle='';}else cb.style.display='none'; }
+                if (window._currentUserId && typeof reloadDataForUser === 'function') reloadDataForUser(window._currentUserId);
                 if (typeof _setActiveNav === 'function') _setActiveNav('dashboard');
                 var mc = document.querySelector('.main-content');
                 if (mc) mc.scrollTop = 0;
@@ -3711,11 +3701,12 @@
 
         // ===== ВСПОМОГАТЕЛЬНЫЕ =====
         // ===== LONG-SCROLL NAV =====
-        const SCROLL_PAGES  = ['dashboard','stats','calendar','roster','packs','archive','settings'];
-        const OVERLAY_PAGES = ['profile','pack-detail','screenshots'];
+        // Order matches sidebar exactly: dashboard→stats→calendar→screenshots→roster→packs→archive→settings
+        var SCROLL_PAGES  = ['dashboard','stats','calendar','screenshots','roster','packs','archive','settings'];
+        var OVERLAY_PAGES = ['profile','pack-detail'];
 
         function _setActiveNav(pageId) {
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.remove('active'); });
             var navId = pageId === 'pack-detail' ? 'nav-packs' : 'nav-' + pageId;
             var nav = document.getElementById(navId);
             if (nav) nav.classList.add('active');
@@ -3735,30 +3726,30 @@
                     if (typeof renderAliases        === 'function') renderAliases();
                     if (typeof renderValueWeightsUI === 'function') renderValueWeightsUI();
                 }
-            } catch(e) { console.warn('render error for', pageId, e); }
+            } catch(e) { console.warn('render error', pageId, e); }
         }
 
         function showPage(pageId) {
-            document.getElementById('similarNicksOverlay')?.remove();
-            document.getElementById('dupesOverlay')?.remove();
-            document.getElementById('attentionListModal')?.remove();
-            document.querySelectorAll('.info-modal-overlay').forEach(m => m.classList.remove('open'));
+            document.getElementById('similarNicksOverlay') && document.getElementById('similarNicksOverlay').remove();
+            document.getElementById('dupesOverlay') && document.getElementById('dupesOverlay').remove();
+            document.getElementById('attentionListModal') && document.getElementById('attentionListModal').remove();
+            document.querySelectorAll('.info-modal-overlay').forEach(function(m){ m.classList.remove('open'); });
 
-            if (OVERLAY_PAGES.includes(pageId)) {
-                // Detail pages: use old show/hide
-                document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
-                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            if (OVERLAY_PAGES.indexOf(pageId) !== -1) {
+                // Overlay: show/hide
+                document.querySelectorAll('.page-section').forEach(function(s){ s.classList.remove('active'); });
+                document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.remove('active'); });
                 var el = document.getElementById('page-' + pageId);
                 if (el) el.classList.add('active');
                 var navId2 = pageId === 'pack-detail' ? 'nav-packs' : 'nav-' + pageId;
                 var nav2 = document.getElementById(navId2);
                 if (nav2) nav2.classList.add('active');
                 _triggerPageRender(pageId);
-                if (pageId !== 'profile') { try { history.replaceState(null, '', '#' + pageId); } catch(e) {} }
+                if (pageId !== 'profile') { try { history.replaceState(null,'','#'+pageId); } catch(e){} }
                 return;
             }
 
-            // Main scroll pages: instant jump, no smooth scroll
+            // Main scroll page: instant jump, no smooth scroll
             _triggerPageRender(pageId);
             var section = document.getElementById('page-' + pageId);
             if (section) {
@@ -3766,35 +3757,34 @@
                 if (mc) mc.scrollTop = section.offsetTop;
             }
             _setActiveNav(pageId);
-            try { history.replaceState(null, '', '#' + pageId); } catch(e) {}
+            try { history.replaceState(null,'','#'+pageId); } catch(e){}
         }
 
-        // Scroll-spy: update active nav while user scrolls
-        (function() {
-            var _spyTimer = null;
-            function _spy() {
+        // Scroll-spy
+        (function(){
+            var _st = null;
+            function _spy(){
                 var mc = document.querySelector('.main-content');
                 if (!mc) return;
-                var mcTop = mc.scrollTop, mcH = mc.clientHeight;
+                var top = mc.scrollTop, h = mc.clientHeight;
                 var bestId = null, bestScore = -Infinity;
                 for (var i = 0; i < SCROLL_PAGES.length; i++) {
                     var pid = SCROLL_PAGES[i];
                     var el = document.getElementById('page-' + pid);
                     if (!el || el.offsetHeight < 10) continue;
-                    var eTop = el.offsetTop, eH = el.offsetHeight;
-                    var vis = Math.max(0, Math.min(eTop + eH, mcTop + mcH) - Math.max(eTop, mcTop));
-                    var bias = Math.max(0, mcH - Math.max(0, eTop - mcTop)) / mcH;
+                    var et = el.offsetTop, eh = el.offsetHeight;
+                    var vis = Math.max(0, Math.min(et+eh, top+h) - Math.max(et, top));
+                    var bias = Math.max(0, h - Math.max(0, et - top)) / h;
                     var score = vis + bias * 20;
                     if (score > bestScore) { bestScore = score; bestId = pid; }
                 }
                 if (bestId) _setActiveNav(bestId);
             }
-            function _attach() {
+            function _attach(){
                 var mc = document.querySelector('.main-content');
                 if (!mc) { setTimeout(_attach, 300); return; }
-                mc.addEventListener('scroll', function() {
-                    clearTimeout(_spyTimer);
-                    _spyTimer = setTimeout(_spy, 60);
+                mc.addEventListener('scroll', function(){
+                    clearTimeout(_st); _st = setTimeout(_spy, 60);
                 }, { passive: true });
             }
             _attach();
@@ -4047,11 +4037,8 @@ function getClass2IconByClass3(c3) {
         let profileReturnPage = "roster"; // куда возвращаться из профиля
 
         function openPlayerProfile(playerName) {
-            // Запоминаем откуда открыли профиль (по активной nav)
-            var _activeNav = document.querySelector('.nav-item.active');
-            if (_activeNav && _activeNav.id && _activeNav.id !== 'nav-profile') {
-                profileReturnPage = _activeNav.id.replace('nav-', '');
-            }
+            var _an = document.querySelector('.nav-item.active');
+            if (_an && _an.id && _an.id !== 'nav-profile') profileReturnPage = _an.id.replace('nav-','');
             currentProfileName = playerName;
             const navProfile = document.getElementById('nav-profile');
             if (navProfile) navProfile.style.display = '';
