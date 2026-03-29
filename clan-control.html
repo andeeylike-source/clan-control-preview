@@ -403,8 +403,12 @@
         .suggestion-item:last-child { border-bottom: none; }
         .suggestion-item:hover { background: rgba(201,168,76,0.1); color: var(--accent-s); }
 
-        .page-section { display: none; }
-        .page-section.active { display: block; }
+        /* Long-scroll: main sections always visible, stacked vertically */
+        .page-section { display: block; min-height: 100vh; padding-bottom: 48px; border-bottom: 1px solid var(--border); }
+        .page-section:last-child { border-bottom: none; }
+        /* Overlay/detail views: hidden until shown */
+        #page-profile, #page-pack-detail, #page-screenshots { display: none !important; min-height: unset !important; border-bottom: none !important; }
+        #page-profile.active, #page-pack-detail.active, #page-screenshots.active { display: block !important; }
 
         .pack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
         .pack-card { background-color: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: all 0.2s; cursor: pointer; position: relative; overflow: hidden; }
@@ -2410,11 +2414,13 @@
                 document.getElementById('appLayout').classList.remove('hidden');
                 const av = document.getElementById('topbarAvatar'); if(av) av.textContent = (email[0]||'?').toUpperCase();
                 const em = document.getElementById('topbarEmail'); if(em) em.textContent = email;
-                const cb = document.getElementById('topbarClan'); if(cb){ if(clan){cb.textContent=clan;cb.style.display='';cb.dataset.ccOriginalStyle='';/* don't let normalize hide it */}else cb.style.display='none'; }
-                // Load account-scoped data for this user
+                const cb = document.getElementById('topbarClan'); if(cb){ if(clan){cb.textContent=clan;cb.style.display='';cb.dataset.ccOriginalStyle='';}else cb.style.display='none'; }
                 if (window._currentUserId && typeof reloadDataForUser === 'function') {
                     reloadDataForUser(window._currentUserId);
                 }
+                if (typeof _setActiveNav === 'function') _setActiveNav('dashboard');
+                var mc = document.querySelector('.main-content');
+                if (mc) mc.scrollTop = 0;
             }
 
             // INIT — Supabase auth
@@ -3236,7 +3242,7 @@
                     <button onclick="(function(){
                         const sel = document.getElementById('packRosterSelect');
                         const pp = window._packRosterPlayer;
-                        if (pp) { pp.pac = sel.value; saveToStorage(); renderRoster(); if(document.getElementById('page-packs').classList.contains('active')) renderPacks(); }
+                        if (pp) { pp.pac = sel.value; saveToStorage(); renderRoster(); renderPacks(); }
                         document.getElementById('packChangeModal').remove();
                     })()" style="background:#6366f1;border:none;color:white;border-radius:8px;padding:8px 18px;cursor:pointer;font-weight:700">💾 ${t('Сохранить','Save')}</button>
                 </div>
@@ -3292,7 +3298,7 @@
                 }
                 saveToStorage();
                 renderRoster();
-                if (document.getElementById('page-archive').classList.contains('active')) renderArchive();
+                renderArchive();
             });
         }
 
@@ -3622,7 +3628,7 @@
                     roster = roster.map(p => ({ ...p, kills: 0, deaths: 0, pvp_dmg: 0, pve_dmg: 0 }));
                     saveToStorage();
                     renderRoster();
-                    if (document.getElementById('page-stats').classList.contains('active')) renderStats();
+                    renderStats();
                     if (document.getElementById('page-screenshots').classList.contains('active')) renderScreenshotArchive();
                 }, true);
         }
@@ -3704,32 +3710,95 @@
         }
 
         // ===== ВСПОМОГАТЕЛЬНЫЕ =====
+        // ===== LONG-SCROLL NAV =====
+        const SCROLL_PAGES  = ['dashboard','stats','calendar','roster','packs','archive','settings'];
+        const OVERLAY_PAGES = ['profile','pack-detail','screenshots'];
+
+        function _setActiveNav(pageId) {
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            var navId = pageId === 'pack-detail' ? 'nav-packs' : 'nav-' + pageId;
+            var nav = document.getElementById(navId);
+            if (nav) nav.classList.add('active');
+        }
+
+        function _triggerPageRender(pageId) {
+            try {
+                if (pageId === 'dashboard'   && typeof renderDashboard         === 'function') renderDashboard();
+                if (pageId === 'roster'       && typeof renderRoster             === 'function') renderRoster();
+                if (pageId === 'packs'         && typeof renderPacks               === 'function') renderPacks();
+                if (pageId === 'calendar'     && typeof renderCalendar           === 'function') renderCalendar();
+                if (pageId === 'archive'       && typeof renderArchive             === 'function') renderArchive();
+                if (pageId === 'stats'         && typeof renderStats               === 'function') renderStats();
+                if (pageId === 'screenshots'   && typeof renderScreenshotArchive === 'function') renderScreenshotArchive();
+                if (pageId === 'settings') {
+                    if (typeof renderApiKeys        === 'function') renderApiKeys();
+                    if (typeof renderAliases        === 'function') renderAliases();
+                    if (typeof renderValueWeightsUI === 'function') renderValueWeightsUI();
+                }
+            } catch(e) { console.warn('render error for', pageId, e); }
+        }
+
         function showPage(pageId) {
-            // Закрываем все всплывающие окна при смене страницы
             document.getElementById('similarNicksOverlay')?.remove();
             document.getElementById('dupesOverlay')?.remove();
             document.getElementById('attentionListModal')?.remove();
             document.querySelectorAll('.info-modal-overlay').forEach(m => m.classList.remove('open'));
-            
-            document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            document.getElementById('page-' + pageId).classList.add('active');
-            const navId = pageId === 'pack-detail' ? 'nav-packs' : 'nav-' + pageId;
-            const nav = document.getElementById(navId);
-            if(nav) nav.classList.add('active');
-            if(pageId === 'dashboard') renderDashboard();
-            if(pageId === 'roster') renderRoster();
-            if(pageId === 'packs') renderPacks();
-            if(pageId === 'calendar') renderCalendar();
-            if(pageId === 'archive') renderArchive();
-            if(pageId === 'stats') renderStats();
-            if(pageId === 'screenshots') renderScreenshotArchive();
-            if(pageId === 'settings') { renderApiKeys(); renderAliases(); renderValueWeightsUI(); }
-            // Обновляем hash в URL (кроме профиля — у него свой hash)
-            if (pageId !== 'profile') {
-                try { history.replaceState(null, '', '#' + pageId); } catch(e) {}
+
+            if (OVERLAY_PAGES.includes(pageId)) {
+                // Detail pages: use old show/hide
+                document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                var el = document.getElementById('page-' + pageId);
+                if (el) el.classList.add('active');
+                var navId2 = pageId === 'pack-detail' ? 'nav-packs' : 'nav-' + pageId;
+                var nav2 = document.getElementById(navId2);
+                if (nav2) nav2.classList.add('active');
+                _triggerPageRender(pageId);
+                if (pageId !== 'profile') { try { history.replaceState(null, '', '#' + pageId); } catch(e) {} }
+                return;
             }
+
+            // Main scroll pages: instant jump, no smooth scroll
+            _triggerPageRender(pageId);
+            var section = document.getElementById('page-' + pageId);
+            if (section) {
+                var mc = document.querySelector('.main-content');
+                if (mc) mc.scrollTop = section.offsetTop;
+            }
+            _setActiveNav(pageId);
+            try { history.replaceState(null, '', '#' + pageId); } catch(e) {}
         }
+
+        // Scroll-spy: update active nav while user scrolls
+        (function() {
+            var _spyTimer = null;
+            function _spy() {
+                var mc = document.querySelector('.main-content');
+                if (!mc) return;
+                var mcTop = mc.scrollTop, mcH = mc.clientHeight;
+                var bestId = null, bestScore = -Infinity;
+                for (var i = 0; i < SCROLL_PAGES.length; i++) {
+                    var pid = SCROLL_PAGES[i];
+                    var el = document.getElementById('page-' + pid);
+                    if (!el || el.offsetHeight < 10) continue;
+                    var eTop = el.offsetTop, eH = el.offsetHeight;
+                    var vis = Math.max(0, Math.min(eTop + eH, mcTop + mcH) - Math.max(eTop, mcTop));
+                    var bias = Math.max(0, mcH - Math.max(0, eTop - mcTop)) / mcH;
+                    var score = vis + bias * 20;
+                    if (score > bestScore) { bestScore = score; bestId = pid; }
+                }
+                if (bestId) _setActiveNav(bestId);
+            }
+            function _attach() {
+                var mc = document.querySelector('.main-content');
+                if (!mc) { setTimeout(_attach, 300); return; }
+                mc.addEventListener('scroll', function() {
+                    clearTimeout(_spyTimer);
+                    _spyTimer = setTimeout(_spy, 60);
+                }, { passive: true });
+            }
+            _attach();
+        })();
 
         // ===== ЗАМЕТКИ ОФИЦЕРА =====
         let playerNotes = {}; // { [normName]: "текст заметки" }
@@ -3978,10 +4047,10 @@ function getClass2IconByClass3(c3) {
         let profileReturnPage = "roster"; // куда возвращаться из профиля
 
         function openPlayerProfile(playerName) {
-            // Запоминаем откуда открыли профиль
-            const activePage = document.querySelector('.page-section.active');
-            if (activePage && activePage.id !== 'page-profile') {
-                profileReturnPage = activePage.id.replace('page-', '');
+            // Запоминаем откуда открыли профиль (по активной nav)
+            var _activeNav = document.querySelector('.nav-item.active');
+            if (_activeNav && _activeNav.id && _activeNav.id !== 'nav-profile') {
+                profileReturnPage = _activeNav.id.replace('nav-', '');
             }
             currentProfileName = playerName;
             const navProfile = document.getElementById('nav-profile');
@@ -7536,8 +7605,8 @@ function getClass2IconByClass3(c3) {
             }
 
             saveToStorage();
-            if (document.getElementById('page-roster').classList.contains('active')) renderRoster();
-            if (document.getElementById('page-stats').classList.contains('active')) renderStats();
+            renderRoster();
+            renderStats();
             if (document.getElementById('page-screenshots').classList.contains('active')) renderScreenshotArchive();
 
             // Открываем попап назначения проф — только игроки из последнего анализа без профы
@@ -7884,7 +7953,7 @@ function getClass2IconByClass3(c3) {
 
         function debugDuplicates_MANUAL() {
             // Только на странице Клан
-            if (!document.getElementById('page-roster')?.classList?.contains('active')) return;
+            
             // Ищем игроков с одинаковым нормализованным ключом
             const groups = {};
             roster.forEach(p => {
@@ -8582,7 +8651,7 @@ function getClass2IconByClass3(c3) {
                 saveAlias(oldName, newName);
                 saveToStorage();
                 renderKmHistory();
-                if (document.getElementById('page-roster').classList.contains('active')) renderRoster();
+                renderRoster();
             }, oldName);
         }
 
@@ -8702,8 +8771,8 @@ function getClass2IconByClass3(c3) {
 
             showStatus('success', '✅', `Применено: ${updCount} обновлено, ${newCount} новых добавлено в ростер`);
             renderParsedPlayers(lastParsedPlayers);
-            if (document.getElementById('page-roster').classList.contains('active')) renderRoster();
-            if (document.getElementById('page-stats').classList.contains('active')) renderStats();
+            renderRoster();
+            renderStats();
         }
 
         // Drag & drop на зону загрузки в модалке дня
@@ -10383,7 +10452,7 @@ function getClass2IconByClass3(c3) {
             } else if (hash && document.getElementById('page-' + hash)) {
                 showPage(hash);
             } else {
-                showPage('dashboard');
+                if (typeof _setActiveNav === 'function') _setActiveNav('dashboard');
             }
             document.querySelector('.main-content').classList.add('ready');
             // Показываем онбординг новым пользователям
