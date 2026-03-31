@@ -11496,8 +11496,56 @@ var _blocksReady=false;
 
 function _g(id){return document.getElementById(id);}
 function _isAdm(){return(window._loginEmail||'').trim().toLowerCase()===CVE_EMAIL.toLowerCase();}
+
+// ── IndexedDB helpers for large heroImage ────────────────────
+var _IDB_NAME='cve_hero_store';
+var _IDB_STORE='images';
+var _IDB_KEY='heroImage';
+function _idbOpen(cb){
+  try{
+    var req=indexedDB.open(_IDB_NAME,1);
+    req.onupgradeneeded=function(e){e.target.result.createObjectStore(_IDB_STORE);};
+    req.onsuccess=function(e){cb(e.target.result);};
+    req.onerror=function(){cb(null);};
+  }catch(e){cb(null);}
+}
+function _idbSaveHero(dataUrl,done){
+  _idbOpen(function(db){
+    if(!db){if(done)done();return;}
+    try{
+      var tx=db.transaction(_IDB_STORE,'readwrite');
+      var st=tx.objectStore(_IDB_STORE);
+      if(dataUrl){st.put(dataUrl,_IDB_KEY);}else{st['delete'](_IDB_KEY);}
+      tx.oncomplete=function(){if(done)done();};
+      tx.onerror=function(){if(done)done();};
+    }catch(e){if(done)done();}
+  });
+}
+function _idbLoadHero(cb){
+  _idbOpen(function(db){
+    if(!db){cb('');return;}
+    try{
+      var tx=db.transaction(_IDB_STORE,'readonly');
+      var req=tx.objectStore(_IDB_STORE).get(_IDB_KEY);
+      req.onsuccess=function(){cb(req.result||'');};
+      req.onerror=function(){cb('');};
+    }catch(e){cb('');}
+  });
+}
+
+// ── localStorage for small config (WITHOUT heroImage) ────────
 function _ld(){try{var r=localStorage.getItem(CVE_KEY);return r?JSON.parse(r):null;}catch(e){return null;}}
-function _sv(c){try{localStorage.setItem(CVE_KEY,JSON.stringify(c));}catch(e){}}
+function _sv(c){
+  // Save config to localStorage WITHOUT heroImage (too large for LS)
+  try{
+    var clone=JSON.parse(JSON.stringify(c));
+    var hasHero=!!clone.heroImage;
+    clone.heroImage=hasHero?'__IDB__':'';
+    localStorage.setItem(CVE_KEY,JSON.stringify(clone));
+  }catch(e){}
+  // Save heroImage to IndexedDB
+  _idbSaveHero(c.heroImage||'');
+}
 function _cp(o){return JSON.parse(JSON.stringify(o));}
 function _mg(a,b){var r=_cp(a);if(b){Object.keys(b).forEach(function(k){if(typeof b[k]==='object'&&b[k]!==null&&!Array.isArray(b[k])&&typeof r[k]==='object'){r[k]=_mg(r[k],b[k]);}else{r[k]=b[k];}});}return r;}
 
@@ -11844,7 +11892,14 @@ window.cveOpen=function(){
   if(!_isAdm())return;
   var saved=_ld();
   _cfg=saved?_mg(CVE_DEF,saved):_cp(CVE_DEF);
-  cveApply(_cfg);_enable();
+  if(_cfg.heroImage==='__IDB__'){
+    _idbLoadHero(function(data){
+      _cfg.heroImage=data||'';
+      cveApply(_cfg);_enable();
+    });
+  } else {
+    cveApply(_cfg);_enable();
+  }
 };
 window.cveToggle=function(){if(!_isAdm())return;if(_active)cveClose();else cveOpen();};
 
@@ -11880,13 +11935,24 @@ function _updBtn(email){
 (function(){
   var saved=_ld();if(!saved)return;
   _cfg=_mg(CVE_DEF,saved);
-  function _try(n){
+  function _tryApply(n){
     if(_g('page-calendar')){cveApply(_cfg);}
-    else if(n>0){setTimeout(function(){_try(n-1);},400);}
+    else if(n>0){setTimeout(function(){_tryApply(n-1);},400);}
+  }
+  function _boot(){
+    // If heroImage marker present, load real data from IndexedDB first
+    if(_cfg.heroImage==='__IDB__'){
+      _idbLoadHero(function(data){
+        _cfg.heroImage=data||'';
+        _tryApply(20);
+      });
+    } else {
+      _tryApply(20);
+    }
   }
   if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){_try(20);},500);});
-  }else{setTimeout(function(){_try(20);},400);}
+    document.addEventListener('DOMContentLoaded',function(){setTimeout(_boot,500);});
+  }else{setTimeout(_boot,400);}
 })();
 
 // ── Patch showPage ────────────────────────────────────────────
@@ -11899,7 +11965,17 @@ function _updBtn(email){
       if(pid==='calendar'){
         setTimeout(function(){
           var saved=_ld();
-          if(saved){_cfg=_mg(CVE_DEF,saved);cveApply(_cfg);}
+          if(saved){
+            _cfg=_mg(CVE_DEF,saved);
+            if(_cfg.heroImage==='__IDB__'){
+              _idbLoadHero(function(data){
+                _cfg.heroImage=data||'';
+                cveApply(_cfg);
+              });
+            } else {
+              cveApply(_cfg);
+            }
+          }
         },150);
       }
     };
