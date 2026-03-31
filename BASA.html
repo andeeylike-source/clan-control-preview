@@ -11519,7 +11519,9 @@ function cveApply(cfg){
 
   var hero=pg.querySelector('.calendar-hero');
   if(hero){
-    if(cfg.heroImage){
+    if(typeof _applyHeroBg==='function'){
+      _applyHeroBg(cfg.heroImage||'');
+    } else if(cfg.heroImage){
       hero.style.setProperty('--calendar-hero-image',"url('"+cfg.heroImage+"')");
     } else {
       hero.style.setProperty('--calendar-hero-image','none');
@@ -11777,6 +11779,21 @@ function _setupHeroBgDrag(pg){
 }
 
 // ── BG handlers ───────────────────────────────────────────────
+function _applyHeroBg(dataUrl){
+  // Use dynamic <style> tag for ::before because large data-URL CSS vars
+  // can silently fail in some browsers; also set CSS var as fallback
+  var hero=document.querySelector('#page-calendar .calendar-hero');
+  var tag=document.getElementById('cveHeroBgStyle');
+  if(dataUrl){
+    var css='.calendar-hero::before{background-image:url("'+dataUrl+'") !important;}';
+    if(!tag){tag=document.createElement('style');tag.id='cveHeroBgStyle';document.head.appendChild(tag);}
+    tag.textContent=css;
+    if(hero)hero.style.setProperty('--calendar-hero-image',"url('"+dataUrl+"')");
+  } else {
+    if(tag)tag.textContent='.calendar-hero::before{background-image:none !important;}';
+    if(hero)hero.style.setProperty('--calendar-hero-image','none');
+  }
+}
 window.cveBgUpload=function(inp){
   var f=inp&&inp.files&&inp.files[0];if(!f)return;
   // Init _cfg if editor not formally opened yet
@@ -11784,9 +11801,7 @@ window.cveBgUpload=function(inp){
   var rd=new FileReader();
   rd.onload=function(e){
     _cfg.heroImage=e.target.result;
-    // Apply immediately to hero
-    var hero=document.querySelector('#page-calendar .calendar-hero');
-    if(hero)hero.style.setProperty('--calendar-hero-image',"url('"+e.target.result+"')");
+    _applyHeroBg(e.target.result);
     // Also save immediately so reload works without extra Save click
     _sv(_cfg);
   };
@@ -11795,8 +11810,7 @@ window.cveBgUpload=function(inp){
 window.cveBgRemove=function(){
   if(!_cfg){var sv2=_ld();_cfg=sv2?_mg(CVE_DEF,sv2):_cp(CVE_DEF);}
   _cfg.heroImage='';
-  var hero=document.querySelector('#page-calendar .calendar-hero');
-  if(hero)hero.style.setProperty('--calendar-hero-image','none');
+  _applyHeroBg('');
   var inp=_g('cveBgInput');if(inp)inp.value='';
   _sv(_cfg);
 };
