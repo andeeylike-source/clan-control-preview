@@ -11459,6 +11459,8 @@ function getClass2IconByClass3(c3) {
   <label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#7aaa88" title="Жирность">B<select id="cveStyleFw" style="background:#060c08;border:1px solid #2a4025;border-radius:5px;padding:2px 4px;color:#c0d8c8;font-size:10px;outline:none;cursor:pointer" onchange="cveStyleApply()"><option value="">—</option><option value="400">400</option><option value="600">600</option><option value="700">700</option><option value="800">800</option><option value="900">900</option></select></label>
   <label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#7aaa88" title="Шрифт">F<select id="cveStyleFf" style="background:#060c08;border:1px solid #2a4025;border-radius:5px;padding:2px 4px;color:#c0d8c8;font-size:10px;outline:none;cursor:pointer;max-width:90px" onchange="cveStyleApply()"><option value="">—</option><option value="Inter,sans-serif">Inter</option><option value="Georgia,serif">Georgia</option><option value="monospace">Mono</option><option value="system-ui">System</option></select></label>
 </div>
+
+<style id="cveStyles">
 body.cve-active [data-cve-text]:not([contenteditable="true"]) { cursor:text; }
 body.cve-active [data-cve-text]:not([contenteditable="true"]):hover { outline:1px dashed rgba(201,168,76,0.6);outline-offset:2px;border-radius:3px; }
 [data-cve-text][contenteditable="true"] { outline:2px solid #c9a84c !important;outline-offset:2px;border-radius:3px;cursor:text; }
