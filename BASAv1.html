@@ -2234,342 +2234,7 @@
         #appLayout.hidden { display: none !important; }
         body { flex-direction: column; }
 
-    
-
-        /* ===== CALENDAR GLASS VISUAL OVERRIDE v1 ===== */
-        body:not(.light):has(#page-calendar.active) {
-            --bg: #060a10;
-            --bg2: #0b1219;
-            --bg3: #101923;
-            --bg4: #151f2b;
-            --border: rgba(255,255,255,0.10);
-            --border2: rgba(255,255,255,0.16);
-            --text: #edf2f7;
-            --text2: rgba(237,242,247,0.84);
-            --text3: rgba(214,224,236,0.62);
-            --text4: rgba(200,211,224,0.46);
-            --text5: rgba(180,193,208,0.34);
-            --accent: #e9d29b;
-            --accent-h: #f2deb0;
-            --accent-s: #f6e7c2;
-            --accent2-s: #67d39e;
-            --shadow: rgba(0,0,0,0.58);
-            --glow: rgba(255,255,255,0.08);
-            --input-bg: rgba(10,15,22,0.74);
-        }
-
-        body:not(.light):has(#page-calendar.active) {
-            background:
-                radial-gradient(circle at 20% 0%, rgba(180,196,220,0.09), transparent 34%),
-                radial-gradient(circle at 82% 12%, rgba(255,255,255,0.06), transparent 28%),
-                linear-gradient(180deg, #060a10 0%, #081018 100%);
-        }
-        body:not(.light):has(#page-calendar.active) #topbar,
-        body:not(.light):has(#page-calendar.active) .sidebar {
-            background: rgba(6,10,16,0.82) !important;
-            border-color: rgba(255,255,255,0.08) !important;
-            backdrop-filter: blur(16px) saturate(135%);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
-        }
-        body:not(.light):has(#page-calendar.active) .main-content {
-            background:
-                radial-gradient(circle at 28% -10%, rgba(180,196,220,0.08), transparent 24%),
-                linear-gradient(180deg, rgba(6,10,16,0.96), rgba(8,12,18,0.94)) !important;
-        }
-        body:not(.light):has(#page-calendar.active) .nav-item {
-            color: rgba(218,226,236,0.66) !important;
-        }
-        body:not(.light):has(#page-calendar.active) .nav-item:hover {
-            background: rgba(255,255,255,0.055) !important;
-            color: #f4f8fc !important;
-        }
-        body:not(.light):has(#page-calendar.active) .nav-item.active {
-            background: linear-gradient(90deg, rgba(255,255,255,0.11), rgba(255,255,255,0.02)) !important;
-            border-left-color: rgba(255,255,255,0.45) !important;
-            color: #f7faff !important;
-        }
-        body:not(.light):has(#page-calendar.active) .topbar-icon-btn,
-        body:not(.light):has(#page-calendar.active) .topbar-user,
-        body:not(.light):has(#page-calendar.active) .topbar-clan,
-        body:not(.light):has(#page-calendar.active) .flip-toggle,
-        body:not(.light):has(#page-calendar.active) .flip-toggle-thumb {
-            border-color: rgba(255,255,255,0.10) !important;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
-        }
-        body:not(.light):has(#page-calendar.active) .topbar-icon-btn,
-        body:not(.light):has(#page-calendar.active) .topbar-user,
-        body:not(.light):has(#page-calendar.active) .flip-toggle {
-            background: rgba(255,255,255,0.035) !important;
-            backdrop-filter: blur(12px) saturate(130%);
-        }
-        body:not(.light):has(#page-calendar.active) .topbar-clan {
-            background: rgba(255,255,255,0.045) !important;
-            color: rgba(244,234,206,0.88) !important;
-        }
-        body:not(.light):has(#page-calendar.active) .topbar-logo span,
-        body:not(.light):has(#page-calendar.active) .topbar-icon-btn:hover,
-        body:not(.light):has(#page-calendar.active) .topbar-icon-btn:focus-visible {
-            color: #f4e8c8 !important;
-        }
-
-        body:has(#page-calendar.active) #page-calendar {
-            --calendar-hero-height: 258px;
-            --calendar-hero-bg-size: 108%;
-            --calendar-hero-pos-x: 52%;
-            --calendar-hero-pos-y: 46%;
-            --calendar-hero-title-size: 34px;
-            --calendar-hero-content-max: 520px;
-        }
-        body:has(#page-calendar.active) #page-calendar h1,
-        body:has(#page-calendar.active) #page-calendar h2,
-        body:has(#page-calendar.active) #page-calendar h3,
-        body:has(#page-calendar.active) #page-calendar p,
-        body:has(#page-calendar.active) #page-calendar div,
-        body:has(#page-calendar.active) #page-calendar span {
-            text-shadow: none;
-        }
-
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-hero {
-            border: 1px solid rgba(255,255,255,0.13) !important;
-            background:
-                linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015)) !important;
-            box-shadow:
-                0 30px 80px rgba(0,0,0,0.52),
-                inset 0 1px 0 rgba(255,255,255,0.15),
-                0 0 0 1px rgba(255,255,255,0.03) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-hero::before {
-            opacity: 0.88 !important;
-            filter: saturate(0.78) contrast(0.96) brightness(0.9) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-hero::after {
-            background:
-                linear-gradient(180deg, rgba(8,12,18,0.42) 0%, rgba(8,12,18,0.56) 100%),
-                radial-gradient(circle at 14% 10%, rgba(255,255,255,0.14), transparent 20%),
-                radial-gradient(circle at 82% 18%, rgba(255,255,255,0.08), transparent 22%),
-                linear-gradient(90deg, rgba(10,14,20,0.66) 0%, rgba(10,14,20,0.36) 38%, rgba(10,14,20,0.62) 100%) !important;
-            opacity: 1 !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-hero::after,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-hero-meta,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-grid-card,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-side-card,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-summary-card {
-            backdrop-filter: blur(18px) saturate(140%);
-            -webkit-backdrop-filter: blur(18px) saturate(140%);
-        }
-
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-hero-meta,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-grid-card,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-side-card,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-summary-card {
-            background: linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.03)) !important;
-            border: 1px solid rgba(255,255,255,0.14) !important;
-            box-shadow:
-                inset 0 1px 0 rgba(255,255,255,0.11),
-                0 18px 40px rgba(0,0,0,0.34),
-                0 0 0 1px rgba(255,255,255,0.03) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-grid-card:hover,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-side-card:hover,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-summary-card:hover,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-hero-meta:hover {
-            border-color: rgba(255,255,255,0.22) !important;
-            transform: translateY(-1px);
-            box-shadow:
-                inset 0 1px 0 rgba(255,255,255,0.14),
-                0 24px 56px rgba(0,0,0,0.38),
-                0 0 24px rgba(255,255,255,0.06) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-hero-summary .calendar-summary-card {
-            background: linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.025)) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-grid-card {
-            padding: 14px !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-side-card {
-            padding: 22px !important;
-        }
-
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-hero-eyebrow {
-            background: rgba(255,255,255,0.045) !important;
-            border-color: rgba(255,255,255,0.15) !important;
-            color: rgba(245,226,179,0.88) !important;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-hero-title,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-month-label {
-            color: #f4f7fb !important;
-            text-shadow: 0 8px 24px rgba(0,0,0,0.28) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-hero-text,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-toolbar-note,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-side-copy,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-template-time,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-side-meta,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-side-caption {
-            color: rgba(228,235,244,0.72) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-section-label,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-side-link,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-side-title,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-summary-label {
-            color: rgba(245,226,179,0.86) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-summary-value {
-            color: #f7faff !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-legend-item {
-            color: rgba(230,238,246,0.76) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-nav-btn {
-            background: rgba(10,15,22,0.52) !important;
-            border-color: rgba(255,255,255,0.12) !important;
-            color: rgba(244,247,252,0.92) !important;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-nav-btn:hover {
-            background: rgba(255,255,255,0.08) !important;
-            border-color: rgba(255,255,255,0.22) !important;
-            color: #ffffff !important;
-        }
-
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-grid {
-            background: rgba(255,255,255,0.08) !important;
-            border: 1px solid rgba(255,255,255,0.14) !important;
-            border-radius: 24px !important;
-            overflow: hidden;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-header-cell {
-            background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)) !important;
-            color: rgba(220,229,239,0.62) !important;
-            border-bottom: 1px solid rgba(255,255,255,0.10) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-day {
-            background: linear-gradient(180deg, rgba(10,15,22,0.26), rgba(10,15,22,0.18)) !important;
-            color: #f3f7fc !important;
-            border-color: rgba(255,255,255,0.08) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-day:hover {
-            background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.035)) !important;
-            filter: none !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-day.today {
-            outline: 1px solid rgba(255,255,255,0.24) !important;
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.07), 0 0 0 1px rgba(255,255,255,0.03) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-day.other-month {
-            opacity: .34 !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .day-number {
-            color: #f3f7fd !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .km-stat-badge {
-            background: rgba(255,255,255,0.07) !important;
-            border: 1px solid rgba(255,255,255,0.1);
-            color: rgba(228,235,244,0.7) !important;
-        }
-
-        body:not(.light):has(#page-calendar.active) #page-calendar .event-chip {
-            border-radius: 10px !important;
-            font-weight: 700 !important;
-            padding: 4px 8px !important;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .event-epic {
-            background: rgba(227,195,123,0.18) !important;
-            color: #f7e7bc !important;
-            border-color: rgba(227,195,123,0.26) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .event-siege {
-            background: rgba(227,109,118,0.16) !important;
-            color: #ffd6db !important;
-            border-color: rgba(227,109,118,0.24) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .event-tv {
-            background: rgba(113,151,230,0.16) !important;
-            color: #d9e6ff !important;
-            border-color: rgba(113,151,230,0.24) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .event-manual {
-            background: rgba(103,211,158,0.16) !important;
-            color: #d4ffea !important;
-            border-color: rgba(103,211,158,0.26) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .event-time {
-            opacity: 0.72 !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-side-item,
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-template-row {
-            border-bottom-color: rgba(255,255,255,0.08) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #page-calendar .calendar-event-accent {
-            box-shadow: 0 0 18px currentColor;
-        }
-
-        body:not(.light):has(#page-calendar.active) #cveToolbar,
-        body:not(.light):has(#page-calendar.active) #cveResizePanel {
-            background: rgba(7,11,17,0.78) !important;
-            border-color: rgba(255,255,255,0.14) !important;
-            box-shadow: 0 16px 36px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.08) !important;
-            backdrop-filter: blur(18px) saturate(145%) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #cveToolbar span:first-child,
-        body:not(.light):has(#page-calendar.active) #cveResizePanel #cvePanelLabel {
-            color: rgba(245,226,179,0.9) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #cveToolbar label,
-        body:not(.light):has(#page-calendar.active) #cveToolbar button,
-        body:not(.light):has(#page-calendar.active) #cveResizePanel label,
-        body:not(.light):has(#page-calendar.active) #cveResizePanel button {
-            color: rgba(226,235,244,0.82) !important;
-        }
-        body:not(.light):has(#page-calendar.active) #cveToolbar input,
-        body:not(.light):has(#page-calendar.active) #cveResizePanel input,
-        body:not(.light):has(#page-calendar.active) #cveResizePanel select {
-            background: rgba(255,255,255,0.06) !important;
-            border-color: rgba(255,255,255,0.12) !important;
-            color: #eef4fa !important;
-        }
-
-        body.light:has(#page-calendar.active) {
-            --bg: #efebe2;
-            --bg2: rgba(255,251,243,0.88);
-            --bg3: rgba(244,238,226,0.94);
-            --bg4: #e5dccb;
-            --border: rgba(129,112,80,0.18);
-            --border2: rgba(129,112,80,0.26);
-            --text: #3a3022;
-            --text2: rgba(58,48,34,0.84);
-            --text3: rgba(77,65,47,0.72);
-            --text4: rgba(94,79,56,0.58);
-            --text5: rgba(112,95,67,0.46);
-            --accent: #b99047;
-            --accent-h: #a77c2f;
-            --accent-s: #cda65d;
-            --accent2-s: #4f8b64;
-            --shadow: rgba(70,45,20,0.14);
-            --glow: rgba(255,255,255,0.34);
-        }
-        body.light:has(#page-calendar.active) #page-calendar .calendar-hero,
-        body.light:has(#page-calendar.active) #page-calendar .calendar-hero-meta,
-        body.light:has(#page-calendar.active) #page-calendar .calendar-grid-card,
-        body.light:has(#page-calendar.active) #page-calendar .calendar-side-card,
-        body.light:has(#page-calendar.active) #page-calendar .calendar-summary-card {
-            background: linear-gradient(180deg, rgba(255,255,255,0.66), rgba(255,248,238,0.42)) !important;
-            border-color: rgba(129,112,80,0.20) !important;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), 0 18px 32px rgba(70,45,20,0.10) !important;
-            backdrop-filter: blur(12px) saturate(120%);
-            -webkit-backdrop-filter: blur(12px) saturate(120%);
-        }
-        body.light:has(#page-calendar.active) #page-calendar .calendar-hero::after {
-            background:
-                linear-gradient(180deg, rgba(255,252,247,0.20) 0%, rgba(255,250,243,0.42) 100%),
-                linear-gradient(90deg, rgba(251,245,235,0.56) 0%, rgba(251,245,235,0.24) 44%, rgba(251,245,235,0.48) 100%) !important;
-        }
-
-</style>
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script>
     // Initialize Supabase client early so it's available to auth module
@@ -2581,6 +2246,252 @@
         'sb_publishable_zCt0JfMRJBW8ao4lNO6mPw_o0ntK-Se'
     );
     </script>
+
+<style id="calendarGlassOverrideV2">
+/* ===== CALENDAR GLASS OVERRIDE V2 — CSS ONLY ===== */
+body:not(.light):has(#page-calendar.active){
+  --bg:#0a0f14 !important;
+  --bg2:#0f151d !important;
+  --bg3:#121a23 !important;
+  --bg4:#18212c !important;
+  --border:rgba(182,198,219,0.14) !important;
+  --border2:rgba(225,234,245,0.24) !important;
+  --text:#edf2f8 !important;
+  --text2:rgba(232,239,248,0.88) !important;
+  --text3:rgba(198,211,226,0.72) !important;
+  --text4:rgba(167,182,201,0.54) !important;
+  --text5:rgba(144,160,181,0.42) !important;
+  --accent:#cbb27a !important;
+  --accent-h:#dfc892 !important;
+  --accent-s:#f1dfb1 !important;
+  --accent2-s:#74c99a !important;
+  --shadow:rgba(2,6,12,0.72) !important;
+  --glow:rgba(255,255,255,0.06) !important;
+  --input-bg:rgba(12,18,26,0.78) !important;
+  background:
+    radial-gradient(circle at 18% 10%, rgba(255,255,255,0.05), transparent 26%),
+    linear-gradient(180deg,#091018 0%,#081018 100%) !important;
+}
+body:not(.light):has(#page-calendar.active) #topbar,
+body:not(.light):has(#page-calendar.active) .sidebar{
+  background:linear-gradient(180deg, rgba(10,15,22,0.94), rgba(8,13,19,0.88)) !important;
+  border-color:rgba(194,208,226,0.10) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+body:not(.light):has(#page-calendar.active) .topbar-icon-btn,
+body:not(.light):has(#page-calendar.active) .topbar-user,
+body:not(.light):has(#page-calendar.active) .flip-toggle{
+  background:rgba(15,22,31,0.62) !important;
+  border-color:rgba(219,229,241,0.12) !important;
+  backdrop-filter: blur(10px) saturate(120%);
+}
+body:not(.light):has(#page-calendar.active) .topbar-logo,
+body:not(.light):has(#page-calendar.active) .nav-item,
+body:not(.light):has(#page-calendar.active) .sidebar-section-label{
+  color:rgba(229,236,244,0.86) !important;
+}
+body:not(.light):has(#page-calendar.active) .nav-item:hover{
+  background:rgba(255,255,255,0.04) !important;
+}
+body:not(.light):has(#page-calendar.active) .nav-item.active{
+  background:linear-gradient(90deg, rgba(255,255,255,0.10), rgba(255,255,255,0.02)) !important;
+  border-left-color:rgba(244,247,252,0.42) !important;
+  color:#fff !important;
+}
+body:not(.light):has(#page-calendar.active) .main-content{
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255,255,255,0.03), transparent 24%),
+    linear-gradient(180deg, rgba(8,13,18,0.96), rgba(8,13,18,0.98)) !important;
+}
+body:not(.light):has(#page-calendar.active) #page-calendar{
+  position:relative;
+  isolation:isolate;
+}
+body:not(.light):has(#page-calendar.active) #page-calendar::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 20% 12%, rgba(255,255,255,0.05), transparent 20%),
+    radial-gradient(circle at 82% 24%, rgba(255,255,255,0.04), transparent 24%);
+  opacity:.75;
+  z-index:0;
+}
+body:not(.light):has(#page-calendar.active) #page-calendar > *{
+  position:relative;
+  z-index:1;
+}
+body:not(.light):has(#page-calendar.active) .calendar-hero{
+  background:linear-gradient(180deg, rgba(12,18,26,0.44), rgba(9,13,20,0.30)) !important;
+  border:1px solid rgba(228,236,246,0.16) !important;
+  box-shadow:
+    0 20px 44px rgba(2,8,16,0.42),
+    inset 0 1px 0 rgba(255,255,255,0.09),
+    0 0 0 1px rgba(255,255,255,0.03) !important;
+  backdrop-filter: blur(5px) saturate(110%);
+}
+body:not(.light):has(#page-calendar.active) .calendar-hero::after{
+  background:
+    linear-gradient(90deg, rgba(8,12,18,0.78) 0%, rgba(8,12,18,0.50) 34%, rgba(8,12,18,0.42) 58%, rgba(8,12,18,0.66) 100%),
+    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.00) 18%, rgba(4,8,14,0.30) 100%) !important;
+}
+body:not(.light):has(#page-calendar.active) .calendar-hero::before{
+  filter:saturate(.62) contrast(1.04) brightness(.84) !important;
+  opacity:1 !important;
+}
+body:not(.light):has(#page-calendar.active) .calendar-hero-meta,
+body:not(.light):has(#page-calendar.active) .calendar-summary-card,
+body:not(.light):has(#page-calendar.active) .calendar-grid-card,
+body:not(.light):has(#page-calendar.active) .calendar-side-card{
+  background:linear-gradient(180deg, rgba(17,25,35,0.54), rgba(10,16,24,0.38)) !important;
+  border:1px solid rgba(225,234,244,0.15) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.09),
+    0 16px 40px rgba(3,8,16,0.28),
+    0 0 0 1px rgba(255,255,255,0.03) !important;
+  backdrop-filter: blur(18px) saturate(115%) !important;
+}
+body:not(.light):has(#page-calendar.active) .calendar-summary-card:hover,
+body:not(.light):has(#page-calendar.active) .calendar-side-card:hover{
+  border-color:rgba(242,246,252,0.22) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    0 22px 48px rgba(3,8,16,0.34),
+    0 0 22px rgba(255,255,255,0.05) !important;
+}
+body:not(.light):has(#page-calendar.active) .calendar-hero-eyebrow,
+body:not(.light):has(#page-calendar.active) .calendar-hero-chip,
+body:not(.light):has(#page-calendar.active) .calendar-nav-btn,
+body:not(.light):has(#page-calendar.active) .calendar-side-link,
+body:not(.light):has(#page-calendar.active) .calendar-recurring-tag,
+body:not(.light):has(#page-calendar.active) .cve-toolbar{
+  background:rgba(12,18,26,0.52) !important;
+  border-color:rgba(223,233,244,0.14) !important;
+  color:rgba(240,243,248,0.92) !important;
+  backdrop-filter: blur(12px) saturate(120%);
+}
+body:not(.light):has(#page-calendar.active) .calendar-hero-eyebrow{
+  color:#dbc79a !important;
+}
+body:not(.light):has(#page-calendar.active) .calendar-hero-title,
+body:not(.light):has(#page-calendar.active) .calendar-side-title,
+body:not(.light):has(#page-calendar.active) .calendar-month-title{
+  color:#f2f6fb !important;
+  text-shadow:0 10px 24px rgba(0,0,0,0.30) !important;
+}
+body:not(.light):has(#page-calendar.active) .calendar-hero-text,
+body:not(.light):has(#page-calendar.active) .calendar-side-caption,
+body:not(.light):has(#page-calendar.active) .calendar-recurring-time,
+body:not(.light):has(#page-calendar.active) .calendar-upcoming-meta{
+  color:rgba(222,231,240,0.82) !important;
+}
+body:not(.light):has(#page-calendar.active) .calendar-grid{
+  background:rgba(196,208,224,0.12) !important;
+  border-color:rgba(203,214,229,0.12) !important;
+  box-shadow:none !important;
+}
+body:not(.light):has(#page-calendar.active) .calendar-header-cell{
+  background:rgba(16,24,34,0.56) !important;
+  color:rgba(214,223,235,0.64) !important;
+  border-bottom:1px solid rgba(222,232,243,0.09) !important;
+}
+body:not(.light):has(#page-calendar.active) .calendar-day{
+  background:rgba(13,19,28,0.42) !important;
+  color:rgba(235,241,248,0.92) !important;
+}
+body:not(.light):has(#page-calendar.active) .calendar-day:hover{
+  background:rgba(18,26,37,0.58) !important;
+}
+body:not(.light):has(#page-calendar.active) .calendar-day.today{
+  background:rgba(28,39,52,0.66) !important;
+  outline:1px solid rgba(244,247,251,0.22) !important;
+}
+body:not(.light):has(#page-calendar.active) .calendar-day.other-month{
+  opacity:.34 !important;
+}
+body:not(.light):has(#page-calendar.active) .day-number{
+  color:#edf3fa !important;
+}
+body:not(.light):has(#page-calendar.active) .event-chip{
+  border-radius:10px !important;
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+body:not(.light):has(#page-calendar.active) .event-epic{
+  background:rgba(147,126,73,0.36) !important;
+  border-color:rgba(218,194,139,0.22) !important;
+  color:#f2ddb1 !important;
+}
+body:not(.light):has(#page-calendar.active) .event-siege{
+  background:rgba(132,61,61,0.38) !important;
+  border-color:rgba(237,151,151,0.24) !important;
+  color:#ffc0c0 !important;
+}
+body:not(.light):has(#page-calendar.active) .event-tv{
+  background:rgba(64,89,138,0.38) !important;
+  border-color:rgba(151,191,255,0.24) !important;
+  color:#cfe0ff !important;
+}
+body:not(.light):has(#page-calendar.active) .event-manual{
+  background:rgba(69,112,92,0.42) !important;
+  border-color:rgba(136,209,170,0.22) !important;
+  color:#cdf0db !important;
+}
+body:not(.light):has(#page-calendar.active) .calendar-side-item,
+body:not(.light):has(#page-calendar.active) .calendar-recurring-row{
+  border-bottom-color:rgba(223,232,244,0.08) !important;
+}
+body:not(.light):has(#page-calendar.active) .calendar-side-link,
+body:not(.light):has(#page-calendar.active) .calendar-nav-btn{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.06) !important;
+}
+body:not(.light):has(#page-calendar.active) .calendar-side-link:hover,
+body:not(.light):has(#page-calendar.active) .calendar-nav-btn:hover{
+  background:rgba(21,30,42,0.70) !important;
+  border-color:rgba(246,249,252,0.22) !important;
+}
+body:not(.light):has(#page-calendar.active) .calendar-grid-card::before,
+body:not(.light):has(#page-calendar.active) .calendar-side-card::before,
+body:not(.light):has(#page-calendar.active) .calendar-summary-card::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  border-radius:inherit;
+  background:linear-gradient(180deg, rgba(255,255,255,0.05), transparent 18%, transparent 82%, rgba(255,255,255,0.02));
+}
+body.light #page-calendar .calendar-hero,
+body.light #page-calendar .calendar-grid-card,
+body.light #page-calendar .calendar-side-card,
+body.light #page-calendar .calendar-summary-card,
+body.light #page-calendar .calendar-hero-meta{
+  background:rgba(255,250,240,0.78) !important;
+  backdrop-filter: blur(10px) saturate(110%);
+  border-color:rgba(142,118,78,0.18) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 14px 32px rgba(76,54,24,0.08) !important;
+}
+body.light #page-calendar .calendar-hero::after{
+  background:
+    linear-gradient(90deg, rgba(255,251,246,0.80) 0%, rgba(255,249,243,0.44) 34%, rgba(255,248,241,0.24) 58%, rgba(255,248,241,0.56) 100%),
+    linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.00) 22%, rgba(255,246,235,0.38) 100%) !important;
+}
+body.light #page-calendar .calendar-grid{
+  background:rgba(163,133,86,0.22) !important;
+  border-color:rgba(163,133,86,0.20) !important;
+}
+body.light #page-calendar .calendar-day{
+  background:rgba(255,250,243,0.78) !important;
+}
+body.light #page-calendar .calendar-header-cell{
+  background:rgba(251,244,234,0.92) !important;
+}
+body.light #page-calendar .calendar-day.today{
+  background:rgba(247,239,226,0.96) !important;
+  outline:1px solid rgba(139,107,63,0.24) !important;
+}
+</style>
+
 </head>
 <body>
 
@@ -2737,7 +2648,7 @@
         <section id="page-calendar" class="page-section">
 
             <!-- HERO -->
-            <div class="calendar-hero" id="cveHeroEl" style="--calendar-hero-image:none">
+            <div class="calendar-hero" style="--calendar-hero-image:url('')">
                 <div class="calendar-hero-shell">
                     <div class="calendar-hero-top">
                         <div class="calendar-hero-content" id="cveBlockHeroContent">
@@ -11857,7 +11768,7 @@ function cveApply(cfg){
     if(cfg.heroImage){
       hero.style.setProperty('--calendar-hero-image',"url('"+cfg.heroImage+"')");
     } else {
-      hero.style.setProperty('--calendar-hero-image','none');
+      hero.style.removeProperty('--calendar-hero-image');
     }
   }
 
@@ -12114,10 +12025,9 @@ function _setupHeroBgDrag(pg){
 // ── BG handlers ───────────────────────────────────────────────
 window.cveBgUpload=function(inp){
   var f=inp&&inp.files&&inp.files[0];if(!f)return;
-  // Ensure _cfg is initialized even if editor isn't formally opened yet
-  if(!_cfg){var saved=_ld();_cfg=saved?_mg(CVE_DEF,saved):_cp(CVE_DEF);}
   var rd=new FileReader();
   rd.onload=function(e){
+    if(!_cfg)return;
     _cfg.heroImage=e.target.result;
     var hero=document.querySelector('#page-calendar .calendar-hero');
     if(hero)hero.style.setProperty('--calendar-hero-image',"url('"+e.target.result+"')");
@@ -12128,7 +12038,7 @@ window.cveBgRemove=function(){
   if(!_cfg)return;
   _cfg.heroImage='';
   var hero=document.querySelector('#page-calendar .calendar-hero');
-  if(hero)hero.style.setProperty('--calendar-hero-image','none');
+  if(hero)hero.style.removeProperty('--calendar-hero-image');
   var inp=_g('cveBgInput');if(inp)inp.value='';
 };
 window.cveBgScaleChange=function(v){
@@ -12198,12 +12108,7 @@ function _updBtn(email){
   var saved=_ld();if(!saved)return;
   _cfg=_mg(CVE_DEF,saved);
   function _try(n){
-    if(_g('page-calendar')){
-      cveApply(_cfg);
-      // Also ensure hero image is correctly set on load (not left as inline url(''))
-      var hero=document.querySelector('#page-calendar .calendar-hero');
-      if(hero&&!_cfg.heroImage){hero.style.setProperty('--calendar-hero-image','none');}
-    }
+    if(_g('page-calendar')){cveApply(_cfg);}
     else if(n>0){setTimeout(function(){_try(n-1);},400);}
   }
   if(document.readyState==='loading'){
