@@ -11451,7 +11451,14 @@ function getClass2IconByClass3(c3) {
   <label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#7aaa88">H<input type="number" id="cvePanelH" min="30" max="1200" step="4" style="width:52px;background:#060c08;border:1px solid #2a4025;border-radius:5px;padding:3px 5px;color:#c0d8c8;font-size:11px;outline:none" oninput="cvePanelApply()"></label>
 </div>
 
-<style id="cveStyles">
+<!-- Per-text style panel -->
+<div id="cveStylePanel" style="display:none;position:fixed;bottom:56px;left:50%;transform:translateX(-50%);z-index:8902;background:rgba(6,10,8,0.94);border:1px solid rgba(201,168,76,0.3);border-radius:9px;padding:5px 11px;align-items:center;gap:7px;box-shadow:0 3px 16px rgba(0,0,0,0.7);backdrop-filter:blur(8px);white-space:nowrap">
+  <span style="font-size:10px;color:#4a6845;font-weight:700" id="cveStyleLabel">Стиль</span>
+  <label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#7aaa88" title="Размер шрифта">Aa<input type="number" id="cveStyleFs" min="8" max="72" step="1" style="width:42px;background:#060c08;border:1px solid #2a4025;border-radius:5px;padding:3px 4px;color:#c0d8c8;font-size:11px;outline:none" oninput="cveStyleApply()"></label>
+  <label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#7aaa88" title="Цвет"><input type="color" id="cveStyleClr" style="width:22px;height:22px;border:1px solid #2a4025;border-radius:5px;padding:0;background:none;cursor:pointer" oninput="cveStyleApply()"></label>
+  <label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#7aaa88" title="Жирность">B<select id="cveStyleFw" style="background:#060c08;border:1px solid #2a4025;border-radius:5px;padding:2px 4px;color:#c0d8c8;font-size:10px;outline:none;cursor:pointer" onchange="cveStyleApply()"><option value="">—</option><option value="400">400</option><option value="600">600</option><option value="700">700</option><option value="800">800</option><option value="900">900</option></select></label>
+  <label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#7aaa88" title="Шрифт">F<select id="cveStyleFf" style="background:#060c08;border:1px solid #2a4025;border-radius:5px;padding:2px 4px;color:#c0d8c8;font-size:10px;outline:none;cursor:pointer;max-width:90px" onchange="cveStyleApply()"><option value="">—</option><option value="Inter,sans-serif">Inter</option><option value="Georgia,serif">Georgia</option><option value="monospace">Mono</option><option value="system-ui">System</option></select></label>
+</div>
 body.cve-active [data-cve-text]:not([contenteditable="true"]) { cursor:text; }
 body.cve-active [data-cve-text]:not([contenteditable="true"]):hover { outline:1px dashed rgba(201,168,76,0.6);outline-offset:2px;border-radius:3px; }
 [data-cve-text][contenteditable="true"] { outline:2px solid #c9a84c !important;outline-offset:2px;border-radius:3px;cursor:text; }
@@ -11488,6 +11495,7 @@ var CVE_DEF={
     calendarRecurringCaption:'preview only',
     chip0:'',chip1:'',chip2:''
   },
+  styles:{},
   blocks:{}
 };
 
@@ -11557,6 +11565,18 @@ window._cveGetLabels=function(){
 };
 
 // ── Apply saved config to DOM ─────────────────────────────────
+function _applyElStyle(el,st){
+  if(!el)return;
+  if(st){
+    if(st.fontSize)el.style.fontSize=st.fontSize; else el.style.removeProperty('font-size');
+    if(st.color)el.style.color=st.color; else el.style.removeProperty('color');
+    if(st.fontWeight)el.style.fontWeight=st.fontWeight; else el.style.removeProperty('font-weight');
+    if(st.fontFamily)el.style.fontFamily=st.fontFamily; else el.style.removeProperty('font-family');
+  } else {
+    el.style.removeProperty('font-size');el.style.removeProperty('color');
+    el.style.removeProperty('font-weight');el.style.removeProperty('font-family');
+  }
+}
 function cveApply(cfg){
   if(!cfg)return;
   var pg=_g('page-calendar');if(!pg)return;
@@ -11605,6 +11625,20 @@ function cveApply(cfg){
   var sl=_g('cveBgScale'),sv=_g('cveBgScaleVal');
   if(sl)sl.value=cfg.bgScale;
   if(sv)sv.textContent=(cfg.bgScale||104)+'%';
+
+  // Apply saved styles
+  var S=cfg.styles||{};
+  var _styleEls=TEXT_EL_IDS||[];
+  _styleEls.forEach(function(id){
+    var el=_g(id);if(!el)return;
+    var st=S[id];
+    _applyElStyle(el,st);
+  });
+  // Chips: style key is 'chip0' etc, element id is 'cveChip0' etc
+  [0,1,2].forEach(function(i){
+    var el=_g('cveChip'+i);if(!el)return;
+    _applyElStyle(el,S['chip'+i]);
+  });
 }
 
 // ── Block definitions ─────────────────────────────────────────
@@ -11780,9 +11814,63 @@ function _setupTextEditing(pg){
 function _activTxt(el,key){
   el.contentEditable='true';el.focus();
   try{var r=document.createRange(),s=window.getSelection();r.selectNodeContents(el);r.collapse(false);s.removeAllRanges();s.addRange(r);}catch(e){}
-  function bl(){el.contentEditable='false';el.removeAttribute('contenteditable');_coll(el,key);el.removeEventListener('blur',bl);el.removeEventListener('keydown',kd);}
+  // Show style panel
+  _showStylePanel(el,key);
+  function bl(){el.contentEditable='false';el.removeAttribute('contenteditable');_coll(el,key);_collStyle(el,key);el.removeEventListener('blur',bl);el.removeEventListener('keydown',kd);_hideStylePanel();}
   function kd(e2){if(e2.key==='Enter'&&!e2.shiftKey){e2.preventDefault();el.blur();}}
   el.addEventListener('blur',bl);el.addEventListener('keydown',kd);
+}
+
+// ── Style panel helpers ──────────────────────────────────────
+var _styleTgt=null, _styleKey=null;
+function _showStylePanel(el,key){
+  _styleTgt=el;_styleKey=key;
+  var sp=_g('cveStylePanel');if(!sp)return;
+  sp.style.display='flex';
+  // Prevent clicks on panel from blurring the text element
+  if(!sp.dataset.cveMd){sp.dataset.cveMd='1';sp.addEventListener('mousedown',function(e){e.preventDefault();});}
+  var lbl=_g('cveStyleLabel');if(lbl)lbl.textContent=key.length>16?key.slice(0,14)+'…':key;
+  var cs=window.getComputedStyle(el);
+  var fs=_g('cveStyleFs');if(fs)fs.value=parseInt(cs.fontSize)||14;
+  var clr=_g('cveStyleClr');if(clr)clr.value=_rgbToHex(cs.color);
+  var fw=_g('cveStyleFw');if(fw){
+    var wv=String(parseInt(cs.fontWeight)||400);
+    fw.value=[...fw.options].some(function(o){return o.value===wv;})?wv:'';
+  }
+  var ff=_g('cveStyleFf');if(ff){
+    var fam=cs.fontFamily||'';
+    ff.value='';
+    [...ff.options].forEach(function(o){if(o.value&&fam.toLowerCase().indexOf(o.value.split(',')[0].toLowerCase())>=0)ff.value=o.value;});
+  }
+}
+function _hideStylePanel(){
+  _styleTgt=null;_styleKey=null;
+  var sp=_g('cveStylePanel');if(sp)sp.style.display='none';
+}
+function _rgbToHex(rgb){
+  if(!rgb)return'#ffffff';
+  if(rgb.charAt(0)==='#')return rgb;
+  var m=rgb.match(/(\d+)/g);if(!m||m.length<3)return'#ffffff';
+  return'#'+((1<<24)+(+m[0]<<16)+(+m[1]<<8)+ +m[2]).toString(16).slice(1);
+}
+window.cveStyleApply=function(){
+  if(!_styleTgt||!_styleKey)return;
+  var fs=_g('cveStyleFs'),clr=_g('cveStyleClr'),fw=_g('cveStyleFw'),ff=_g('cveStyleFf');
+  if(fs&&fs.value)_styleTgt.style.fontSize=fs.value+'px';
+  if(clr)_styleTgt.style.color=clr.value;
+  if(fw)_styleTgt.style.fontWeight=fw.value||'';
+  if(ff)_styleTgt.style.fontFamily=ff.value||'';
+  _collStyle(_styleTgt,_styleKey);
+};
+function _collStyle(el,key){
+  if(!_cfg)return;if(!_cfg.styles)_cfg.styles={};
+  var s={};
+  if(el.style.fontSize)s.fontSize=el.style.fontSize;
+  if(el.style.color)s.color=el.style.color;
+  if(el.style.fontWeight)s.fontWeight=el.style.fontWeight;
+  if(el.style.fontFamily)s.fontFamily=el.style.fontFamily;
+  if(Object.keys(s).length)_cfg.styles[key]=s;
+  else delete _cfg.styles[key];
 }
 
 function _coll(el,key){
@@ -11792,8 +11880,8 @@ function _coll(el,key){
 
 function _collAll(){
   var pg=_g('page-calendar');if(!pg)return;
-  TEXT_EL_IDS.forEach(function(id){var el=_g(id);if(el)_coll(el,id);});
-  pg.querySelectorAll('[data-cve-chip]').forEach(function(ch){_coll(ch,'chip'+ch.dataset.cveChip);});
+  TEXT_EL_IDS.forEach(function(id){var el=_g(id);if(el){_coll(el,id);_collStyle(el,id);}});
+  pg.querySelectorAll('[data-cve-chip]').forEach(function(ch){var k='chip'+ch.dataset.cveChip;_coll(ch,k);_collStyle(ch,k);});
 }
 
 // ── Hero BG drag ──────────────────────────────────────────────
@@ -11920,6 +12008,7 @@ function _disable(){
   }
   var tb=_g('cveToolbar');if(tb)tb.style.display='none';
   var rp=_g('cveResizePanel');if(rp)rp.style.display='none';
+  _hideStylePanel();
 }
 
 // ESC
