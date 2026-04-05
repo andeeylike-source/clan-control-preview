@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
     <title>Clan Control v12</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -3040,7 +3041,7 @@
 <!-- =============================================
      TOPBAR
 ============================================= -->
-<div id="topbar" class="hidden">
+<div id="topbar" class="hidden" translate="no">
     <div class="topbar-logo">⚔️ Clan<span>Control</span></div>
     <div class="topbar-right">
         <div class="topbar-clan" id="topbarClan" style="display:none"></div>
@@ -3073,7 +3074,7 @@
 <div id="appLayout" class="hidden">
 
 
-    <aside class="sidebar">
+    <aside class="sidebar" translate="no">
         <nav>
             <div style="font-size:9px;font-weight:800;color:#334155;text-transform:uppercase;letter-spacing:.1em;padding:6px 16px 4px;margin-top:4px">Аналитика</div>
             <div onclick="showPage('dashboard')" id="nav-dashboard" class="nav-item">🏠 Дашборд</div>
@@ -3905,9 +3906,9 @@
                     const next = upcoming[0];
                     if(text){
                         if(_cveTx.calendarHeroText){text.textContent=_cveTx.calendarHeroText;}
-                        else{text.textContent=next?(lang==='en'?`Next event — ${next.title}${next.time?' at '+next.time:''}, ${calendarDateLabel(next.dateStr,{day:'numeric',month:'long'})}. Art works only as the section cover, while the work layer below stays clean.`:`Ближайшее событие — ${next.title}${next.time?' в '+next.time:''}, ${calendarDateLabel(next.dateStr,{day:'numeric',month:'long'})}. Арт работает только как обложка раздела, а рабочий слой ниже остаётся чистым.`):(lang==='en'?'The calendar became more compact: the art works as a section cover, while the work layer below stays readable.':'Календарь стал компактнее: арт работает как обложка раздела, а рабочий слой ниже остаётся читаемым.');}
+                        else{text.textContent=next?(lang==='en'?`Next event — ${next.title}${next.time?' at '+next.time:''}, ${calendarDateLabel(next.dateStr,{day:'numeric',month:'long'})}.`:`Ближайшее событие — ${next.title}${next.time?' в '+next.time:''}, ${calendarDateLabel(next.dateStr,{day:'numeric',month:'long'})}.`):(lang==='en'?'No upcoming events this month.':'Ближайших событий в этом месяце нет.');}
                     }
-                    if(note){note.textContent=_cveTx.calendarToolbarNote||(lang==='en'?'Test premium layout: current event logic, month switching and day modals remain intact.':'Тестовый premium-layout: текущая логика событий, переключение месяцев и модалки дней остаются без поломки.');}
+                    if(note){note.textContent=_cveTx.calendarToolbarNote||(lang==='en'?'Navigate months and tap any day to view or add events.':'Переключай месяцы и нажимай на день, чтобы просмотреть или добавить события.');}
                     
 
                     if(chips){
