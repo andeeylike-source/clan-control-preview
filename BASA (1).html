@@ -2957,6 +2957,20 @@
     }
 
     </style>
+    <style id="cve-layout-fix">
+    /* Fix: prevent bad saved CVE block positions from breaking calendar layout
+       when the visual editor is not active. The editor still works normally
+       because body.cve-active removes this selector match. */
+    body:not(.cve-active) #cveW_cveBlockHeroMeta,
+    body:not(.cve-active) #cveW_cveBlockSummary1,
+    body:not(.cve-active) #cveW_cveBlockSummary2,
+    body:not(.cve-active) #cveW_cveBlockSummary3 {
+        left: 0 !important;
+        top: 0 !important;
+        width: auto !important;
+        min-height: auto !important;
+    }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script>
     // Initialize Supabase client early so it's available to auth module
