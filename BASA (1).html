@@ -2972,8 +2972,32 @@
     }
     </style>
     <style id="shell-off-layer">
-    /* shell-off: admin mode — hides sidebar for clean content view */
+    /* shell-off: admin architecture mode */
     body.shell-off .sidebar { display: none !important; }
+    body.shell-off .main-content {
+        margin-right: 262px !important;
+        padding-bottom: 120px !important;
+    }
+    body.shell-off .topbar {
+        box-shadow: 0 0 0 1px rgba(99,102,241,0.25) inset !important;
+    }
+    body.shell-off .page-section.active {
+        box-shadow: 0 0 0 1px rgba(56,100,180,0.25) inset !important;
+        position: relative;
+    }
+    body.shell-off .page-section.active::before {
+        content: attr(id);
+        position: absolute;
+        top: 6px; left: 10px;
+        font-size: 9px; font-weight: 800;
+        letter-spacing: .1em; text-transform: uppercase;
+        color: rgba(99,102,241,0.35);
+        pointer-events: none; z-index: 1;
+    }
+    #archDiagPanel  { display: none; }
+    #archChainPanel { display: none; }
+    body.shell-off #archDiagPanel  { display: block; }
+    body.shell-off #archChainPanel { display: flex; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script>
@@ -4919,6 +4943,9 @@
             // Обновляем hash в URL (кроме профиля — у него свой hash)
             if (pageId !== 'profile') {
                 try { history.replaceState(null, '', '#' + pageId); } catch(e) {}
+            }
+            if (document.body.classList.contains('shell-off') && typeof window._archRender === 'function') {
+                setTimeout(window._archRender, 60);
             }
         }
 
@@ -11407,6 +11434,35 @@ function getClass2IconByClass3(c3) {
             // Auth handles app init via _basaInit()
             // _basaInit() is called by _showApp() after authentication
         };
+
+        // Arch mode: expose runtime state for diagnostic overlay (admin only)
+        window._archDiagData = function() {
+            var keys = [];
+            try { keys = JSON.parse(localStorage.getItem('clanControl_geminiKeys') || '[]'); } catch(e) {}
+            var lsOk = false;
+            try { var raw = localStorage.getItem('clanControl_v1'); lsOk = !!(raw && JSON.parse(raw).roster); } catch(e) {}
+            var today = typeof getTodayStr === 'function' ? getTodayStr() : '';
+            var exh = Object.values(exhaustedKeys || {}).filter(function(v){ return v === today; }).length;
+            var snapDates = Object.keys(appliedStatsByDate || {}).sort();
+            var dayKeys = Object.keys(dayScreenshots || {});
+            var dayTotal = dayKeys.reduce(function(s,k){ return s + ((dayScreenshots[k]||[]).length); }, 0);
+            return {
+                rosterCount:         (roster  || []).length,
+                archiveCount:        (archive || []).length,
+                packsCount:          (packs   || []).length,
+                snapCount:           snapDates.length,
+                snapDatesRecent:     snapDates.slice(-3),
+                dayScreenshotsTotal: dayTotal,
+                dayScreenshotsDates: dayKeys,
+                apiKeysCount:        keys.length,
+                apiKeysExhausted:    exh,
+                lsOk:                lsOk,
+                activePage: (function(){
+                    var s = document.querySelector('.page-section.active');
+                    return s ? s.id.replace('page-','') : '—';
+                })()
+            };
+        };
     </script>
     <!-- DATE PICKER POPUP -->
     <div id="dpPopup" class="dp-popup">
@@ -12028,7 +12084,8 @@ function getClass2IconByClass3(c3) {
         window.shellToggle = function() {
             var isOff = document.body.classList.toggle('shell-off');
             var btn = document.getElementById('shellToggleBtn');
-            if (btn) btn.textContent = isOff ? 'Без оболочки' : 'Оболочка';
+            if (btn) btn.textContent = isOff ? '✕ Арх.режим' : 'Оболочка';
+            if (isOff && typeof window._archRender === 'function') window._archRender();
         };
 
         function _showApp(email, clan) {
@@ -12980,6 +13037,130 @@ function _updBtn(email){
 })();
 
 })(); // end CVE v3 IIFE
+</script>
+<!-- ARCHITECTURE MODE OVERLAY (admin only, visible only with body.shell-off) -->
+<div id="archDiagPanel" style="position:fixed;top:52px;right:0;width:260px;height:calc(100vh - 52px - 114px);background:#06090e;border-left:1px solid #141f2e;z-index:7900;overflow-y:auto;padding:12px;font-family:'Inter',sans-serif"></div>
+<div id="archChainPanel" style="position:fixed;bottom:0;left:0;right:0;height:112px;background:#06090e;border-top:1px solid #141f2e;z-index:7900;padding:10px 16px;align-items:center;gap:0;overflow-x:auto;white-space:nowrap"></div>
+<script>
+(function(){
+function _row(ic,label,detail){
+    return '<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #0c1520;align-items:flex-start">'+
+        '<span style="flex-shrink:0;font-size:11px;margin-top:1px">'+ic+'</span>'+
+        '<div><div style="color:#cbd5e1;font-size:11px;font-weight:600">'+label+'</div>'+
+        (detail?'<div style="color:#475569;font-size:10px;margin-top:1px">'+detail+'</div>':'')+
+        '</div></div>';
+}
+function _step(label,status,note){
+    var bg ={ok:'#0d2818',warn:'#1c1508',error:'#1c0808',idle:'#0c1320'}[status]||'#0c1320';
+    var br ={ok:'#14532d',warn:'#78350f',error:'#7f1d1d',idle:'#1e2d3d'}[status]||'#1e2d3d';
+    var ic ={ok:'🟢',warn:'🟠',error:'🔴',idle:'⚪'}[status]||'⚪';
+    return '<div style="display:inline-flex;flex-direction:column;align-items:center;flex-shrink:0">'+
+        '<div style="background:'+bg+';border:1px solid '+br+';border-radius:6px;padding:5px 9px;font-size:10px;font-weight:700;color:#94a3b8;white-space:pre;text-align:center;line-height:1.5">'+
+        ic+' '+label+
+        (note?'\n<span style="font-size:9px;font-weight:400;color:#475569">'+note+'</span>':'')+
+        '</div></div>';
+}
+function _arr(){
+    return '<span style="flex-shrink:0;color:#1e3a5f;font-size:13px;padding:0 4px;align-self:center">→</span>';
+}
+
+window._archRender = function(){
+    var diag  = document.getElementById('archDiagPanel');
+    var chain = document.getElementById('archChainPanel');
+    if(!diag||!chain) return;
+
+    var d = typeof window._archDiagData==='function' ? window._archDiagData() : {};
+    var email  = window._loginEmail||'';
+    var hasSess= !!email;
+    var hasSB  = !!(window._supabase);
+    var keysOk = d.apiKeysCount > 0;
+    var allExh = keysOk && d.apiKeysExhausted >= d.apiKeysCount;
+
+    // ── DIAG PANEL ──────────────────────
+    var lsIc  = d.lsOk?'🟢':(localStorage.getItem('clanControl_v1')?'🟠':'🔴');
+    var keyIc = !keysOk?'🔴':allExh?'🟠':'🟢';
+    var dayIc = d.dayScreenshotsTotal>0?'🟠':'🟢';
+    var keyDetail = !keysOk?'нет ключей → добавь в Настройках'
+        :allExh?'все '+d.apiKeysCount+' исчерпаны сегодня'
+        :d.apiKeysCount+' ключей · исчерпано: '+d.apiKeysExhausted;
+
+    diag.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
+        '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#334155">Диагностика</div>'+
+        '<button onclick="if(typeof window._archRender===\'function\')window._archRender()" style="background:none;border:1px solid #1e2d3d;border-radius:4px;color:#475569;font-size:10px;padding:2px 7px;cursor:pointer;font-family:inherit" title="Обновить">↻</button>'+
+        '</div>'+
+        _row(hasSess?'🟢':'🔴', 'Auth',          hasSess?email:'нет сессии')+
+        _row(lsIc,               'localStorage',  d.lsOk?'ростер '+d.rosterCount+' · снапшотов '+d.snapCount:'нет данных')+
+        _row(hasSB?'🟢':'🔴',   'Supabase',      hasSB?'клиент готов':'клиент не найден')+
+        _row(keyIc,              'OpenRouter key', keyDetail)+
+        _row('⚪',               'Страница',      'page-'+d.activePage)+
+        _row(dayIc,              'dayScreenshots', d.dayScreenshotsTotal>0?d.dayScreenshotsTotal+' шт в памяти (не сохранены!)':'нет незафиксированных')+
+        '<div style="margin-top:10px;padding:8px;background:#0c1320;border-radius:6px;border:1px solid #141f2e;font-size:10px;color:#475569;line-height:1.8">'+
+        '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#334155;margin-bottom:4px">Состояние данных</div>'+
+        'Ростер: <b style="color:#64748b">'+d.rosterCount+'</b><br>'+
+        'Архив: <b style="color:#64748b">'+d.archiveCount+'</b><br>'+
+        'Паки: <b style="color:#64748b">'+d.packsCount+'</b><br>'+
+        'КМ снапшоты: <b style="color:#64748b">'+d.snapCount+'</b>'+
+        (d.snapDatesRecent&&d.snapDatesRecent.length?'<br><span style="color:#334155;font-size:9px">'+d.snapDatesRecent.join(' · ')+'</span>':'')+
+        '</div>';
+
+    // ── CHAIN PANEL ──────────────────────
+    var ap = d.activePage;
+    var steps;
+    if(ap==='calendar'){
+        steps=[
+            {l:'Вход',               s:hasSess?'ok':'error',             n:hasSess?email.split('@')[0]:'нет'},
+            {l:'showPage\ncalendar', s:'ok',                             n:''},
+            {l:'renderCalendar',     s:'ok',                             n:''},
+            {l:'dayScreenshots',     s:d.dayScreenshotsTotal>0?'warn':'idle', n:d.dayScreenshotsTotal>0?d.dayScreenshotsTotal+' шт':'0'},
+            {l:'API ключ',           s:!keysOk?'error':allExh?'warn':'ok', n:''},
+            {l:'анализ',             s:'idle',                           n:''},
+            {l:'apply',              s:d.snapCount>0?'ok':'idle',        n:d.snapCount>0?d.snapCount+' дней':'0'},
+            {l:'каскад\nростер/стат/история', s:d.rosterCount>0?'ok':'idle', n:'дашборд — вручную'}
+        ];
+    } else if(ap==='roster'){
+        steps=[
+            {l:'Вход',             s:hasSess?'ok':'error',        n:''},
+            {l:'showPage\nroster', s:'ok',                        n:''},
+            {l:'renderRoster',     s:d.rosterCount>0?'ok':'warn', n:d.rosterCount+' игроков'},
+            {l:'импорт\nскринов',  s:'idle',                      n:''},
+            {l:'saveToStorage',    s:d.lsOk?'ok':'error',         n:''},
+            {l:'архив',            s:d.archiveCount>0?'ok':'idle', n:d.archiveCount+' записей'}
+        ];
+    } else if(ap==='dashboard'){
+        steps=[
+            {l:'Вход',                s:hasSess?'ok':'error',        n:''},
+            {l:'showPage\ndashboard', s:'ok',                        n:''},
+            {l:'renderDashboard',     s:'ok',                        n:'ленивый: только при nav'},
+            {l:'calcStats',           s:d.snapCount>0?'ok':'warn',   n:d.snapCount+' снапш.'},
+            {l:'ростер',              s:d.rosterCount>0?'ok':'warn', n:d.rosterCount+' игроков'}
+        ];
+    } else if(ap==='stats'){
+        steps=[
+            {l:'Вход',           s:hasSess?'ok':'error',     n:''},
+            {l:'showPage\nstats',s:'ok',                     n:''},
+            {l:'renderStats',    s:'ok',                     n:''},
+            {l:'appliedStats\nByDate',s:d.snapCount>0?'ok':'warn',n:d.snapCount+' дней'},
+            {l:'фильтр\nпо паку',s:'idle',                  n:''}
+        ];
+    } else {
+        steps=[
+            {l:'Вход',            s:hasSess?'ok':'error',  n:''},
+            {l:'showPage\n'+ap,   s:ap!=='—'?'ok':'warn',  n:''},
+            {l:'render',          s:'idle',                n:''},
+            {l:'localStorage',    s:d.lsOk?'ok':'error',  n:''}
+        ];
+    }
+
+    var html='<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#334155;flex-shrink:0;margin-right:14px;line-height:1.7">Цепочка<br><span style="color:#1e3a5f;font-weight:400;text-transform:none">'+ap+'</span></div>';
+    for(var i=0;i<steps.length;i++){
+        var s=steps[i];
+        html+=_step(s.l,s.s,s.n);
+        if(i<steps.length-1) html+=_arr();
+    }
+    chain.innerHTML=html;
+};
+})();
 </script>
 </body>
 </html>
