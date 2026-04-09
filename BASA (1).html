@@ -2972,32 +2972,42 @@
     }
     </style>
     <style id="shell-off-layer">
-    /* shell-off: admin architecture mode */
+    /* shell-off: admin architecture / system map mode */
     body.shell-off .sidebar { display: none !important; }
-    body.shell-off .main-content {
-        margin-right: 262px !important;
-        padding-bottom: 120px !important;
+    body.shell-off .main-content { display: none !important; }
+    body.shell-off .topbar { box-shadow: 0 0 0 1px rgba(99,102,241,0.18) inset !important; }
+    #archSystemMap { display: none; }
+    body.shell-off #archSystemMap {
+        display: flex; flex-direction: column;
+        position: fixed; top: 52px; left: 0; right: 0; bottom: 0;
+        z-index: 8000; background: #050810; overflow: hidden;
+        font-family: 'Inter', sans-serif;
     }
-    body.shell-off .topbar {
-        box-shadow: 0 0 0 1px rgba(99,102,241,0.25) inset !important;
+    #archSystemMap .arch-node {
+        display: inline-flex; align-items: center; gap: 5px;
+        background: #0c1320; border: 1px solid #1e2d3d; border-radius: 6px;
+        padding: 5px 10px; cursor: pointer; font-size: 11px; font-weight: 600;
+        color: #64748b; transition: border-color .15s, color .15s; white-space: nowrap;
     }
-    body.shell-off .page-section.active {
-        box-shadow: 0 0 0 1px rgba(56,100,180,0.25) inset !important;
-        position: relative;
+    #archSystemMap .arch-node:hover { border-color: #2d4a6a; color: #94a3b8; }
+    #archSystemMap .arch-node.sel   { border-color: #3b82f6 !important; color: #93c5fd; }
+    #archSystemMap .arch-node.s-ok   { border-color: #14532d; color: #86efac; }
+    #archSystemMap .arch-node.s-warn { border-color: #78350f; color: #fcd34d; }
+    #archSystemMap .arch-node.s-err  { border-color: #7f1d1d; color: #fca5a5; }
+    #archSystemMap .arch-arrow { color: #1e3a5f; font-size: 13px; padding: 0 4px; user-select: none; }
+    #archSystemMap .arch-layer { margin-bottom: 14px; }
+    #archSystemMap .arch-layer-lbl {
+        font-size: 9px; font-weight: 800; text-transform: uppercase;
+        letter-spacing: .1em; color: #1e2d3d; margin-bottom: 7px;
     }
-    body.shell-off .page-section.active::before {
-        content: attr(id);
-        position: absolute;
-        top: 6px; left: 10px;
-        font-size: 9px; font-weight: 800;
-        letter-spacing: .1em; text-transform: uppercase;
-        color: rgba(99,102,241,0.35);
-        pointer-events: none; z-index: 1;
+    #archSystemMap .arch-layer-nodes { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+    #archSystemMap .arch-chain-item {
+        padding: 7px 10px; border-radius: 6px; border: 1px solid #0f1a2e;
+        cursor: pointer; font-size: 11px; color: #334155;
+        transition: all .15s; white-space: nowrap; margin-bottom: 4px;
     }
-    #archDiagPanel  { display: none; }
-    #archChainPanel { display: none; }
-    body.shell-off #archDiagPanel  { display: block; }
-    body.shell-off #archChainPanel { display: flex; }
+    #archSystemMap .arch-chain-item:hover { border-color: #1e2d3d; color: #475569; }
+    #archSystemMap .arch-chain-item.sel   { border-color: #3b82f6; color: #93c5fd; background: #0c1a30; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script>
@@ -13038,128 +13048,192 @@ function _updBtn(email){
 
 })(); // end CVE v3 IIFE
 </script>
-<!-- ARCHITECTURE MODE OVERLAY (admin only, visible only with body.shell-off) -->
-<div id="archDiagPanel" style="position:fixed;top:52px;right:0;width:260px;height:calc(100vh - 52px - 114px);background:#06090e;border-left:1px solid #141f2e;z-index:7900;overflow-y:auto;padding:12px;font-family:'Inter',sans-serif"></div>
-<div id="archChainPanel" style="position:fixed;bottom:0;left:0;right:0;height:112px;background:#06090e;border-top:1px solid #141f2e;z-index:7900;padding:10px 16px;align-items:center;gap:0;overflow-x:auto;white-space:nowrap"></div>
+<!-- ARCHITECTURE MODE: SYSTEM MAP (admin only, activated by shellToggle) -->
+<div id="archSystemMap">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 16px;border-bottom:1px solid #0a121e;flex-shrink:0">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.1em;color:#1e2d3d;text-transform:uppercase">⬡ Clan Control — Карта системы</div>
+        <div style="display:flex;align-items:center;gap:8px">
+            <button onclick="if(typeof window._archRender==='function')window._archRender()" style="background:none;border:1px solid #0f1a2e;border-radius:4px;color:#334155;font-size:10px;padding:2px 8px;cursor:pointer;font-family:inherit">↻ Обновить</button>
+            <button onclick="shellToggle()" style="background:none;border:1px solid #1e2d3d;border-radius:4px;color:#475569;font-size:10px;padding:2px 8px;cursor:pointer;font-family:inherit">✕ Выйти</button>
+        </div>
+    </div>
+    <div style="display:flex;flex:1;overflow:hidden;min-height:0">
+        <div id="archChainList" style="width:152px;flex-shrink:0;border-right:1px solid #0a121e;overflow-y:auto;padding:12px 8px;display:flex;flex-direction:column;gap:0"></div>
+        <div id="archMapCenter" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:16px 18px"></div>
+        <div id="archNodeDetail" style="width:238px;flex-shrink:0;border-left:1px solid #0a121e;overflow-y:auto;padding:12px"></div>
+    </div>
+    <div id="archChainBar" style="height:96px;flex-shrink:0;border-top:1px solid #0a121e;padding:8px 14px;overflow-x:auto;white-space:nowrap;display:flex;align-items:center;gap:0"></div>
+</div>
 <script>
 (function(){
-function _row(ic,label,detail){
-    return '<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #0c1520;align-items:flex-start">'+
-        '<span style="flex-shrink:0;font-size:11px;margin-top:1px">'+ic+'</span>'+
-        '<div><div style="color:#cbd5e1;font-size:11px;font-weight:600">'+label+'</div>'+
-        (detail?'<div style="color:#475569;font-size:10px;margin-top:1px">'+detail+'</div>':'')+
-        '</div></div>';
-}
-function _step(label,status,note){
-    var bg ={ok:'#0d2818',warn:'#1c1508',error:'#1c0808',idle:'#0c1320'}[status]||'#0c1320';
-    var br ={ok:'#14532d',warn:'#78350f',error:'#7f1d1d',idle:'#1e2d3d'}[status]||'#1e2d3d';
-    var ic ={ok:'🟢',warn:'🟠',error:'🔴',idle:'⚪'}[status]||'⚪';
-    return '<div style="display:inline-flex;flex-direction:column;align-items:center;flex-shrink:0">'+
-        '<div style="background:'+bg+';border:1px solid '+br+';border-radius:6px;padding:5px 9px;font-size:10px;font-weight:700;color:#94a3b8;white-space:pre;text-align:center;line-height:1.5">'+
-        ic+' '+label+
-        (note?'\n<span style="font-size:9px;font-weight:400;color:#475569">'+note+'</span>':'')+
-        '</div></div>';
-}
-function _arr(){
-    return '<span style="flex-shrink:0;color:#1e3a5f;font-size:13px;padding:0 4px;align-self:center">→</span>';
-}
 
-window._archRender = function(){
-    var diag  = document.getElementById('archDiagPanel');
-    var chain = document.getElementById('archChainPanel');
-    if(!diag||!chain) return;
-
-    var d = typeof window._archDiagData==='function' ? window._archDiagData() : {};
-    var email  = window._loginEmail||'';
-    var hasSess= !!email;
-    var hasSB  = !!(window._supabase);
-    var keysOk = d.apiKeysCount > 0;
-    var allExh = keysOk && d.apiKeysExhausted >= d.apiKeysCount;
-
-    // ── DIAG PANEL ──────────────────────
-    var lsIc  = d.lsOk?'🟢':(localStorage.getItem('clanControl_v1')?'🟠':'🔴');
-    var keyIc = !keysOk?'🔴':allExh?'🟠':'🟢';
-    var dayIc = d.dayScreenshotsTotal>0?'🟠':'🟢';
-    var keyDetail = !keysOk?'нет ключей → добавь в Настройках'
-        :allExh?'все '+d.apiKeysCount+' исчерпаны сегодня'
-        :d.apiKeysCount+' ключей · исчерпано: '+d.apiKeysExhausted;
-
-    diag.innerHTML =
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
-        '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#334155">Диагностика</div>'+
-        '<button onclick="if(typeof window._archRender===\'function\')window._archRender()" style="background:none;border:1px solid #1e2d3d;border-radius:4px;color:#475569;font-size:10px;padding:2px 7px;cursor:pointer;font-family:inherit" title="Обновить">↻</button>'+
-        '</div>'+
-        _row(hasSess?'🟢':'🔴', 'Auth',          hasSess?email:'нет сессии')+
-        _row(lsIc,               'localStorage',  d.lsOk?'ростер '+d.rosterCount+' · снапшотов '+d.snapCount:'нет данных')+
-        _row(hasSB?'🟢':'🔴',   'Supabase',      hasSB?'клиент готов':'клиент не найден')+
-        _row(keyIc,              'OpenRouter key', keyDetail)+
-        _row('⚪',               'Страница',      'page-'+d.activePage)+
-        _row(dayIc,              'dayScreenshots', d.dayScreenshotsTotal>0?d.dayScreenshotsTotal+' шт в памяти (не сохранены!)':'нет незафиксированных')+
-        '<div style="margin-top:10px;padding:8px;background:#0c1320;border-radius:6px;border:1px solid #141f2e;font-size:10px;color:#475569;line-height:1.8">'+
-        '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#334155;margin-bottom:4px">Состояние данных</div>'+
-        'Ростер: <b style="color:#64748b">'+d.rosterCount+'</b><br>'+
-        'Архив: <b style="color:#64748b">'+d.archiveCount+'</b><br>'+
-        'Паки: <b style="color:#64748b">'+d.packsCount+'</b><br>'+
-        'КМ снапшоты: <b style="color:#64748b">'+d.snapCount+'</b>'+
-        (d.snapDatesRecent&&d.snapDatesRecent.length?'<br><span style="color:#334155;font-size:9px">'+d.snapDatesRecent.join(' · ')+'</span>':'')+
-        '</div>';
-
-    // ── CHAIN PANEL ──────────────────────
-    var ap = d.activePage;
-    var steps;
-    if(ap==='calendar'){
-        steps=[
-            {l:'Вход',               s:hasSess?'ok':'error',             n:hasSess?email.split('@')[0]:'нет'},
-            {l:'showPage\ncalendar', s:'ok',                             n:''},
-            {l:'renderCalendar',     s:'ok',                             n:''},
-            {l:'dayScreenshots',     s:d.dayScreenshotsTotal>0?'warn':'idle', n:d.dayScreenshotsTotal>0?d.dayScreenshotsTotal+' шт':'0'},
-            {l:'API ключ',           s:!keysOk?'error':allExh?'warn':'ok', n:''},
-            {l:'анализ',             s:'idle',                           n:''},
-            {l:'apply',              s:d.snapCount>0?'ok':'idle',        n:d.snapCount>0?d.snapCount+' дней':'0'},
-            {l:'каскад\nростер/стат/история', s:d.rosterCount>0?'ok':'idle', n:'дашборд — вручную'}
-        ];
-    } else if(ap==='roster'){
-        steps=[
-            {l:'Вход',             s:hasSess?'ok':'error',        n:''},
-            {l:'showPage\nroster', s:'ok',                        n:''},
-            {l:'renderRoster',     s:d.rosterCount>0?'ok':'warn', n:d.rosterCount+' игроков'},
-            {l:'импорт\nскринов',  s:'idle',                      n:''},
-            {l:'saveToStorage',    s:d.lsOk?'ok':'error',         n:''},
-            {l:'архив',            s:d.archiveCount>0?'ok':'idle', n:d.archiveCount+' записей'}
-        ];
-    } else if(ap==='dashboard'){
-        steps=[
-            {l:'Вход',                s:hasSess?'ok':'error',        n:''},
-            {l:'showPage\ndashboard', s:'ok',                        n:''},
-            {l:'renderDashboard',     s:'ok',                        n:'ленивый: только при nav'},
-            {l:'calcStats',           s:d.snapCount>0?'ok':'warn',   n:d.snapCount+' снапш.'},
-            {l:'ростер',              s:d.rosterCount>0?'ok':'warn', n:d.rosterCount+' игроков'}
-        ];
-    } else if(ap==='stats'){
-        steps=[
-            {l:'Вход',           s:hasSess?'ok':'error',     n:''},
-            {l:'showPage\nstats',s:'ok',                     n:''},
-            {l:'renderStats',    s:'ok',                     n:''},
-            {l:'appliedStats\nByDate',s:d.snapCount>0?'ok':'warn',n:d.snapCount+' дней'},
-            {l:'фильтр\nпо паку',s:'idle',                  n:''}
-        ];
-    } else {
-        steps=[
-            {l:'Вход',            s:hasSess?'ok':'error',  n:''},
-            {l:'showPage\n'+ap,   s:ap!=='—'?'ok':'warn',  n:''},
-            {l:'render',          s:'idle',                n:''},
-            {l:'localStorage',    s:d.lsOk?'ok':'error',  n:''}
-        ];
-    }
-
-    var html='<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#334155;flex-shrink:0;margin-right:14px;line-height:1.7">Цепочка<br><span style="color:#1e3a5f;font-weight:400;text-transform:none">'+ap+'</span></div>';
-    for(var i=0;i<steps.length;i++){
-        var s=steps[i];
-        html+=_step(s.l,s.s,s.n);
-        if(i<steps.length-1) html+=_arr();
-    }
-    chain.innerHTML=html;
+var _N = {
+  auth:         { label:'Auth форма',     icon:'🔐', desc:'email+password вход/регистрация. signInWithPassword / signUp через Supabase Auth.',             layer:0 },
+  supabase_auth:{ label:'Supabase Auth',  icon:'☁️', desc:'Supabase Auth service. Хранит сессию в localStorage. window._supabase.auth.',                  layer:0 },
+  profiles:     { label:'profiles',       icon:'🗃️', desc:'Supabase таблица profiles. Создаётся при первом входе. Поля: email, display_name.',              layer:1 },
+  basa_init:    { label:'basa_init',      icon:'⚙️', desc:'DOMContentLoaded → проверяет сессию → showPage. Читает app_settings из Supabase.',              layer:1 },
+  supabase_db:  { label:'app_settings',   icon:'🗄️', desc:'Supabase таблица app_settings (key-value JSONB). Хранит: cve_config, admin_bg.',                layer:1 },
+  ls:           { label:'localStorage',   icon:'💾', desc:'clanControl_v1. Ключи: roster, archive, packs, appliedStatsByDate.',                            layer:2 },
+  openrouter:   { label:'OpenRouter',     icon:'🔑', desc:'API ключи из настроек. Ротация getNextApiKey() / markCurrentKeyExhausted(). exhaustedKeys in-memory.', layer:2 },
+  km_cal:       { label:'Календарь КМ',   icon:'📅', desc:'#page-calendar. renderCalendar(). Сетка дней. Точка входа в поток КМ-анализа.',                 layer:2 },
+  roster_page:  { label:'Ростер',         icon:'👥', desc:'#page-roster. renderRoster(). Читает roster из localStorage.',                                  layer:2 },
+  dashboard:    { label:'Дашборд',        icon:'📊', desc:'#page-dashboard. renderDashboard(). Агрегирует roster + appliedStatsByDate.',                   layer:2 },
+  stats_page:   { label:'Статистика',     icon:'📈', desc:'#page-stats. renderStats(). Читает appliedStatsByDate, фильтр по паку.',                        layer:2 },
+  archive_page: { label:'Архив',          icon:'🗂️', desc:'#page-archive. renderArchive(). Читает archive из localStorage.',                              layer:2 },
+  packs_page:   { label:'Паки',           icon:'📦', desc:'#page-packs. renderPacks(). Читает packs из localStorage.',                                    layer:2 },
+  profile_page: { label:'Профиль',        icon:'👤', desc:'#page-profile. Данные текущего пользователя из Supabase profiles.',                            layer:2 },
+  day_shots:    { label:'dayScreenshots', icon:'📸', desc:'In-memory Map(). Скрины дня до анализа. НЕ сохраняются. Сбрасываются при перезагрузке.',        layer:3 },
+  clan_import:  { label:'Clan Import',    icon:'📋', desc:'Парсинг скриншота клана. Обновляет roster. Сохраняет в localStorage.',                          layer:3 },
+  analysis:     { label:'sendToAI()',     icon:'🤖', desc:'Отправляет скрин в OpenRouter (Gemini). Получает структурированный JSON статов.',               layer:3 },
+  apply:        { label:'applyStats()',   icon:'✅', desc:'Применяет результат анализа к appliedStatsByDate[date]. Сохраняет в localStorage.',             layer:3 },
+  gemini:       { label:'Gemini',         icon:'✨', desc:'gemini-2.0-flash через OpenRouter. Получает base64 изображение + промпт.',                      layer:4 }
 };
+
+var _C = [
+  { id:'auth',    label:'Авторизация', nodes:['auth','supabase_auth','profiles','basa_init'] },
+  { id:'config',  label:'Конфиг',      nodes:['basa_init','supabase_db'] },
+  { id:'km',      label:'КМ-анализ',   nodes:['km_cal','day_shots','analysis','openrouter','gemini','apply','ls'] },
+  { id:'roster',  label:'Ростер',      nodes:['roster_page','clan_import','ls'] },
+  { id:'stats',   label:'Статистика',  nodes:['stats_page','ls'] },
+  { id:'dash',    label:'Дашборд',     nodes:['dashboard','ls'] },
+  { id:'archive', label:'Архив/Паки',  nodes:['archive_page','packs_page','ls'] }
+];
+
+var _BG  = { ok:'#0d2818', warn:'#1c1508', error:'#1c0808', idle:'#0c1320' };
+var _BR  = { ok:'#14532d', warn:'#78350f', error:'#7f1d1d', idle:'#1e2d3d' };
+var _CLR = { ok:'#86efac', warn:'#fbbf24', error:'#f87171', idle:'#475569' };
+var _IC  = { ok:'🟢',      warn:'🟠',      error:'🔴',      idle:'⚪' };
+
+var _activeChain = null;
+
+function _st(nid, d) {
+  d = d || {};
+  var hasSess = !!(window._loginEmail);
+  var hasSB   = !!(window._supabase);
+  var keys    = d.apiKeysCount || 0;
+  var exh     = d.apiKeysExhausted || 0;
+  switch(nid) {
+    case 'auth':          return hasSess ? 'ok' : 'idle';
+    case 'supabase_auth': return hasSB ? (hasSess ? 'ok' : 'warn') : 'error';
+    case 'profiles':      return hasSess ? 'ok' : 'idle';
+    case 'basa_init':     return hasSB ? 'ok' : 'warn';
+    case 'supabase_db':   return hasSB ? 'ok' : 'warn';
+    case 'ls':            return d.lsOk ? 'ok' : (localStorage.getItem('clanControl_v1') ? 'warn' : 'error');
+    case 'openrouter':    return keys === 0 ? 'error' : (exh >= keys ? 'warn' : 'ok');
+    case 'gemini':        return (keys > 0 && exh < keys) ? 'ok' : 'idle';
+    case 'day_shots':     return (d.dayScreenshotsTotal || 0) > 0 ? 'warn' : 'idle';
+    case 'apply':         return (d.snapCount || 0) > 0 ? 'ok' : 'idle';
+    case 'clan_import':   return (d.rosterCount || 0) > 0 ? 'ok' : 'idle';
+    case 'stats_page':    return (d.snapCount || 0) > 0 ? 'ok' : 'idle';
+    case 'archive_page':  return (d.archiveCount || 0) > 0 ? 'ok' : 'idle';
+    case 'packs_page':    return (d.packsCount || 0) > 0 ? 'ok' : 'idle';
+    case 'profile_page':  return hasSess ? 'ok' : 'idle';
+    default:              return 'ok';
+  }
+}
+
+window._archSN = function(nid) {
+  var panel = document.getElementById('archNodeDetail');
+  if (!panel) return;
+  var n = _N[nid]; if (!n) return;
+  var d = typeof window._archDiagData === 'function' ? window._archDiagData() : {};
+  var s = _st(nid, d);
+  var extra = '';
+  if (nid === 'ls')              extra = 'roster: '+(d.rosterCount||0)+' · archive: '+(d.archiveCount||0)+' · packs: '+(d.packsCount||0)+' · snapshots: '+(d.snapCount||0);
+  else if (nid === 'openrouter') extra = (d.apiKeysCount||0)+' ключей, исчерпано: '+(d.apiKeysExhausted||0);
+  else if (nid === 'day_shots')  extra = (d.dayScreenshotsTotal||0)+' шт в памяти';
+  else if (nid === 'apply')      extra = 'snapshots: '+(d.snapCount||0)+(d.snapDatesRecent&&d.snapDatesRecent.length?' · '+d.snapDatesRecent.slice(0,3).join(' · '):'');
+  else if (nid === 'auth' || nid === 'supabase_auth' || nid === 'profiles') extra = window._loginEmail ? 'сессия: '+window._loginEmail : 'нет сессии';
+  var inChains = _C.filter(function(c){ return c.nodes.indexOf(nid) !== -1; }).map(function(c){ return c.label; }).join(', ');
+  var stLabel = {ok:'активен', warn:'предупреждение', error:'ошибка', idle:'ожидание'}[s];
+  panel.innerHTML =
+    '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#334155;margin-bottom:10px">Узел</div>'+
+    '<div style="font-size:20px;margin-bottom:4px">'+n.icon+'</div>'+
+    '<div style="font-size:12px;font-weight:700;color:#cbd5e1;margin-bottom:6px">'+n.label+'</div>'+
+    '<div style="display:inline-flex;align-items:center;gap:4px;background:'+_BG[s]+';border:1px solid '+_BR[s]+';border-radius:4px;padding:2px 8px;font-size:10px;color:'+_CLR[s]+';margin-bottom:10px">'+_IC[s]+' '+stLabel+'</div>'+
+    '<div style="font-size:10px;color:#64748b;line-height:1.6;margin-bottom:10px">'+n.desc+'</div>'+
+    (extra?'<div style="font-size:10px;color:#334155;background:#0c1520;border:1px solid #141f2e;border-radius:4px;padding:6px 8px;margin-bottom:10px;line-height:1.6">'+extra+'</div>':'')+
+    (inChains?'<div style="font-size:9px;color:#334155">Цепочки: <span style="color:#475569">'+inChains+'</span></div>':'');
+};
+
+window._archSC = function(cid) {
+  _activeChain = cid;
+  var bar = document.getElementById('archChainBar');
+  if (!bar) return;
+  var c = _C.filter(function(x){ return x.id === cid; })[0]; if (!c) return;
+  var d = typeof window._archDiagData === 'function' ? window._archDiagData() : {};
+  var html = '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#334155;margin-right:14px;flex-shrink:0;align-self:center">'+c.label+'</div>';
+  for (var i = 0; i < c.nodes.length; i++) {
+    var nid = c.nodes[i]; var n = _N[nid]; if (!n) continue;
+    var s = _st(nid, d);
+    html += '<div onclick="window._archSN(\''+nid+'\')" style="cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;flex-shrink:0;background:'+_BG[s]+';border:1px solid '+_BR[s]+';border-radius:6px;padding:6px 10px;font-size:10px;color:'+_CLR[s]+';text-align:center;min-width:60px;max-width:80px;line-height:1.4">'+
+      '<span style="font-size:13px">'+n.icon+'</span>'+
+      '<span style="font-weight:700;margin-top:2px">'+_IC[s]+'</span>'+
+      '<span style="font-size:9px;color:#94a3b8;margin-top:1px">'+n.label+'</span>'+
+      '</div>';
+    if (i < c.nodes.length - 1) html += '<span style="color:#1e3a5f;font-size:16px;padding:0 4px;align-self:center;flex-shrink:0">→</span>';
+  }
+  bar.innerHTML = html;
+  document.querySelectorAll('.arch-node').forEach(function(el){
+    el.style.opacity = c.nodes.indexOf(el.dataset.nid) !== -1 ? '1' : '0.35';
+  });
+};
+
+window._archRender = function() {
+  var chainList  = document.getElementById('archChainList');
+  var mapCenter  = document.getElementById('archMapCenter');
+  var nodeDetail = document.getElementById('archNodeDetail');
+  var chainBar   = document.getElementById('archChainBar');
+  if (!chainList || !mapCenter) return;
+  var d = typeof window._archDiagData === 'function' ? window._archDiagData() : {};
+
+  // chain list
+  var clHtml = '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#1e2d3d;margin-bottom:8px;padding:0 4px">Цепочки</div>';
+  _C.forEach(function(c) {
+    var active = (_activeChain === c.id);
+    var ns = c.nodes.map(function(nid){ return _st(nid,d); });
+    var ic = ns.indexOf('error')!==-1?'🔴':ns.indexOf('warn')!==-1?'🟠':'🟢';
+    clHtml += '<div onclick="window._archSC(\''+c.id+'\')" style="cursor:pointer;padding:6px 8px;margin-bottom:2px;border-radius:5px;border:1px solid '+(active?'#1e3a5f':'#0a121e')+';background:'+(active?'#0a1628':'transparent')+';color:'+(active?'#93c5fd':'#475569')+';font-size:10px;font-weight:'+(active?'700':'400')+';display:flex;align-items:center;gap:5px">'+ic+' '+c.label+'</div>';
+  });
+  chainList.innerHTML = clHtml;
+
+  // map center
+  var layers = [
+    { title:'Вход / Auth',     ids:['auth','supabase_auth'] },
+    { title:'Инициализация',   ids:['profiles','basa_init','supabase_db'] },
+    { title:'Хранение',        ids:['ls','openrouter'] },
+    { title:'Страницы',        ids:['km_cal','roster_page','dashboard','stats_page','archive_page','packs_page','profile_page'] },
+    { title:'Обработка',       ids:['day_shots','clan_import','analysis','apply'] },
+    { title:'Внешние сервисы', ids:['gemini'] }
+  ];
+  var activeNodes = _activeChain ? (_C.filter(function(c){ return c.id===_activeChain; })[0]||{nodes:[]}).nodes : [];
+  var mHtml = '';
+  layers.forEach(function(layer) {
+    mHtml += '<div style="margin-bottom:14px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#1e2d3d;margin-bottom:6px;padding-left:2px">'+layer.title+'</div><div style="display:flex;flex-wrap:wrap;gap:6px">';
+    layer.ids.forEach(function(nid) {
+      var n = _N[nid]; if (!n) return;
+      var s = _st(nid,d);
+      var dim = activeNodes.length > 0 && activeNodes.indexOf(nid) === -1;
+      mHtml += '<div class="arch-node" data-nid="'+nid+'" onclick="window._archSN(\''+nid+'\')" style="cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;background:'+_BG[s]+';border:1px solid '+_BR[s]+';border-radius:7px;padding:8px 10px;min-width:72px;text-align:center;opacity:'+(dim?'0.3':'1')+';transition:opacity .15s">'+
+        '<span style="font-size:16px">'+n.icon+'</span>'+
+        '<span style="font-size:10px;font-weight:700;color:'+_CLR[s]+';margin-top:3px">'+_IC[s]+'</span>'+
+        '<span style="font-size:9px;color:#94a3b8;margin-top:2px;line-height:1.3">'+n.label+'</span>'+
+        '</div>';
+    });
+    mHtml += '</div></div>';
+  });
+  mapCenter.innerHTML = mHtml;
+
+  // defaults
+  if (nodeDetail && !nodeDetail.innerHTML.trim()) {
+    nodeDetail.innerHTML = '<div style="font-size:9px;color:#1e2d3d;padding:8px 0">← Нажми узел</div>';
+  }
+  if (chainBar) {
+    if (_activeChain) window._archSC(_activeChain);
+    else chainBar.innerHTML = '<div style="font-size:9px;color:#1e2d3d">← Выбери цепочку</div>';
+  }
+};
+
 })();
 </script>
 </body>
