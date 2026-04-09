@@ -2971,6 +2971,10 @@
         min-height: auto !important;
     }
     </style>
+    <style id="shell-off-layer">
+    /* shell-off: admin mode — hides sidebar for clean content view */
+    body.shell-off .sidebar { display: none !important; }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script>
     // Initialize Supabase client early so it's available to auth module
@@ -3078,6 +3082,7 @@
             <span class="topbar-user-email" id="topbarEmail">—</span>
         </div>
         <button id="ccAdminBtn" onclick="cveToggle()" title="Редактировать календарь" style="display:none;width:34px;height:34px;border-radius:9px;border:1px solid rgba(201,168,76,0.35);background:rgba(201,168,76,0.08);color:#e8c97a;font-size:15px;cursor:pointer;transition:all .2s;flex-shrink:0">✏️</button>
+        <button id="shellToggleBtn" onclick="shellToggle()" title="Убрать оболочку" style="display:none;padding:0 10px;height:34px;border-radius:9px;border:1px solid rgba(120,160,255,0.35);background:rgba(120,160,255,0.08);color:rgba(140,185,255,0.85);font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;flex-shrink:0;white-space:nowrap">Оболочка</button>
         <div class="topbar-icon-btn" onclick="loginLogout()" title="Выйти" style="color:#475569">🚪</div>
     </div>
 </div>
@@ -12015,6 +12020,15 @@ function getClass2IconByClass3(c3) {
             var _ab = document.getElementById('ccAdminBtn');
             if (_ab) _ab.style.display = 'none';
             if(typeof cveClose==="function")cveClose();
+            var _sb = document.getElementById('shellToggleBtn');
+            if (_sb) _sb.style.display = 'none';
+            document.body.classList.remove('shell-off');
+        };
+
+        window.shellToggle = function() {
+            var isOff = document.body.classList.toggle('shell-off');
+            var btn = document.getElementById('shellToggleBtn');
+            if (btn) btn.textContent = isOff ? 'Без оболочки' : 'Оболочка';
         };
 
         function _showApp(email, clan) {
@@ -12034,7 +12048,10 @@ function getClass2IconByClass3(c3) {
             if (typeof _basaInit === 'function') _basaInit();
             // show/hide admin btn
             var _ab = document.getElementById('ccAdminBtn');
-            if (_ab) _ab.style.display = (email && email.trim().toLowerCase() === 'pivo.news@gmail.com') ? '' : 'none';
+            var _isAdmin = !!(email && email.trim().toLowerCase() === 'pivo.news@gmail.com');
+            if (_ab) _ab.style.display = _isAdmin ? '' : 'none';
+            var _sb = document.getElementById('shellToggleBtn');
+            if (_sb) _sb.style.display = _isAdmin ? '' : 'none';
         }
 
         function _showLoginScreen() {
@@ -12858,6 +12875,8 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape'&&_active)cve
 function _updBtn(email){
   var btn=_g('ccAdminBtn');if(!btn)return;
   btn.style.display=(email||'').trim().toLowerCase()===CVE_EMAIL.toLowerCase()?'':'none';
+  var stb=_g('shellToggleBtn');
+  if(stb)stb.style.display=btn.style.display;
 }
 
 // ── Auto-apply on load ────────────────────────────────────────
