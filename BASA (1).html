@@ -13240,7 +13240,7 @@ window._archRender = function() {
 <!-- =============================================
      DEV-ONLY: IN-PAGE INSPECT OVERLAY
      Активируется только когда localStorage.__devInspect === '1'
-     или при нажатии Ctrl+Shift+D.
+     или при нажатии Alt+Shift+I.
      Не влияет на prod-пользователей.
 ============================================= -->
 <script>
@@ -13424,9 +13424,9 @@ window._archRender = function() {
     else           { startInspect(); localStorage.setItem(STORAGE_KEY,'1'); }
   });
 
-  // ── Ctrl+Shift+D — клавиатурный ярлык ──
+  // ── Alt+Shift+I — клавиатурный ярлык ──
   document.addEventListener('keydown', function(e){
-    if (e.ctrlKey && e.shiftKey && e.key === 'D'){
+    if (e.altKey && e.shiftKey && e.key === 'I'){
       e.preventDefault();
       toggleBtn.click();
     }
