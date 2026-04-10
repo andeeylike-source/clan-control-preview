@@ -11451,8 +11451,8 @@ function getClass2IconByClass3(c3) {
             renderCalendar();
             renderPacks();
             renderRoster();
-            // Синхронизируем статистику ростера из снапшотов при старте
-            syncRosterStatsFromSnapshots();
+            // Defer roster stats sync so browser can paint the UI first
+            setTimeout(syncRosterStatsFromSnapshots, 0);
 
             // Debounce на поиск по ростеру
             const rosterInput = document.getElementById('rosterSearchInput');
