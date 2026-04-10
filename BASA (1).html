@@ -52,12 +52,13 @@
       }catch(e){}
     })();
     </script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Non-blocking Google Fonts: preconnect + stylesheet link (replaces render-blocking @import) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap">
+    <!-- defer: downloads in parallel, executes after HTML is parsed, does not block first paint -->
+    <script defer src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
-
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
-
         /* =============================================
            CSS ПЕРЕМЕННЫЕ
         ============================================= */
@@ -3056,16 +3057,18 @@
     #archSystemMap .arch-chain-item:hover { border-color: #1e2d3d; color: #475569; }
     #archSystemMap .arch-chain-item.sel   { border-color: #3b82f6; color: #93c5fd; background: #0c1a30; }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <!-- defer: ~950 KB UMD bundle downloads in parallel, executes after HTML parsed, not blocking first paint -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" id="supabase-sdk"></script>
     <script>
-    // Initialize Supabase client early so it's available to auth module
+    // Supabase init: runs on DOMContentLoaded, which fires after all defer scripts have executed,
+    // so `supabase` global is guaranteed to be defined by this point.
     window._supabaseReady = false;
-    document.addEventListener('DOMContentLoaded', function() {});
-    // Supabase client created after SDK loads
-    window._supabase = supabase.createClient(
-        'https://sluqteqisrkdsmcsydlv.supabase.co',
-        'sb_publishable_zCt0JfMRJBW8ao4lNO6mPw_o0ntK-Se'
-    );
+    document.addEventListener('DOMContentLoaded', function() {
+        window._supabase = supabase.createClient(
+            'https://sluqteqisrkdsmcsydlv.supabase.co',
+            'sb_publishable_zCt0JfMRJBW8ao4lNO6mPw_o0ntK-Se'
+        );
+    });
     </script>
 </head>
 <body>
