@@ -13475,7 +13475,9 @@ var _N = {
   packs_page:   { label:'Паки',           icon:'📦', desc:'#page-packs. renderPacks(). Читает packs из localStorage.',                                    layer:2 },
   profile_page: { label:'Профиль',        icon:'👤', desc:'#page-profile. Данные текущего пользователя из Supabase profiles.',                            layer:2 },
   day_shots:    { label:'dayScreenshots', icon:'📸', desc:'In-memory Map(). Скрины дня до анализа. НЕ сохраняются. Сбрасываются при перезагрузке.',        layer:3 },
-  clan_import:  { label:'Clan Import',    icon:'📋', desc:'Парсинг скриншота клана. Обновляет roster. Сохраняет в localStorage.',                          layer:3 },
+  clan_import:  { label:'Clan Import',    icon:'📋', desc:'Энтрипоинт импорта клана. #clanImportLabel → file input → handleClanScreenshots(). Capability gate: Pro / admin+pro.', layer:3 },
+  clan_api:     { label:'Clan API/Gemini',icon:'🤖', desc:'handleClanScreenshots → OpenRouter → gemini-2.0-flash-lite. Отправляет base64 скриншот, получает JSON игроков {name, prof_ru, level, online}.', layer:3 },
+  clan_apply:   { label:'→ Добавить в клан', icon:'➕', desc:'confirmClanImport() — добавляет новых игроков в roster. assignProfaFromImport() — назначает профу. saveToStorage(). Capability gate: Pro / admin+pro.', layer:3 },
   analysis:     { label:'sendToAI()',     icon:'🤖', desc:'Отправляет скрин в OpenRouter (Gemini). Получает структурированный JSON статов.',               layer:3 },
   apply:        { label:'applyStats()',   icon:'✅', desc:'Применяет результат анализа к appliedStatsByDate[date]. Сохраняет в localStorage.',             layer:3 },
   gemini:       { label:'Gemini',         icon:'✨', desc:'gemini-2.0-flash через OpenRouter. Получает base64 изображение + промпт.',                      layer:4 },
@@ -13486,7 +13488,7 @@ var _C = [
   { id:'auth',    label:'Авторизация', nodes:['auth','supabase_auth','profiles','basa_init'] },
   { id:'config',  label:'Конфиг',      nodes:['basa_init','supabase_db'] },
   { id:'km',      label:'КМ-анализ',   nodes:['km_cal','day_shots','analysis','openrouter','gemini','apply','ls'] },
-  { id:'roster',  label:'Ростер',      nodes:['roster_page','clan_import','ls'] },
+  { id:'roster',  label:'Ростер',      nodes:['roster_page','clan_import','clan_api','gemini','clan_apply','ls'] },
   { id:'stats',   label:'Статистика',  nodes:['stats_page','ls'] },
   { id:'dash',    label:'Дашборд',     nodes:['dashboard','ls'] },
   { id:'archive', label:'Архив/Паки',  nodes:['archive_page','packs_page','ls'] },
@@ -13518,6 +13520,8 @@ function _st(nid, d) {
     case 'day_shots':     return (d.dayScreenshotsTotal || 0) > 0 ? 'warn' : 'idle';
     case 'apply':         return (d.snapCount || 0) > 0 ? 'ok' : 'idle';
     case 'clan_import':   return (d.rosterCount || 0) > 0 ? 'ok' : 'idle';
+    case 'clan_api':      return (keys > 0 && exh < keys) ? 'ok' : (keys === 0 ? 'error' : 'warn');
+    case 'clan_apply':    return (d.rosterCount || 0) > 0 ? 'ok' : 'idle';
     case 'stats_page':    return (d.snapCount || 0) > 0 ? 'ok' : 'idle';
     case 'archive_page':  return (d.archiveCount || 0) > 0 ? 'ok' : 'idle';
     case 'packs_page':    return (d.packsCount || 0) > 0 ? 'ok' : 'idle';
@@ -13611,7 +13615,8 @@ window._archRender = function() {
     { title:'Инициализация',   ids:['profiles','basa_init','supabase_db'] },
     { title:'Хранение',        ids:['ls','openrouter'] },
     { title:'Страницы',        ids:['km_cal','roster_page','dashboard','stats_page','archive_page','packs_page','profile_page','users_mgr'] },
-    { title:'Обработка',       ids:['day_shots','clan_import','analysis','apply'] },
+    { title:'Обработка (КМ)',   ids:['day_shots','analysis','apply'] },
+    { title:'Импорт клана',    ids:['clan_import','clan_api','clan_apply'] },
     { title:'Внешние сервисы', ids:['gemini'] }
   ];
   var activeNodes = _activeChain ? (_C.filter(function(c){ return c.id===_activeChain; })[0]||{nodes:[]}).nodes : [];
