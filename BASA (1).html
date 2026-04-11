@@ -9956,12 +9956,19 @@ function getClass2IconByClass3(c3) {
                     valueWeights
                 };
                 localStorage.setItem(LS_KEY, JSON.stringify(data));
+                if (window._currentUserId && window._supabase) {
+                    window._supabase.from('user_app_data').upsert(
+                        { user_id: window._currentUserId, data: data, updated_at: new Date().toISOString() },
+                        { onConflict: 'user_id' }
+                    ).then(function(r) { if (r.error) console.warn('Supabase save error:', r.error); });
+                }
             } catch(e) {
                 console.warn('localStorage save failed:', e);
             }
         }
 
         function loadFromStorage() {
+            if (window._appDataReady) return true; // data already loaded from Supabase — skip localStorage
             try {
                 const raw = localStorage.getItem(LS_KEY);
                 if (!raw) return false;
@@ -9984,6 +9991,47 @@ function getClass2IconByClass3(c3) {
                 console.warn('localStorage load failed:', e);
                 return false;
             }
+        }
+
+        // Applies a data blob to all global state variables (shared by Supabase loader and localStorage).
+        function _applyAppData(data) {
+            if (!data) return false;
+            if (data.roster)             roster             = data.roster;
+            if (data.archive)            archive            = data.archive;
+            if (data.packs)              packs              = data.packs;
+            if (data.manualEvents)       manualEvents       = data.manualEvents;
+            if (data.eventStatuses)      eventStatuses      = data.eventStatuses;
+            if (data.eventOverrides)     eventOverrides     = data.eventOverrides;
+            if (data.kmStats)            kmStats            = data.kmStats;
+            if (data.nickAliases)        nickAliases        = data.nickAliases;
+            if (data.exhaustedKeys)      exhaustedKeys      = data.exhaustedKeys;
+            if (data.appliedStatsByDate) appliedStatsByDate = data.appliedStatsByDate;
+            if (data.playerNotes)        playerNotes        = data.playerNotes;
+            if (data.playerProfaByDate)  playerProfaByDate  = data.playerProfaByDate;
+            if (data.valueWeights)       valueWeights       = data.valueWeights;
+            return true;
+        }
+
+        // Resets all app state to defaults — called on logout to prevent data leaking to the next user.
+        function _resetAppState() {
+            roster             = [{ id: 1, name: "ВИЗАРД", rank: "КЛ", profa: "Bishop", pac: "СОЛО", attendance: 100, kills: 0, deaths: 0, pvp_dmg: 0, pve_dmg: 0 }];
+            archive            = [];
+            packs              = [{ id: 101, name: "ТРИЛЛИОН" }, { id: 102, name: "АРМАТУРА" }];
+            manualEvents       = [];
+            eventStatuses      = {};
+            eventOverrides     = {};
+            kmStats            = {};
+            nickAliases        = {};
+            exhaustedKeys      = {};
+            appliedStatsByDate = {};
+            playerNotes        = {};
+            playerProfaByDate  = {};
+            valueWeights       = {
+                dps:    { presence: 20, classRank: 20, kda: 20, clanRank: 15, pvp: 15, pve: 10 },
+                healer: { presence: 35, classRank: 25, kda: 20, deaths: 20 },
+                tank:   { presence: 30, deaths: 25, classRank: 25, kda: 20 }
+            };
+            window._appDataReady = false;
         }
 
         function exportData() {
@@ -12116,6 +12164,7 @@ function getClass2IconByClass3(c3) {
 
         window.loginLogout = async function() {
             await window._supabase.auth.signOut();
+            _resetAppState();
             window._loginEmail = '';
             window._currentUserId = '';
             _authMode = 'login';
@@ -12202,11 +12251,24 @@ function getClass2IconByClass3(c3) {
         async function _initWithSupabaseUser(user) {
             window._loginEmail = user.email || '';
             window._currentUserId = user.id || '';
+            // Reset first: prevents previous user's data from leaking to a new session.
+            _resetAppState();
             var profile = null;
             try {
                 var res = await window._supabase.from('profiles').select('clan_name').eq('id', user.id).maybeSingle();
                 if (!res.error) profile = res.data;
             } catch(e) { console.warn('profiles read error:', e); }
+
+            // Load user-scoped data from Supabase.
+            // _appDataReady is set to true ONLY when a row is actually found and applied.
+            // If missing or errored, _appDataReady stays false → loadFromStorage() fallback runs.
+            try {
+                var dr = await window._supabase.from('user_app_data').select('data').eq('user_id', user.id).maybeSingle();
+                if (!dr.error && dr.data && dr.data.data) {
+                    _applyAppData(dr.data.data);
+                    window._appDataReady = true;
+                }
+            } catch(e) { console.warn('user_app_data load error:', e); }
 
             if (profile && profile.clan_name) {
                 _showApp(user.email, profile.clan_name);
