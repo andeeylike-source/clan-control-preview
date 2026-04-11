@@ -12351,7 +12351,10 @@ function getClass2IconByClass3(c3) {
                 if (upsertRes.error) throw upsertRes.error;
                 _showApp(user.email, clan);
             } catch(err) {
-                var hint = document.getElementById('loginHintText') || document.querySelector('#loginStep2 .login-hint');
+                console.error('loginFinish failed:', (err && err.message) || err, (err && err.code) || '', err);
+                // Primary target: visible .login-hint inside active #loginStep2.
+                // loginHintText lives inside hidden #loginStep1 after step-1 passes, so it is only a last-resort fallback.
+                var hint = document.querySelector('#loginStep2 .login-hint') || document.getElementById('loginHintText');
                 if (hint) { hint.textContent = (err && err.message) || 'Ошибка сохранения'; hint.style.color = '#ef4444'; }
             } finally {
                 if (finBtn) { finBtn.disabled = false; finBtn.style.opacity = ''; }
