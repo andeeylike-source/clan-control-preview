@@ -3335,9 +3335,9 @@
                         </span>
                         <input type="text" id="rosterSearchInput" class="input-dark pl-10" placeholder="Поиск по нику..." oninput="renderRoster()">
                     </div>
-                    <label style="display:flex;align-items:center;gap:8px;background:#1e3a5f;color:#60a5fa;border:none;padding:8px 16px;border-radius:10px;cursor:pointer;font-weight:600;font-size:13px;transition:all .2s" onmouseover="this.style.background='#1e4a7f'" onmouseout="this.style.background='#1e3a5f'">
+                    <label id="clanImportLabel" style="display:flex;align-items:center;gap:8px;background:#1e3a5f;color:#60a5fa;border:none;padding:8px 16px;border-radius:10px;cursor:pointer;font-weight:600;font-size:13px;transition:all .2s" onmouseover="if(!this.dataset.blocked)this.style.background='#1e4a7f'" onmouseout="if(!this.dataset.blocked)this.style.background='#1e3a5f'">
                         📸 Импорт из скриншота клана
-                        <input type="file" accept="image/*" multiple style="display:none" onchange="handleClanScreenshots(event)">
+                        <input id="clanImportFileInput" type="file" accept="image/*" multiple style="display:none" onchange="handleClanScreenshots(event)">
                     </label>
                 </div>
                 <!-- Статус и превью -->
@@ -7215,6 +7215,7 @@ function getClass2IconByClass3(c3) {
         }
 
         async function handleClanScreenshots(event) {
+            if (typeof window._cc === 'function' && !window._cc().canUploadScreens) return; // blocked by capability
             const files = Array.from(event.target.files);
             if (files.length === 0) return;
             event.target.value = '';
@@ -12061,6 +12062,25 @@ function getClass2IconByClass3(c3) {
             }
             if (uploadInput) uploadInput.disabled = !cap.canUploadScreens;
             if (proCTA) proCTA.style.display = cap.canUploadScreens ? 'none' : '';
+            // Clan import label gate
+            var clanLbl = document.getElementById('clanImportLabel');
+            var clanFi  = document.getElementById('clanImportFileInput');
+            if (clanLbl) {
+                if (!cap.canUploadScreens) {
+                    clanLbl.dataset.blocked = '1';
+                    clanLbl.style.opacity = '0.4';
+                    clanLbl.style.pointerEvents = 'none';
+                    clanLbl.style.cursor = 'not-allowed';
+                    clanLbl.title = 'Импорт клана доступен на плане Pro';
+                } else {
+                    delete clanLbl.dataset.blocked;
+                    clanLbl.style.opacity = '';
+                    clanLbl.style.pointerEvents = '';
+                    clanLbl.style.cursor = 'pointer';
+                    clanLbl.title = '';
+                }
+            }
+            if (clanFi) clanFi.disabled = !cap.canUploadScreens;
             var navUsers = document.getElementById('nav-users');
             if (navUsers) navUsers.style.display = cap.canManageRoles ? '' : 'none';
             if (typeof window._updateRoleBadge === 'function') window._updateRoleBadge();
