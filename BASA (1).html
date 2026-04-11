@@ -3148,6 +3148,7 @@
     <div class="topbar-right">
         <div class="topbar-clan" id="topbarClan" style="display:none"></div>
         <span id="roleBadge" style="display:none"></span>
+        <button id="adminModeToggle" onclick="window._toggleAdminMode&&window._toggleAdminMode()" style="display:none;font-size:9px;font-weight:800;padding:2px 7px;border-radius:5px;border:1px solid rgba(201,168,76,0.35);background:rgba(201,168,76,0.06);color:#e8c97a;cursor:pointer;white-space:nowrap;flex-shrink:0;letter-spacing:.04em;line-height:18px" title="Тест-режим для admin">▸ TEST</button>
         <button class="flip-toggle" id="themeToggle" type="button" onclick="toggleTheme()" aria-label="Theme" data-state="left">
             <span class="flip-toggle-track"></span>
             <span class="flip-toggle-thumb"></span>
@@ -11945,6 +11946,7 @@ function getClass2IconByClass3(c3) {
         window._currentUserId = '';
         window._userRole = 'free';
         window._testProActive = false; // preview-only test override, resets on logout
+        window._adminTestMode = null;  // admin effective mode: null | 'free' | 'pro'
         window._archProfilesProbe = null; // { count, rlsSuspected, error } — populated async
 
         // Probes profiles count for system map (admin only, fire-and-forget).
@@ -11971,15 +11973,18 @@ function getClass2IconByClass3(c3) {
             var r = window._userRole || 'free';
             // Test override: only upgrades 'free', never degrades admin/pro
             if (r === 'free' && window._testProActive) r = 'pro';
-            var isPro   = r === 'pro'   || r === 'admin';
-            var isAdmin = r === 'admin';
+            // Admin test-mode: simulate free/pro capabilities without changing real role
+            var effR = r;
+            if (r === 'admin' && window._adminTestMode) effR = window._adminTestMode;
+            var isPro   = effR === 'pro' || effR === 'admin';
+            var isAdmin = r === 'admin'; // always real role — admin-only gates never change
             return {
                 canManualInput:           true,    // all roles
-                canUploadScreens:         isPro,   // pro + admin
-                canAutoAnalyze:           isPro,   // pro + admin
-                canManageRoles:           isAdmin, // admin only (P1)
-                canManageGlobalSettings:  isAdmin, // admin only (P1)
-                canAccessForeignUserData: isAdmin, // admin only (P1)
+                canUploadScreens:         isPro,   // pro + admin (affected by test-mode)
+                canAutoAnalyze:           isPro,   // pro + admin (affected by test-mode)
+                canManageRoles:           isAdmin, // admin only — unaffected by test-mode
+                canManageGlobalSettings:  isAdmin, // admin only — unaffected by test-mode
+                canAccessForeignUserData: isAdmin, // admin only — unaffected by test-mode
             };
         };
 
@@ -11989,10 +11994,17 @@ function getClass2IconByClass3(c3) {
             if (!badge) return;
             var r = window._userRole || 'free';
             var isTest = r === 'free' && window._testProActive;
+            var tm = (r === 'admin') ? (window._adminTestMode || null) : null;
             var eff = isTest ? 'pro' : r;
             var label, color, bg, border;
             if (eff === 'admin') {
-                label='Admin'; color='#e8c97a'; bg='rgba(201,168,76,0.15)'; border='rgba(201,168,76,0.4)';
+                if (tm === 'free') {
+                    label='Admin | Free'; color='#94a3b8'; bg='rgba(201,168,76,0.08)'; border='rgba(201,168,76,0.3)';
+                } else if (tm === 'pro') {
+                    label='Admin | Pro'; color='#a5b4fc'; bg='rgba(201,168,76,0.08)'; border='rgba(201,168,76,0.3)';
+                } else {
+                    label='Admin'; color='#e8c97a'; bg='rgba(201,168,76,0.15)'; border='rgba(201,168,76,0.4)';
+                }
             } else if (eff === 'pro') {
                 label = isTest ? 'Pro ✦' : 'Pro';
                 color='#a5b4fc'; bg='rgba(99,102,241,0.15)'; border='rgba(99,102,241,0.4)';
@@ -12003,6 +12015,13 @@ function getClass2IconByClass3(c3) {
             badge.style.cssText = 'display:inline-flex;align-items:center;font-size:10px;font-weight:800;'
                 + 'border-radius:6px;padding:3px 8px;letter-spacing:.05em;white-space:nowrap;flex-shrink:0;'
                 + 'text-transform:uppercase;color:'+color+';background:'+bg+';border:1px solid '+border;
+            // Admin mode toggle button visibility + label
+            var tmBtn = document.getElementById('adminModeToggle');
+            if (tmBtn) {
+                tmBtn.style.display = (r === 'admin') ? '' : 'none';
+                tmBtn.textContent = tm ? ('▸ ' + tm.toUpperCase()) : '▸ TEST';
+                tmBtn.title = tm ? ('Тест-режим: ' + tm + '. Нажми для переключения') : 'Тест-режим для admin: симулировать Free или Pro';
+            }
         };
 
         // Activate test Pro for current session (Free only, preview-safe, no Supabase write).
@@ -12011,6 +12030,15 @@ function getClass2IconByClass3(c3) {
             window._testProActive = true;
             if (typeof window._applyCapabilityGates === 'function') window._applyCapabilityGates();
             if (typeof window._updateRoleBadge === 'function') window._updateRoleBadge();
+        };
+
+        // Toggle admin effective test mode: null → 'free' → 'pro' → null
+        // Only changes user-capability simulation; real role + admin-only zones stay intact.
+        window._toggleAdminMode = function() {
+            if (window._userRole !== 'admin') return;
+            var cur = window._adminTestMode;
+            window._adminTestMode = cur === null ? 'free' : cur === 'free' ? 'pro' : null;
+            if (typeof window._applyCapabilityGates === 'function') window._applyCapabilityGates();
         };
 
         // Apply UI gates that depend on capabilities.
@@ -12368,6 +12396,7 @@ function getClass2IconByClass3(c3) {
             window._currentUserId = '';
             window._userRole = 'free';
             window._testProActive = false; // reset preview test override
+            window._adminTestMode = null;  // reset admin effective mode
             _authMode = 'login';
             var s2 = document.getElementById('loginStep2');
             var d2 = document.getElementById('loginDot2');
