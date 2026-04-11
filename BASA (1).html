@@ -5041,12 +5041,19 @@
             window._supabase.from('profiles').select('id, email, role').order('email', { ascending: true })
                 .then(function(res) {
                     if (res.error) {
+                        window._archProfilesProbe = { count: null, rlsSuspected: false, error: res.error.message || 'unknown' };
                         el.innerHTML = '<div style="color:#ef4444;font-size:13px">❌ ' + (res.error.message || 'Ошибка загрузки') + '</div>';
                         return;
                     }
                     var rows = res.data || [];
-                    if (!rows.length) { el.innerHTML = '<div style="color:#64748b;font-size:13px">Нет зарегистрированных пользователей</div>'; return; }
-                    var html = '<table style="width:100%;border-collapse:collapse;font-size:13px">'
+                    var rlsWarn = rows.length <= 1 && !!window._loginEmail;
+                    window._archProfilesProbe = { count: rows.length, rlsSuspected: rlsWarn, error: null };
+                    if (!rows.length) {
+                        el.innerHTML = '<div style="color:#fbbf24;font-size:12px;background:#1c1508;border:1px solid #78350f;border-radius:6px;padding:8px 12px;margin-bottom:10px">⚠️ Profiles пусты. Вероятно RLS блокирует SELECT. Нужна политика allow admin read all.</div><div style="color:#64748b;font-size:13px">Нет зарегистрированных пользователей</div>';
+                        return;
+                    }
+                    var rlsBanner = rlsWarn ? '<div style="color:#fbbf24;font-size:12px;background:#1c1508;border:1px solid #78350f;border-radius:6px;padding:8px 12px;margin-bottom:12px">⚠️ Загружена только 1 запись — вероятно RLS блокирует SELECT всех профилей. Добавьте политику allow admin select all в Supabase.</div>' : '';
+                    var html = rlsBanner + '<table style="width:100%;border-collapse:collapse;font-size:13px">'
                         + '<thead><tr style="border-bottom:1px solid #1e2530">'
                         + '<th style="text-align:left;padding:8px 12px;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Email</th>'
                         + '<th style="text-align:left;padding:8px 12px;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Роль</th>'
@@ -11659,7 +11666,8 @@ function getClass2IconByClass3(c3) {
                 activePage: (function(){
                     var s = document.querySelector('.page-section.active');
                     return s ? s.id.replace('page-','') : '—';
-                })()
+                })(),
+                profilesProbe: window._archProfilesProbe
             };
         };
     </script>
@@ -11935,6 +11943,23 @@ function getClass2IconByClass3(c3) {
         window._currentUserId = '';
         window._userRole = 'free';
         window._testProActive = false; // preview-only test override, resets on logout
+        window._archProfilesProbe = null; // { count, rlsSuspected, error } — populated async
+
+        // Probes profiles count for system map (admin only, fire-and-forget).
+        window._probeProfilesForAdmin = async function() {
+            if (!window._supabase || window._userRole !== 'admin') return;
+            try {
+                var r = await window._supabase.from('profiles').select('id', { count: 'exact', head: true });
+                var cnt = (r.count !== null && r.count !== undefined) ? r.count : null;
+                window._archProfilesProbe = {
+                    count: cnt,
+                    rlsSuspected: cnt !== null && cnt <= 1,
+                    error: r.error ? (r.error.message || 'unknown') : null
+                };
+            } catch(e) {
+                window._archProfilesProbe = { count: null, rlsSuspected: false, error: String(e) };
+            }
+        };
 
         // ── Centralized capability layer ──────────────────────────
         // Returns current user's capabilities based on effective role.
@@ -12395,6 +12420,7 @@ function getClass2IconByClass3(c3) {
             if (_db) _db.style.display = _isAdmin ? '' : 'none';
             if (!_isAdmin && typeof window._devStop === 'function') window._devStop();
             if (typeof window._applyCapabilityGates === 'function') window._applyCapabilityGates();
+            if (_isAdmin && typeof window._probeProfilesForAdmin === 'function') window._probeProfilesForAdmin();
         }
 
         function _showLoginScreen() {
@@ -13388,7 +13414,8 @@ var _N = {
   clan_import:  { label:'Clan Import',    icon:'📋', desc:'Парсинг скриншота клана. Обновляет roster. Сохраняет в localStorage.',                          layer:3 },
   analysis:     { label:'sendToAI()',     icon:'🤖', desc:'Отправляет скрин в OpenRouter (Gemini). Получает структурированный JSON статов.',               layer:3 },
   apply:        { label:'applyStats()',   icon:'✅', desc:'Применяет результат анализа к appliedStatsByDate[date]. Сохраняет в localStorage.',             layer:3 },
-  gemini:       { label:'Gemini',         icon:'✨', desc:'gemini-2.0-flash через OpenRouter. Получает base64 изображение + промпт.',                      layer:4 }
+  gemini:       { label:'Gemini',         icon:'✨', desc:'gemini-2.0-flash через OpenRouter. Получает base64 изображение + промпт.',                      layer:4 },
+  users_mgr:    { label:'Users manager',  icon:'👮', desc:'Admin-only вкладка Пользователи. SELECT profiles из Supabase. RLS обязателен: allow admin read all.', layer:2 }
 };
 
 var _C = [
@@ -13398,7 +13425,8 @@ var _C = [
   { id:'roster',  label:'Ростер',      nodes:['roster_page','clan_import','ls'] },
   { id:'stats',   label:'Статистика',  nodes:['stats_page','ls'] },
   { id:'dash',    label:'Дашборд',     nodes:['dashboard','ls'] },
-  { id:'archive', label:'Архив/Паки',  nodes:['archive_page','packs_page','ls'] }
+  { id:'archive', label:'Архив/Паки',  nodes:['archive_page','packs_page','ls'] },
+  { id:'users',   label:'Пользователи',nodes:['users_mgr','profiles','supabase_auth'] }
 ];
 
 var _BG  = { ok:'#0d2818', warn:'#1c1508', error:'#1c0808', idle:'#0c1320' };
@@ -13430,6 +13458,14 @@ function _st(nid, d) {
     case 'archive_page':  return (d.archiveCount || 0) > 0 ? 'ok' : 'idle';
     case 'packs_page':    return (d.packsCount || 0) > 0 ? 'ok' : 'idle';
     case 'profile_page':  return hasSess ? 'ok' : 'idle';
+    case 'users_mgr': {
+      if (!hasSess || window._userRole !== 'admin') return 'idle';
+      var _p = window._archProfilesProbe;
+      if (!_p) return 'idle';
+      if (_p.error) return 'error';
+      if (_p.rlsSuspected) return 'warn';
+      return 'ok';
+    }
     default:              return 'ok';
   }
 }
@@ -13446,6 +13482,12 @@ window._archSN = function(nid) {
   else if (nid === 'day_shots')  extra = (d.dayScreenshotsTotal||0)+' шт в памяти';
   else if (nid === 'apply')      extra = 'snapshots: '+(d.snapCount||0)+(d.snapDatesRecent&&d.snapDatesRecent.length?' · '+d.snapDatesRecent.slice(0,3).join(' · '):'');
   else if (nid === 'auth' || nid === 'supabase_auth' || nid === 'profiles') extra = window._loginEmail ? 'сессия: '+window._loginEmail : 'нет сессии';
+  else if (nid === 'users_mgr') {
+    var _p2 = window._archProfilesProbe;
+    if (!_p2) { extra = 'probe не запускался (откройте вкладку Пользователи)'; }
+    else if (_p2.error) { extra = 'ошибка: '+_p2.error; }
+    else { extra = 'profiles: '+(_p2.count !== null ? _p2.count : '?')+(_p2.rlsSuspected ? ' ⚠️ RLS блокирует SELECT' : ' ✓'); }
+  }
   var inChains = _C.filter(function(c){ return c.nodes.indexOf(nid) !== -1; }).map(function(c){ return c.label; }).join(', ');
   var stLabel = {ok:'активен', warn:'предупреждение', error:'ошибка', idle:'ожидание'}[s];
   panel.innerHTML =
@@ -13504,7 +13546,7 @@ window._archRender = function() {
     { title:'Вход / Auth',     ids:['auth','supabase_auth'] },
     { title:'Инициализация',   ids:['profiles','basa_init','supabase_db'] },
     { title:'Хранение',        ids:['ls','openrouter'] },
-    { title:'Страницы',        ids:['km_cal','roster_page','dashboard','stats_page','archive_page','packs_page','profile_page'] },
+    { title:'Страницы',        ids:['km_cal','roster_page','dashboard','stats_page','archive_page','packs_page','profile_page','users_mgr'] },
     { title:'Обработка',       ids:['day_shots','clan_import','analysis','apply'] },
     { title:'Внешние сервисы', ids:['gemini'] }
   ];
