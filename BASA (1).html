@@ -11627,7 +11627,9 @@ function getClass2IconByClass3(c3) {
                     showPage('roster');
                 }
             } else if (hash && document.getElementById('page-' + hash)) {
-                showPage(hash);
+                // users page requires admin; fall back to dashboard for anyone else
+                var safeHash = (hash === 'users' && window._userRole !== 'admin') ? 'dashboard' : hash;
+                try { showPage(safeHash); } catch(e) { showPage('dashboard'); }
             } else {
                 showPage('dashboard');
             }
