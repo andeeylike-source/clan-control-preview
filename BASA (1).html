@@ -11841,6 +11841,7 @@ function getClass2IconByClass3(c3) {
 
         window._loginEmail = '';
         window._currentUserId = '';
+        window._userRole = 'free';
 
         var EYE_ON  = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
         var EYE_OFF = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
@@ -12214,9 +12215,9 @@ function getClass2IconByClass3(c3) {
             if (cb) { if (clan) { cb.textContent = clan; cb.style.display = ''; } else { cb.style.display = 'none'; } }
             window._loginEmail = email;
             if (typeof _basaInit === 'function') _basaInit();
-            // show/hide admin btn
+            // show/hide admin btn — driven by window._userRole set before _showApp is called
+            var _isAdmin = window._userRole === 'admin';
             var _ab = document.getElementById('ccAdminBtn');
-            var _isAdmin = !!(email && email.trim().toLowerCase() === 'pivo.news@gmail.com');
             if (_ab) _ab.style.display = _isAdmin ? '' : 'none';
             var _sb = document.getElementById('shellToggleBtn');
             if (_sb) _sb.style.display = _isAdmin ? '' : 'none';
@@ -12251,12 +12252,14 @@ function getClass2IconByClass3(c3) {
         async function _initWithSupabaseUser(user) {
             window._loginEmail = user.email || '';
             window._currentUserId = user.id || '';
+            window._userRole = 'free';
             // Reset first: prevents previous user's data from leaking to a new session.
             _resetAppState();
             var profile = null;
             try {
-                var res = await window._supabase.from('profiles').select('clan_name').eq('id', user.id).maybeSingle();
+                var res = await window._supabase.from('profiles').select('clan_name, role').eq('id', user.id).maybeSingle();
                 if (!res.error) profile = res.data;
+                if (profile && profile.role) window._userRole = profile.role;
             } catch(e) { console.warn('profiles read error:', e); }
 
             // Load user-scoped data from Supabase.
@@ -12481,7 +12484,7 @@ var _blocksReady=false;
 })();
 
 function _g(id){return document.getElementById(id);}
-function _isAdm(){return(window._loginEmail||'').trim().toLowerCase()===CVE_EMAIL.toLowerCase();}
+function _isAdm(){return window._userRole==='admin';}
 
 // ── IndexedDB helpers for large heroImage ────────────────────
 var _IDB_NAME='cve_hero_store';
@@ -13066,14 +13069,15 @@ function _disable(){
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&_active)cveClose();});
 
 // ── Admin button visibility ───────────────────────────────────
-function _updBtn(email){
+function _updBtn(){
+  var isAdm=window._userRole==='admin';
   var btn=_g('ccAdminBtn');if(!btn)return;
-  btn.style.display=(email||'').trim().toLowerCase()===CVE_EMAIL.toLowerCase()?'':'none';
+  btn.style.display=isAdm?'':'none';
   var stb=_g('shellToggleBtn');
   if(stb)stb.style.display=btn.style.display;
   var db=_g('dev-inspect-toggle');
   if(db)db.style.display=btn.style.display;
-  if(btn.style.display==='none'&&typeof window._devStop==='function')window._devStop();
+  if(!isAdm&&typeof window._devStop==='function')window._devStop();
 }
 
 // ── Auto-apply on load ────────────────────────────────────────
@@ -13166,8 +13170,8 @@ function _updBtn(email){
       muts.forEach(function(m){
         if(m.attributeName==='class'){
           var vis=!tb.classList.contains('hidden');
-          if(vis){setTimeout(function(){_updBtn(window._loginEmail||'');},100);}
-          else{_updBtn('');if(_active)cveClose();}
+          if(vis){setTimeout(function(){_updBtn();},100);}
+          else{_updBtn();if(_active)cveClose();}
         }
       });
     }).observe(tb,{attributes:true});
