@@ -3147,6 +3147,7 @@
     <div class="topbar-logo">⚔️ Clan<span>Control</span></div>
     <div class="topbar-right">
         <div class="topbar-clan" id="topbarClan" style="display:none"></div>
+        <span id="roleBadge" style="display:none"></span>
         <button class="flip-toggle" id="themeToggle" type="button" onclick="toggleTheme()" aria-label="Theme" data-state="left">
             <span class="flip-toggle-track"></span>
             <span class="flip-toggle-thumb"></span>
@@ -3681,6 +3682,11 @@
                 <div style="font-size:11px;color:#64748b">Нажми или перетащи скриншоты (до 25 шт.)</div>
                 <input type="file" id="dayScreenshotUpload" accept="image/*" multiple style="display:none" onchange="handleDayScreenshots(event)">
             </label>
+
+            <!-- Pro CTA (только для Free) -->
+            <div id="proCTA" style="display:none;margin-bottom:8px">
+                <button onclick="window._activateTestPro&&_activateTestPro()" style="width:100%;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid rgba(99,102,241,0.5);background:rgba(99,102,241,0.1);color:#a5b4fc;transition:all .2s" onmouseover="this.style.background='rgba(99,102,241,0.22)'" onmouseout="this.style.background='rgba(99,102,241,0.1)'">⚡ Получить Pro за 0 ₽ — тест</button>
+            </div>
 
             <!-- Превью загруженных скриншотов -->
             <div id="dayScreenshotPreviews" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
@@ -11852,12 +11858,16 @@ function getClass2IconByClass3(c3) {
         window._loginEmail = '';
         window._currentUserId = '';
         window._userRole = 'free';
+        window._testProActive = false; // preview-only test override, resets on logout
 
         // ── Centralized capability layer ──────────────────────────
-        // Returns current user's capabilities based on role.
+        // Returns current user's capabilities based on effective role.
         // Roles inherit: admin ⊃ pro ⊃ free.
+        // _testProActive: preview-only session flag that upgrades Free→Pro for testing.
         window._cc = function() {
             var r = window._userRole || 'free';
+            // Test override: only upgrades 'free', never degrades admin/pro
+            if (r === 'free' && window._testProActive) r = 'pro';
             var isPro   = r === 'pro'   || r === 'admin';
             var isAdmin = r === 'admin';
             return {
@@ -11870,12 +11880,43 @@ function getClass2IconByClass3(c3) {
             };
         };
 
+        // Update role badge in topbar to reflect effective role.
+        window._updateRoleBadge = function() {
+            var badge = document.getElementById('roleBadge');
+            if (!badge) return;
+            var r = window._userRole || 'free';
+            var isTest = r === 'free' && window._testProActive;
+            var eff = isTest ? 'pro' : r;
+            var label, color, bg, border;
+            if (eff === 'admin') {
+                label='Admin'; color='#e8c97a'; bg='rgba(201,168,76,0.15)'; border='rgba(201,168,76,0.4)';
+            } else if (eff === 'pro') {
+                label = isTest ? 'Pro ✦' : 'Pro';
+                color='#a5b4fc'; bg='rgba(99,102,241,0.15)'; border='rgba(99,102,241,0.4)';
+            } else {
+                label='Free'; color='#64748b'; bg='rgba(100,116,139,0.1)'; border='rgba(100,116,139,0.3)';
+            }
+            badge.textContent = label;
+            badge.style.cssText = 'display:inline-flex;align-items:center;font-size:10px;font-weight:800;'
+                + 'border-radius:6px;padding:3px 8px;letter-spacing:.05em;white-space:nowrap;flex-shrink:0;'
+                + 'text-transform:uppercase;color:'+color+';background:'+bg+';border:1px solid '+border;
+        };
+
+        // Activate test Pro for current session (Free only, preview-safe, no Supabase write).
+        window._activateTestPro = function() {
+            if (window._userRole !== 'free') return; // never degrades admin/pro
+            window._testProActive = true;
+            if (typeof window._applyCapabilityGates === 'function') window._applyCapabilityGates();
+            if (typeof window._updateRoleBadge === 'function') window._updateRoleBadge();
+        };
+
         // Apply UI gates that depend on capabilities.
         // Called after role is known (login) and when day modal opens.
         window._applyCapabilityGates = function() {
             var cap = window._cc();
             var dropZone    = document.getElementById('dayDropZone');
             var uploadInput = document.getElementById('dayScreenshotUpload');
+            var proCTA      = document.getElementById('proCTA');
             if (dropZone) {
                 if (!cap.canUploadScreens) {
                     dropZone.style.opacity = '0.4';
@@ -11888,6 +11929,8 @@ function getClass2IconByClass3(c3) {
                 }
             }
             if (uploadInput) uploadInput.disabled = !cap.canUploadScreens;
+            if (proCTA) proCTA.style.display = cap.canUploadScreens ? 'none' : '';
+            if (typeof window._updateRoleBadge === 'function') window._updateRoleBadge();
         };
 
         var EYE_ON  = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
@@ -12215,6 +12258,8 @@ function getClass2IconByClass3(c3) {
             _resetAppState();
             window._loginEmail = '';
             window._currentUserId = '';
+            window._userRole = 'free';
+            window._testProActive = false; // reset preview test override
             _authMode = 'login';
             var s2 = document.getElementById('loginStep2');
             var d2 = document.getElementById('loginDot2');
