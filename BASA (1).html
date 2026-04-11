@@ -4201,6 +4201,7 @@
             pendingOverrides = Object.assign({}, eventOverrides);
 
             renderDayEventsList(dateStr);
+            if (typeof window._applyCapabilityGates === 'function') window._applyCapabilityGates();
             document.getElementById('dayModal').style.display = 'flex';
         }
 
@@ -7531,6 +7532,11 @@ function getClass2IconByClass3(c3) {
         }
 
         function handleDayScreenshots(event) {
+            if (typeof window._cc === 'function' && !window._cc().canUploadScreens) {
+                if (event.target) event.target.value = '';
+                setDayStatus('error', '❌ Загрузка скриншотов доступна только на плане Pro.');
+                return;
+            }
             const files = Array.from(event.target.files);
             event.target.value = '';
             if (!files.length) return;
@@ -7828,6 +7834,10 @@ function getClass2IconByClass3(c3) {
         }
 
         async function analyzeDayScreenshots() {
+            if (typeof window._cc === 'function' && !window._cc().canAutoAnalyze) {
+                setDayStatus('error', '❌ AI-анализ доступен только на плане Pro.');
+                return;
+            }
             document.getElementById('similarNicksOverlay')?.remove();
             document.getElementById('dupesOverlay')?.remove();
             const dateStr = activeDayDate;
@@ -11843,6 +11853,43 @@ function getClass2IconByClass3(c3) {
         window._currentUserId = '';
         window._userRole = 'free';
 
+        // ── Centralized capability layer ──────────────────────────
+        // Returns current user's capabilities based on role.
+        // Roles inherit: admin ⊃ pro ⊃ free.
+        window._cc = function() {
+            var r = window._userRole || 'free';
+            var isPro   = r === 'pro'   || r === 'admin';
+            var isAdmin = r === 'admin';
+            return {
+                canManualInput:           true,    // all roles
+                canUploadScreens:         isPro,   // pro + admin
+                canAutoAnalyze:           isPro,   // pro + admin
+                canManageRoles:           isAdmin, // admin only (P1)
+                canManageGlobalSettings:  isAdmin, // admin only (P1)
+                canAccessForeignUserData: isAdmin, // admin only (P1)
+            };
+        };
+
+        // Apply UI gates that depend on capabilities.
+        // Called after role is known (login) and when day modal opens.
+        window._applyCapabilityGates = function() {
+            var cap = window._cc();
+            var dropZone    = document.getElementById('dayDropZone');
+            var uploadInput = document.getElementById('dayScreenshotUpload');
+            if (dropZone) {
+                if (!cap.canUploadScreens) {
+                    dropZone.style.opacity = '0.4';
+                    dropZone.style.pointerEvents = 'none';
+                    dropZone.title = 'Загрузка скриншотов доступна на плане Pro';
+                } else {
+                    dropZone.style.opacity = '';
+                    dropZone.style.pointerEvents = '';
+                    dropZone.title = '';
+                }
+            }
+            if (uploadInput) uploadInput.disabled = !cap.canUploadScreens;
+        };
+
         var EYE_ON  = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
         var EYE_OFF = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
 
@@ -12224,6 +12271,7 @@ function getClass2IconByClass3(c3) {
             var _db = document.getElementById('dev-inspect-toggle');
             if (_db) _db.style.display = _isAdmin ? '' : 'none';
             if (!_isAdmin && typeof window._devStop === 'function') window._devStop();
+            if (typeof window._applyCapabilityGates === 'function') window._applyCapabilityGates();
         }
 
         function _showLoginScreen() {
@@ -12446,7 +12494,6 @@ body.cve-active .calendar-hero.cve-hact.cve-hdrag { cursor:grabbing; }
 (function(){
 'use strict';
 var CVE_KEY='clan_control_calendar_visual_editor_v1';
-var CVE_EMAIL='pivo.news@gmail.com';
 var CVE_DEFAULT_BG=''; // no default image
 var CVE_DEF={
   heroImage:'',bgScale:104,bgX:82,bgY:50,
