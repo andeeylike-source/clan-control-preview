@@ -12260,15 +12260,16 @@ function getClass2IconByClass3(c3) {
             } catch(e) { console.warn('profiles read error:', e); }
 
             // Load user-scoped data from Supabase.
-            // _appDataReady is set to true ONLY when a row is actually found and applied.
-            // If missing or errored, _appDataReady stays false → loadFromStorage() fallback runs.
+            // _appDataReady is ALWAYS set to true after this block so that loadFromStorage()
+            // never runs for an authenticated user — localStorage is not a source of truth for accounts.
+            // No row → user starts with clean default state (already set by _resetAppState above).
             try {
                 var dr = await window._supabase.from('user_app_data').select('data').eq('user_id', user.id).maybeSingle();
                 if (!dr.error && dr.data && dr.data.data) {
                     _applyAppData(dr.data.data);
-                    window._appDataReady = true;
                 }
             } catch(e) { console.warn('user_app_data load error:', e); }
+            window._appDataReady = true; // block localStorage fallback for all authenticated sessions
 
             if (profile && profile.clan_name) {
                 _showApp(user.email, profile.clan_name);
