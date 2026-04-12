@@ -3430,7 +3430,7 @@
         <!-- АРХИВ -->
         <section id="page-archive" class="page-section">
             <h1 class="text-3xl font-bold mb-8">Архив игроков</h1>
-            <div class="card overflow-x-auto">
+            <div class="card overflow-x-auto mb-8">
                 <table>
                     <thead>
                         <tr>
@@ -3442,6 +3442,8 @@
                     <tbody id="archiveBody"></tbody>
                 </table>
             </div>
+            <h2 class="text-xl font-bold mb-4">🗄️ Архив КМ</h2>
+            <div id="kmArchiveBody" class="card overflow-x-auto"></div>
         </section>
 
         <!-- ДЕТАЛИ ПАКА -->
@@ -3761,6 +3763,7 @@
         ];
 
         let archive = [];
+        let kmArchive = []; // Архив удалённых КМ-записей: { dateStr, archivedAt, snap, statuses, overrides }
         let packs = [{ id: 101, name: "ТРИЛЛИОН" }, { id: 102, name: "АРМАТУРА" }];
         
         // manualEvents теперь хранят: { id, title, date, time, done }
@@ -4648,6 +4651,23 @@
                     </td>
                 </tr>
             `).join('');
+
+            // КМ-архив
+            var kmEl = document.getElementById('kmArchiveBody');
+            if (kmEl) {
+                if (kmArchive.length === 0) {
+                    kmEl.innerHTML = '<div style="padding:16px;color:#475569;font-style:italic;text-align:center">Архив КМ пуст</div>';
+                } else {
+                    kmEl.innerHTML = '<table style="width:100%"><thead><tr><th>Дата КМ</th><th>Событие</th><th>Удалён</th><th class="text-right">Действия</th></tr></thead><tbody>' +
+                    kmArchive.slice().reverse().map(function(e) {
+                        var [y,m,d] = e.dateStr.split('-');
+                        var dateFormatted = new Date(+y,+m-1,+d).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'});
+                        var archivedDate = e.archivedAt ? new Date(e.archivedAt).toLocaleDateString('ru-RU',{day:'numeric',month:'short'}) : '—';
+                        var eventLabel = Object.keys(e.statuses || {}).length > 0 ? 'КМ' : (e.snap ? 'КМ' : '—');
+                        return '<tr><td>' + dateFormatted + '</td><td style="color:#f59e0b;font-weight:700">⚔️ ' + eventLabel + '</td><td style="color:#64748b;font-size:12px">' + archivedDate + '</td><td class="text-right" style="white-space:nowrap"><button onclick="restoreKmEvent(\'' + e.dateStr + '\')" style="color:#4ade80;font-weight:700;background:none;border:none;cursor:pointer;margin-right:12px">Восстановить</button><button onclick="deleteKmFromArchive(\'' + e.dateStr + '\')" style="color:#f87171;font-weight:700;background:none;border:none;cursor:pointer">Удалить</button></td></tr>';
+                    }).join('') + '</tbody></table>';
+                }
+            }
         }
 
         function restoreFromArchive(id) {
@@ -9367,14 +9387,39 @@ function getClass2IconByClass3(c3) {
         }
 
         function deleteKmEvent(dateStr) {
-            showConfirm('Точно хотите удалить?', 'Запись КМ за ' + dateStr + ' будет удалена из истории.', function() {
-                Object.keys(eventStatuses).forEach(function(k) { if (k.startsWith(dateStr + '|')) delete eventStatuses[k]; });
-                Object.keys(eventOverrides).forEach(function(k) { if (k.startsWith(dateStr + '|')) delete eventOverrides[k]; });
+            showConfirm('Точно хотите удалить?', 'Запись КМ за ' + dateStr + ' будет перенесена в Архив.', function() {
+                // Собираем statuses/overrides для этой даты
+                var archivedStatuses = {}, archivedOverrides = {};
+                Object.keys(eventStatuses).forEach(function(k) { if (k.startsWith(dateStr + '|')) { archivedStatuses[k] = eventStatuses[k]; delete eventStatuses[k]; } });
+                Object.keys(eventOverrides).forEach(function(k) { if (k.startsWith(dateStr + '|')) { archivedOverrides[k] = eventOverrides[k]; delete eventOverrides[k]; } });
+                var snap = appliedStatsByDate[dateStr] || null;
                 delete appliedStatsByDate[dateStr];
+                kmArchive.push({ dateStr: dateStr, archivedAt: new Date().toISOString(), snap: snap, statuses: archivedStatuses, overrides: archivedOverrides });
                 saveToStorage();
                 renderKmHistory();
                 renderCalendar();
+                if (document.getElementById('page-archive').classList.contains('active')) renderArchive();
             }, true, 'Да', 'Нет');
+        }
+
+        function restoreKmEvent(dateStr) {
+            var idx = kmArchive.findIndex(function(e) { return e.dateStr === dateStr; });
+            if (idx === -1) return;
+            var entry = kmArchive[idx];
+            if (entry.snap) appliedStatsByDate[entry.dateStr] = entry.snap;
+            Object.assign(eventStatuses, entry.statuses || {});
+            Object.assign(eventOverrides, entry.overrides || {});
+            kmArchive.splice(idx, 1);
+            saveToStorage();
+            renderKmHistory();
+            renderCalendar();
+            renderArchive();
+        }
+
+        function deleteKmFromArchive(dateStr) {
+            kmArchive = kmArchive.filter(function(e) { return e.dateStr !== dateStr; });
+            saveToStorage();
+            renderArchive();
         }
 
         function renderKmHistory() {
@@ -10390,6 +10435,7 @@ function getClass2IconByClass3(c3) {
                 const data = {
                     roster,
                     archive,
+                    kmArchive,
                     packs,
                     manualEvents,
                     eventStatuses,
@@ -10422,6 +10468,7 @@ function getClass2IconByClass3(c3) {
                 const data = JSON.parse(raw);
                 if (data.roster)       roster        = data.roster;
                 if (data.archive)      archive       = data.archive;
+                if (data.kmArchive)    kmArchive     = data.kmArchive;
                 if (data.packs)        packs         = data.packs;
                 if (data.manualEvents) manualEvents  = data.manualEvents;
                 if (data.eventStatuses) eventStatuses = data.eventStatuses;
@@ -10445,6 +10492,7 @@ function getClass2IconByClass3(c3) {
             if (!data) return false;
             if (data.roster)             roster             = data.roster;
             if (data.archive)            archive            = data.archive;
+            if (data.kmArchive)          kmArchive          = data.kmArchive;
             if (data.packs)              packs              = data.packs;
             if (data.manualEvents)       manualEvents       = data.manualEvents;
             if (data.eventStatuses)      eventStatuses      = data.eventStatuses;
@@ -10463,6 +10511,7 @@ function getClass2IconByClass3(c3) {
         function _resetAppState() {
             roster             = [{ id: 1, name: "ВИЗАРД", rank: "КЛ", profa: "Bishop", pac: "СОЛО", attendance: 100, kills: 0, deaths: 0, pvp_dmg: 0, pve_dmg: 0 }];
             archive            = [];
+            kmArchive          = [];
             packs              = [{ id: 101, name: "ТРИЛЛИОН" }, { id: 102, name: "АРМАТУРА" }];
             manualEvents       = [];
             eventStatuses      = {};
@@ -10487,7 +10536,7 @@ function getClass2IconByClass3(c3) {
                 exportedAt: new Date().toISOString(),
                 appStorageKey: 'clanControl_v1',
                 data: {
-                    roster, archive, packs, manualEvents,
+                    roster, archive, kmArchive, packs, manualEvents,
                     eventStatuses, eventOverrides, nickAliases,
                     exhaustedKeys, appliedStatsByDate, playerNotes,
                     playerProfaByDate, valueWeights
@@ -10520,6 +10569,7 @@ function getClass2IconByClass3(c3) {
                         () => {
                             if (d.roster)             roster             = d.roster;
                             if (d.archive)            archive            = d.archive;
+                            if (d.kmArchive)          kmArchive          = d.kmArchive;
                             if (d.packs)              packs              = d.packs;
                             if (d.manualEvents)       manualEvents       = d.manualEvents;
                             if (d.eventStatuses)      eventStatuses      = d.eventStatuses;
