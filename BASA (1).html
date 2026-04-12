@@ -3705,6 +3705,8 @@
             <div id="proCTA" style="display:none;margin-bottom:8px">
                 <button onclick="window._activateTestPro&&_activateTestPro()" style="width:100%;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid rgba(99,102,241,0.5);background:rgba(99,102,241,0.1);color:#a5b4fc;transition:all .2s" onmouseover="this.style.background='rgba(99,102,241,0.22)'" onmouseout="this.style.background='rgba(99,102,241,0.1)'">⚡ Получить Pro за 0 ₽ — тест</button>
             </div>
+            <!-- Ручной ввод КМ — доступен всегда -->
+            <button onclick="openManualKmEditor(activeDayDate)" style="width:100%;background:#0f1f12;border:1px solid rgba(34,197,94,0.3);color:#4ade80;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:8px;transition:all .2s" onmouseover="this.style.background='#14532d'" onmouseout="this.style.background='#0f1f12'">✍️ Ввести КМ вручную</button>
 
             <!-- Превью загруженных скриншотов -->
             <div id="dayScreenshotPreviews" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
@@ -9733,11 +9735,19 @@ function getClass2IconByClass3(c3) {
 
         // ===== MANUAL KM EDITOR =====
         (function() {
-            var _st = null; // editor state
+            var _st = null;
 
             function _esc(s) {
                 if (s == null) return '';
                 return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            }
+
+            function _loadPlayer(p, dateStr) {
+                var nk = normalizeNick(p.name || '');
+                var rp = roster.find(function(r) { return normalizeNick(r.name) === nk; });
+                var savedProfa = (playerProfaByDate[nk] && playerProfaByDate[nk][dateStr]) ? playerProfaByDate[nk][dateStr] : '';
+                var profa = p.profa || savedProfa || (rp ? (rp.profa || '') : '') || '';
+                return { name: p.name||'', kills: p.kills||0, deaths: p.deaths||0, pvp_dmg: p.pvp_dmg||0, pve_dmg: p.pve_dmg||0, profa: profa };
             }
 
             window.openManualKmEditor = function(dateStr) {
@@ -9750,11 +9760,11 @@ function getClass2IconByClass3(c3) {
                         return {
                             name: e[0],
                             leader: (existing.packLeaders && existing.packLeaders[e[0]]) ? existing.packLeaders[e[0]] : (e[1].length > 0 ? e[1][0].name : ''),
-                            players: e[1].map(function(p) { return { name: p.name||'', kills: p.kills||0, deaths: p.deaths||0, pvp_dmg: p.pvp_dmg||0, pve_dmg: p.pve_dmg||0 }; })
+                            players: e[1].map(function(p) { return _loadPlayer(p, dateStr); })
                         };
                     });
                 } else if (existing && existing.players && existing.players.length > 0) {
-                    parties = [{ name: 'Пати 1', leader: existing._leader||'', players: existing.players.map(function(p) { return { name: p.name||'', kills: p.kills||0, deaths: p.deaths||0, pvp_dmg: p.pvp_dmg||0, pve_dmg: p.pve_dmg||0 }; }) }];
+                    parties = [{ name: 'Пати 1', leader: existing._leader||'', players: existing.players.map(function(p) { return _loadPlayer(p, dateStr); }) }];
                 } else {
                     parties = [{ name: 'Пати 1', leader: '', players: [] }];
                 }
@@ -9779,8 +9789,8 @@ function getClass2IconByClass3(c3) {
             };
 
             window._mkeClose = function() {
-                var el = document.getElementById('mkeOverlay');
-                if (el) el.remove();
+                document.getElementById('mkeOverlay') && document.getElementById('mkeOverlay').remove();
+                document.getElementById('mkeProfaPicker') && document.getElementById('mkeProfaPicker').remove();
                 _st = null;
             };
 
@@ -9790,7 +9800,6 @@ function getClass2IconByClass3(c3) {
                 if (!ov) return;
                 var s = _st;
                 var pty = s.parties[s.ptyIdx];
-
                 var totalPlayers = s.parties.reduce(function(acc, p) { return acc + p.players.length; }, 0);
 
                 var tabsHtml = s.parties.map(function(p, i) {
@@ -9803,21 +9812,30 @@ function getClass2IconByClass3(c3) {
                 }).join('');
 
                 var rowsHtml = pty.players.length === 0
-                    ? '<tr><td colspan="7" style="padding:14px;text-align:center;color:#475569;font-size:12px;font-style:italic">— нет игроков, нажми «+ Игрок»</td></tr>'
+                    ? '<tr><td colspan="8" style="padding:14px;text-align:center;color:#475569;font-size:12px;font-style:italic">— нет игроков, нажми «+ Игрок»</td></tr>'
                     : pty.players.map(function(p, i) {
                         var isLdr = pty.leader !== '' && pty.leader === p.name;
-                        return '<tr>' +
-                            '<td style="padding:3px 5px"><input oninput="_mkeUpd(' + i + ',\'name\',this.value)" value="' + _esc(p.name) + '" placeholder="Ник" style="width:120px;background:#0b0e14;border:1px solid #2d3748;border-radius:5px;padding:4px 7px;color:#e2e8f0;font-size:12px;outline:none"></td>' +
-                            '<td style="padding:3px 5px;text-align:center"><input type="number" oninput="_mkeUpd(' + i + ',\'kills\',+this.value||0)" value="' + (p.kills||0) + '" min="0" style="width:56px;background:#0b0e14;border:1px solid #2d3748;border-radius:5px;padding:4px 5px;color:#f59e0b;font-size:12px;text-align:center;outline:none"></td>' +
-                            '<td style="padding:3px 5px;text-align:center"><input type="number" oninput="_mkeUpd(' + i + ',\'deaths\',+this.value||0)" value="' + (p.deaths||0) + '" min="0" style="width:56px;background:#0b0e14;border:1px solid #2d3748;border-radius:5px;padding:4px 5px;color:#ef4444;font-size:12px;text-align:center;outline:none"></td>' +
-                            '<td style="padding:3px 5px;text-align:center"><input type="number" oninput="_mkeUpd(' + i + ',\'pvp_dmg\',+this.value||0)" value="' + (p.pvp_dmg||0) + '" min="0" style="width:72px;background:#0b0e14;border:1px solid #2d3748;border-radius:5px;padding:4px 5px;color:#818cf8;font-size:12px;text-align:center;outline:none"></td>' +
-                            '<td style="padding:3px 5px;text-align:center"><input type="number" oninput="_mkeUpd(' + i + ',\'pve_dmg\',+this.value||0)" value="' + (p.pve_dmg||0) + '" min="0" style="width:72px;background:#0b0e14;border:1px solid #2d3748;border-radius:5px;padding:4px 5px;color:#22c55e;font-size:12px;text-align:center;outline:none"></td>' +
-                            '<td style="padding:3px 5px;text-align:center"><button onclick="_mkeLdr(' + i + ')" title="Лидер пати" style="background:' + (isLdr ? '#f59e0b;color:#000' : '#1e2530;color:#64748b') + ';border:none;border-radius:5px;padding:2px 8px;font-size:11px;cursor:pointer;font-weight:700">' + (isLdr ? '★' : '☆') + '</button></td>' +
-                            '<td style="padding:3px 5px;text-align:center"><button onclick="_mkeDelRow(' + i + ')" style="background:none;border:none;color:#475569;cursor:pointer;font-size:13px;padding:0 4px" onmouseover="this.style.color=\'#ef4444\'" onmouseout="this.style.color=\'#475569\'">✕</button></td>' +
+                        var profaHtml = (p.profa && typeof profaIconHtml === 'function')
+                            ? profaIconHtml(p.profa, 18)
+                            : '<span style="font-size:9px;color:#475569">+класс</span>';
+                        return '<tr data-mke-row="' + i + '">' +
+                            '<td style="padding:3px 4px;position:relative">' +
+                                '<input oninput="_mkeUpd(' + i + ',\'name\',this.value);_mkeNickSuggest(' + i + ',this)" value="' + _esc(p.name) + '" placeholder="Ник" autocomplete="off" style="width:116px;background:#0b0e14;border:1px solid #2d3748;border-radius:5px;padding:4px 7px;color:#e2e8f0;font-size:12px;outline:none">' +
+                                '<div id="mkeNickDrop' + i + '" style="display:none;position:absolute;top:100%;left:0;z-index:200;background:#1a1f29;border:1px solid #6366f1;border-radius:8px;min-width:140px;max-height:160px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.6)"></div>' +
+                            '</td>' +
+                            '<td style="padding:3px 4px;text-align:center">' +
+                                '<button onclick="_mkeProfaPick(' + i + ',this)" data-profa="' + _esc(p.profa||'') + '" title="Выбрать профу" style="background:#0b0e14;border:1px solid #2d3748;border-radius:5px;padding:2px 6px;cursor:pointer;min-width:36px;display:inline-flex;align-items:center;gap:3px;vertical-align:middle">' + profaHtml + '</button>' +
+                            '</td>' +
+                            '<td style="padding:3px 4px;text-align:center"><input type="number" oninput="_mkeUpd(' + i + ',\'kills\',+this.value||0)" value="' + (p.kills||0) + '" min="0" style="width:52px;background:#0b0e14;border:1px solid #2d3748;border-radius:5px;padding:4px 5px;color:#f59e0b;font-size:12px;text-align:center;outline:none"></td>' +
+                            '<td style="padding:3px 4px;text-align:center"><input type="number" oninput="_mkeUpd(' + i + ',\'deaths\',+this.value||0)" value="' + (p.deaths||0) + '" min="0" style="width:52px;background:#0b0e14;border:1px solid #2d3748;border-radius:5px;padding:4px 5px;color:#ef4444;font-size:12px;text-align:center;outline:none"></td>' +
+                            '<td style="padding:3px 4px;text-align:center"><input type="number" oninput="_mkeUpd(' + i + ',\'pvp_dmg\',+this.value||0)" value="' + (p.pvp_dmg||0) + '" min="0" style="width:68px;background:#0b0e14;border:1px solid #2d3748;border-radius:5px;padding:4px 5px;color:#818cf8;font-size:12px;text-align:center;outline:none"></td>' +
+                            '<td style="padding:3px 4px;text-align:center"><input type="number" oninput="_mkeUpd(' + i + ',\'pve_dmg\',+this.value||0)" value="' + (p.pve_dmg||0) + '" min="0" style="width:68px;background:#0b0e14;border:1px solid #2d3748;border-radius:5px;padding:4px 5px;color:#22c55e;font-size:12px;text-align:center;outline:none"></td>' +
+                            '<td style="padding:3px 4px;text-align:center"><button onclick="_mkeLdr(' + i + ')" title="Лидер пати" style="background:' + (isLdr ? '#f59e0b;color:#000' : '#1e2530;color:#64748b') + ';border:none;border-radius:5px;padding:2px 8px;font-size:11px;cursor:pointer;font-weight:700">' + (isLdr ? '★' : '☆') + '</button></td>' +
+                            '<td style="padding:3px 4px;text-align:center"><button onclick="_mkeDelRow(' + i + ')" style="background:none;border:none;color:#475569;cursor:pointer;font-size:13px;padding:0 4px" onmouseover="this.style.color=\'#ef4444\'" onmouseout="this.style.color=\'#475569\'">✕</button></td>' +
                         '</tr>';
                     }).join('');
 
-                ov.innerHTML = '<div style="background:#0f1319;border:1px solid #2d3748;border-radius:14px;width:100%;max-width:800px;overflow:hidden;margin:auto">' +
+                ov.innerHTML = '<div style="background:#0f1319;border:1px solid #2d3748;border-radius:14px;width:100%;max-width:860px;overflow:hidden;margin:auto">' +
                     '<div style="padding:18px 22px;border-bottom:1px solid #1e2530;display:flex;justify-content:space-between;align-items:center">' +
                         '<div style="font-size:15px;font-weight:800;color:#e2e8f0">✍️ ' + (s.origDate ? 'Редактировать КМ' : 'Создать КМ вручную') + '</div>' +
                         '<button onclick="_mkeClose()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">✕</button>' +
@@ -9843,15 +9861,16 @@ function getClass2IconByClass3(c3) {
                         '<span style="font-size:10px;font-weight:700;text-transform:uppercase;color:#475569">Название:</span>' +
                         '<input type="text" id="mkePtyName" value="' + _esc(pty.name) + '" style="width:150px;background:#12171f;border:1px solid #2d3748;border-radius:6px;padding:5px 9px;color:#e2e8f0;font-size:12px;outline:none">' +
                     '</div>' +
-                    '<div style="padding:12px 22px">' +
+                    '<div style="padding:12px 22px;overflow-x:auto">' +
                         '<table style="width:100%;border-collapse:collapse">' +
                         '<thead><tr>' +
-                        '<th style="padding:5px 5px 8px;font-size:9px;font-weight:700;text-transform:uppercase;color:#475569;text-align:left;border-bottom:1px solid #1e2530">Ник</th>' +
-                        '<th style="padding:5px 5px 8px;font-size:9px;font-weight:700;text-transform:uppercase;color:#f59e0b;text-align:center;border-bottom:1px solid #1e2530">⚔️ Kills</th>' +
-                        '<th style="padding:5px 5px 8px;font-size:9px;font-weight:700;text-transform:uppercase;color:#ef4444;text-align:center;border-bottom:1px solid #1e2530">💀 Deaths</th>' +
-                        '<th style="padding:5px 5px 8px;font-size:9px;font-weight:700;text-transform:uppercase;color:#818cf8;text-align:center;border-bottom:1px solid #1e2530">🗡️ PvP урон</th>' +
-                        '<th style="padding:5px 5px 8px;font-size:9px;font-weight:700;text-transform:uppercase;color:#22c55e;text-align:center;border-bottom:1px solid #1e2530">🐉 PvE урон</th>' +
-                        '<th style="padding:5px 5px 8px;font-size:9px;text-align:center;border-bottom:1px solid #1e2530;color:#475569">Лидер</th>' +
+                        '<th style="padding:5px 4px 8px;font-size:9px;font-weight:700;text-transform:uppercase;color:#475569;text-align:left;border-bottom:1px solid #1e2530">Ник</th>' +
+                        '<th style="padding:5px 4px 8px;font-size:9px;font-weight:700;text-transform:uppercase;color:#a78bfa;text-align:center;border-bottom:1px solid #1e2530">Класс</th>' +
+                        '<th style="padding:5px 4px 8px;font-size:9px;font-weight:700;text-transform:uppercase;color:#f59e0b;text-align:center;border-bottom:1px solid #1e2530">⚔️ Kills</th>' +
+                        '<th style="padding:5px 4px 8px;font-size:9px;font-weight:700;text-transform:uppercase;color:#ef4444;text-align:center;border-bottom:1px solid #1e2530">💀 Deaths</th>' +
+                        '<th style="padding:5px 4px 8px;font-size:9px;font-weight:700;text-transform:uppercase;color:#818cf8;text-align:center;border-bottom:1px solid #1e2530">🗡️ PvP</th>' +
+                        '<th style="padding:5px 4px 8px;font-size:9px;font-weight:700;text-transform:uppercase;color:#22c55e;text-align:center;border-bottom:1px solid #1e2530">🐉 PvE</th>' +
+                        '<th style="padding:5px 4px 8px;font-size:9px;text-align:center;border-bottom:1px solid #1e2530;color:#475569">Лидер</th>' +
                         '<th style="border-bottom:1px solid #1e2530"></th>' +
                         '</tr></thead><tbody>' + rowsHtml + '</tbody></table>' +
                         '<button onclick="_mkeAddRow()" style="margin-top:8px;width:100%;background:none;border:1px dashed #2d3748;color:#64748b;border-radius:7px;padding:7px;cursor:pointer;font-size:12px;font-weight:600" onmouseover="this.style.color=\'#a5b4fc\';this.style.borderColor=\'#6366f1\'" onmouseout="this.style.color=\'#64748b\';this.style.borderColor=\'#2d3748\'">+ Игрок</button>' +
@@ -9873,71 +9892,122 @@ function getClass2IconByClass3(c3) {
                 if (typeEl) _st.type   = typeEl.value;
                 if (ldrEl)  _st.leader = ldrEl.value;
                 if (ptnEl)  _st.parties[_st.ptyIdx].name = ptnEl.value || ('Пати ' + (_st.ptyIdx + 1));
-                // Read table rows
                 var pty = _st.parties[_st.ptyIdx];
-                var rows = document.querySelectorAll('#mkeOverlay tbody tr');
+                var rows = document.querySelectorAll('#mkeOverlay tbody tr[data-mke-row]');
                 rows.forEach(function(row, i) {
                     if (!pty.players[i]) return;
-                    var ins = row.querySelectorAll('input');
-                    if (ins[0]) pty.players[i].name    = ins[0].value;
-                    if (ins[1]) pty.players[i].kills   = +ins[1].value || 0;
-                    if (ins[2]) pty.players[i].deaths  = +ins[2].value || 0;
-                    if (ins[3]) pty.players[i].pvp_dmg = +ins[3].value || 0;
-                    if (ins[4]) pty.players[i].pve_dmg = +ins[4].value || 0;
+                    var ni = row.querySelector('input:not([type="number"])');
+                    if (ni) pty.players[i].name = ni.value;
+                    var nums = row.querySelectorAll('input[type="number"]');
+                    if (nums[0]) pty.players[i].kills   = +nums[0].value || 0;
+                    if (nums[1]) pty.players[i].deaths  = +nums[1].value || 0;
+                    if (nums[2]) pty.players[i].pvp_dmg = +nums[2].value || 0;
+                    if (nums[3]) pty.players[i].pve_dmg = +nums[3].value || 0;
+                    // profa stored in _st directly via _mkeSetProfa / _mkeNickPick
                 });
             }
 
-            window._mkePtyIdx = function(idx) {
+            window._mkePtyIdx    = function(idx) { _mkeRead(); _st.ptyIdx = idx; _mkeRender(); };
+            window._mkeAddParty  = function() { _mkeRead(); _st.parties.push({ name: 'Пати ' + (_st.parties.length+1), leader: '', players: [] }); _st.ptyIdx = _st.parties.length-1; _mkeRender(); };
+            window._mkeDelParty  = function(idx) { if (!_st||_st.parties.length<=1) return; _st.parties.splice(idx,1); if (_st.ptyIdx>=_st.parties.length) _st.ptyIdx=_st.parties.length-1; _mkeRender(); };
+            window._mkeAddRow    = function() {
                 _mkeRead();
-                _st.ptyIdx = idx;
+                _st.parties[_st.ptyIdx].players.push({ name:'', kills:0, deaths:0, pvp_dmg:0, pve_dmg:0, profa:'' });
                 _mkeRender();
+                setTimeout(function() { var rows=document.querySelectorAll('#mkeOverlay tbody tr[data-mke-row]'); if (rows.length) { var inp=rows[rows.length-1].querySelector('input'); if (inp) inp.focus(); } }, 40);
             };
+            window._mkeDelRow    = function(idx) { _mkeRead(); var pty=_st.parties[_st.ptyIdx]; var dn=pty.players[idx]?pty.players[idx].name:''; pty.players.splice(idx,1); if (pty.leader===dn) pty.leader=pty.players.length>0?pty.players[0].name:''; _mkeRender(); };
+            window._mkeLdr       = function(idx) { _mkeRead(); var pty=_st.parties[_st.ptyIdx]; pty.leader=pty.players[idx]?pty.players[idx].name:''; _mkeRender(); };
+            window._mkeUpd       = function(idx, field, val) { if (!_st) return; var pty=_st.parties[_st.ptyIdx]; if (pty.players[idx]) pty.players[idx][field]=val; };
 
-            window._mkeAddParty = function() {
-                _mkeRead();
-                var n = _st.parties.length + 1;
-                _st.parties.push({ name: 'Пати ' + n, leader: '', players: [] });
-                _st.ptyIdx = _st.parties.length - 1;
-                _mkeRender();
-            };
-
-            window._mkeDelParty = function(idx) {
-                if (!_st || _st.parties.length <= 1) return;
-                _st.parties.splice(idx, 1);
-                if (_st.ptyIdx >= _st.parties.length) _st.ptyIdx = _st.parties.length - 1;
-                _mkeRender();
-            };
-
-            window._mkeAddRow = function() {
-                _mkeRead();
-                _st.parties[_st.ptyIdx].players.push({ name: '', kills: 0, deaths: 0, pvp_dmg: 0, pve_dmg: 0 });
-                _mkeRender();
+            // ---- Profa picker ----
+            window._mkeProfaPick = function(idx, btn) {
+                document.getElementById('mkeProfaPicker') && document.getElementById('mkeProfaPicker').remove();
+                var rect = btn.getBoundingClientRect();
+                var picker = document.createElement('div');
+                picker.id = 'mkeProfaPicker';
+                picker.dataset.rowIdx = idx;
+                picker.style.cssText = 'position:fixed;top:' + (rect.bottom+4) + 'px;left:' + rect.left + 'px;background:#1a1f29;border:1px solid #6366f1;border-radius:10px;z-index:10000;width:280px;max-height:360px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.7)';
+                picker.innerHTML = '<div style="padding:7px 8px;border-bottom:1px solid #1e2530"><input id="mkeProfaSearch" type="text" placeholder="Поиск: биш, cardinal, хилер..." autocomplete="off" style="width:100%;background:#0b0e14;border:1px solid #2d3748;border-radius:7px;padding:6px 10px;color:#e2e8f0;font-size:12px;outline:none" oninput="_mkeProfaFilter(this.value)"></div><div id="mkeProfaList" style="overflow-y:auto;max-height:300px"></div>';
+                document.body.appendChild(picker);
+                var pr = picker.getBoundingClientRect();
+                if (pr.right > window.innerWidth) picker.style.left = (window.innerWidth-pr.width-8) + 'px';
+                if (pr.bottom > window.innerHeight) picker.style.top = (rect.top-pr.height-4) + 'px';
+                _mkeProfaFilter('');
+                setTimeout(function() { var s=document.getElementById('mkeProfaSearch'); if(s) s.focus(); }, 50);
                 setTimeout(function() {
-                    var rows = document.querySelectorAll('#mkeOverlay tbody tr');
-                    if (rows.length) { var inp = rows[rows.length-1].querySelector('input'); if (inp) inp.focus(); }
-                }, 40);
+                    var close = function(e) { var p=document.getElementById('mkeProfaPicker'); if (p&&!p.contains(e.target)&&e.target!==btn) { p.remove(); document.removeEventListener('click',close); } };
+                    document.addEventListener('click', close);
+                }, 10);
             };
 
-            window._mkeDelRow = function(idx) {
-                _mkeRead();
-                var pty = _st.parties[_st.ptyIdx];
-                var delName = pty.players[idx] ? pty.players[idx].name : '';
-                pty.players.splice(idx, 1);
-                if (pty.leader === delName) pty.leader = pty.players.length > 0 ? pty.players[0].name : '';
-                _mkeRender();
+            window._mkeProfaFilter = function(q) {
+                var el = document.getElementById('mkeProfaList');
+                var picker = document.getElementById('mkeProfaPicker');
+                if (!el||!picker) return;
+                var ri = +picker.dataset.rowIdx;
+                q = q.toLowerCase().trim();
+                var qAlt = typeof switchKeyboardLayout==='function' ? switchKeyboardLayout(q) : q;
+                var html = '';
+                (typeof PROFA_DROPDOWN_GROUPS!=='undefined' ? PROFA_DROPDOWN_GROUPS : []).forEach(function(grp) {
+                    var items = grp.items.filter(function(pf) {
+                        if (!q) return true;
+                        var info = (typeof PROFA_INFO!=='undefined'&&PROFA_INFO[pf]) ? PROFA_INFO[pf] : {};
+                        var s = [pf,info.ru||'',info.short||'',info.ru2||'',info.en2||''].join(' ').toLowerCase();
+                        return s.includes(q)||(qAlt&&s.includes(qAlt));
+                    });
+                    if (!items.length) return;
+                    html += '<div style="padding:3px 10px;font-size:9px;font-weight:800;text-transform:uppercase;color:#475569;border-top:1px solid #1e2530">' + grp.label + '</div>';
+                    items.forEach(function(pf) {
+                        var icon = typeof profaIconHtml==='function' ? profaIconHtml(pf,20) : '';
+                        var info = (typeof PROFA_INFO!=='undefined'&&PROFA_INFO[pf]) ? PROFA_INFO[pf] : {};
+                        var sh = info.short||'';
+                        html += '<div onclick="_mkeSetProfa(' + ri + ',\'' + pf.replace(/'/g,"\\'") + '\')" style="display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;border-bottom:1px solid #1e253033;font-size:12px" onmouseover="this.style.background=\'#6366f122\'" onmouseout="this.style.background=\'\'">' +
+                            icon + '<span style="color:#e2e8f0">' + pf + '</span>' + (sh?'<span style="color:#f59e0b;font-size:10px;margin-left:2px">('+sh+')</span>':'') + '</div>';
+                    });
+                });
+                el.innerHTML = html || '<div style="color:#475569;font-size:12px;padding:12px;text-align:center">Не найдено</div>';
             };
 
-            window._mkeLdr = function(idx) {
-                _mkeRead();
-                var pty = _st.parties[_st.ptyIdx];
-                pty.leader = pty.players[idx] ? pty.players[idx].name : '';
-                _mkeRender();
-            };
-
-            window._mkeUpd = function(idx, field, val) {
+            window._mkeSetProfa = function(idx, profa) {
                 if (!_st) return;
                 var pty = _st.parties[_st.ptyIdx];
-                if (pty.players[idx]) pty.players[idx][field] = val;
+                if (pty.players[idx]) pty.players[idx].profa = profa;
+                document.getElementById('mkeProfaPicker') && document.getElementById('mkeProfaPicker').remove();
+                var row = document.querySelector('#mkeOverlay tbody tr[data-mke-row="' + idx + '"]');
+                if (row) {
+                    var btn = row.querySelector('[data-profa]');
+                    if (btn) { btn.dataset.profa=profa; btn.innerHTML=(profa&&typeof profaIconHtml==='function')?profaIconHtml(profa,18):'<span style="font-size:9px;color:#475569">+класс</span>'; }
+                }
+            };
+
+            // ---- Nick autocomplete ----
+            window._mkeNickSuggest = function(idx, input) {
+                var q = input.value.trim().toLowerCase();
+                var drop = document.getElementById('mkeNickDrop' + idx);
+                if (!drop) return;
+                if (!q) { drop.style.display='none'; return; }
+                var matches = (roster||[]).filter(function(r) { return r.name&&r.name.toLowerCase().includes(q); }).slice(0,8);
+                if (!matches.length) { drop.style.display='none'; return; }
+                drop.innerHTML = matches.map(function(r) {
+                    var icon = (r.profa&&typeof profaIconHtml==='function') ? profaIconHtml(r.profa,16) : '';
+                    return '<div onclick="_mkeNickPick(' + idx + ',\'' + r.name.replace(/'/g,"\\'") + '\',\'' + (r.profa||'').replace(/'/g,"\\'") + '\')" style="display:flex;align-items:center;gap:7px;padding:6px 10px;cursor:pointer;border-bottom:1px solid #1e253044;font-size:12px" onmouseover="this.style.background=\'#6366f122\'" onmouseout="this.style.background=\'\'">' + icon + '<span style="color:#e2e8f0;font-weight:600">' + r.name + '</span></div>';
+                }).join('');
+                drop.style.display = 'block';
+            };
+
+            window._mkeNickPick = function(idx, name, profa) {
+                var pty = _st && _st.parties[_st.ptyIdx];
+                if (!pty||!pty.players[idx]) return;
+                pty.players[idx].name = name;
+                if (profa) pty.players[idx].profa = profa;
+                var drop = document.getElementById('mkeNickDrop' + idx);
+                if (drop) drop.style.display = 'none';
+                var row = document.querySelector('#mkeOverlay tbody tr[data-mke-row="' + idx + '"]');
+                if (row) {
+                    var ni = row.querySelector('input:not([type="number"])'); if (ni) ni.value = name;
+                    if (profa) { var btn = row.querySelector('[data-profa]'); if (btn) { btn.dataset.profa=profa; btn.innerHTML=(typeof profaIconHtml==='function')?profaIconHtml(profa,18):'<span style="font-size:9px;color:#475569">+класс</span>'; } }
+                }
             };
 
             window._mkeSave = function() {
@@ -9948,34 +10018,31 @@ function getClass2IconByClass3(c3) {
 
                 var spm = {}, pls = {}, cc = [], flat = [], seen = {};
                 s.parties.forEach(function(pty) {
-                    var valid = pty.players.filter(function(p) { return p.name && p.name.trim(); });
+                    var valid = pty.players.filter(function(p) { return p.name&&p.name.trim(); });
                     if (!valid.length) return;
-                    var pname = pty.name || ('Пати ' + (Object.keys(spm).length + 1));
+                    var pname = pty.name || ('Пати ' + (Object.keys(spm).length+1));
                     spm[pname] = valid;
                     var ldr = pty.leader || valid[0].name;
                     pls[pname] = ldr;
-                    var sk = 0, sd = 0, sp = 0, sv = 0;
+                    var sk=0, sd=0, sp=0, sv=0;
                     valid.forEach(function(p) {
-                        sk += p.kills||0; sd += p.deaths||0; sp += p.pvp_dmg||0; sv += p.pve_dmg||0;
+                        sk+=p.kills||0; sd+=p.deaths||0; sp+=p.pvp_dmg||0; sv+=p.pve_dmg||0;
                         var nk = normalizeNick(p.name);
-                        if (!seen[nk]) { seen[nk] = 1; flat.push({ name: p.name, kills: p.kills||0, deaths: p.deaths||0, pvp_dmg: p.pvp_dmg||0, pve_dmg: p.pve_dmg||0 }); }
+                        if (!seen[nk]) {
+                            seen[nk] = 1;
+                            flat.push({ name:p.name, kills:p.kills||0, deaths:p.deaths||0, pvp_dmg:p.pvp_dmg||0, pve_dmg:p.pve_dmg||0 });
+                            if (p.profa) { if (!playerProfaByDate[nk]) playerProfaByDate[nk]={}; playerProfaByDate[nk][s.date]=p.profa; }
+                        }
                     });
-                    if (ldr) cc.push({ leader: ldr, kills: sk, deaths: sd, pvp_dmg: sp, pve_dmg: sv, members: valid.length });
+                    if (ldr) cc.push({ leader:ldr, kills:sk, deaths:sd, pvp_dmg:sp, pve_dmg:sv, members:valid.length });
                 });
 
                 if (!flat.length) { alert('Добавь хотя бы одного игрока'); return; }
-
                 if (s.origDate && s.origDate !== s.date) delete appliedStatsByDate[s.origDate];
 
                 appliedStatsByDate[s.date] = {
-                    _manual: true,
-                    _eventType: s.type || 'КМ',
-                    _leader: s.leader || '',
-                    players: flat,
-                    commandChannel: cc,
-                    screenPlayersMap: spm,
-                    packLeaders: pls,
-                    raidTotal: flat.length
+                    _manual: true, _eventType: s.type||'КМ', _leader: s.leader||'',
+                    players: flat, commandChannel: cc, screenPlayersMap: spm, packLeaders: pls, raidTotal: flat.length
                 };
 
                 saveToStorage();
