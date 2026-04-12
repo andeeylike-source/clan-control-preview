@@ -9882,8 +9882,9 @@ function getClass2IconByClass3(c3) {
                             : '<span style="font-size:9px;color:#475569">+класс</span>';
                         return '<tr data-mke-row="' + i + '">' +
                             '<td style="padding:3px 4px;position:relative">' +
-                                '<input oninput="_mkeUpd(' + i + ',\'name\',this.value);_mkeNickSuggest(' + i + ',this)" value="' + _esc(p.name) + '" placeholder="Ник" autocomplete="off" style="width:116px;background:#0b0e14;border:1px solid #2d3748;border-radius:5px;padding:4px 7px;color:#e2e8f0;font-size:12px;outline:none">' +
-                                '<div id="mkeNickDrop' + i + '" style="display:none;position:absolute;top:100%;left:0;z-index:200;background:#1a1f29;border:1px solid #6366f1;border-radius:8px;min-width:140px;max-height:160px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.6)"></div>' +
+                                '<input oninput="_mkeUpd(' + i + ',\'name\',this.value);_mkeNickSuggest(' + i + ',this)" value="' + _esc(p.name) + '" placeholder="Ник" autocomplete="off" style="width:100px;background:#0b0e14;border:1px solid #2d3748;border-radius:5px;padding:4px 7px;color:#e2e8f0;font-size:12px;outline:none;vertical-align:middle">' +
+                                '<button onclick="_mkeRosterPick(' + i + ')" title="Выбрать из ростера" style="padding:3px 6px;background:#1e2530;border:1px solid #2d3748;border-radius:5px;cursor:pointer;font-size:11px;color:#64748b;margin-left:3px;vertical-align:middle;line-height:1" onmouseover="this.style.color=\'#a5b4fc\';this.style.borderColor=\'#6366f1\'" onmouseout="this.style.color=\'#64748b\';this.style.borderColor=\'#2d3748\'">👥</button>' +
+                                '<div id="mkeNickDrop' + i + '" style="display:none;position:absolute;top:100%;left:0;z-index:200;background:#1a1f29;border:1px solid #6366f1;border-radius:8px;min-width:160px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.6)"></div>' +
                             '</td>' +
                             '<td style="padding:3px 4px;text-align:center">' +
                                 '<button onclick="_mkeProfaPick(' + i + ',this)" data-profa="' + _esc(p.profa||'') + '" title="Выбрать профу" style="background:#0b0e14;border:1px solid #2d3748;border-radius:5px;padding:2px 6px;cursor:pointer;min-width:36px;display:inline-flex;align-items:center;gap:3px;vertical-align:middle">' + profaHtml + '</button>' +
@@ -10051,9 +10052,9 @@ function getClass2IconByClass3(c3) {
                 if (!q) { drop.style.display='none'; return; }
                 var matches = (roster||[]).filter(function(r) { return r.name&&r.name.toLowerCase().includes(q); }).slice(0,8);
                 if (!matches.length) { drop.style.display='none'; return; }
+                delete drop.dataset.mode;
                 drop.innerHTML = matches.map(function(r) {
-                    var icon = (r.profa&&typeof profaIconHtml==='function') ? profaIconHtml(r.profa,16) : '';
-                    return '<div onclick="_mkeNickPick(' + idx + ',\'' + r.name.replace(/'/g,"\\'") + '\',\'' + (r.profa||'').replace(/'/g,"\\'") + '\')" style="display:flex;align-items:center;gap:7px;padding:6px 10px;cursor:pointer;border-bottom:1px solid #1e253044;font-size:12px" onmouseover="this.style.background=\'#6366f122\'" onmouseout="this.style.background=\'\'">' + icon + '<span style="color:#e2e8f0;font-weight:600">' + r.name + '</span></div>';
+                    return '<div onclick="_mkeNickPick(' + idx + ',\'' + r.name.replace(/'/g,"\\'") + '\',\'' + (r.profa||'').replace(/'/g,"\\'") + '\')" style="padding:6px 10px;cursor:pointer;border-bottom:1px solid #1e253044;font-size:12px;color:#e2e8f0;font-weight:600" onmouseover="this.style.background=\'#6366f122\'" onmouseout="this.style.background=\'\'">' + r.name + '</div>';
                 }).join('');
                 drop.style.display = 'block';
             };
@@ -10070,6 +10071,29 @@ function getClass2IconByClass3(c3) {
                     var ni = row.querySelector('input:not([type="number"])'); if (ni) ni.value = name;
                     if (profa) { var btn = row.querySelector('[data-profa]'); if (btn) { btn.dataset.profa=profa; btn.innerHTML=(typeof profaIconHtml==='function')?profaIconHtml(profa,18):'<span style="font-size:9px;color:#475569">+класс</span>'; } }
                 }
+            };
+
+            window._mkeRosterPick = function(idx) {
+                var drop = document.getElementById('mkeNickDrop' + idx);
+                if (!drop) return;
+                if (drop.style.display === 'block' && drop.dataset.mode === 'roster') {
+                    drop.style.display = 'none'; return;
+                }
+                drop.dataset.mode = 'roster';
+                window._mkeRLRender = function(q) {
+                    var filtered = (roster||[]).filter(function(r) { return !q || (r.name&&r.name.toLowerCase().includes(q.toLowerCase())); }).slice(0,40);
+                    return filtered.map(function(r) {
+                        return '<div onclick="_mkeNickPick(' + idx + ',\'' + r.name.replace(/'/g,"\\'") + '\',\'' + (r.profa||'').replace(/'/g,"\\'") + '\')" style="padding:6px 10px;cursor:pointer;border-bottom:1px solid #1e253044;font-size:12px;color:#e2e8f0;font-weight:600" onmouseover="this.style.background=\'#6366f122\'" onmouseout="this.style.background=\'\'">' + r.name + '</div>';
+                    }).join('') || '<div style="padding:8px 10px;color:#475569;font-size:12px">Не найдено</div>';
+                };
+                drop.innerHTML =
+                    '<div style="padding:6px 8px;border-bottom:1px solid #2d3748">' +
+                    '<input id="mkeRS' + idx + '" type="text" placeholder="Поиск по нику..." autocomplete="off" ' +
+                    'oninput="document.getElementById(\'mkeRL' + idx + '\').innerHTML=window._mkeRLRender(this.value)" ' +
+                    'style="width:100%;background:#0b0e14;border:1px solid #2d3748;border-radius:5px;padding:4px 7px;color:#e2e8f0;font-size:12px;outline:none"></div>' +
+                    '<div id="mkeRL' + idx + '" style="max-height:180px;overflow-y:auto">' + window._mkeRLRender('') + '</div>';
+                drop.style.display = 'block';
+                setTimeout(function() { var si=document.getElementById('mkeRS'+idx); if(si) si.focus(); }, 10);
             };
 
             window._mkeSave = function() {
