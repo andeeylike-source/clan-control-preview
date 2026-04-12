@@ -12354,9 +12354,17 @@ function getClass2IconByClass3(c3) {
             }
         };
 
-        // Activate test Pro for current session (Free only, preview-safe, no Supabase write).
+        // Activate test Pro for current session (preview-safe, no Supabase write).
+        // For real Free users: sets _testProActive flag.
+        // For Admin in Free test-mode: advances _adminTestMode to 'pro'.
         window._activateTestPro = function() {
-            if (window._userRole !== 'free') return; // never degrades admin/pro
+            if (window._userRole === 'admin' && window._adminTestMode === 'free') {
+                window._adminTestMode = 'pro';
+                if (typeof window._applyCapabilityGates === 'function') window._applyCapabilityGates();
+                if (typeof window._updateRoleBadge === 'function') window._updateRoleBadge();
+                return;
+            }
+            if (window._userRole !== 'free') return; // never degrades real admin/pro
             window._testProActive = true;
             if (typeof window._applyCapabilityGates === 'function') window._applyCapabilityGates();
             if (typeof window._updateRoleBadge === 'function') window._updateRoleBadge();
