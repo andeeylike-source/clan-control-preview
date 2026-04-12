@@ -3514,10 +3514,15 @@
                 <div id="apiKeyStatus" style="display:none;margin-top:12px;font-size:13px;padding:10px;border-radius:8px"></div>
             </div>
             <div class="card mb-6">
-                <h2 class="text-lg font-bold mb-2">🔗 Алиасы ников</h2>
-                <p class="text-slate-500 text-sm mb-4">Если AI читает ник неправильно — укажи соответствие. Например: <code style="background:#1e2530;padding:1px 6px;border-radius:4px;font-size:11px">НигативВ → НигатиВ</code></p>
-                <div id="aliasesList" class="space-y-2 mb-4"></div>
-                <button onclick="addAliasRow()" style="background:none;border:1px dashed #2d3748;color:#64748b;border-radius:10px;padding:10px;width:100%;cursor:pointer;font-size:13px;transition:all .2s" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#64748b'">+ Добавить алиас</button>
+                <div onclick="(function(el){var b=document.getElementById('aliasesBody');var open=b.style.display!=='none';b.style.display=open?'none':'block';el.querySelector('.aliases-arr').textContent=open?'▼':'▲'})(this)" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none">
+                    <h2 class="text-lg font-bold">🔗 Алиасы ников</h2>
+                    <span class="aliases-arr" style="color:#475569;font-size:12px;padding:2px 6px">▼</span>
+                </div>
+                <div id="aliasesBody" style="display:none">
+                    <p class="text-slate-500 text-sm mb-4 mt-3">Если AI читает ник неправильно — укажи соответствие. Например: <code style="background:#1e2530;padding:1px 6px;border-radius:4px;font-size:11px">НигативВ → НигатиВ</code></p>
+                    <div id="aliasesList" class="space-y-2 mb-4"></div>
+                    <button onclick="addAliasRow()" style="background:none;border:1px dashed #2d3748;color:#64748b;border-radius:10px;padding:10px;width:100%;cursor:pointer;font-size:13px;transition:all .2s" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#64748b'">+ Добавить алиас</button>
+                </div>
             </div>
                         <div class="card mb-6">
                 <h2 class="text-lg font-bold mb-2">⚖️ Веса ценности</h2>
@@ -10326,6 +10331,19 @@ function getClass2IconByClass3(c3) {
                 syncRosterStatsFromSnapshots();
                 _mkeClose();
                 renderKmHistory();
+                renderCalendar();
+                if (document.getElementById('page-stats').classList.contains('active')) renderStats();
+                if (document.getElementById('page-dashboard').classList.contains('active')) renderDashboard();
+                if (currentProfileName && document.getElementById('page-profile').classList.contains('active')) renderPlayerProfile(currentProfileName);
+                // Brief success toast via autoSaveIndicator
+                var _ind = document.getElementById('autoSaveIndicator');
+                var _txt = document.getElementById('autoSaveText');
+                if (_ind && _txt) {
+                    _txt.textContent = 'КМ сохранён ✓';
+                    _ind.style.opacity = '1';
+                    clearTimeout(window._mkeToastTimer);
+                    window._mkeToastTimer = setTimeout(function() { _ind.style.opacity = '0'; _txt.textContent = 'Сохранено'; }, 2500);
+                }
             };
         })();
 
@@ -10861,6 +10879,10 @@ function getClass2IconByClass3(c3) {
                 if (from && to) {
                     nickAliases[from.toLowerCase()] = to;
                     saveToStorage();
+                    // Раскрываем блок алиасов если он свёрнут
+                    const body = document.getElementById('aliasesBody');
+                    const arr  = document.querySelector('.aliases-arr');
+                    if (body && body.style.display === 'none') { body.style.display = 'block'; if (arr) arr.textContent = '▲'; }
                     renderAliases();
                 }
             });
