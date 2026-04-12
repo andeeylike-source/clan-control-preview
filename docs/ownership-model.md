@@ -7,7 +7,7 @@ Defines who owns what, and who can do what. Direct input for SQL migrations and 
 ## Context
 
 - Auth: Supabase Auth (`auth.users`). Current user = `auth.uid()`.
-- Roles: `profiles.role` — `free`, `pro`, `admin`. Checked via `profiles` table join.
+- Roles: `profiles.role` — `free`, `pro`, `admin`. Checked via `private.is_admin(auth.uid())` helper function (avoids direct `profiles` join in every policy).
 - Current live data: stored in `user_app_data.data` JSONB blob per user (migration 0002). Each user has their own isolated copy of events, sessions, stats.
 - Schema v1 tables (0001): designed pre-auth, **no `user_id` columns**. Not yet used as source of truth — serve as target schema for future per-table migration.
 - `km_screenshots` (0004): already has ownership columns + RLS. Reference pattern for all other entities.
@@ -89,18 +89,19 @@ Already implemented in migration 0004. Reference pattern.
 ### 4. screenshot_analysis (future table)
 
 Analysis results from AI processing of screenshots. Does not exist yet.
+**Child table** — no own `user_id`. Access derived from parent `km_screenshots.user_id` via FK, same pattern as `km_session_player_stats`.
 
 | Aspect | Rule |
 |--------|------|
-| Owner | `user_id` — same user who owns the source screenshot |
+| Owner | Inherited from parent `km_screenshots.user_id` via `screenshot_id` FK |
 | "My data" | Yes — analysis is derived from user's screenshots |
 | Shared? | No |
-| CREATE | System/app on behalf of owner (`created_by = user_id`) |
-| SELECT | Owner reads own. Admin reads all. |
-| UPDATE | Owner updates own (manual corrections). |
-| DELETE | CASCADE from parent `km_screenshots` OR owner explicit delete. |
+| CREATE | App on behalf of screenshot owner |
+| SELECT | Via parent: `EXISTS (SELECT 1 FROM km_screenshots WHERE id = screenshot_id AND user_id = auth.uid())`. Admin reads all. |
+| UPDATE | Via parent (manual corrections). |
+| DELETE | CASCADE from parent `km_screenshots`. No independent orphan rows. |
 | Admin | SELECT all (read-only). |
-| Fields for RLS | `user_id` (primary filter). FK to `km_screenshots(id)` with ON DELETE CASCADE. |
+| Fields for RLS | `screenshot_id` FK (used in parent-join check). No own `user_id`. |
 
 **Proposed schema** (for future migration):
 
@@ -108,12 +109,9 @@ Analysis results from AI processing of screenshots. Does not exist yet.
 CREATE TABLE km_screenshot_analysis (
     id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     screenshot_id   uuid NOT NULL REFERENCES km_screenshots(id) ON DELETE CASCADE,
-    user_id         uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     analysis_json   jsonb,          -- raw AI response
     status          text NOT NULL DEFAULT 'pending'
                     CHECK (status IN ('pending','done','error','corrected')),
-    created_by      uuid NOT NULL REFERENCES auth.users(id),
-    updated_by      uuid REFERENCES auth.users(id),
     created_at      timestamptz NOT NULL DEFAULT now(),
     updated_at      timestamptz NOT NULL DEFAULT now()
 );
@@ -129,11 +127,28 @@ CREATE TABLE km_screenshot_analysis (
 | `km_sessions` | Full | Yes | Deferred | No |
 | `km_session_player_stats` | Via parent | Via parent | Deferred | No |
 | `km_screenshots` | Full | Yes | Deferred | No |
-| `km_screenshot_analysis` | Full | Yes | Deferred | No |
+| `km_screenshot_analysis` | Via parent (`km_screenshots`) | Via parent | Deferred | No |
 
 ---
 
 ## RLS Pattern (consistent across all entities)
+
+### Prerequisite: `private.is_admin()` helper
+
+Create once, use in every admin policy. Lives in `private` schema to prevent direct client calls.
+
+```sql
+CREATE SCHEMA IF NOT EXISTS private;
+
+CREATE OR REPLACE FUNCTION private.is_admin(uid uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+AS $$
+    SELECT EXISTS (SELECT 1 FROM profiles WHERE id = uid AND role = 'admin');
+$$;
+```
+
+### Owned tables (have `user_id`)
 
 ```sql
 -- Owner CRUD
@@ -152,27 +167,47 @@ CREATE POLICY {table}_delete_own ON {table}
 
 -- Admin read-only
 CREATE POLICY {table}_select_admin ON {table}
-    FOR SELECT USING (
-        EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
-    );
+    FOR SELECT USING (private.is_admin(auth.uid()));
 ```
 
-For child tables without `user_id` (e.g. `km_session_player_stats`):
+### Child tables without `user_id` (e.g. `km_session_player_stats`, `km_screenshot_analysis`)
+
+Access derived from parent row's `user_id` via FK join.
 
 ```sql
+-- Owner via parent
 CREATE POLICY {child}_select_own ON {child}
     FOR SELECT USING (
         EXISTS (SELECT 1 FROM {parent} WHERE {parent}.id = {child}.{parent_fk} AND {parent}.user_id = auth.uid())
     );
+
+CREATE POLICY {child}_insert_own ON {child}
+    FOR INSERT WITH CHECK (
+        EXISTS (SELECT 1 FROM {parent} WHERE {parent}.id = {child}.{parent_fk} AND {parent}.user_id = auth.uid())
+    );
+
+CREATE POLICY {child}_update_own ON {child}
+    FOR UPDATE USING (
+        EXISTS (SELECT 1 FROM {parent} WHERE {parent}.id = {child}.{parent_fk} AND {parent}.user_id = auth.uid())
+    );
+
+CREATE POLICY {child}_delete_own ON {child}
+    FOR DELETE USING (
+        EXISTS (SELECT 1 FROM {parent} WHERE {parent}.id = {child}.{parent_fk} AND {parent}.user_id = auth.uid())
+    );
+
+-- Admin read-only
+CREATE POLICY {child}_select_admin ON {child}
+    FOR SELECT USING (private.is_admin(auth.uid()));
 ```
 
 ---
 
 ## What Remains (next steps)
 
-1. **Migration 0005**: add `user_id`, `created_by`, `updated_by` to `calendar_events` and `km_sessions`. Enable RLS + apply standard policies.
-2. **Migration 0006**: create `km_screenshot_analysis` table with ownership columns.
-3. **Frontend**: when writing to these tables, include `user_id = window._currentUserId` and `created_by = window._currentUserId` in every insert.
+1. **Migration 0005**: create `private.is_admin()` function. Update existing `km_screenshots` admin policy to use it. Add `user_id`, `created_by`, `updated_by` to `calendar_events` and `km_sessions`. Enable RLS + apply standard policies.
+2. **Migration 0006**: create `km_screenshot_analysis` table (child, no `user_id` — access via parent FK). Apply child RLS pattern.
+3. **Frontend**: when writing to owned tables, include `user_id = window._currentUserId` and `created_by = window._currentUserId` in every insert.
 4. **Admin write access**: define when admin should be able to modify other users' data. Not needed for v1 — owner-first is sufficient.
 5. **Transition from blob to per-table**: migrate data from `user_app_data.data` JSONB into owned rows in `calendar_events`, `km_sessions`, etc. Each row gets `user_id` from the blob's owner.
 
@@ -182,5 +217,6 @@ CREATE POLICY {child}_select_own ON {child}
 
 1. **No shared entities in v1.** Every row belongs to one user. This matches the current `user_app_data` blob isolation. Clan-wide shared views are a future feature.
 2. **Admin = read-only expansion.** Admin can see all data but cannot modify others' data yet. This is safe and matches the existing `_cc().canAccessForeignUserData` capability gate.
-3. **Child table access via parent FK.** `km_session_player_stats` and `km_screenshot_analysis` derive access from their parent's `user_id`. No redundant `user_id` on child rows that are always accessed through their parent.
-4. **`created_by` / `updated_by` separate from `user_id`.** Prepares for future admin-write scenarios without changing the schema again.
+3. **Child table access via parent FK.** `km_session_player_stats` (parent: `km_sessions`) and `km_screenshot_analysis` (parent: `km_screenshots`) derive access from their parent's `user_id`. No own `user_id` — avoids redundancy and guarantees no orphan-ownership drift.
+4. **`created_by` / `updated_by` separate from `user_id`.** On owned tables only. Prepares for future admin-write scenarios without changing the schema again. Child tables omit these — audit trail lives on the parent.
+5. **`private.is_admin()` over direct `profiles` join.** Single place to change admin logic. `SECURITY DEFINER` + `private` schema prevents client-side bypass.
