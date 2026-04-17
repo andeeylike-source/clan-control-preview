@@ -81,14 +81,20 @@ def run_codex_exec(repo_root: Path, trigger: dict):
     visible_command = ["codex", "--yolo", "exec", "-"]
     try:
         if sys.platform == "win32":
-            # start /WAIT opens a visible cmd window and blocks until it closes.
-            # /C closes the window when the command finishes.
-            inner = "type .agents\\_codex_prompt.txt | cmd /c codex --yolo exec -"
-            launch_cmd = ["cmd", "/c", "start", "/WAIT", "Codex Agent", "cmd", "/C", inner]
+            # CREATE_NEW_CONSOLE guarantees a separate visible terminal window.
+            # The watcher blocks on proc.wait() until Codex finishes.
+            inner = "type .agents\\_codex_prompt.txt | codex --yolo exec -"
+            launch_cmd = ["cmd", "/C", inner]
+            proc = subprocess.Popen(
+                launch_cmd,
+                cwd=str(repo_root),
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+            )
+            proc.wait(timeout=240)
         else:
             inner = "cat .agents/_codex_prompt.txt | codex --yolo exec -"
             launch_cmd = ["bash", "-c", f'xterm -e \'bash -c "{inner}; read -p Done\\ press\\ Enter"\' ']
-        subprocess.run(launch_cmd, cwd=str(repo_root), timeout=240)
+            subprocess.run(launch_cmd, cwd=str(repo_root), timeout=240)
     except subprocess.TimeoutExpired:
         print("CODEX_WINDOW_TIMEOUT")
     finally:
