@@ -120,3 +120,5 @@ RESULT: analysis complete; no code changes made
 NEXT_AGENT: Codex
 NEXT_STEP: diagnosis-only — read the unstaged diff of BASA (1).html and .gitignore; identify what changed and whether it should be committed, reverted, or left as-is; do NOT modify any file; return facts only
 BLOCKERS: no PROJECT_STATE.md — Codex should create it after diagnosis if useful
+
+smoke test
