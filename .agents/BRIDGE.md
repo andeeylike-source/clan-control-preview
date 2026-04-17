@@ -16,7 +16,7 @@ Do not guess and do not re-scan on handoff.
 
 ## CLAUDE RUNTIME APPROVALS
 - Config: `.claude/settings.local.json` (gitignored, local-only)
-- `defaultMode: acceptEdits` — Edit/Write/NotebookEdit auto-approved, no prompt
+- `defaultMode: bypassPermissions` — все инструменты auto-approved без prompt; deny-list блокирует production
 - Allow: `Bash(git:*)`, `verify_flow.py`, `write_bridge_trigger.py`, `bridge_watcher.py`
 - Deny (hard, precedence over allow): `git push origin:*`, `git push --force*`, `git push --force-with-lease*`, `gh workflow run deploy-production-pages.yml`
 - Result: Clan Control work-cycle (edit -> git add -> git commit -> git push preview main -> verify -> trigger -> watcher) runs without confirm
