@@ -5103,6 +5103,45 @@ function resolveClass2ToClass3(n) {
     );
     return k ? CLASS2_TO_CLASS3[k] : [];
 }
+function getStoredDayProfa(dateStr, playerName) {
+    if (!dateStr || !playerName) return null;
+    if (typeof playerProfaByDate === 'undefined' || !playerProfaByDate) return null;
+    const normKey = normalizeNick(playerName);
+    if (playerProfaByDate[normKey] && playerProfaByDate[normKey][dateStr]) return playerProfaByDate[normKey][dateStr];
+    for (const key of Object.keys(playerProfaByDate)) {
+        if (normalizeNick(key) === normKey && playerProfaByDate[key] && playerProfaByDate[key][dateStr]) {
+            return playerProfaByDate[key][dateStr];
+        }
+    }
+    return null;
+}
+function hasResolvedProfa(profa) {
+    return !!profa && profa !== '—' && profa !== 'вЂ”' && profa !== 'РІР‚вЂќ';
+}
+function enrichDayAnalyzePlayer(player, dateStr) {
+    if (!player) return player;
+    const resolvedName = resolveAlias(player.name || '');
+    const rosterMatch = roster.find(r => normalizeNick(r.name) === normalizeNick(resolvedName));
+    const class2 = player.class2 || null;
+    const class3options = class2 ? resolveClass2ToClass3(class2) : [];
+    const storedDayProfa = getStoredDayProfa(dateStr, resolvedName) || (rosterMatch ? getStoredDayProfa(dateStr, rosterMatch.name) : null);
+    const rosterProfa = rosterMatch && hasResolvedProfa(rosterMatch.profa) ? rosterMatch.profa : null;
+    let profa = hasResolvedProfa(player.profa) ? player.profa : null;
+    if (!profa && hasResolvedProfa(storedDayProfa)) profa = storedDayProfa;
+    if (!profa && rosterProfa) profa = rosterProfa;
+    if (!profa && class3options.length === 1) profa = class3options[0];
+    return { ...player, name: resolvedName || player.name, class2, profa: profa || null };
+}
+function enrichDayAnalyzePlayers(players, dateStr) {
+    return (players || []).map(player => enrichDayAnalyzePlayer(player, dateStr));
+}
+function enrichDayScreenPlayersMap(screenPlayersMap, dateStr) {
+    const enriched = {};
+    Object.entries(screenPlayersMap || {}).forEach(([packName, players]) => {
+        enriched[packName] = enrichDayAnalyzePlayers(players || [], dateStr);
+    });
+    return enriched;
+}
 
         // ===== ОБРАТНЫЙ МАППИНГ: 3я -> иконка 2й =====
 const CLASS3_TO_CLASS2_ICON = {
@@ -8129,9 +8168,13 @@ function getClass2IconByClass3(c3) {
                 if (merged[k]) {
                     merged[k].kills   += p.kills;   merged[k].deaths  += p.deaths;
                     merged[k].pvp_dmg += p.pvp_dmg; merged[k].pve_dmg += p.pve_dmg;
+                    if (!merged[k].class2 && p.class2) merged[k].class2 = p.class2;
+                    if (!merged[k].profa && p.profa) merged[k].profa = p.profa;
                 } else merged[k] = {...p};
             });
             dayLastParsed = Object.values(merged);
+            dayLastParsed = enrichDayAnalyzePlayers(dayLastParsed, dateStr);
+            dayScreenPlayersMap = enrichDayScreenPlayersMap(dayScreenPlayersMap, dateStr);
 
             setDayStatus('loading', `✅ Распознано ${dayLastParsed.length} игроков. Проверяю похожие ники...`);
 
@@ -8309,14 +8352,18 @@ function getClass2IconByClass3(c3) {
                 const class2src = class2 ? getClass2Icon(class2) : null;
                 const class3options = class2 ? resolveClass2ToClass3(class2) : [];
                 const currentProfa = inRoster ? (inRoster.profa || '—') : (p.profa || '—');
+                const currentProfaLabel = currentProfa && currentProfa !== '—' ? (PROFA_NAMES[currentProfa] || currentProfa) : '';
 
                 const class2Html = class2src
                     ? `<img src="${class2src}" title="${class2}" style="width:18px;height:18px;border-radius:50%;border:1px solid #2d3748;flex-shrink:0">`
                     : '';
+                const class2LabelHtml = class2 && (!currentProfa || currentProfa === '—')
+                    ? `<span style="font-size:10px;color:#94a3b8;background:#0f172a;border:1px solid #1e293b;border-radius:4px;padding:1px 6px">${class2}</span>`
+                    : '';
 
                 let profaHtml = '';
                 if (currentProfa && currentProfa !== '—') {
-                    profaHtml = profaIconHtml(currentProfa, 15);
+                    profaHtml = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#a5b4fc;background:#6366f122;border:1px solid #6366f155;border-radius:4px;padding:1px 6px">${profaIconHtml(currentProfa, 15)}<span>${currentProfaLabel}</span></span>`;
                 } else if (class3options.length === 1) {
                     const shortName = PROFA_NAMES[class3options[0]] || class3options[0];
                     profaHtml = `<span onclick="dayLastParsed[${i}].profa='${class3options[0].replace(/'/g,"\'")}';renderDayAnalyzedPlayers(dayLastParsed)" style="font-size:10px;color:#22c55e;cursor:pointer;background:#22c55e11;border:1px solid #22c55e33;border-radius:4px;padding:1px 6px">+ ${shortName}</span>`;
@@ -8333,6 +8380,7 @@ function getClass2IconByClass3(c3) {
                         <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
                             <span style="font-size:9px;background:${badgeBg};color:${badgeColor};font-weight:900;padding:1px 5px;border-radius:3px;text-transform:uppercase">${badgeText}</span>
                             ${class2Html}
+                            ${class2LabelHtml}
                             <input value="${p.name}" oninput="dayLastParsed[${i}]._rawName=dayLastParsed[${i}]._rawName||dayLastParsed[${i}].name; dayLastParsed[${i}].name=this.value" onblur="saveAlias(dayLastParsed[${i}]._rawName||dayLastParsed[${i}].name, this.value)" onclick="let v=this.value,l=v.length;this.setSelectionRange(l,l)" style="background:#0b0e14;border:1px solid #2d3748;border-radius:6px;padding:3px 8px;color:white;font-weight:700;font-size:13px;width:130px">
                             ${profaHtml}
                         </div>
@@ -8493,6 +8541,8 @@ function getClass2IconByClass3(c3) {
                 // 1. Резолвим через алиас
                 const resolvedName = resolveAlias(p.name);
                 const normKey = normalizeNick(resolvedName);
+                const detectedProfa = p.profa && p.profa !== '—' ? p.profa : null;
+                const detectedProfaValue = hasResolvedProfa(detectedProfa) ? detectedProfa : null;
                 let existing = roster.find(r => normalizeNick(r.name) === normKey);
 
                 // 2. Если не нашли — fuzzy match (отличие в 1-2 символа)
@@ -8526,18 +8576,38 @@ function getClass2IconByClass3(c3) {
                         id: Date.now() + Math.random(),
                         name: resolvedName,
                         rank: 'ИГРОК',
-                        profa: '—',
-                        profas: [],
+                        profa: detectedProfaValue || '—',
+                        profas: detectedProfaValue ? [detectedProfaValue] : [],
                         pac: 'СОЛО',
                         attendance: 0,
                         isNew: true
                     });
+                    if (detectedProfaValue) {
+                        if (!playerProfaByDate[normKey]) playerProfaByDate[normKey] = {};
+                        playerProfaByDate[normKey][dateStr] = detectedProfaValue;
+                    }
                     newCount++;
                 } else {
                     existing.isNew = false;
                     if (p.name !== resolvedName || p.name !== existing.name) {
                         nickAliases[p.name.toLowerCase()] = existing.name;
                         nickAliases[p.name] = existing.name;
+                    }
+                    if (detectedProfaValue) {
+                        const currentProfas = existing.profas && existing.profas.length
+                            ? [...existing.profas]
+                            : (hasResolvedProfa(existing.profa) ? [existing.profa] : []);
+                        const alreadyKnown = currentProfas.some(pf => pf === detectedProfaValue);
+                        if (!alreadyKnown) {
+                            if (currentProfas.length === 0) {
+                                existing.profa = detectedProfaValue;
+                                existing.profas = [detectedProfaValue];
+                            } else {
+                                profaConflicts.push({ player: existing, detectedProfa: detectedProfaValue, currentProfas });
+                            }
+                        }
+                        if (!playerProfaByDate[normKey]) playerProfaByDate[normKey] = {};
+                        playerProfaByDate[normKey][dateStr] = detectedProfaValue;
                     }
                 }
             });
