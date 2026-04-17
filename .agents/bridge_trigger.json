@@ -1,0 +1,12 @@
+{
+  "trigger_id": "claude-20260417T212442Z-ready_for_codex",
+  "status": "ready_for_codex",
+  "task": "dedupe fix smoke test",
+  "last_writer": "Claude",
+  "files": [
+    ".agents/handoff-smoke.txt"
+  ],
+  "preview_url": "https://andeeylike-source.github.io/clan-control-preview/BASA%20(1).html",
+  "next_agent": "Codex",
+  "next_step": "dedupe fix smoke test"
+}

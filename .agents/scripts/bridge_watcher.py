@@ -102,14 +102,14 @@ def run_codex_exec(repo_root: Path, trigger: dict):
     return visible_command, returncode, stdout, stderr
 
 
-def should_skip(trigger: dict, last_result: dict | None) -> bool:
+def should_skip(trigger: dict, handled_ids: set) -> bool:
     trigger_id = trigger.get("trigger_id")
-    if not trigger_id or not last_result:
+    if not trigger_id:
         return False
-    return last_result.get("trigger_id") == trigger_id and last_result.get("status") == "verify_completed"
+    return trigger_id in handled_ids
 
 
-def handle_trigger(repo_root: Path, trigger_path: Path, result_path: Path) -> int:
+def handle_trigger(repo_root: Path, trigger_path: Path, result_path: Path, handled_ids: set) -> int:
     if not trigger_path.exists():
         print(f"WAITING_FOR_TRIGGER {trigger_path.as_posix()}")
         return 2
@@ -126,8 +126,7 @@ def handle_trigger(repo_root: Path, trigger_path: Path, result_path: Path) -> in
         print("TRIGGER_IGNORED")
         return 0
 
-    last_result = load_json(result_path) if result_path.exists() else None
-    if should_skip(trigger, last_result):
+    if should_skip(trigger, handled_ids):
         print("TRIGGER_ALREADY_HANDLED")
         return 0
 
@@ -172,6 +171,9 @@ def handle_trigger(repo_root: Path, trigger_path: Path, result_path: Path) -> in
     }
     save_json(result_path, result)
     print(f"RESULT_WRITTEN={result_path.as_posix()}")
+    trigger_id = trigger.get("trigger_id")
+    if trigger_id:
+        handled_ids.add(trigger_id)
     return 0 if returncode == 0 else 1
 
 
@@ -191,14 +193,16 @@ def main():
     trigger_path = repo_root / args.trigger
     result_path = repo_root / args.result
 
+    handled_ids: set = set()
+
     if args.once:
-        raise SystemExit(handle_trigger(repo_root, trigger_path, result_path))
+        raise SystemExit(handle_trigger(repo_root, trigger_path, result_path, handled_ids))
 
     print("BRIDGE_WATCHER_STARTED")
     print(f"TRIGGER_PATH={trigger_path.as_posix()}")
     print(f"RESULT_PATH={result_path.as_posix()}")
     while True:
-        exit_code = handle_trigger(repo_root, trigger_path, result_path)
+        exit_code = handle_trigger(repo_root, trigger_path, result_path, handled_ids)
         if exit_code == 1:
             time.sleep(args.poll_interval)
         elif exit_code == 2:
