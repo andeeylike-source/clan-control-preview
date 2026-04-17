@@ -17,13 +17,15 @@ Use only when the task is already diagnosed and needs a narrow local fix in Clan
 - After a local fix, check the adjacent scope for the same pattern
 - If preview remote is behind, inspect its state safely first
 - Do not touch `origin/main`
+- Use the repo verify script for hands-off checks when verification is possible
 
 ## EXECUTION FLOW
 - Make only the narrow fix
-- Verify locally if possible
+- Run `python .agents/skills/cc-fix-preview/scripts/verify_flow.py --local-file "BASA (1).html" --preview-url "https://andeeylike-source.github.io/clan-control-preview/BASA%20(1).html"` after the fix
 - `git add` only relevant files
 - `git commit -m "short message"`
 - `git push preview main` via local flow
+- Run the same verify command again after preview push
 - If normal push is rejected by fast-forward, inspect preview state safely and act only within preview remote
 - Always end with `FINAL REPORT`
 
@@ -36,6 +38,8 @@ FINAL REPORT
 - tested:
 - result:
 - residual:
+- verify_command:
+- verify_scope:
 
 ## PROJECT NOTES
 - Main file: `BASA (1).html`
@@ -43,3 +47,6 @@ FINAL REPORT
 - For scan/review tasks canonical unified row: `screenshot`, `side`, `row`, `nick`, `kills`, `deaths`, `pvp`, `pve`, `class`, `confidence`, `source_by_field`
 - Treat `recommended_status` as optional meta
 - Do not mix `review.json` path and unified path unless necessary
+- Default verify checks:
+  local = file read + local temporary HTTP fetch of `BASA (1).html`
+  preview = HTTP fetch of preview URL and marker check
