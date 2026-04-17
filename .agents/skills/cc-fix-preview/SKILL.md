@@ -1,0 +1,45 @@
+---
+name: cc-fix-preview
+description: Use for already-diagnosed Clan Control tasks that need a narrow local fix, adjacent-scope pattern check, local verification when possible, commit, preview push, and a strict FINAL REPORT.
+---
+
+# NAME
+cc-fix-preview
+
+## WHEN TO USE
+Use only when the task is already diagnosed and needs a narrow local fix in Clan Control.
+
+## RULES
+- Work only in the nearest relevant scope
+- Do not re-scan the whole project
+- Do not edit `clan-control.html`, `BASA.html`, `BASAv1.html`
+- Do not touch production without explicit permission
+- After a local fix, check the adjacent scope for the same pattern
+- If preview remote is behind, inspect its state safely first
+- Do not touch `origin/main`
+
+## EXECUTION FLOW
+- Make only the narrow fix
+- Verify locally if possible
+- `git add` only relevant files
+- `git commit -m "short message"`
+- `git push preview main` via local flow
+- If normal push is rejected by fast-forward, inspect preview state safely and act only within preview remote
+- Always end with `FINAL REPORT`
+
+## OUTPUT FORMAT
+FINAL REPORT
+- changed:
+- files:
+- commit:
+- preview:
+- tested:
+- result:
+- residual:
+
+## PROJECT NOTES
+- Main file: `BASA (1).html`
+- Project: single-file SPA
+- For scan/review tasks canonical unified row: `screenshot`, `side`, `row`, `nick`, `kills`, `deaths`, `pvp`, `pve`, `class`, `confidence`, `source_by_field`
+- Treat `recommended_status` as optional meta
+- Do not mix `review.json` path and unified path unless necessary
