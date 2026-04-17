@@ -3189,7 +3189,7 @@
                     <div class="calendar-side-card" id="cveBlockRecurring">
                         <div class="calendar-side-head">
                             <div class="calendar-side-title" id="calendarRecurringTitle">Шаблоны недели</div>
-                            <div class="calendar-side-caption" id="calendarRecurringCaption">preview only</div>
+                            <div class="calendar-side-caption" id="calendarRecurringCaption" style="display:none"></div>
                         </div>
                         <div id="calendarRecurringPreview"></div>
                     </div>
@@ -3390,7 +3390,7 @@
                             onfocus="this.style.borderColor='#6366f1'"
                             onblur="this.style.borderColor='#1e2530'">
                     </div>
-                    <button onclick="debugSnapshotData()" style="background:#1e2530;border:1px solid #2d3748;color:#f59e0b;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer" title="Диагностика">🔍 Диагностика</button>
+                    <button onclick="debugSnapshotData()" style="display:none;background:#1e2530;border:1px solid #2d3748;color:#f59e0b;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer" title="Диагностика">🔍 Диагностика</button>
                 </div>
             </div>
             <div id="kmHistoryContent"></div>
@@ -3908,7 +3908,10 @@
                     if(legendFuture)legendFuture.textContent=_cveTx.calendarLegendFuture||(lang==='en'?'upcoming':'впереди');
                     if(upcomingTitle)upcomingTitle.textContent=_cveTx.calendarUpcomingTitle||(lang==='en'?'Upcoming events':'Ближайшие события');
                     if(recurringTitle)recurringTitle.textContent=_cveTx.calendarRecurringTitle||(lang==='en'?'Weekly templates':'Шаблоны недели');
-                    if(recurringCaption)recurringCaption.textContent=_cveTx.calendarRecurringCaption||(lang==='en'?'preview only':'preview only');
+                    if(recurringCaption){
+                        recurringCaption.textContent=_cveTx.calendarRecurringCaption||'';
+                        recurringCaption.style.display=recurringCaption.textContent?'':'none';
+                    }
                     if(todayShortcut)todayShortcut.textContent=_cveTx.calendarTodayShortcut||(lang==='en'?'Open today':'Открыть сегодня');
 
                     const next = upcoming[0];
@@ -12240,7 +12243,7 @@ var CVE_DEF={
     calendarSummaryLabel3:'КМ и скрины',
     calendarUpcomingTitle:'Ближайшие события',
     calendarRecurringTitle:'Шаблоны недели',
-    calendarRecurringCaption:'preview only',
+    calendarRecurringCaption:'',
     calendarSectionLabel:'Календарь КМ',
     calendarLegendPast:'прошло',
     calendarLegendDone:'выполнено',
