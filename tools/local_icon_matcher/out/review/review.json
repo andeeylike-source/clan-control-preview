@@ -1,0 +1,2450 @@
+[
+  {
+    "screen": "photo_2026-03-26_22-45-09 (2).jpg",
+    "row": 0,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3918,
+    "gap": 0.0071,
+    "family": "warlock",
+    "top3": [
+      {
+        "name": "Arcana Lord",
+        "score": 0.3918
+      },
+      {
+        "name": "Doombringer",
+        "score": 0.3847
+      },
+      {
+        "name": "Sword Muse",
+        "score": 0.3621
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (2).jpg",
+    "row": 1,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3077,
+    "gap": 0.0476,
+    "family": "overlord",
+    "top3": [
+      {
+        "name": "Overlord",
+        "score": 0.3077
+      },
+      {
+        "name": "Shillien Knight",
+        "score": 0.2601
+      },
+      {
+        "name": "Mystic Muse",
+        "score": 0.2483
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (2).jpg",
+    "row": 2,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.492,
+    "gap": 0.0187,
+    "family": "paladin",
+    "top3": [
+      {
+        "name": "Paladin",
+        "score": 0.492
+      },
+      {
+        "name": "Elven Elder",
+        "score": 0.4733
+      },
+      {
+        "name": "Trickster",
+        "score": 0.4709
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (2).jpg",
+    "row": 3,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4334,
+    "gap": 0.0542,
+    "family": "elven_elder",
+    "top3": [
+      {
+        "name": "Trickster",
+        "score": 0.4334
+      },
+      {
+        "name": "Elven Elder",
+        "score": 0.3792
+      },
+      {
+        "name": "Phantom Ranger",
+        "score": 0.3724
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (2).jpg",
+    "row": 4,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3494,
+    "gap": 0.0644,
+    "family": "ghost_hunter",
+    "top3": [
+      {
+        "name": "Ghost Hunter",
+        "score": 0.3494
+      },
+      {
+        "name": "Warcryer",
+        "score": 0.285
+      },
+      {
+        "name": "Warsmith",
+        "score": 0.2678
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (2).jpg",
+    "row": 5,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.367,
+    "gap": 0.0205,
+    "family": "paladin",
+    "top3": [
+      {
+        "name": "Phoenix Knight",
+        "score": 0.367
+      },
+      {
+        "name": "Prophet",
+        "score": 0.3465
+      },
+      {
+        "name": "Berserker",
+        "score": 0.3449
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (2).jpg",
+    "row": 6,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.422,
+    "gap": 0.0218,
+    "family": "bishop",
+    "top3": [
+      {
+        "name": "Bishop",
+        "score": 0.422
+      },
+      {
+        "name": "Adventurer",
+        "score": 0.4002
+      },
+      {
+        "name": "Elemental Summoner",
+        "score": 0.3466
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (2).jpg",
+    "row": 7,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.5516,
+    "gap": 0.0046,
+    "family": "prophet",
+    "top3": [
+      {
+        "name": "Prophet",
+        "score": 0.5516
+      },
+      {
+        "name": "Phoenix Knight",
+        "score": 0.547
+      },
+      {
+        "name": "Bounty Hunter",
+        "score": 0.4693
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (2).jpg",
+    "row": 8,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4524,
+    "gap": 0.0487,
+    "family": "elven_elder",
+    "top3": [
+      {
+        "name": "Elven Elder",
+        "score": 0.4524
+      },
+      {
+        "name": "Trickster",
+        "score": 0.4037
+      },
+      {
+        "name": "Treasure Hunter",
+        "score": 0.3273
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (3).jpg",
+    "row": 0,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3119,
+    "gap": 0.0379,
+    "family": "warsmith",
+    "top3": [
+      {
+        "name": "Warsmith",
+        "score": 0.3119
+      },
+      {
+        "name": "Sword Singer",
+        "score": 0.274
+      },
+      {
+        "name": "Arcana Lord",
+        "score": 0.2739
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (3).jpg",
+    "row": 1,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Arbalester",
+    "confidence": 0.5531,
+    "gap": 0.0988,
+    "family": "arbalester",
+    "top3": [
+      {
+        "name": "Arbalester",
+        "score": 0.5531
+      },
+      {
+        "name": "Sword Muse",
+        "score": 0.4543
+      },
+      {
+        "name": "Bounty Hunter",
+        "score": 0.4282
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (3).jpg",
+    "row": 2,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3825,
+    "gap": 0.0251,
+    "family": "bladedancer",
+    "top3": [
+      {
+        "name": "Bladedancer",
+        "score": 0.3825
+      },
+      {
+        "name": "Trickster",
+        "score": 0.3574
+      },
+      {
+        "name": "Spectral Dancer",
+        "score": 0.3132
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (3).jpg",
+    "row": 3,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Paladin",
+    "confidence": 0.4652,
+    "gap": 0.1026,
+    "family": "paladin",
+    "top3": [
+      {
+        "name": "Paladin",
+        "score": 0.4652
+      },
+      {
+        "name": "Phantom Summoner",
+        "score": 0.3626
+      },
+      {
+        "name": "Inspector",
+        "score": 0.3601
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (3).jpg",
+    "row": 4,
+    "player": null,
+    "recommended_status": "manual_required",
+    "final_class": null,
+    "confidence": 0.1861,
+    "gap": 0.0165,
+    "family": "phantom_ranger",
+    "top3": [
+      {
+        "name": "Phantom Ranger",
+        "score": 0.1861
+      },
+      {
+        "name": "Silver Ranger",
+        "score": 0.1696
+      },
+      {
+        "name": "Wind Rider",
+        "score": 0.1681
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (3).jpg",
+    "row": 5,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Shillien Knight",
+    "confidence": 0.4438,
+    "gap": 0.0986,
+    "family": "shillien_knight",
+    "top3": [
+      {
+        "name": "Shillien Knight",
+        "score": 0.4438
+      },
+      {
+        "name": "Necromancer",
+        "score": 0.3452
+      },
+      {
+        "name": "Spellhowler",
+        "score": 0.3159
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (3).jpg",
+    "row": 6,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Warcryer",
+    "confidence": 0.4597,
+    "gap": 0.1223,
+    "family": "warcryer",
+    "top3": [
+      {
+        "name": "Warcryer",
+        "score": 0.4597
+      },
+      {
+        "name": "Ghost Hunter",
+        "score": 0.3374
+      },
+      {
+        "name": "Bishop",
+        "score": 0.2833
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (3).jpg",
+    "row": 7,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Bounty Hunter",
+    "confidence": 0.4968,
+    "gap": 0.1024,
+    "family": "bounty_hunter",
+    "top3": [
+      {
+        "name": "Bounty Hunter",
+        "score": 0.4968
+      },
+      {
+        "name": "Berserker",
+        "score": 0.3944
+      },
+      {
+        "name": "Ghost Hunter",
+        "score": 0.3881
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (3).jpg",
+    "row": 8,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.2927,
+    "gap": 0.0567,
+    "family": "elven_elder",
+    "top3": [
+      {
+        "name": "Trickster",
+        "score": 0.2927
+      },
+      {
+        "name": "Elven Elder",
+        "score": 0.236
+      },
+      {
+        "name": "Paladin",
+        "score": 0.2183
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (4).jpg",
+    "row": 0,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3985,
+    "gap": 0.0605,
+    "family": "paladin",
+    "top3": [
+      {
+        "name": "Paladin",
+        "score": 0.3985
+      },
+      {
+        "name": "Phantom Summoner",
+        "score": 0.338
+      },
+      {
+        "name": "Bishop",
+        "score": 0.3188
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (4).jpg",
+    "row": 1,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3587,
+    "gap": 0.0011,
+    "family": "temple_knight",
+    "top3": [
+      {
+        "name": "Temple Knight",
+        "score": 0.3587
+      },
+      {
+        "name": "Doombringer",
+        "score": 0.3576
+      },
+      {
+        "name": "Warlock",
+        "score": 0.3243
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (4).jpg",
+    "row": 2,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.2898,
+    "gap": 0.0398,
+    "family": "bladedancer",
+    "top3": [
+      {
+        "name": "Spectral Dancer",
+        "score": 0.2898
+      },
+      {
+        "name": "Storm Screamer",
+        "score": 0.25
+      },
+      {
+        "name": "Mystic Muse",
+        "score": 0.2434
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (4).jpg",
+    "row": 3,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.456,
+    "gap": 0.016,
+    "family": "bishop",
+    "top3": [
+      {
+        "name": "Cardinal",
+        "score": 0.456
+      },
+      {
+        "name": "Elven Elder",
+        "score": 0.44
+      },
+      {
+        "name": "Inspector",
+        "score": 0.3988
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (4).jpg",
+    "row": 4,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3772,
+    "gap": 0.0588,
+    "family": "temple_knight",
+    "top3": [
+      {
+        "name": "Temple Knight",
+        "score": 0.3772
+      },
+      {
+        "name": "Warlock",
+        "score": 0.3184
+      },
+      {
+        "name": "Male Soulbreaker",
+        "score": 0.3053
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (4).jpg",
+    "row": 5,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4129,
+    "gap": 0.0051,
+    "family": "prophet",
+    "top3": [
+      {
+        "name": "Prophet",
+        "score": 0.4129
+      },
+      {
+        "name": "Ghost Hunter",
+        "score": 0.4078
+      },
+      {
+        "name": "Wind Rider",
+        "score": 0.3284
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (4).jpg",
+    "row": 6,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Shillien Elder",
+    "confidence": 0.4016,
+    "gap": 0.0848,
+    "family": "shillien_elder",
+    "top3": [
+      {
+        "name": "Shillien Elder",
+        "score": 0.4016
+      },
+      {
+        "name": "Shillien Knight",
+        "score": 0.3168
+      },
+      {
+        "name": "Temple Knight",
+        "score": 0.2959
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (4).jpg",
+    "row": 7,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.2703,
+    "gap": 0.0298,
+    "family": "spellsinger",
+    "top3": [
+      {
+        "name": "Mystic Muse",
+        "score": 0.2703
+      },
+      {
+        "name": "Storm Screamer",
+        "score": 0.2405
+      },
+      {
+        "name": "Spectral Dancer",
+        "score": 0.2404
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (4).jpg",
+    "row": 8,
+    "player": null,
+    "recommended_status": "manual_required",
+    "final_class": null,
+    "confidence": 0.2146,
+    "gap": 0.0105,
+    "family": "paladin",
+    "top3": [
+      {
+        "name": "Trickster",
+        "score": 0.2146
+      },
+      {
+        "name": "Paladin",
+        "score": 0.2041
+      },
+      {
+        "name": "Spectral Dancer",
+        "score": 0.1628
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (5).jpg",
+    "row": 0,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4628,
+    "gap": 0.0768,
+    "family": "elven_elder",
+    "top3": [
+      {
+        "name": "Elven Elder",
+        "score": 0.4628
+      },
+      {
+        "name": "Treasure Hunter",
+        "score": 0.386
+      },
+      {
+        "name": "Inspector",
+        "score": 0.385
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (5).jpg",
+    "row": 1,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4545,
+    "gap": 0.0267,
+    "family": "ghost_hunter",
+    "top3": [
+      {
+        "name": "Ghost Hunter",
+        "score": 0.4545
+      },
+      {
+        "name": "Prophet",
+        "score": 0.4278
+      },
+      {
+        "name": "Sorcerer",
+        "score": 0.3763
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (5).jpg",
+    "row": 2,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Sword Muse",
+    "confidence": 0.5165,
+    "gap": 0.1292,
+    "family": "sword_singer",
+    "top3": [
+      {
+        "name": "Sword Muse",
+        "score": 0.5165
+      },
+      {
+        "name": "Soulhound",
+        "score": 0.3873
+      },
+      {
+        "name": "Sword Singer",
+        "score": 0.3278
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (5).jpg",
+    "row": 3,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.5315,
+    "gap": 0.0141,
+    "family": "elven_elder",
+    "top3": [
+      {
+        "name": "Trickster",
+        "score": 0.5315
+      },
+      {
+        "name": "Elven Elder",
+        "score": 0.5174
+      },
+      {
+        "name": "Treasure Hunter",
+        "score": 0.399
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (5).jpg",
+    "row": 4,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.2839,
+    "gap": 0.1051,
+    "family": "phantom_ranger",
+    "top3": [
+      {
+        "name": "Ghost Sentinel",
+        "score": 0.2839
+      },
+      {
+        "name": "Spectral Dancer",
+        "score": 0.1788
+      },
+      {
+        "name": "Warcryer",
+        "score": 0.1658
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (5).jpg",
+    "row": 5,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3085,
+    "gap": 0.0376,
+    "family": "treasure_hunter",
+    "top3": [
+      {
+        "name": "Adventurer",
+        "score": 0.3085
+      },
+      {
+        "name": "Archmage",
+        "score": 0.2709
+      },
+      {
+        "name": "Judicator",
+        "score": 0.269
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (5).jpg",
+    "row": 6,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Necromancer",
+    "confidence": 0.6475,
+    "gap": 0.0863,
+    "family": "necromancer",
+    "top3": [
+      {
+        "name": "Necromancer",
+        "score": 0.6475
+      },
+      {
+        "name": "Shillien Knight",
+        "score": 0.5612
+      },
+      {
+        "name": "Soulhound",
+        "score": 0.4607
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (5).jpg",
+    "row": 7,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.5697,
+    "gap": 0.0486,
+    "family": "elven_elder",
+    "top3": [
+      {
+        "name": "Elven Elder",
+        "score": 0.5697
+      },
+      {
+        "name": "Trickster",
+        "score": 0.5211
+      },
+      {
+        "name": "Treasure Hunter",
+        "score": 0.3898
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (5).jpg",
+    "row": 8,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4645,
+    "gap": 0.0532,
+    "family": "elven_elder",
+    "top3": [
+      {
+        "name": "Elven Elder",
+        "score": 0.4645
+      },
+      {
+        "name": "Trickster",
+        "score": 0.4113
+      },
+      {
+        "name": "Treasure Hunter",
+        "score": 0.3345
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (6).jpg",
+    "row": 0,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3844,
+    "gap": 0.1069,
+    "family": "bishop",
+    "top3": [
+      {
+        "name": "Bishop",
+        "score": 0.3844
+      },
+      {
+        "name": "Warcryer",
+        "score": 0.2775
+      },
+      {
+        "name": "Wind Rider",
+        "score": 0.2632
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (6).jpg",
+    "row": 1,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4759,
+    "gap": 0.0237,
+    "family": "sword_singer",
+    "top3": [
+      {
+        "name": "Sword Singer",
+        "score": 0.4759
+      },
+      {
+        "name": "Elemental Master",
+        "score": 0.4522
+      },
+      {
+        "name": "Paladin",
+        "score": 0.4459
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (6).jpg",
+    "row": 2,
+    "player": null,
+    "recommended_status": "manual_required",
+    "final_class": null,
+    "confidence": 0.2245,
+    "gap": 0.0075,
+    "family": "dark_avenger",
+    "top3": [
+      {
+        "name": "Dark Avenger",
+        "score": 0.2245
+      },
+      {
+        "name": "Maestro",
+        "score": 0.217
+      },
+      {
+        "name": "Ghost Sentinel",
+        "score": 0.1996
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (6).jpg",
+    "row": 3,
+    "player": null,
+    "recommended_status": "manual_required",
+    "final_class": null,
+    "confidence": 0.2361,
+    "gap": 0.0214,
+    "family": "silver_ranger",
+    "top3": [
+      {
+        "name": "Silver Ranger",
+        "score": 0.2361
+      },
+      {
+        "name": "Spectral Dancer",
+        "score": 0.2147
+      },
+      {
+        "name": "Doombringer",
+        "score": 0.1957
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (6).jpg",
+    "row": 4,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4249,
+    "gap": 0.0439,
+    "family": "elven_elder",
+    "top3": [
+      {
+        "name": "Elven Elder",
+        "score": 0.4249
+      },
+      {
+        "name": "Shillien Elder",
+        "score": 0.381
+      },
+      {
+        "name": "Tyrant",
+        "score": 0.3365
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (6).jpg",
+    "row": 5,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.5159,
+    "gap": 0.0203,
+    "family": "shillien_knight",
+    "top3": [
+      {
+        "name": "Shillien Knight",
+        "score": 0.5159
+      },
+      {
+        "name": "Spellsinger",
+        "score": 0.4956
+      },
+      {
+        "name": "Necromancer",
+        "score": 0.4034
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (6).jpg",
+    "row": 6,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4119,
+    "gap": 0.0571,
+    "family": "bounty_hunter",
+    "top3": [
+      {
+        "name": "Bounty Hunter",
+        "score": 0.4119
+      },
+      {
+        "name": "Archmage",
+        "score": 0.3548
+      },
+      {
+        "name": "Sagittarius",
+        "score": 0.3175
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (6).jpg",
+    "row": 7,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.267,
+    "gap": 0.0017,
+    "family": "elven_elder",
+    "top3": [
+      {
+        "name": "Elven Elder",
+        "score": 0.267
+      },
+      {
+        "name": "Paladin",
+        "score": 0.2653
+      },
+      {
+        "name": "Dark Avenger",
+        "score": 0.2485
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09 (6).jpg",
+    "row": 8,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.2602,
+    "gap": 0.1089,
+    "family": "elven_elder",
+    "top3": [
+      {
+        "name": "Trickster",
+        "score": 0.2602
+      },
+      {
+        "name": "Elven Elder",
+        "score": 0.1513
+      },
+      {
+        "name": "Ghost Sentinel",
+        "score": 0.1355
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09.jpg",
+    "row": 0,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3687,
+    "gap": 0.0006,
+    "family": "bishop",
+    "top3": [
+      {
+        "name": "Bishop",
+        "score": 0.3687
+      },
+      {
+        "name": "Ghost Hunter",
+        "score": 0.3681
+      },
+      {
+        "name": "Adventurer",
+        "score": 0.3359
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09.jpg",
+    "row": 1,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Treasure Hunter",
+    "confidence": 0.6147,
+    "gap": 0.2419,
+    "family": "treasure_hunter",
+    "top3": [
+      {
+        "name": "Treasure Hunter",
+        "score": 0.6147
+      },
+      {
+        "name": "Spectral Dancer",
+        "score": 0.3728
+      },
+      {
+        "name": "Elven Elder",
+        "score": 0.3644
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09.jpg",
+    "row": 2,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4355,
+    "gap": 0.0079,
+    "family": "elven_elder",
+    "top3": [
+      {
+        "name": "Elven Elder",
+        "score": 0.4355
+      },
+      {
+        "name": "Trickster",
+        "score": 0.4276
+      },
+      {
+        "name": "Treasure Hunter",
+        "score": 0.3421
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09.jpg",
+    "row": 3,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.362,
+    "gap": 0.0012,
+    "family": "warlock",
+    "top3": [
+      {
+        "name": "Arcana Lord",
+        "score": 0.362
+      },
+      {
+        "name": "Ghost Hunter",
+        "score": 0.3608
+      },
+      {
+        "name": "Elemental Master",
+        "score": 0.355
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09.jpg",
+    "row": 4,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.2737,
+    "gap": 0.0078,
+    "family": "wind_rider",
+    "top3": [
+      {
+        "name": "Wind Rider",
+        "score": 0.2737
+      },
+      {
+        "name": "Warcryer",
+        "score": 0.2659
+      },
+      {
+        "name": "Berserker",
+        "score": 0.2594
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09.jpg",
+    "row": 5,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.414,
+    "gap": 0.049,
+    "family": "overlord",
+    "top3": [
+      {
+        "name": "Overlord",
+        "score": 0.414
+      },
+      {
+        "name": "Shillien Knight",
+        "score": 0.365
+      },
+      {
+        "name": "Warsmith",
+        "score": 0.3297
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09.jpg",
+    "row": 6,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Tyrant",
+    "confidence": 0.5779,
+    "gap": 0.1922,
+    "family": "tyrant",
+    "top3": [
+      {
+        "name": "Tyrant",
+        "score": 0.5779
+      },
+      {
+        "name": "Hell Knight",
+        "score": 0.3857
+      },
+      {
+        "name": "Eva_s Saint",
+        "score": 0.3816
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09.jpg",
+    "row": 7,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.388,
+    "gap": 0.0116,
+    "family": "elven_elder",
+    "top3": [
+      {
+        "name": "Trickster",
+        "score": 0.388
+      },
+      {
+        "name": "Elven Elder",
+        "score": 0.3764
+      },
+      {
+        "name": "Treasure Hunter",
+        "score": 0.3443
+      }
+    ]
+  },
+  {
+    "screen": "photo_2026-03-26_22-45-09.jpg",
+    "row": 8,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3575,
+    "gap": 0.0281,
+    "family": "elven_elder",
+    "top3": [
+      {
+        "name": "Elven Elder",
+        "score": 0.3575
+      },
+      {
+        "name": "Trickster",
+        "score": 0.3294
+      },
+      {
+        "name": "Paladin",
+        "score": 0.2073
+      }
+    ]
+  },
+  {
+    "screen": "20e66877-6a3b-4beb-a9b6-5a06f80bef45.jpg",
+    "row": 0,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Necromancer",
+    "confidence": 0.7249,
+    "gap": 0.2176,
+    "family": "necromancer",
+    "top3": [
+      {
+        "name": "Necromancer",
+        "score": 0.7249
+      },
+      {
+        "name": "Shillien Knight",
+        "score": 0.5073
+      },
+      {
+        "name": "Soulhound",
+        "score": 0.4393
+      }
+    ]
+  },
+  {
+    "screen": "20e66877-6a3b-4beb-a9b6-5a06f80bef45.jpg",
+    "row": 1,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4545,
+    "gap": 0.0115,
+    "family": "shillien_knight",
+    "top3": [
+      {
+        "name": "Shillien Knight",
+        "score": 0.4545
+      },
+      {
+        "name": "Necromancer",
+        "score": 0.443
+      },
+      {
+        "name": "Overlord",
+        "score": 0.4068
+      }
+    ]
+  },
+  {
+    "screen": "20e66877-6a3b-4beb-a9b6-5a06f80bef45.jpg",
+    "row": 2,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3047,
+    "gap": 0.0109,
+    "family": "hawkeye",
+    "top3": [
+      {
+        "name": "Hawkeye",
+        "score": 0.3047
+      },
+      {
+        "name": "Shillien Knight",
+        "score": 0.2938
+      },
+      {
+        "name": "Paladin",
+        "score": 0.2496
+      }
+    ]
+  },
+  {
+    "screen": "20e66877-6a3b-4beb-a9b6-5a06f80bef45.jpg",
+    "row": 3,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3418,
+    "gap": 0.0362,
+    "family": "warsmith",
+    "top3": [
+      {
+        "name": "Maestro",
+        "score": 0.3418
+      },
+      {
+        "name": "Paladin",
+        "score": 0.3056
+      },
+      {
+        "name": "Bishop",
+        "score": 0.2991
+      }
+    ]
+  },
+  {
+    "screen": "20e66877-6a3b-4beb-a9b6-5a06f80bef45.jpg",
+    "row": 4,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.6091,
+    "gap": 0.0,
+    "family": "abyss_walker",
+    "top3": [
+      {
+        "name": "Abyss Walker",
+        "score": 0.6091
+      },
+      {
+        "name": "Plains Walker",
+        "score": 0.6091
+      },
+      {
+        "name": "АВ_ПВ",
+        "score": 0.6091
+      }
+    ]
+  },
+  {
+    "screen": "20e66877-6a3b-4beb-a9b6-5a06f80bef45.jpg",
+    "row": 5,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3625,
+    "gap": 0.0057,
+    "family": "female_sb",
+    "top3": [
+      {
+        "name": "Female Soulbreaker",
+        "score": 0.3625
+      },
+      {
+        "name": "Elemental Summoner",
+        "score": 0.3568
+      },
+      {
+        "name": "Male Soulbreaker",
+        "score": 0.3214
+      }
+    ]
+  },
+  {
+    "screen": "20e66877-6a3b-4beb-a9b6-5a06f80bef45.jpg",
+    "row": 6,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Necromancer",
+    "confidence": 0.4752,
+    "gap": 0.105,
+    "family": "necromancer",
+    "top3": [
+      {
+        "name": "Necromancer",
+        "score": 0.4752
+      },
+      {
+        "name": "Spellsinger",
+        "score": 0.3702
+      },
+      {
+        "name": "Dominator",
+        "score": 0.3543
+      }
+    ]
+  },
+  {
+    "screen": "20e66877-6a3b-4beb-a9b6-5a06f80bef45.jpg",
+    "row": 7,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3408,
+    "gap": 0.0141,
+    "family": "paladin",
+    "top3": [
+      {
+        "name": "Paladin",
+        "score": 0.3408
+      },
+      {
+        "name": "Grand Khavatari",
+        "score": 0.3267
+      },
+      {
+        "name": "Inspector",
+        "score": 0.2816
+      }
+    ]
+  },
+  {
+    "screen": "813b7215-36ab-4d4d-95b4-9e29720f2b0e.jpg",
+    "row": 0,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4016,
+    "gap": 0.0057,
+    "family": "elem_summoner",
+    "top3": [
+      {
+        "name": "Elemental Master",
+        "score": 0.4016
+      },
+      {
+        "name": "Paladin",
+        "score": 0.3959
+      },
+      {
+        "name": "Duelist",
+        "score": 0.365
+      }
+    ]
+  },
+  {
+    "screen": "813b7215-36ab-4d4d-95b4-9e29720f2b0e.jpg",
+    "row": 1,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.339,
+    "gap": 0.029,
+    "family": "shillien_knight",
+    "top3": [
+      {
+        "name": "Shillien Knight",
+        "score": 0.339
+      },
+      {
+        "name": "Abyss Walker",
+        "score": 0.31
+      },
+      {
+        "name": "Plains Walker",
+        "score": 0.31
+      }
+    ]
+  },
+  {
+    "screen": "813b7215-36ab-4d4d-95b4-9e29720f2b0e.jpg",
+    "row": 2,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3695,
+    "gap": 0.0273,
+    "family": "ghost_hunter",
+    "top3": [
+      {
+        "name": "Ghost Hunter",
+        "score": 0.3695
+      },
+      {
+        "name": "Wind Rider",
+        "score": 0.3422
+      },
+      {
+        "name": "Sorcerer",
+        "score": 0.3299
+      }
+    ]
+  },
+  {
+    "screen": "813b7215-36ab-4d4d-95b4-9e29720f2b0e.jpg",
+    "row": 3,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Shillien Elder",
+    "confidence": 0.6014,
+    "gap": 0.219,
+    "family": "shillien_elder",
+    "top3": [
+      {
+        "name": "Shillien Elder",
+        "score": 0.6014
+      },
+      {
+        "name": "Temple Knight",
+        "score": 0.3824
+      },
+      {
+        "name": "Elemental Summoner",
+        "score": 0.3549
+      }
+    ]
+  },
+  {
+    "screen": "813b7215-36ab-4d4d-95b4-9e29720f2b0e.jpg",
+    "row": 4,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3303,
+    "gap": 0.0346,
+    "family": "temple_knight",
+    "top3": [
+      {
+        "name": "Temple Knight",
+        "score": 0.3303
+      },
+      {
+        "name": "Warlock",
+        "score": 0.2957
+      },
+      {
+        "name": "Necromancer",
+        "score": 0.2874
+      }
+    ]
+  },
+  {
+    "screen": "813b7215-36ab-4d4d-95b4-9e29720f2b0e.jpg",
+    "row": 5,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3761,
+    "gap": 0.0555,
+    "family": "hawkeye",
+    "top3": [
+      {
+        "name": "Sagittarius",
+        "score": 0.3761
+      },
+      {
+        "name": "Archmage",
+        "score": 0.3206
+      },
+      {
+        "name": "Wind Rider",
+        "score": 0.29
+      }
+    ]
+  },
+  {
+    "screen": "813b7215-36ab-4d4d-95b4-9e29720f2b0e.jpg",
+    "row": 6,
+    "player": null,
+    "recommended_status": "manual_required",
+    "final_class": null,
+    "confidence": 0.2327,
+    "gap": 0.0126,
+    "family": "overlord",
+    "top3": [
+      {
+        "name": "Overlord",
+        "score": 0.2327
+      },
+      {
+        "name": "Mystic Muse",
+        "score": 0.2201
+      },
+      {
+        "name": "Shillien Knight",
+        "score": 0.2089
+      }
+    ]
+  },
+  {
+    "screen": "813b7215-36ab-4d4d-95b4-9e29720f2b0e.jpg",
+    "row": 7,
+    "player": null,
+    "recommended_status": "manual_required",
+    "final_class": null,
+    "confidence": 0.1865,
+    "gap": 0.0206,
+    "family": "gladiator",
+    "top3": [
+      {
+        "name": "Duelist",
+        "score": 0.1865
+      },
+      {
+        "name": "Grand Khavatari",
+        "score": 0.1659
+      },
+      {
+        "name": "Overlord",
+        "score": 0.1342
+      }
+    ]
+  },
+  {
+    "screen": "8df71a7a-30aa-4e3b-8108-5d96ebfa0d63.jpg",
+    "row": 0,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3615,
+    "gap": 0.0261,
+    "family": "bishop",
+    "top3": [
+      {
+        "name": "Bishop",
+        "score": 0.3615
+      },
+      {
+        "name": "Ghost Hunter",
+        "score": 0.3354
+      },
+      {
+        "name": "Warcryer",
+        "score": 0.2978
+      }
+    ]
+  },
+  {
+    "screen": "8df71a7a-30aa-4e3b-8108-5d96ebfa0d63.jpg",
+    "row": 1,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Phantom Ranger",
+    "confidence": 0.575,
+    "gap": 0.1142,
+    "family": "phantom_ranger",
+    "top3": [
+      {
+        "name": "Phantom Ranger",
+        "score": 0.575
+      },
+      {
+        "name": "Silver Ranger",
+        "score": 0.4608
+      },
+      {
+        "name": "Hawkeye",
+        "score": 0.3442
+      }
+    ]
+  },
+  {
+    "screen": "8df71a7a-30aa-4e3b-8108-5d96ebfa0d63.jpg",
+    "row": 2,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4158,
+    "gap": 0.0363,
+    "family": "phantom_ranger",
+    "top3": [
+      {
+        "name": "Trickster",
+        "score": 0.4158
+      },
+      {
+        "name": "Phantom Ranger",
+        "score": 0.3795
+      },
+      {
+        "name": "Hawkeye",
+        "score": 0.3297
+      }
+    ]
+  },
+  {
+    "screen": "8df71a7a-30aa-4e3b-8108-5d96ebfa0d63.jpg",
+    "row": 3,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3168,
+    "gap": 0.0033,
+    "family": "temple_knight",
+    "top3": [
+      {
+        "name": "Temple Knight",
+        "score": 0.3168
+      },
+      {
+        "name": "Warlock",
+        "score": 0.3135
+      },
+      {
+        "name": "Dark Avenger",
+        "score": 0.3039
+      }
+    ]
+  },
+  {
+    "screen": "8df71a7a-30aa-4e3b-8108-5d96ebfa0d63.jpg",
+    "row": 4,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4261,
+    "gap": 0.0404,
+    "family": "temple_knight",
+    "top3": [
+      {
+        "name": "Temple Knight",
+        "score": 0.4261
+      },
+      {
+        "name": "Shillien Elder",
+        "score": 0.3857
+      },
+      {
+        "name": "Warlock",
+        "score": 0.3454
+      }
+    ]
+  },
+  {
+    "screen": "8df71a7a-30aa-4e3b-8108-5d96ebfa0d63.jpg",
+    "row": 5,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Shillien Knight",
+    "confidence": 0.5626,
+    "gap": 0.2458,
+    "family": "shillien_knight",
+    "top3": [
+      {
+        "name": "Shillien Knight",
+        "score": 0.5626
+      },
+      {
+        "name": "Necromancer",
+        "score": 0.3168
+      },
+      {
+        "name": "Soulhound",
+        "score": 0.3163
+      }
+    ]
+  },
+  {
+    "screen": "8df71a7a-30aa-4e3b-8108-5d96ebfa0d63.jpg",
+    "row": 6,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.5346,
+    "gap": 0.0208,
+    "family": "prophet",
+    "top3": [
+      {
+        "name": "Prophet",
+        "score": 0.5346
+      },
+      {
+        "name": "Phoenix Knight",
+        "score": 0.5138
+      },
+      {
+        "name": "Bounty Hunter",
+        "score": 0.4476
+      }
+    ]
+  },
+  {
+    "screen": "8df71a7a-30aa-4e3b-8108-5d96ebfa0d63.jpg",
+    "row": 7,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Cardinal",
+    "confidence": 0.6187,
+    "gap": 0.1707,
+    "family": "bishop",
+    "top3": [
+      {
+        "name": "Cardinal",
+        "score": 0.6187
+      },
+      {
+        "name": "Inspector",
+        "score": 0.448
+      },
+      {
+        "name": "Sword Singer",
+        "score": 0.4388
+      }
+    ]
+  },
+  {
+    "screen": "8df71a7a-30aa-4e3b-8108-5d96ebfa0d63.jpg",
+    "row": 8,
+    "player": null,
+    "recommended_status": "manual_required",
+    "final_class": null,
+    "confidence": 0.2067,
+    "gap": 0.0129,
+    "family": "dark_avenger",
+    "top3": [
+      {
+        "name": "Dark Avenger",
+        "score": 0.2067
+      },
+      {
+        "name": "Paladin",
+        "score": 0.1938
+      },
+      {
+        "name": "Trickster",
+        "score": 0.1568
+      }
+    ]
+  },
+  {
+    "screen": "aeef21db-acd2-4124-aecd-89fbbaa3156b.jpg",
+    "row": 0,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Inspector",
+    "confidence": 0.6386,
+    "gap": 0.0856,
+    "family": "male_sb",
+    "top3": [
+      {
+        "name": "Inspector",
+        "score": 0.6386
+      },
+      {
+        "name": "Sword Singer",
+        "score": 0.553
+      },
+      {
+        "name": "Treasure Hunter",
+        "score": 0.4775
+      }
+    ]
+  },
+  {
+    "screen": "aeef21db-acd2-4124-aecd-89fbbaa3156b.jpg",
+    "row": 1,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Shillien Knight",
+    "confidence": 0.5952,
+    "gap": 0.1522,
+    "family": "shillien_knight",
+    "top3": [
+      {
+        "name": "Shillien Knight",
+        "score": 0.5952
+      },
+      {
+        "name": "Necromancer",
+        "score": 0.443
+      },
+      {
+        "name": "Spellhowler",
+        "score": 0.4264
+      }
+    ]
+  },
+  {
+    "screen": "aeef21db-acd2-4124-aecd-89fbbaa3156b.jpg",
+    "row": 2,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.2825,
+    "gap": 0.0038,
+    "family": "elem_summoner",
+    "top3": [
+      {
+        "name": "Elemental Summoner",
+        "score": 0.2825
+      },
+      {
+        "name": "Cardinal",
+        "score": 0.2787
+      },
+      {
+        "name": "Bishop",
+        "score": 0.2275
+      }
+    ]
+  },
+  {
+    "screen": "aeef21db-acd2-4124-aecd-89fbbaa3156b.jpg",
+    "row": 3,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3087,
+    "gap": 0.0316,
+    "family": "bladedancer",
+    "top3": [
+      {
+        "name": "Spectral Dancer",
+        "score": 0.3087
+      },
+      {
+        "name": "Arcana Lord",
+        "score": 0.2771
+      },
+      {
+        "name": "Duelist",
+        "score": 0.2747
+      }
+    ]
+  },
+  {
+    "screen": "aeef21db-acd2-4124-aecd-89fbbaa3156b.jpg",
+    "row": 4,
+    "player": null,
+    "recommended_status": "manual_required",
+    "final_class": null,
+    "confidence": 0.2413,
+    "gap": 0.003,
+    "family": "sorcerer",
+    "top3": [
+      {
+        "name": "Archmage",
+        "score": 0.2413
+      },
+      {
+        "name": "Shillien Templar",
+        "score": 0.2383
+      },
+      {
+        "name": "Grand Khavatari",
+        "score": 0.2264
+      }
+    ]
+  },
+  {
+    "screen": "aeef21db-acd2-4124-aecd-89fbbaa3156b.jpg",
+    "row": 5,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.5634,
+    "gap": 0.0783,
+    "family": "prophet",
+    "top3": [
+      {
+        "name": "Prophet",
+        "score": 0.5634
+      },
+      {
+        "name": "Phoenix Knight",
+        "score": 0.4851
+      },
+      {
+        "name": "Adventurer",
+        "score": 0.3775
+      }
+    ]
+  },
+  {
+    "screen": "aeef21db-acd2-4124-aecd-89fbbaa3156b.jpg",
+    "row": 6,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4879,
+    "gap": 0.0541,
+    "family": "phantom_ranger",
+    "top3": [
+      {
+        "name": "Trickster",
+        "score": 0.4879
+      },
+      {
+        "name": "Phantom Ranger",
+        "score": 0.4338
+      },
+      {
+        "name": "Elven Elder",
+        "score": 0.4251
+      }
+    ]
+  },
+  {
+    "screen": "d701f500-7fb3-42b7-bfdb-be68b42d2450.jpg",
+    "row": 0,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4155,
+    "gap": 0.0663,
+    "family": "ghost_hunter",
+    "top3": [
+      {
+        "name": "Ghost Hunter",
+        "score": 0.4155
+      },
+      {
+        "name": "Bishop",
+        "score": 0.3492
+      },
+      {
+        "name": "Adventurer",
+        "score": 0.3338
+      }
+    ]
+  },
+  {
+    "screen": "d701f500-7fb3-42b7-bfdb-be68b42d2450.jpg",
+    "row": 1,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Shillien Elder",
+    "confidence": 0.6485,
+    "gap": 0.2664,
+    "family": "shillien_elder",
+    "top3": [
+      {
+        "name": "Shillien Elder",
+        "score": 0.6485
+      },
+      {
+        "name": "Bladedancer",
+        "score": 0.3821
+      },
+      {
+        "name": "Shillien Knight",
+        "score": 0.3791
+      }
+    ]
+  },
+  {
+    "screen": "d701f500-7fb3-42b7-bfdb-be68b42d2450.jpg",
+    "row": 2,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.5806,
+    "gap": 0.0671,
+    "family": "treasure_hunter",
+    "top3": [
+      {
+        "name": "Treasure Hunter",
+        "score": 0.5806
+      },
+      {
+        "name": "Abyss Walker",
+        "score": 0.5135
+      },
+      {
+        "name": "Plains Walker",
+        "score": 0.5135
+      }
+    ]
+  },
+  {
+    "screen": "d701f500-7fb3-42b7-bfdb-be68b42d2450.jpg",
+    "row": 3,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.2849,
+    "gap": 0.0084,
+    "family": "shillien_elder",
+    "top3": [
+      {
+        "name": "Shillien Elder",
+        "score": 0.2849
+      },
+      {
+        "name": "Shillien Knight",
+        "score": 0.2765
+      },
+      {
+        "name": "Bladedancer",
+        "score": 0.2709
+      }
+    ]
+  },
+  {
+    "screen": "d701f500-7fb3-42b7-bfdb-be68b42d2450.jpg",
+    "row": 4,
+    "player": null,
+    "recommended_status": "manual_required",
+    "final_class": null,
+    "confidence": 0.2274,
+    "gap": 0.0129,
+    "family": "paladin",
+    "top3": [
+      {
+        "name": "Paladin",
+        "score": 0.2274
+      },
+      {
+        "name": "Mystic Muse",
+        "score": 0.2145
+      },
+      {
+        "name": "Necromancer",
+        "score": 0.2011
+      }
+    ]
+  },
+  {
+    "screen": "d701f500-7fb3-42b7-bfdb-be68b42d2450.jpg",
+    "row": 5,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4042,
+    "gap": 0.0662,
+    "family": "prophet",
+    "top3": [
+      {
+        "name": "Prophet",
+        "score": 0.4042
+      },
+      {
+        "name": "Ghost Hunter",
+        "score": 0.338
+      },
+      {
+        "name": "Sorcerer",
+        "score": 0.3154
+      }
+    ]
+  },
+  {
+    "screen": "d701f500-7fb3-42b7-bfdb-be68b42d2450.jpg",
+    "row": 6,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Overlord",
+    "confidence": 0.5201,
+    "gap": 0.1597,
+    "family": "overlord",
+    "top3": [
+      {
+        "name": "Overlord",
+        "score": 0.5201
+      },
+      {
+        "name": "Shillien Knight",
+        "score": 0.3604
+      },
+      {
+        "name": "Dominator",
+        "score": 0.2715
+      }
+    ]
+  },
+  {
+    "screen": "d701f500-7fb3-42b7-bfdb-be68b42d2450.jpg",
+    "row": 7,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4182,
+    "gap": 0.0417,
+    "family": "treasure_hunter",
+    "top3": [
+      {
+        "name": "Treasure Hunter",
+        "score": 0.4182
+      },
+      {
+        "name": "Female Soulbreaker",
+        "score": 0.3765
+      },
+      {
+        "name": "Inspector",
+        "score": 0.3417
+      }
+    ]
+  },
+  {
+    "screen": "d701f500-7fb3-42b7-bfdb-be68b42d2450.jpg",
+    "row": 8,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.2553,
+    "gap": 0.0216,
+    "family": "dark_avenger",
+    "top3": [
+      {
+        "name": "Dark Avenger",
+        "score": 0.2553
+      },
+      {
+        "name": "Paladin",
+        "score": 0.2337
+      },
+      {
+        "name": "Elven Elder",
+        "score": 0.2219
+      }
+    ]
+  },
+  {
+    "screen": "f4b06847-bf01-4221-9cf3-59b3d4b5b586.jpg",
+    "row": 0,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4784,
+    "gap": 0.0016,
+    "family": "silver_ranger",
+    "top3": [
+      {
+        "name": "Silver Ranger",
+        "score": 0.4784
+      },
+      {
+        "name": "Phantom Ranger",
+        "score": 0.4768
+      },
+      {
+        "name": "Trickster",
+        "score": 0.4423
+      }
+    ]
+  },
+  {
+    "screen": "f4b06847-bf01-4221-9cf3-59b3d4b5b586.jpg",
+    "row": 1,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.4274,
+    "gap": 0.0444,
+    "family": "elven_elder",
+    "top3": [
+      {
+        "name": "Trickster",
+        "score": 0.4274
+      },
+      {
+        "name": "Elven Elder",
+        "score": 0.383
+      },
+      {
+        "name": "Phantom Ranger",
+        "score": 0.3393
+      }
+    ]
+  },
+  {
+    "screen": "f4b06847-bf01-4221-9cf3-59b3d4b5b586.jpg",
+    "row": 2,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3572,
+    "gap": 0.0157,
+    "family": "ghost_hunter",
+    "top3": [
+      {
+        "name": "Ghost Hunter",
+        "score": 0.3572
+      },
+      {
+        "name": "Phoenix Knight",
+        "score": 0.3415
+      },
+      {
+        "name": "Titan",
+        "score": 0.2899
+      }
+    ]
+  },
+  {
+    "screen": "f4b06847-bf01-4221-9cf3-59b3d4b5b586.jpg",
+    "row": 3,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.2788,
+    "gap": 0.0504,
+    "family": "hawkeye",
+    "top3": [
+      {
+        "name": "Hawkeye",
+        "score": 0.2788
+      },
+      {
+        "name": "Overlord",
+        "score": 0.2284
+      },
+      {
+        "name": "Sword Singer",
+        "score": 0.2276
+      }
+    ]
+  },
+  {
+    "screen": "f4b06847-bf01-4221-9cf3-59b3d4b5b586.jpg",
+    "row": 4,
+    "player": null,
+    "recommended_status": "auto_accept",
+    "final_class": "Hawkeye",
+    "confidence": 0.4375,
+    "gap": 0.1392,
+    "family": "hawkeye",
+    "top3": [
+      {
+        "name": "Hawkeye",
+        "score": 0.4375
+      },
+      {
+        "name": "Sword Singer",
+        "score": 0.2983
+      },
+      {
+        "name": "Hell Knight",
+        "score": 0.2846
+      }
+    ]
+  },
+  {
+    "screen": "f4b06847-bf01-4221-9cf3-59b3d4b5b586.jpg",
+    "row": 5,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3832,
+    "gap": 0.0088,
+    "family": "shillien_knight",
+    "top3": [
+      {
+        "name": "Shillien Knight",
+        "score": 0.3832
+      },
+      {
+        "name": "Overlord",
+        "score": 0.3744
+      },
+      {
+        "name": "Necromancer",
+        "score": 0.361
+      }
+    ]
+  },
+  {
+    "screen": "f4b06847-bf01-4221-9cf3-59b3d4b5b586.jpg",
+    "row": 6,
+    "player": null,
+    "recommended_status": "ambiguous_review",
+    "final_class": null,
+    "confidence": 0.3884,
+    "gap": 0.0511,
+    "family": "paladin",
+    "top3": [
+      {
+        "name": "Paladin",
+        "score": 0.3884
+      },
+      {
+        "name": "Trickster",
+        "score": 0.3373
+      },
+      {
+        "name": "Elven Elder",
+        "score": 0.2971
+      }
+    ]
+  }
+]

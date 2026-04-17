@@ -1,5 +1,4 @@
 CLAUDE.local.md
 .claude/settings.local.json
 tools/local_icon_matcher/.openrouter_key
-tools/local_icon_matcher/out/unified.json
 tools/local_icon_matcher/out/gemini_rows.json
