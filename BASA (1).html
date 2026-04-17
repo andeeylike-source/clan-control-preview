@@ -3233,6 +3233,14 @@
                         📸 Импорт из скриншота клана
                         <input type="file" accept="image/*" multiple style="display:none" onchange="handleClanScreenshots(event)">
                     </label>
+                    <label style="display:flex;align-items:center;gap:8px;background:#1a2235;color:#a78bfa;border:1px solid #312e81;padding:8px 16px;border-radius:10px;cursor:pointer;font-weight:600;font-size:13px;transition:all .2s" title="Загрузить review.json из local_icon_matcher" onmouseover="this.style.background='#1e2a45'" onmouseout="this.style.background='#1a2235'">
+                        📊 Скан-ревью
+                        <input type="file" accept=".json" style="display:none" onchange="openScanReview(event)">
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;background:#1a1a35;color:#c4b5fd;border:1px solid #4c1d95;padding:8px 16px;border-radius:10px;cursor:pointer;font-weight:600;font-size:13px;transition:all .2s" title="Загрузить unified.json (nick+stats+class, left+right)" onmouseover="this.style.background='#1e1e45'" onmouseout="this.style.background='#1a1a35'">
+                        🔗 Unified
+                        <input type="file" accept=".json" style="display:none" onchange="openUnifiedReview(event)">
+                    </label>
                 </div>
                 <!-- Статус и превью -->
                 <div id="clanImportStatus" style="display:none;margin-top:10px;font-size:12px;padding:10px 14px;border-radius:8px"></div>
@@ -12295,38 +12303,67 @@ function _idbLoadHero(cb){
 }
 
 // ── Supabase remote storage (shared across all browsers) ─────
+// heroImage stored in Supabase Storage bucket 'cve-hero' as binary.
+// app_settings key 'cve_config' stores metadata + public URL only (no base64).
 var CVE_REMOTE_CFG_KEY='cve_config';
-var CVE_REMOTE_IMG_KEY='cve_hero_image';
+var CVE_STORAGE_BUCKET='cve-hero';
+var CVE_STORAGE_PATH='hero';
+
+function _uploadHeroToStorage(dataUrl,cb){
+  var sb=window._supabase;if(!sb){cb('');return;}
+  try{
+    var arr=dataUrl.split(',');
+    var mime=(arr[0].match(/:(.*?);/)||[])[1]||'image/jpeg';
+    var ext=mime.split('/')[1]||'jpg';
+    var bstr=atob(arr[1]);var n=bstr.length;var u8=new Uint8Array(n);
+    while(n--)u8[n]=bstr.charCodeAt(n);
+    var blob=new Blob([u8],{type:mime});
+    var path=CVE_STORAGE_PATH+'.'+ext;
+    sb.storage.from(CVE_STORAGE_BUCKET).upload(path,blob,{upsert:true,contentType:mime}).then(function(r){
+      if(r&&r.error){console.warn('[CVE] storage upload:',r.error.message);cb('');return;}
+      var res=sb.storage.from(CVE_STORAGE_BUCKET).getPublicUrl(path);
+      cb((res.data&&res.data.publicUrl)||'');
+    }).catch(function(){cb('');});
+  }catch(e){cb('');}
+}
+
+function _saveConfigRemote(cfg){
+  var sb=window._supabase;if(!sb)return;
+  sb.from('app_settings').upsert({key:CVE_REMOTE_CFG_KEY,value_json:cfg},{onConflict:'key'}).then(function(r){
+    if(r&&r.error)console.warn('[CVE] config save:',r.error.message);
+  });
+}
 
 function _svRemote(cfg){
   var sb=window._supabase;if(!sb)return;
   try{
     var clone=JSON.parse(JSON.stringify(cfg));
-    var heroImage=clone.heroImage||'';
-    clone.heroImage=heroImage?'__REMOTE__':'';
-    sb.from('app_settings').upsert({key:CVE_REMOTE_CFG_KEY,value_json:clone},{onConflict:'key'}).then(function(r){
-      if(r&&r.error)console.warn('[CVE] remote config save:',r.error.message);
-    });
-    sb.from('app_settings').upsert({key:CVE_REMOTE_IMG_KEY,value_json:{dataUrl:heroImage}},{onConflict:'key'}).then(function(r){
-      if(r&&r.error)console.warn('[CVE] remote hero save:',r.error.message);
-    });
+    var hero=clone.heroImage||'';
+    if(hero.indexOf('data:')===0){
+      // Upload binary to Storage, store public URL in config
+      _uploadHeroToStorage(hero,function(url){
+        clone.heroImage=url;
+        _saveConfigRemote(clone);
+        // Update in-memory cfg with the URL so local cache can store it
+        if(_cfg)_cfg.heroImage=url;
+      });
+    } else {
+      // Already a URL or empty
+      _saveConfigRemote(clone);
+    }
   }catch(e){}
 }
 
 function _ldRemote(cb){
   var sb=window._supabase;if(!sb){cb(null);return;}
   try{
-    Promise.all([
-      sb.from('app_settings').select('value_json').eq('key',CVE_REMOTE_CFG_KEY).maybeSingle(),
-      sb.from('app_settings').select('value_json').eq('key',CVE_REMOTE_IMG_KEY).maybeSingle()
-    ]).then(function(results){
-      var cfgR=results[0],imgR=results[1];
-      if(cfgR.error||!cfgR.data||!cfgR.data.value_json){cb(null);return;}
-      var cfg=JSON.parse(JSON.stringify(cfgR.data.value_json));
-      var heroImage=(imgR.data&&imgR.data.value_json&&imgR.data.value_json.dataUrl)||'';
-      cfg.heroImage=heroImage;
-      cb(cfg);
-    }).catch(function(){cb(null);});
+    sb.from('app_settings').select('value_json').eq('key',CVE_REMOTE_CFG_KEY).maybeSingle()
+      .then(function(r){
+        if(r.error||!r.data||!r.data.value_json){cb(null);return;}
+        var cfg=JSON.parse(JSON.stringify(r.data.value_json));
+        // heroImage is a public Storage URL or ''
+        cb(cfg);
+      }).catch(function(){cb(null);});
   }catch(e){cb(null);}
 }
 
@@ -12337,15 +12374,19 @@ function _migrateToRemoteIfNeeded(cfg){
 // ── localStorage for small config (WITHOUT heroImage) ────────
 function _ld(){try{var r=localStorage.getItem(CVE_KEY);return r?JSON.parse(r):null;}catch(e){return null;}}
 function _sv(c){
-  // Save config to localStorage WITHOUT heroImage (too large for LS)
   try{
     var clone=JSON.parse(JSON.stringify(c));
-    var hasHero=!!clone.heroImage;
-    clone.heroImage=hasHero?'__IDB__':'';
-    localStorage.setItem(CVE_KEY,JSON.stringify(clone));
+    var hero=clone.heroImage||'';
+    if(hero.indexOf('data:')===0){
+      // base64 too large for localStorage — keep in IndexedDB
+      clone.heroImage='__IDB__';
+      localStorage.setItem(CVE_KEY,JSON.stringify(clone));
+      _idbSaveHero(hero);
+    } else {
+      // URL or empty — small enough for localStorage directly
+      localStorage.setItem(CVE_KEY,JSON.stringify(clone));
+    }
   }catch(e){}
-  // Save heroImage to IndexedDB (local cache)
-  _idbSaveHero(c.heroImage||'');
   // Save to Supabase — shared source of truth for all browsers
   _svRemote(c);
 }
@@ -12948,5 +12989,277 @@ function _updBtn(email){
 
 })(); // end CVE v3 IIFE
 </script>
+
+<script>
+// SCAN-REVIEW BLOCK -- semi-auto profession validation from review.json / unified.json
+(function() {
+var _srData = [];
+var _srState = {};
+// side included so left row0 and right row0 of same screen don't collide
+function rowKey(e){ return (e.screenshot||e.screen)+'::'+(e.side||'right')+'::'+e.row; }
+function srRecommendedStatus(row){
+    if(row && row.recommended_status) return row.recommended_status;
+    return row && row['class'] ? 'auto_accept' : 'manual_required';
+}
+
+window.openScanReview = function(evt){
+    var file = evt.target.files[0]; evt.target.value='';
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e){
+        try{
+            var data = JSON.parse(e.target.result);
+            if(!Array.isArray(data)||!data.length) throw new Error('пустой массив');
+            // review.json rows have no side field — all are right-panel
+            _srData = data.map(function(r){ return Object.assign({side:'right'}, r); });
+            _srState = {};
+            _srData.forEach(function(r){
+                if(r.recommended_status==='auto_accept'&&r.final_class)
+                    _srState[rowKey(r)]=r.final_class;
+            });
+            renderSR();
+            document.getElementById('scanReviewModal').style.display='flex';
+        }catch(ex){ alert('Ошибка review.json: '+ex.message); }
+    };
+    reader.readAsText(file);
+};
+
+// Load unified.json (nick+kills+deaths+pvp+pve+class, left+right)
+window.openUnifiedReview = function(evt){
+    var file = evt.target.files[0]; evt.target.value='';
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e){
+        try{
+            var data = JSON.parse(e.target.result);
+            if(!Array.isArray(data)||!data.length) throw new Error('пустой массив');
+            _srData = data.map(function(r){
+                return Object.assign({}, r, {
+                    screenshot: r.screenshot,
+                    side: r.side || 'right'
+                });
+            });
+            _srState = {};
+            _srData.forEach(function(r){
+                if(srRecommendedStatus(r)==='auto_accept' && r['class'] && r.side==='right')
+                    _srState[rowKey(r)] = r['class'];
+            });
+            renderSR();
+            document.getElementById('scanReviewModal').style.display='flex';
+        }catch(ex){ alert('Ошибка unified.json: '+ex.message); }
+    };
+    reader.readAsText(file);
+};
+
+window.closeScanReview = function(){
+    document.getElementById('scanReviewModal').style.display='none';
+};
+
+function renderSR(){
+    var list   = document.getElementById('scanReviewList');
+    var total  = _srData.length;
+    var rRows  = _srData.filter(function(r){return (r.side||'right')==='right';});
+    var lRows  = _srData.filter(function(r){return r.side==='left';});
+    var done   = Object.keys(_srState).length;
+    var screens= [...new Set(_srData.map(function(r){return r.screenshot||r.screen;}))].length;
+    document.getElementById('scanReviewSubtitle').textContent =
+        total+' строк из '+screens+' скринов (right='+rRows.length+' left='+lRows.length+')';
+    document.getElementById('scanReviewCounter').textContent =
+        'Подтверждено: '+done+' / '+rRows.length+' right';
+
+    var html = ''; var lastScr = null;
+    _srData.forEach(function(row){
+        var key    = rowKey(row);
+        var status = srRecommendedStatus(row);
+        var side   = row.side || 'right';
+        var isLeft = side === 'left';
+        var chosen = _srState[key]||null;
+        var top3   = row.top3||[];
+        var ok     = isLeft || !!chosen;
+
+        var scrName = row.screenshot || row.screen;
+        if(scrName!==lastScr){
+            lastScr=scrName;
+            html+='<div style="font-size:11px;color:#475569;padding:6px 0 2px;font-weight:600;border-top:1px solid #1e2530;margin-top:4px">'+
+                  '📸 '+scrName+'</div>';
+        }
+
+        var sc = status==='auto_accept'?'#4ade80':status==='ambiguous_review'?'#fbbf24':'#f87171';
+        var sl = status==='auto_accept'?'✓ авто':status==='ambiguous_review'?'? выбор':'! ручной';
+
+        // stats snippet (kills/deaths/pvp/pve) — shown when available
+        var statsHtml = '';
+        if(row.kills!=null||row.deaths!=null||row.pvp!=null){
+            statsHtml = '<span style="font-size:10px;color:#64748b;white-space:nowrap">'
+                +'⚔'+( row.kills!=null?row.kills:'?')
+                +' 💀'+(row.deaths!=null?row.deaths:'?')
+                +' P'+(row.pvp!=null?row.pvp:'?')
+                +'</span>';
+        }
+
+        // side badge
+        var sideBadge = '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:'
+            +(isLeft?'#1e3a5f':'#1a2a1a')+';color:'+(isLeft?'#60a5fa':'#4ade80')
+            +';font-weight:700">'+(isLeft?'L':'R')+'</span>';
+
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:'
+             +(ok?'#0f1a12':'#1a1a2a')+';border:1px solid '+(ok?'#166534':'#2d3748')+'">';
+        html+=sideBadge;
+        html+='<span style="min-width:24px;font-size:11px;color:#475569">r'+row.row+'</span>';
+        html+='<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#1e2530;color:'+sc+';min-width:52px;text-align:center">'+sl+'</span>';
+        html+='<span style="min-width:80px;font-size:12px;color:#94a3b8">'+((row.nick||row.player)||'—')+'</span>';
+        html+=statsHtml;
+
+        if(isLeft){
+            // Left = CC leader row: no class column, just stats
+            html+='<span style="flex:1;font-size:11px;color:#475569;font-style:italic">лидер пака</span>';
+        } else if(status==='auto_accept'){
+            html+='<span style="flex:1;font-size:13px;color:#4ade80;font-weight:600">'+(chosen||'—')+'</span>';
+        } else {
+            html+='<div style="display:flex;flex-wrap:wrap;gap:4px;flex:1">';
+            top3.forEach(function(c){
+                var active=chosen===c.name;
+                var safeN = c.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+                html+='<button onclick="srPick(\''+key+'\',\''+safeN+'\')"\n'
+                     +' style="font-size:11px;padding:3px 8px;border-radius:6px;cursor:pointer;border:1px solid '
+                     +(active?'#6366f1':'#2d3748')+';background:'+(active?'#312e81':'#1e2530')
+                     +';color:'+(active?'white':'#94a3b8')+'">'+c.name
+                     +' <span style="opacity:.6">'+c.score.toFixed(3)+'</span></button>';
+            });
+            html+='</div>';
+        }
+        // manual override dropdown — right rows only
+        if(!isLeft) html+=_sel(key,chosen);
+        html+='</div>';
+    });
+    list.innerHTML = html;
+}
+
+function _sel(key,chosen){
+    var profas = [];
+    if(typeof CLASS2_ICONS!=='undefined') profas=profas.concat(Object.keys(CLASS2_ICONS));
+    if(typeof PROFA_ICONS!=='undefined')  profas=profas.concat(Object.keys(PROFA_ICONS));
+    profas=profas.filter(function(v,i,a){return a.indexOf(v)===i;}).sort();
+    var s='<select onchange="srPickSel(\''+key+'\',this.value)" style="font-size:11px;padding:2px 5px;border-radius:6px;background:#1e2530;color:#94a3b8;border:1px solid #2d3748;max-width:130px">';
+    s+='<option value="">— вручную —</option>';
+    profas.forEach(function(p){
+        s+='<option value="'+p+'"'+(chosen===p?' selected':'')+'>'+p+'</option>';
+    });
+    s+='</select>';
+    return s;
+}
+
+window.srPick    = function(k,c){ _srState[k]=c; renderSR(); };
+window.srPickSel = function(k,c){ if(c){ _srState[k]=c; renderSR(); } };
+
+function _buildResult(){
+    return _srData.map(function(r){
+        var k=rowKey(r);
+        return { screen:(r.screenshot||r.screen), row:r.row, player:(r.nick||r.player),
+                 recommended_status:srRecommendedStatus(r),
+                 confirmed_class:_srState[k]||null,
+                 confidence:r.confidence, gap:r.gap };
+    });
+}
+
+window.exportScanReview = function(){
+    var blob=new Blob([JSON.stringify(_buildResult(),null,2)],{type:'application/json'});
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='scan_review_confirmed.json'; a.click();
+};
+
+window.applyScanReviewToRoster = function(){
+    var result=_buildResult(), applied=0, skipped=0, leftSkipped=0;
+    result.forEach(function(r){
+        // left = CC leaders, not in roster — skip entirely
+        if(r.side==='left'){ leftSkipped++; return; }
+        if(!r.confirmed_class||!r.player){ skipped++; return; }
+        if(typeof roster==='undefined') return;
+        var norm=typeof normalizeNick==='function'?normalizeNick(r.player):r.player.toLowerCase();
+        var found=roster.find(function(p){
+            return (typeof normalizeNick==='function'?normalizeNick(p.name):p.name.toLowerCase())===norm;
+        });
+        if(found){ found.profa=r.confirmed_class; applied++; } else skipped++;
+    });
+    if(typeof saveToStorage==='function') saveToStorage();
+    if(typeof renderRoster==='function') renderRoster();
+    closeScanReview();
+    alert('Применено: '+applied+'\nПропущено (нет в ростере или нет имени): '+skipped+
+          (leftSkipped?'\nLeft (лидеры паков): '+leftSkipped+' — в ростер не применяются':'')+
+          '\n\nСтроки без player=null пропущены (OCR не реализован).');
+};
+
+window.exportLabeledDataset = function(){
+    var rows = _srData.reduce(function(acc, r){
+        var k = rowKey(r);
+        var cls = _srState[k] || null;
+        if(!cls) return acc;
+        var scrName = r.screenshot || r.screen;
+        var cropPath = 'crops/' + scrName.replace(/[/\\]/g,'_') + '_row' + String(r.row).padStart(3,'0') + '.png';
+        acc.push({
+            screenshot:         scrName,
+            row:                r.row,
+            player:             (r.nick || r.player) || null,
+            final_class:        cls,
+            recommended_status: srRecommendedStatus(r),
+            source:             'review_ui',
+            confidence:         r.confidence != null ? r.confidence : null,
+            gap:                r.gap        != null ? r.gap        : null,
+            crop_path:          cropPath
+        });
+        return acc;
+    }, []);
+
+    if(!rows.length){ alert('Нет confirmed строк для экспорта.'); return; }
+
+    var jsonBlob = new Blob([JSON.stringify(rows, null, 2)], {type:'application/json'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(jsonBlob);
+    a.download = 'labeled_rows.json'; a.click();
+
+    var cols = ['screenshot','row','player','final_class','recommended_status','source','confidence','gap','crop_path'];
+    var csvLines = [cols.join(',')];
+    rows.forEach(function(r){
+        csvLines.push(cols.map(function(c){
+            var v = r[c];
+            if(v == null) return '';
+            var s = String(v);
+            if(s.indexOf(',')!==-1||s.indexOf('"')!==-1||s.indexOf('\n')!==-1)
+                s = '"' + s.replace(/"/g,'""') + '"';
+            return s;
+        }).join(','));
+    });
+    var csvBlob = new Blob([csvLines.join('\n')], {type:'text/csv'});
+    var b = document.createElement('a');
+    b.href = URL.createObjectURL(csvBlob);
+    b.download = 'labeled_rows.csv'; b.click();
+
+    alert('Экспортировано: ' + rows.length + ' confirmed строк.\nСохрани оба файла в tools/local_icon_matcher/out/');
+};
+})();
+</script>
+
+<!-- ── Scan-Review Modal ────────────────────────────────────────────── -->
+<div id="scanReviewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:170;align-items:center;justify-content:center">
+    <div style="background:#12171f;border:1px solid #1e2530;border-radius:16px;width:700px;max-width:97vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">
+        <div style="padding:18px 24px 14px;border-bottom:1px solid #1e2530;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+            <div>
+                <div style="font-size:15px;font-weight:700;color:#e2e8f0">📊 Ревью скана проф (КМ)</div>
+                <div id="scanReviewSubtitle" style="font-size:12px;color:#64748b;margin-top:2px"></div>
+            </div>
+            <button onclick="closeScanReview()" style="background:#1e2530;border:none;color:#94a3b8;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px">✕</button>
+        </div>
+        <div id="scanReviewList" style="overflow-y:auto;padding:14px 20px;display:flex;flex-direction:column;gap:8px;flex:1"></div>
+        <div style="padding:14px 20px;border-top:1px solid #1e2530;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+            <span id="scanReviewCounter" style="font-size:12px;color:#64748b"></span>
+            <div style="display:flex;gap:10px">
+                <button onclick="closeScanReview()" style="background:#1e2530;border:none;color:#94a3b8;border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer">Отмена</button>
+                <button onclick="exportScanReview()" style="background:#166534;border:none;color:#4ade80;border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer;font-weight:700">💾 Скачать JSON</button>
+                <button onclick="exportLabeledDataset()" style="background:#0f3460;border:none;color:#60a5fa;border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer;font-weight:700">📦 Датасет</button>
+                <button onclick="applyScanReviewToRoster()" style="background:#6366f1;border:none;color:white;border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer;font-weight:700">✅ Применить в ростер</button>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
 </html>
