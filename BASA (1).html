@@ -5118,11 +5118,24 @@ function getStoredDayProfa(dateStr, playerName) {
 function hasResolvedProfa(profa) {
     return !!profa && profa !== '—' && profa !== 'вЂ”' && profa !== 'РІР‚вЂќ';
 }
+// Lookup class from icon_matcher results (unified.json / review.json) populated via openUnifiedReview / openScanReview
+function getIconMatcherClass2ByNick(name) {
+    if (!name) return null;
+    const map = (typeof window !== 'undefined') ? window.__iconMatcherClassByNick : null;
+    if (!map) return null;
+    const key = normalizeNick(name);
+    return map[key] || null;
+}
 function enrichDayAnalyzePlayer(player, dateStr) {
     if (!player) return player;
     const resolvedName = resolveAlias(player.name || '');
     const rosterMatch = roster.find(r => normalizeNick(r.name) === normalizeNick(resolvedName));
-    const class2 = player.class2 || null;
+    let class2 = player.class2 || null;
+    // Fallback: если Gemini class2 пуст — добираем class из icon_matcher (unified.json/review.json) по нику
+    if (!class2) {
+        const iconClass = getIconMatcherClass2ByNick(resolvedName);
+        if (iconClass) class2 = iconClass;
+    }
     const class3options = class2 ? resolveClass2ToClass3(class2) : [];
     const storedDayProfa = getStoredDayProfa(dateStr, resolvedName) || (rosterMatch ? getStoredDayProfa(dateStr, rosterMatch.name) : null);
     const rosterProfa = rosterMatch && hasResolvedProfa(rosterMatch.profa) ? rosterMatch.profa : null;
@@ -13073,6 +13086,21 @@ function srRecommendedStatus(row){
     if(row && row.recommended_status) return row.recommended_status;
     return row && row['class'] ? 'auto_accept' : 'manual_required';
 }
+// Публикуем nick → class индекс из _srData (unified.json / review.json) на window,
+// чтобы calendar analyze flow мог добирать class, когда Gemini class2 пуст.
+function _publishIconMatcherIdx(){
+    var idx = {};
+    (_srData||[]).forEach(function(r){
+        if(!r) return;
+        var nick = r.nick || r.player;
+        if(!nick) return;
+        var cls = r['class'] || r.final_class || (r.top3 && r.top3[0] && r.top3[0].name);
+        if(!cls) return;
+        var key = (typeof normalizeNick==='function') ? normalizeNick(nick) : String(nick).toLowerCase();
+        if(!idx[key]) idx[key] = cls;
+    });
+    window.__iconMatcherClassByNick = idx;
+}
 
 window.openScanReview = function(evt){
     var file = evt.target.files[0]; evt.target.value='';
@@ -13089,6 +13117,7 @@ window.openScanReview = function(evt){
                 if(r.recommended_status==='auto_accept'&&r.final_class)
                     _srState[rowKey(r)]=r.final_class;
             });
+            _publishIconMatcherIdx();
             renderSR();
             document.getElementById('scanReviewModal').style.display='flex';
         }catch(ex){ alert('Ошибка review.json: '+ex.message); }
@@ -13116,6 +13145,7 @@ window.openUnifiedReview = function(evt){
                 if(srRecommendedStatus(r)==='auto_accept' && r['class'] && r.side==='right')
                     _srState[rowKey(r)] = r['class'];
             });
+            _publishIconMatcherIdx();
             renderSR();
             document.getElementById('scanReviewModal').style.display='flex';
         }catch(ex){ alert('Ошибка unified.json: '+ex.message); }
