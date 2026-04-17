@@ -1,0 +1,44 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Clan Control: Bridge Watcher",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".agents/scripts/bridge_watcher.py"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Clan Control: Bridge Watcher Once",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".agents/scripts/bridge_watcher.py",
+        "--once"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": false
+      },
+      "problemMatcher": []
+    }
+  ]
+}
