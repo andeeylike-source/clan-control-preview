@@ -13088,9 +13088,10 @@ function srRecommendedStatus(row){
 }
 // Публикуем nick → class индекс из _srData (unified.json / review.json) на window,
 // чтобы calendar analyze flow мог добирать class, когда Gemini class2 пуст.
-function _publishIconMatcherIdx(){
+var ICON_IDX_CACHE_KEY = '__iconMatcherClassByNick_v1';
+function _buildClassIdxFromRows(rows){
     var idx = {};
-    (_srData||[]).forEach(function(r){
+    (rows||[]).forEach(function(r){
         if(!r) return;
         var nick = r.nick || r.player;
         if(!nick) return;
@@ -13099,8 +13100,54 @@ function _publishIconMatcherIdx(){
         var key = (typeof normalizeNick==='function') ? normalizeNick(nick) : String(nick).toLowerCase();
         if(!idx[key]) idx[key] = cls;
     });
-    window.__iconMatcherClassByNick = idx;
+    return idx;
 }
+function _persistIconMatcherIdx(idx){
+    try { localStorage.setItem(ICON_IDX_CACHE_KEY, JSON.stringify(idx||{})); } catch(e){}
+}
+function _publishIconMatcherIdx(){
+    var idx = _buildClassIdxFromRows(_srData);
+    window.__iconMatcherClassByNick = idx;
+    _persistIconMatcherIdx(idx);
+}
+
+// Auto-restore from localStorage (instant, survives reloads) — работает и на file://, и на gh-pages
+try {
+    var _cached = localStorage.getItem(ICON_IDX_CACHE_KEY);
+    if(_cached){
+        var _cachedParsed = JSON.parse(_cached);
+        if(_cachedParsed && typeof _cachedParsed==='object') window.__iconMatcherClassByNick = _cachedParsed;
+    }
+} catch(e) {}
+
+// Auto-fetch from local icon_matcher artifacts (работает, когда сайт отдан через HTTP, напр. локальный сервер).
+// На file:// или gh-pages без этих файлов fetch тихо падает в catch — деградация без ошибок.
+(function autoFetchIconMatcherIdx(){
+    if(typeof fetch!=='function') return;
+    var sources = [
+        'tools/local_icon_matcher/out/unified.json',
+        'tools/local_icon_matcher/out/review/review.json'
+    ];
+    function mergeIdx(extra){
+        var base = window.__iconMatcherClassByNick || {};
+        Object.keys(extra).forEach(function(k){ if(!base[k]) base[k]=extra[k]; });
+        window.__iconMatcherClassByNick = base;
+        _persistIconMatcherIdx(base);
+    }
+    function tryAt(i){
+        if(i>=sources.length) return;
+        fetch(sources[i], { cache:'no-store' })
+            .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+            .then(function(data){
+                if(Array.isArray(data) && data.length){
+                    mergeIdx(_buildClassIdxFromRows(data));
+                }
+                tryAt(i+1);
+            })
+            .catch(function(){ tryAt(i+1); });
+    }
+    tryAt(0);
+})();
 
 window.openScanReview = function(evt){
     var file = evt.target.files[0]; evt.target.value='';
