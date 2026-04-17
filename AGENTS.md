@@ -14,6 +14,9 @@
 - Do not re-scan the whole project without need
 - Work only in the nearest relevant scope
 - After a fix, check the adjacent scope for the same pattern
+- Bridge-first workflow: read only the last confirmed block in `.agents/BRIDGE.md`
+- Handoff must rely only on `FACTS`, `RESULT`, `NEXT_STEP`
+- No guessing and no re-scan during handoff
 - Default flow: fix -> local check -> preview/site check -> FINAL REPORT
 - For UI changes, preview push is mandatory
 - Run a local test before the final report if testing is possible
