@@ -5143,7 +5143,10 @@ function enrichDayAnalyzePlayer(player, dateStr) {
     let profa = hasResolvedProfa(player.profa) ? player.profa : null;
     let profaSource = profa ? 'player' : null;
     if (!profa && hasResolvedProfa(storedDayProfa)) { profa = storedDayProfa; profaSource = 'stored_day'; }
+    // Gemini class2 → однозначный class3: доверяем Gemini больше, чем ростеру (ростер может быть устаревшим)
+    if (!profa && class2Source === 'gemini' && class3options.length === 1) { profa = class3options[0]; profaSource = 'class3options'; }
     if (!profa && rosterProfa) { profa = rosterProfa; profaSource = 'roster'; }
+    // Оставшийся fallback: class3options из icon_matcher (не gemini) или если gemini дал >1 вариант
     if (!profa && class3options.length === 1) { profa = class3options[0]; profaSource = 'class3options'; }
     return { ...player, name: resolvedName || player.name, class2, class2Source, profa: profa || null, profaSource: profa ? profaSource : null };
 }
@@ -8366,9 +8369,10 @@ function getClass2IconByClass3(c3) {
                 const class2 = p.class2 || null;
                 const class2src = class2 ? getClass2Icon(class2) : null;
                 const class3options = class2 ? resolveClass2ToClass3(class2) : [];
-                const currentProfa = inRoster
-                    ? (hasResolvedProfa(inRoster.profa) ? inRoster.profa : (p.profa || '—'))
-                    : (p.profa || '—');
+                // Если profaSource уже определён в analyze-flow — доверяем ему, не подменяем ростером
+                const currentProfa = (p.profa && p.profaSource)
+                    ? p.profa
+                    : (inRoster && hasResolvedProfa(inRoster.profa) ? inRoster.profa : (p.profa || '—'));
                 const currentProfaLabel = currentProfa && currentProfa !== '—' ? (PROFA_NAMES[currentProfa] || currentProfa) : '';
                 const _c2SrcLabel = {'gemini':'G','icon_matcher':'IM'}[p.class2Source] || null;
                 const _pSrcLabel = {'player':'P','stored_day':'S','roster':'R','class3options':'C3'}[p.profaSource] || null;
