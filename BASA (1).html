@@ -5131,19 +5131,21 @@ function enrichDayAnalyzePlayer(player, dateStr) {
     const resolvedName = resolveAlias(player.name || '');
     const rosterMatch = roster.find(r => normalizeNick(r.name) === normalizeNick(resolvedName));
     let class2 = player.class2 || null;
+    let class2Source = class2 ? 'gemini' : null;
     // Fallback: если Gemini class2 пуст — добираем class из icon_matcher (unified.json/review.json) по нику
     if (!class2) {
         const iconClass = getIconMatcherClass2ByNick(resolvedName);
-        if (iconClass) class2 = iconClass;
+        if (iconClass) { class2 = iconClass; class2Source = 'icon_matcher'; }
     }
     const class3options = class2 ? resolveClass2ToClass3(class2) : [];
     const storedDayProfa = getStoredDayProfa(dateStr, resolvedName) || (rosterMatch ? getStoredDayProfa(dateStr, rosterMatch.name) : null);
     const rosterProfa = rosterMatch && hasResolvedProfa(rosterMatch.profa) ? rosterMatch.profa : null;
     let profa = hasResolvedProfa(player.profa) ? player.profa : null;
-    if (!profa && hasResolvedProfa(storedDayProfa)) profa = storedDayProfa;
-    if (!profa && rosterProfa) profa = rosterProfa;
-    if (!profa && class3options.length === 1) profa = class3options[0];
-    return { ...player, name: resolvedName || player.name, class2, profa: profa || null };
+    let profaSource = profa ? 'player' : null;
+    if (!profa && hasResolvedProfa(storedDayProfa)) { profa = storedDayProfa; profaSource = 'stored_day'; }
+    if (!profa && rosterProfa) { profa = rosterProfa; profaSource = 'roster'; }
+    if (!profa && class3options.length === 1) { profa = class3options[0]; profaSource = 'class3options'; }
+    return { ...player, name: resolvedName || player.name, class2, class2Source, profa: profa || null, profaSource: profa ? profaSource : null };
 }
 function enrichDayAnalyzePlayers(players, dateStr) {
     return (players || []).map(player => enrichDayAnalyzePlayer(player, dateStr));
@@ -8368,17 +8370,20 @@ function getClass2IconByClass3(c3) {
                     ? (hasResolvedProfa(inRoster.profa) ? inRoster.profa : (p.profa || '—'))
                     : (p.profa || '—');
                 const currentProfaLabel = currentProfa && currentProfa !== '—' ? (PROFA_NAMES[currentProfa] || currentProfa) : '';
+                const _c2SrcLabel = {'gemini':'G','icon_matcher':'IM'}[p.class2Source] || null;
+                const _pSrcLabel = {'player':'P','stored_day':'S','roster':'R','class3options':'C3'}[p.profaSource] || null;
 
                 const class2Html = class2src
-                    ? `<img src="${class2src}" title="${class2}" style="width:18px;height:18px;border-radius:50%;border:1px solid #2d3748;flex-shrink:0">`
+                    ? `<img src="${class2src}" title="${class2} · src:${p.class2Source||'?'}" style="width:18px;height:18px;border-radius:50%;border:1px solid #2d3748;flex-shrink:0">${_c2SrcLabel ? `<span style="font-size:8px;color:#475569;margin-left:-2px" title="class2 from ${p.class2Source}">${_c2SrcLabel}</span>` : ''}`
                     : '';
                 const class2LabelHtml = class2 && (!currentProfa || currentProfa === '—')
-                    ? `<span style="font-size:10px;color:#94a3b8;background:#0f172a;border:1px solid #1e293b;border-radius:4px;padding:1px 6px">${class2}</span>`
+                    ? `<span style="font-size:10px;color:#94a3b8;background:#0f172a;border:1px solid #1e293b;border-radius:4px;padding:1px 6px" title="source: ${p.class2Source||'?'}">${class2}</span>`
                     : '';
 
                 let profaHtml = '';
                 if (currentProfa && currentProfa !== '—') {
-                    profaHtml = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#a5b4fc;background:#6366f122;border:1px solid #6366f155;border-radius:4px;padding:1px 6px">${profaIconHtml(currentProfa, 15)}<span>${currentProfaLabel}</span></span>`;
+                    const _pSrcBadge = _pSrcLabel ? `<span style="font-size:8px;color:#475569" title="profa from ${p.profaSource}">${_pSrcLabel}</span>` : '';
+                    profaHtml = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#a5b4fc;background:#6366f122;border:1px solid #6366f155;border-radius:4px;padding:1px 6px">${profaIconHtml(currentProfa, 15)}<span>${currentProfaLabel}</span>${_pSrcBadge}</span>`;
                 } else if (class3options.length === 1) {
                     const shortName = PROFA_NAMES[class3options[0]] || class3options[0];
                     profaHtml = `<span onclick="dayLastParsed[${i}].profa='${class3options[0].replace(/'/g,"\'")}';renderDayAnalyzedPlayers(dayLastParsed)" style="font-size:10px;color:#22c55e;cursor:pointer;background:#22c55e11;border:1px solid #22c55e33;border-radius:4px;padding:1px 6px">+ ${shortName}</span>`;
