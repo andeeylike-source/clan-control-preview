@@ -5148,6 +5148,29 @@ function enrichDayAnalyzePlayer(player, dateStr) {
     if (!profa && rosterProfa) { profa = rosterProfa; profaSource = 'roster'; }
     // Оставшийся fallback: class3options из icon_matcher (не gemini) или если gemini дал >1 вариант
     if (!profa && class3options.length === 1) { profa = class3options[0]; profaSource = 'class3options'; }
+    // [DIAG-TEMP] diagnosis-only logging for specific nicks — remove after investigation
+    try {
+        const _DIAG_TARGETS = ['крыжовник','benj1r0s','heartlessking','morevnutri','unholyholy','vizavi','памперс','фор'];
+        const _rn = String(player.name || '').toLowerCase();
+        const _resn = String(resolvedName || '').toLowerCase();
+        const _hit = _DIAG_TARGETS.find(t => _rn === t || _resn === t || _rn.includes(t) || _resn.includes(t));
+        if (_hit) {
+            console.log('[DIAG]', {
+                rawName: player.name || null,
+                resolvedName: resolvedName || null,
+                geminiClass2Raw: player.class2 || null,
+                class2: class2 || null,
+                class2Source: class2Source || null,
+                class3options: class3options,
+                iconMatcherClass2: (typeof getIconMatcherClass2ByNick === 'function' ? (getIconMatcherClass2ByNick(resolvedName) || null) : null),
+                rosterMatch: rosterMatch ? { name: rosterMatch.name, profa: rosterMatch.profa } : null,
+                rosterProfa: rosterProfa || null,
+                storedDayProfa: storedDayProfa || null,
+                profa: profa || null,
+                profaSource: profa ? profaSource : null
+            });
+        }
+    } catch(_diagErr) { console.warn('[DIAG] log error', _diagErr); }
     return { ...player, name: resolvedName || player.name, class2, class2Source, profa: profa || null, profaSource: profa ? profaSource : null };
 }
 function enrichDayAnalyzePlayers(players, dateStr) {
@@ -7955,6 +7978,25 @@ function getClass2IconByClass3(c3) {
 
                     // Поддержка нового формата {total_count, players} и старого формата []
                     const players = Array.isArray(parsed) ? parsed : (parsed.players || []);
+
+                    // [DIAG-TEMP] raw Gemini players for target nicks — remove after investigation
+                    try {
+                        const _DIAG_TARGETS_RAW = ['крыжовник','benj1r0s','heartlessking','morevnutri','unholyholy','vizavi','памперс','фор'];
+                        (players || []).forEach(_p => {
+                            if (!_p || !_p.name) return;
+                            const _n = String(_p.name).toLowerCase();
+                            if (_DIAG_TARGETS_RAW.some(t => _n === t || _n.includes(t))) {
+                                console.log('[DIAG-RAW-GEMINI]', {
+                                    screenIndex: i + 1,
+                                    pack: parsed.pack_name || null,
+                                    rawName: _p.name,
+                                    rawClass2: _p.class2 || null,
+                                    rawProfa: _p.profa || null,
+                                    full: JSON.parse(JSON.stringify(_p))
+                                });
+                            }
+                        });
+                    } catch(_diagRawErr) { console.warn('[DIAG-RAW-GEMINI] log error', _diagRawErr); }
 
                     // ===== АВТОКОРРЕКЦИЯ ПЕРЕПУТАННЫХ КОЛОНОК =====
                     // Если AI перепутал deaths и pvp_dmg (kills===deaths у большинства игроков)
