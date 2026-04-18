@@ -1,9 +1,0 @@
-# Codex per-repo config — clan-control-github (trusted workspace)
-# Режим: full-auto — без approval prompts для рабочих действий.
-# Применяется только когда Codex запущен из этого репо.
-
-approval_policy = "never"
-
-# Sandbox: сеть включена для git push preview и preview fetch.
-[sandbox]
-net = true
