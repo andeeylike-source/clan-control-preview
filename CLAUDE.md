@@ -3,6 +3,9 @@
 ## Working rules
 
 - Always communicate with the user in Russian.
+- After `git push preview main` — STOP. Do not trigger Codex, watcher, or any auto-handoff.
+- One defect per session cycle. Do not bundle unrelated fixes.
+- Read narrow: grep/sed first, full file reads only when unavoidable.
 
 ## Auto-deploy to preview (mandatory)
 
