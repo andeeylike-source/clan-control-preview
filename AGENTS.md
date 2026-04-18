@@ -30,10 +30,11 @@
 - Shell output that exceeds what is needed for the decision: truncate with head/tail
 
 ## RTK (context economy — Windows)
-- RTK is NOT currently installed (`rtk --version` → not found)
-- When installed: use `rtk run <cmd>` to pipe shell/git/grep output as compressed context
-- When installed: prefer `rtk grep`, `rtk git log`, `rtk read` over raw tool calls for large outputs
-- Until installed: apply manual discipline — head/tail/grep with explicit limits on every read
+- RTK v0.37.0 installed at `~/.local/bin/rtk.exe`; `~/.local/bin` added to user PATH
+- Windows limitation: bash hook auto-rewrite unavailable; running in `--claude-md` instruction mode
+- Full RTK instructions injected into CLAUDE.md (see `<!-- rtk-instructions -->` block)
+- Use `rtk git status`, `rtk git log`, `rtk grep`, `rtk git diff`, `rtk read` for compressed output
+- No WSL required — explicit `rtk <cmd>` prefix works in bash/PowerShell/Windows Terminal
 
 ## OUTPUT POLICY
 - Do not end replies with tool logs
