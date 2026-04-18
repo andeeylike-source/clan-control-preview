@@ -8364,7 +8364,9 @@ function getClass2IconByClass3(c3) {
                 const class2 = p.class2 || null;
                 const class2src = class2 ? getClass2Icon(class2) : null;
                 const class3options = class2 ? resolveClass2ToClass3(class2) : [];
-                const currentProfa = inRoster ? (inRoster.profa || '—') : (p.profa || '—');
+                const currentProfa = inRoster
+                    ? (hasResolvedProfa(inRoster.profa) ? inRoster.profa : (p.profa || '—'))
+                    : (p.profa || '—');
                 const currentProfaLabel = currentProfa && currentProfa !== '—' ? (PROFA_NAMES[currentProfa] || currentProfa) : '';
 
                 const class2Html = class2src
