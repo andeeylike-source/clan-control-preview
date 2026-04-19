@@ -921,8 +921,11 @@ function classifyAugBank(feat, topK) {
 }
 
 function augExpSimForClass(className, feat) {
+  // returns {sim, variant} — best-variant result for expected class only
   if (!__augBank||!feat||!__augBank[className]) return null;
-  return Math.max(...__augBank[className].map(v=>cosineSim(feat,v.vec)));
+  let bestSim=-Infinity,bestVar=null;
+  for(const v of __augBank[className]){const s=cosineSim(feat,v.vec);if(s>bestSim){bestSim=s;bestVar=v.variantId;}}
+  return bestSim===-Infinity ? null : {sim:bestSim,variant:bestVar};
 }
 
 function canvasToFeat(src, sx, sy, sw, sh, size, rgb) {
@@ -1227,7 +1230,7 @@ function renderScanResults(container) {
     });
     // aug-bank stats
     const augBankRows = fsExpRows.filter(r => r.augExpSim);
-    const augAvgExpV  = augBankRows.length ? augBankRows.reduce((a,r)=>a+(r.augExpSim.best??r.augExpSim.raw??0),0)/augBankRows.length : null;
+    const augAvgExpV  = augBankRows.length ? augBankRows.reduce((a,r)=>a+((r.augExpSim.best?.sim??r.augExpSim.raw?.sim)??0),0)/augBankRows.length : null;
     const augCorrectV = augBankRows.filter(r=>(r.augRes?.best??r.augRes?.raw)?.class2?.toLowerCase()===r.expected.toLowerCase()).length;
     const augWinsV    = fsExpRows.filter(r=>r.fsWinner==='__aug__').length;
     const augStat     = { mode:{id:'__aug__',label:`aug-bank RGB32 (${AUG_DEFS.length} var)`}, avgExp:augAvgExpV, correct:augCorrectV, wins:augWinsV, n:augBankRows.length };
@@ -1295,13 +1298,20 @@ function renderScanResults(container) {
           `<td style="padding:3px 6px;color:${correct?'#86efac':'#e2e8f0'}">${res ? escapeHtml(res.class2) : '—'}</td>` +
           `<td style="padding:3px 6px;${isRowWin?'outline:1px solid #fbbf2444;':''}">${scFmt(expS)}</td>`;
       });
-      const augR  = augRes?.best ?? augRes?.raw;
-      const augE  = augExpSim?.best ?? augExpSim?.raw;
-      const augOk = augR?.class2?.toLowerCase() === expected.toLowerCase();
+      const augR    = augRes?.best ?? augRes?.raw;
+      const augEObj = augExpSim?.best ?? augExpSim?.raw;   // {sim, variant} for expected class
+      const augE    = augEObj?.sim ?? null;
+      const augEVar = augEObj?.variant ?? null;
+      const augOk   = augR?.class2?.toLowerCase() === expected.toLowerCase();
       const augIsWin = fsWinner === '__aug__';
+      // Δ = top1 class score − expected class score (positive → wrong class wins, domain gap)
+      const augDelta = (augR?.sim != null && augE != null) ? augR.sim - augE : null;
+      const augDbg   = `top1: ${augR?.class2??'—'} [${augR?.variant??'—'}] ${augR?.sim?.toFixed(4)??'—'} | exp: ${expected} [${augEVar??'—'}] ${augE?.toFixed(4)??'—'} | Δ=${augDelta!=null?(augDelta>=0?'+':'')+augDelta.toFixed(4):'—'}`;
       cells +=
-        `<td style="padding:3px 6px;color:${augOk?'#86efac':'#e2e8f0'}">${augR?escapeHtml(augR.class2)+` <span style="color:#475569;font-size:9px">[${augR.variant??''}]</span>`:'—'}</td>`+
-        `<td style="padding:3px 6px;${augIsWin?'outline:1px solid #fbbf2444;':''}">${scFmt(augE)}</td>`;
+        `<td style="padding:3px 6px;color:${augOk?'#86efac':'#e2e8f0'}" title="${escapeHtml(augDbg)}">`+
+          `${augR?escapeHtml(augR.class2)+` <span style="color:#475569;font-size:9px">[${augR.variant??''}]</span><span style="color:#64748b;font-size:9px"> ${augR.sim?.toFixed(3)??''}</span>`:'—'}</td>`+
+        `<td style="padding:3px 6px;${augIsWin?'outline:1px solid #fbbf2444;':''}" title="${escapeHtml(augDbg)}">`+
+          `${augE!=null?scFmt(augE)+` <span style="color:#475569;font-size:9px">[${augEVar??''}]</span>`:'—'}</td>`;
       cells += `<td style="padding:3px 6px;font-weight:700;color:#fbbf24">${winLabel}</td>`;
       fsTbl += `<tr>${cells}</tr>`;
     });
@@ -1384,7 +1394,7 @@ function runExpectedCompare() {
         const rs = augExpSimForClass(row.expected, row.augFeat.raw);
         const bs = augExpSimForClass(row.expected, row.augFeat.best);
         row.augExpSim = { raw: rs, best: bs };
-        const augBest = bs != null ? bs : (rs ?? -Infinity);
+        const augBest = bs?.sim ?? rs?.sim ?? -Infinity;
         if (augBest > winSim) row.fsWinner = '__aug__';
       } else { row.augExpSim = null; }
     }
