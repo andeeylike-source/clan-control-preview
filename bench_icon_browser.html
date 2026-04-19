@@ -928,6 +928,43 @@ function augExpSimForClass(className, feat) {
   return bestSim===-Infinity ? null : {sim:bestSim,variant:bestVar};
 }
 
+// ── REAL CROP BANK ────────────────────────────────────────────────────────────
+// Uses labeled real CC crops (from calibration mode) as templates.
+// class score = best cosine sim among real crops of that class (RGB32).
+let __realBank = null; // Object: className -> [{feat, meta}]
+
+function buildRealBank() {
+  // always rebuild from current calibrationSet (may grow between runs)
+  __realBank = {};
+  for (const e of calibrationSet) {
+    if (!e.crop_feat || !e.expected) continue;
+    if (!__realBank[e.expected]) __realBank[e.expected] = [];
+    __realBank[e.expected].push({ feat: e.crop_feat, meta: e.crop_sz||'?' });
+  }
+}
+function realBankSize() {
+  if (!__realBank) return 0;
+  return Object.values(__realBank).reduce((a,v)=>a+v.length,0);
+}
+function classifyRealBank(feat, topK) {
+  if (!__realBank||!feat||realBankSize()===0) return null;
+  const scores=[];
+  for (const [name,crops] of Object.entries(__realBank)) {
+    let best=-Infinity;
+    for(const c of crops){const s=cosineSim(feat,c.feat);if(s>best)best=s;}
+    scores.push({name,sim:best});
+  }
+  scores.sort((a,b)=>b.sim-a.sim);
+  const top=scores.slice(0,topK||5);
+  return{class2:top[0].name,sim:top[0].sim,margin:top[0].sim-(top[1]?.sim??0),top};
+}
+function realBankExpSim(className, feat) {
+  if (!__realBank||!feat||!__realBank[className]) return null;
+  let best=-Infinity;
+  for(const c of __realBank[className]){const s=cosineSim(feat,c.feat);if(s>best)best=s;}
+  return best===-Infinity?null:best;
+}
+
 function canvasToFeat(src, sx, sy, sw, sh, size, rgb) {
   if (sw<4||sh<4) return null;
   const c=document.createElement('canvas'); c.width=size; c.height=size;
@@ -1014,7 +1051,7 @@ async function runAutoScan() {
   document.getElementById('asBtnExportJSON').style.display = 'none';
   document.getElementById('asBtnExportCSV').style.display  = 'none';
 
-  try { await ensureAllFsIndexes(); await buildAugBank(); }
+  try { await ensureAllFsIndexes(); await buildAugBank(); buildRealBank(); }
   catch(e) { prog.textContent = '❌ ' + e.message; btnRun.disabled = false; return; }
 
   const p = getAutoScanParams();
@@ -1084,7 +1121,12 @@ async function runAutoScan() {
       raw:  augRawFeat  ? classifyAugBank(augRawFeat)  : null,
       best: augBestFeat ? classifyAugBank(augBestFeat) : null,
     };
-    autoScanRows.push({ i, rawRes, rawFeat, best, thumb: tc.toDataURL(), expected: null, expSimRaw: null, expSimRef: null, verdict: null, fsFeats, fsRes, fsExpSim: null, fsWinner: null, augFeat:{raw:augRawFeat,best:augBestFeat}, augRes, augExpSim:null });
+    // real-bank: same RGB32 feat as aug-bank
+    const rbRes = {
+      raw:  augRawFeat  ? classifyRealBank(augRawFeat)  : null,
+      best: augBestFeat ? classifyRealBank(augBestFeat) : null,
+    };
+    autoScanRows.push({ i, rawRes, rawFeat, best, thumb: tc.toDataURL(), expected: null, expSimRaw: null, expSimRef: null, verdict: null, fsFeats, fsRes, fsExpSim: null, fsWinner: null, augFeat:{raw:augRawFeat,best:augBestFeat}, augRes, augExpSim:null, rbRes, rbExpSim:null });
   }
 
   prog.textContent = 'done — ' + autoScanRows.length + ' rows scanned';
@@ -1234,8 +1276,15 @@ function renderScanResults(container) {
     const augCorrectV = augBankRows.filter(r=>(r.augRes?.best??r.augRes?.raw)?.class2?.toLowerCase()===r.expected.toLowerCase()).length;
     const augWinsV    = fsExpRows.filter(r=>r.fsWinner==='__aug__').length;
     const augStat     = { mode:{id:'__aug__',label:`aug-bank RGB32 (${AUG_DEFS.length} var)`}, avgExp:augAvgExpV, correct:augCorrectV, wins:augWinsV, n:augBankRows.length };
-    // two independent criteria — must not be mixed; aug included
-    const allStats   = [...modeStats, augStat];
+    // real-bank stats
+    const rbTotalSize = realBankSize();
+    const rbRows2     = fsExpRows.filter(r => r.rbExpSim);
+    const rbAvgExpV   = rbRows2.length ? rbRows2.reduce((a,r)=>a+((r.rbExpSim.best??r.rbExpSim.raw)??0),0)/rbRows2.length : null;
+    const rbCorrectV  = rbRows2.filter(r=>(r.rbRes?.best??r.rbRes?.raw)?.class2?.toLowerCase()===r.expected.toLowerCase()).length;
+    const rbWinsV     = fsExpRows.filter(r=>r.fsWinner==='__rb__').length;
+    const rbStat      = { mode:{id:'__rb__',label:`real-bank RGB32 (${rbTotalSize} crops)`}, avgExp:rbAvgExpV, correct:rbCorrectV, wins:rbWinsV, n:rbRows2.length };
+    // two independent criteria — must not be mixed; aug + real-bank included
+    const allStats   = [...modeStats, augStat, rbStat];
     const bestByAvg  = allStats.filter(s=>s.avgExp!=null).sort((a,b)=>b.avgExp-a.avgExp)[0];
     const bestByWins = allStats.slice().sort((a,b)=>b.wins-a.wins)[0];
 
@@ -1267,6 +1316,20 @@ function renderScanResults(container) {
         `<td style="padding:2px 10px 2px 0;color:#a78bfa">${wins}${isWinsBest?' <b style="color:#fbbf24">★wins</b>':''}</td>`+
         `</tr>`;
     }
+    // real-bank row in mode table
+    { const {avgExp,correct,wins,n} = rbStat;
+      const isAvgBest  = bestByAvg?.mode?.id  === '__rb__';
+      const isWinsBest = bestByWins?.mode?.id === '__rb__';
+      const nc  = isAvgBest||isWinsBest ? '#fbbf24':'#94a3b8';
+      const avgColor = avgExp!=null?(avgExp>=0.72?'#86efac':avgExp>=0.60?'#fbbf24':'#f87171'):'#475569';
+      const emptyNote = rbTotalSize===0 ? ' <span style="color:#475569;font-size:9px">(нужны реальные crops — включи Calibration mode + Expected-compare + Compare)</span>' : '';
+      msTbl += `<tr>`+
+        `<td style="padding:2px 10px 2px 0;font-weight:700;color:${nc}">${escapeHtml(rbStat.mode.label)}${emptyNote}</td>`+
+        `<td style="padding:2px 10px 2px 0;color:${avgColor}">${avgExp!=null?avgExp.toFixed(4):'—'}${isAvgBest?' <b style="color:#fbbf24">★avg</b>':''}</td>`+
+        `<td style="padding:2px 10px 2px 0">${n>0?correct+'/'+n:'—'}</td>`+
+        `<td style="padding:2px 10px 2px 0;color:#a78bfa">${wins}${isWinsBest?' <b style="color:#fbbf24">★wins</b>':''}</td>`+
+        `</tr>`;
+    }
     msTbl += `</tbody></table>`;
 
     // header badges — computed independently, shown separately
@@ -1280,13 +1343,13 @@ function renderScanResults(container) {
     const scFmt = v => v==null ? '<span style="color:#475569">—</span>' :
       `<span style="color:${v>=0.72?'#86efac':v>=0.60?'#fbbf24':'#f87171'}">${v.toFixed(3)}</span>`;
 
-    const fsHeaders = ['#','expected', ...FS_MODES.flatMap(m=>[m.label+' top1', m.label+' exp']), 'aug top1', 'aug exp', '★wins'];
+    const fsHeaders = ['#','expected', ...FS_MODES.flatMap(m=>[m.label+' top1', m.label+' exp']), 'aug top1', 'aug exp', 'rb top1', 'rb exp', '★wins'];
     let fsTbl = `<table style="border-collapse:collapse;font-size:10px;width:100%"><thead><tr>` +
       fsHeaders.map(h=>`<th style="padding:3px 6px;color:#64748b;white-space:nowrap;background:#0a0f1e;position:sticky;top:0">${h}</th>`).join('') +
       `</tr></thead><tbody>`;
 
-    fsExpRows.forEach(({ i, expected, fsExpSim, fsRes, fsWinner, augRes, augExpSim }) => {
-      const winLabel = fsWinner==='__aug__' ? 'aug-bank' : (FS_MODES.find(m=>m.id===fsWinner)?.label??'—');
+    fsExpRows.forEach(({ i, expected, fsExpSim, fsRes, fsWinner, augRes, augExpSim, rbRes, rbExpSim }) => {
+      const winLabel = fsWinner==='__rb__' ? 'real-bank' : fsWinner==='__aug__' ? 'aug-bank' : (FS_MODES.find(m=>m.id===fsWinner)?.label??'—');
       let cells = `<td style="padding:3px 6px;color:#475569">${i}</td>` +
                   `<td style="padding:3px 6px;color:#c8a84b;font-weight:700">${escapeHtml(expected)}</td>`;
       FS_MODES.forEach(mode => {
@@ -1312,6 +1375,19 @@ function renderScanResults(container) {
           `${augR?escapeHtml(augR.class2)+` <span style="color:#475569;font-size:9px">[${augR.variant??''}]</span><span style="color:#64748b;font-size:9px"> ${augR.sim?.toFixed(3)??''}</span>`:'—'}</td>`+
         `<td style="padding:3px 6px;${augIsWin?'outline:1px solid #fbbf2444;':''}" title="${escapeHtml(augDbg)}">`+
           `${augE!=null?scFmt(augE)+` <span style="color:#475569;font-size:9px">[${augEVar??''}]</span>`:'—'}</td>`;
+      // real-bank cells
+      const rbR   = rbRes?.best ?? rbRes?.raw;
+      const rbE   = rbExpSim?.best ?? rbExpSim?.raw;
+      const rbOk  = rbR?.class2?.toLowerCase() === expected.toLowerCase();
+      const rbIsWin = fsWinner === '__rb__';
+      if (rbTotalSize === 0) {
+        cells +=
+          `<td style="padding:3px 6px;color:#334155" colspan="2">— <span style="font-size:9px">no real crops</span></td>`;
+      } else {
+        cells +=
+          `<td style="padding:3px 6px;color:${rbOk?'#86efac':'#e2e8f0'}">${rbR?escapeHtml(rbR.class2)+` <span style="color:#64748b;font-size:9px">${rbR.sim?.toFixed(3)??''}</span>`:'—'}</td>`+
+          `<td style="padding:3px 6px;${rbIsWin?'outline:1px solid #fbbf2444;':''}">${scFmt(rbE)}</td>`;
+      }
       cells += `<td style="padding:3px 6px;font-weight:700;color:#fbbf24">${winLabel}</td>`;
       fsTbl += `<tr>${cells}</tr>`;
     });
@@ -1395,8 +1471,16 @@ function runExpectedCompare() {
         const bs = augExpSimForClass(row.expected, row.augFeat.best);
         row.augExpSim = { raw: rs, best: bs };
         const augBest = bs?.sim ?? rs?.sim ?? -Infinity;
-        if (augBest > winSim) row.fsWinner = '__aug__';
+        if (augBest > winSim) { winSim = augBest; row.fsWinner = '__aug__'; }
       } else { row.augExpSim = null; }
+      // real-bank expected sim (reuses augFeat RGB32 vectors)
+      if (row.augFeat) {
+        const rs = realBankExpSim(row.expected, row.augFeat.raw);
+        const bs = realBankExpSim(row.expected, row.augFeat.best);
+        row.rbExpSim = { raw: rs, best: bs };
+        const rbBest = bs ?? rs ?? -Infinity;
+        if (rbBest > winSim) row.fsWinner = '__rb__';
+      } else { row.rbExpSim = null; }
     }
   });
 
@@ -1812,6 +1896,7 @@ async function matchRegion(sx, sy, sw, sh) {
         crop_sz:     sw+'×'+sh,
         best_dx:     null,
         best_dy:     null,
+        crop_feat:   canvasToFeat(raw, 0, 0, sw, sh, AUG_SIZE, true),
       });
     }
   }
@@ -2014,6 +2099,9 @@ async function matchClickRefine(cx, cy) {
       best_sz:     best ? best.sz : null,
       best_dx:     best ? best.dx : null,
       best_dy:     best ? best.dy : null,
+      crop_feat:   best
+        ? canvasToFeat(ssCanvas, best.sx, best.sy, best.sw, best.sh, AUG_SIZE, true)
+        : canvasToFeat(ssCanvas, rawSx, rawSy, rawSw, rawSh, AUG_SIZE, true),
     });
   }
 }
