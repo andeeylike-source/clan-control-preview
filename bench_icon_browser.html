@@ -116,14 +116,27 @@
 </div>
 
 <div class="card">
-  <h2>6. Real CC crop (опциональный hook)</h2>
-  <div class="muted">Загрузи любое изображение — harness прогонит его через тот же matcher и покажет top-3. Ожидаемый класс укажи в поле рядом — можно не заполнять.</div>
-  <div class="row" style="margin-top:8px">
-    <input type="file" id="realFile" accept="image/*">
-    <input type="text" id="realLabel" placeholder="expected class2 (optional)" style="width:220px">
-    <button id="btnReal" class="secondary">проверить</button>
+  <h2>6. Real CC screenshot — diagnostic crop tool</h2>
+  <div class="muted">
+    Загрузи полный CC screenshot → выдели иконку мышкой (<b>drag-rect</b>) или кликни по ней (<b>click-sample</b>) → matcher покажет top-5 + preview crop.
   </div>
-  <div id="realResult" style="margin-top:8px"></div>
+  <div class="row" style="margin-top:10px;gap:16px">
+    <input type="file" id="realFile" accept="image/*">
+    <label style="gap:4px"><input type="radio" name="cropMode2" value="drag" checked> drag-rect</label>
+    <label style="gap:4px"><input type="radio" name="cropMode2" value="click"> click-sample</label>
+    <span id="clickSizeWrap" class="muted" style="display:none">size:
+      <select id="clickSize" style="background:#0b1220;color:#e2e8f0;border:1px solid #273449;border-radius:4px;padding:2px 4px;font-size:12px">
+        <option value="16">16</option><option value="20">20</option><option value="24">24</option>
+        <option value="32">32</option><option value="40" selected>40</option><option value="56">56</option>
+      </select> px
+    </span>
+    <input type="text" id="realLabel" placeholder="expected class2 (optional)" style="width:180px">
+  </div>
+  <div style="margin-top:10px;position:relative;overflow:auto;max-height:620px;border:1px solid #1e293b;border-radius:6px;background:#060d1a">
+    <div id="ssPlaceholder" style="padding:48px;text-align:center;color:#64748b;font-size:12px">Загрузите screenshot выше</div>
+    <canvas id="ssCanvas" style="display:none;cursor:crosshair;max-width:100%;max-height:620px"></canvas>
+  </div>
+  <div id="realResult" style="margin-top:10px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap"></div>
 </div>
 
 <script>
@@ -509,35 +522,165 @@ document.getElementById('btnExport').addEventListener('click', () => {
   a.click();
 });
 
-// ── Real CC crop hook (optional) ──
-document.getElementById('btnReal').addEventListener('click', async () => {
-  const fileInput = document.getElementById('realFile');
-  const expected = document.getElementById('realLabel').value.trim();
-  const outEl = document.getElementById('realResult');
-  if (!fileInput.files || !fileInput.files[0]) { outEl.innerHTML = '<span class="muted">файл не выбран</span>'; return; }
-  outEl.innerHTML = '<span class="muted">матчу…</span>';
-  try { await ensureIconFeatures(); } catch(e) { outEl.innerHTML = '❌ feature-index: '+e.message; return; }
-  const file = fileInput.files[0];
-  const dataUrl = await new Promise(res => { const fr = new FileReader(); fr.onload = ()=>res(fr.result); fr.readAsDataURL(file); });
-  const im = await new Promise((res, rej)=>{ const i = new Image(); i.onload = ()=>res(i); i.onerror = rej; i.src = dataUrl; });
-  // crop вся картинка → 24×24 feature (сравниваем как есть, пользователь сам выбирает crop)
-  const c = document.createElement('canvas');
-  c.width = im.naturalWidth; c.height = im.naturalHeight;
-  c.getContext('2d').drawImage(im, 0, 0);
-  const feat = canvasRegionToFeature(c, 0, 0, c.width, c.height, ICON_FEATURE_SIZE);
+// ── Real CC screenshot — diagnostic crop tool ──
+const ssCanvas = document.getElementById('ssCanvas');
+const ssCtx = ssCanvas.getContext('2d', { willReadFrequently: true });
+const ssPlaceholder = document.getElementById('ssPlaceholder');
+const realResult = document.getElementById('realResult');
+let ssImage = null;
+let isDragging = false;
+let dragStart = { x: 0, y: 0 };
+let lastHighlight = null;
+
+function cssToCanvas(cssX, cssY) {
+  const r = ssCanvas.getBoundingClientRect();
+  return {
+    x: Math.round(cssX * (ssCanvas.width / r.width)),
+    y: Math.round(cssY * (ssCanvas.height / r.height))
+  };
+}
+
+function redraw(hl) {
+  if (!ssImage) return;
+  ssCtx.drawImage(ssImage, 0, 0);
+  if (hl && hl.w > 0 && hl.h > 0) {
+    ssCtx.save();
+    ssCtx.strokeStyle = '#a78bfa';
+    ssCtx.lineWidth = Math.max(1, Math.round(ssCanvas.width / 600));
+    ssCtx.setLineDash([5, 3]);
+    ssCtx.strokeRect(hl.x + 0.5, hl.y + 0.5, hl.w, hl.h);
+    ssCtx.restore();
+  }
+}
+
+document.getElementById('realFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const dataUrl = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = dataUrl; });
+  ssImage = img;
+  ssCanvas.width = img.naturalWidth;
+  ssCanvas.height = img.naturalHeight;
+  ssCtx.drawImage(img, 0, 0);
+  ssPlaceholder.style.display = 'none';
+  ssCanvas.style.display = 'block';
+  lastHighlight = null;
+  realResult.innerHTML = '<span class="muted">Выдели crop (drag) или кликни по иконке (click-sample)</span>';
+});
+
+// ── drag-rect mode ──
+ssCanvas.addEventListener('mousedown', (e) => {
+  if (!ssImage || document.querySelector('input[name=cropMode2]:checked').value !== 'drag') return;
+  const r = ssCanvas.getBoundingClientRect();
+  dragStart = cssToCanvas(e.clientX - r.left, e.clientY - r.top);
+  isDragging = true;
+  e.preventDefault();
+});
+
+ssCanvas.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  const r = ssCanvas.getBoundingClientRect();
+  const cur = cssToCanvas(e.clientX - r.left, e.clientY - r.top);
+  lastHighlight = {
+    x: Math.min(dragStart.x, cur.x), y: Math.min(dragStart.y, cur.y),
+    w: Math.abs(cur.x - dragStart.x), h: Math.abs(cur.y - dragStart.y)
+  };
+  redraw(lastHighlight);
+});
+
+ssCanvas.addEventListener('mouseup', async (e) => {
+  if (!isDragging) return;
+  isDragging = false;
+  if (!lastHighlight || lastHighlight.w < 4 || lastHighlight.h < 4) {
+    realResult.innerHTML = '<span class="muted">Crop слишком маленький — выдели больший прямоугольник</span>';
+    return;
+  }
+  await matchRegion(lastHighlight.x, lastHighlight.y, lastHighlight.w, lastHighlight.h);
+});
+
+// ── click-to-sample mode ──
+ssCanvas.addEventListener('click', async (e) => {
+  if (!ssImage || document.querySelector('input[name=cropMode2]:checked').value !== 'click') return;
+  const sz = +document.getElementById('clickSize').value;
+  const r = ssCanvas.getBoundingClientRect();
+  const { x: cx, y: cy } = cssToCanvas(e.clientX - r.left, e.clientY - r.top);
+  const sx = Math.max(0, cx - Math.floor(sz / 2));
+  const sy = Math.max(0, cy - Math.floor(sz / 2));
+  const sw = Math.min(ssCanvas.width - sx, sz);
+  const sh = Math.min(ssCanvas.height - sy, sz);
+  lastHighlight = { x: sx, y: sy, w: sw, h: sh };
+  redraw(lastHighlight);
+  await matchRegion(sx, sy, sw, sh);
+});
+
+async function matchRegion(sx, sy, sw, sh) {
+  realResult.innerHTML = '<span class="muted">матчу…</span>';
+  try { await ensureIconFeatures(); } catch(e) { realResult.innerHTML = '❌ feature-index: ' + e.message; return; }
+
+  const feat = canvasRegionToFeature(ssCanvas, sx, sy, sw, sh, ICON_FEATURE_SIZE);
+  if (!feat) { realResult.innerHTML = '❌ feature extraction failed (crop too small?)'; return; }
   const r = classifyFromFeature(feat, 5);
-  if (!r) { outEl.innerHTML = '❌ classify failed'; return; }
-  const lines = [];
-  lines.push('file: ' + escapeHtml(file.name) + '  ('+c.width+'×'+c.height+')');
+  if (!r) { realResult.innerHTML = '❌ classify failed'; return; }
+
+  const expected = (document.getElementById('realLabel').value || '').trim();
+
+  // ── crop preview (original) ──
+  const prev = document.createElement('canvas');
+  prev.width = sw; prev.height = sh;
+  prev.style.cssText = 'width:80px;height:80px;border:1px solid #1e293b;border-radius:4px;image-rendering:pixelated;background:#0d152a';
+  prev.getContext('2d').drawImage(ssCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+
+  // ── 24×24 grayscale feature preview ──
+  const gray = document.createElement('canvas');
+  gray.width = 24; gray.height = 24;
+  gray.style.cssText = 'width:48px;height:48px;border:1px solid #1e293b;border-radius:4px;image-rendering:pixelated';
+  const gctx = gray.getContext('2d', { willReadFrequently: true });
+  gctx.drawImage(ssCanvas, sx, sy, sw, sh, 0, 0, 24, 24);
+  const id = gctx.getImageData(0, 0, 24, 24);
+  for (let i = 0; i < id.data.length; i += 4) {
+    const g = Math.round(0.299 * id.data[i] + 0.587 * id.data[i+1] + 0.114 * id.data[i+2]);
+    id.data[i] = id.data[i+1] = id.data[i+2] = g;
+  }
+  gctx.putImageData(id, 0, 0);
+
+  // ── layout ──
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;width:100%';
+
+  const previewCol = document.createElement('div');
+  previewCol.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:6px;min-width:80px';
+  const addLbl = (t) => { const d = document.createElement('div'); d.className = 'muted'; d.textContent = t; previewCol.appendChild(d); };
+  addLbl('crop (' + sw + '×' + sh + ')'); previewCol.appendChild(prev);
+  addLbl('feat 24×24 gray');              previewCol.appendChild(gray);
+
+  const infoCol = document.createElement('div');
+  infoCol.style.flex = '1';
+  let html = '';
   if (expected) {
     const ok = r.class2.toLowerCase() === expected.toLowerCase();
-    lines.push((ok?'✓':'✗') + ' expected: ' + escapeHtml(expected) + ' / top1: ' + escapeHtml(r.class2));
+    html += '<div style="margin-bottom:8px;font-size:12px">'+(ok?'<span style="color:#86efac">✓':'<span style="color:#f87171">✗')+' expected: <b>'+escapeHtml(expected)+'</b> / top1: <b>'+escapeHtml(r.class2)+'</b></span></div>';
   }
-  lines.push('top-5:');
-  r.top.forEach((t,i) => lines.push('  '+(i+1)+'. '+t.name+'  sim='+t.sim.toFixed(3)));
-  lines.push('margin: ' + r.margin.toFixed(3));
-  outEl.innerHTML = '<pre>'+lines.join('\n')+'</pre>';
-});
+  html += '<table><thead><tr><th>#</th><th>class2</th><th>sim</th><th>margin to next</th></tr></thead><tbody>';
+  r.top.forEach((t, i) => {
+    const bad = i === 0 && expected && t.name.toLowerCase() !== expected.toLowerCase();
+    const rowCls = i === 0 ? (bad ? 'bad' : 'ok') : '';
+    html += '<tr class="'+rowCls+'"><td>'+(i+1)+'</td><td>'+escapeHtml(t.name)+'</td><td>'+t.sim.toFixed(4)+'</td><td>'+(i===0?r.margin.toFixed(4):'—')+'</td></tr>';
+  });
+  html += '</tbody></table>';
+  html += '<div class="muted" style="margin-top:6px;font-size:10px">region: ('+sx+', '+sy+') '+sw+'×'+sh+'px  |  prod thresholds: sim≥0.78, margin≥0.05 → '+(r.top[0].sim>=0.78&&r.margin>=0.05?'<span style="color:#86efac">TRIGGER</span>':'<span style="color:#fbbf24">NO TRIGGER</span>')+'</div>';
+  infoCol.innerHTML = html;
+
+  wrap.appendChild(previewCol);
+  wrap.appendChild(infoCol);
+  realResult.innerHTML = '';
+  realResult.appendChild(wrap);
+}
+
+// toggle click-size selector visibility
+document.querySelectorAll('input[name=cropMode2]').forEach(rb => rb.addEventListener('change', () => {
+  document.getElementById('clickSizeWrap').style.display =
+    document.querySelector('input[name=cropMode2]:checked').value === 'click' ? '' : 'none';
+}));
 </script>
 </body>
 </html>
