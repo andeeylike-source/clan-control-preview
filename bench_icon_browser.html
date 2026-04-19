@@ -708,10 +708,12 @@ function calibExport(fmt) {
 
 // ── Multi-mode feature-space comparison ──────────────────────────────────────
 const FS_MODES = [
-  { id: 'gray24', label: 'gray 24×24', size: 24, rgb: false },
-  { id: 'rgb24',  label: 'RGB  24×24', size: 24, rgb: true  },
-  { id: 'gray32', label: 'gray 32×32', size: 32, rgb: false },
-  { id: 'rgb32',  label: 'RGB  32×32', size: 32, rgb: true  },
+  { id: 'gray24',      label: 'cos gray 24', size: 24, rgb: false, ssim: false },
+  { id: 'rgb24',       label: 'cos RGB  24', size: 24, rgb: true,  ssim: false },
+  { id: 'gray32',      label: 'cos gray 32', size: 32, rgb: false, ssim: false },
+  { id: 'rgb32',       label: 'cos RGB  32', size: 32, rgb: true,  ssim: false },
+  { id: 'ssim_gray32', label: 'SSIM gray 32', size: 32, rgb: false, ssim: true  },
+  { id: 'ssim_rgb32',  label: 'SSIM RGB  32', size: 32, rgb: true,  ssim: true  },
 ];
 const __fsIdx = {};
 let __iconImgCache = null;
@@ -742,6 +744,52 @@ function _rgbVec(data, n) {
   for (let i=0;i<n;i++) { r[i]/=nr; g[i]/=ng; b[i]/=nb; }
   const v=new Float32Array(n*3); v.set(r,0); v.set(g,n); v.set(b,n*2); return v;
 }
+// ── SSIM helpers (raw pixels, no normalisation) ───────────────────────────────
+function _grayPx(data, n) {
+  const v=new Float32Array(n);
+  for(let i=0,j=0;i<data.length;i+=4,j++){const a=data[i+3]/255,g=0.299*data[i]+0.587*data[i+1]+0.114*data[i+2];v[j]=a*g+(1-a)*128;}
+  return v;
+}
+function _rgbPx(data, n) {
+  // channel-first layout: [R×n | G×n | B×n]
+  const v=new Float32Array(n*3);
+  for(let i=0,j=0;i<data.length;i+=4,j++){const a=data[i+3]/255;v[j]=a*data[i]+(1-a)*128;v[j+n]=a*data[i+1]+(1-a)*128;v[j+2*n]=a*data[i+2]+(1-a)*128;}
+  return v;
+}
+function canvasToPixels(src, sx, sy, sw, sh, size, rgb) {
+  if(sw<4||sh<4) return null;
+  const c=document.createElement('canvas'); c.width=size; c.height=size;
+  const ctx=c.getContext('2d',{willReadFrequently:true});
+  ctx.drawImage(src,sx,sy,sw,sh,0,0,size,size);
+  const d=ctx.getImageData(0,0,size,size).data, n=size*size;
+  return rgb ? _rgbPx(d,n) : _grayPx(d,n);
+}
+function imgToPixels(img, mode) {
+  const c=document.createElement('canvas'); c.width=mode.size; c.height=mode.size;
+  const ctx=c.getContext('2d',{willReadFrequently:true});
+  ctx.drawImage(img,0,0,mode.size,mode.size);
+  const d=ctx.getImageData(0,0,mode.size,mode.size).data, n=mode.size*mode.size;
+  return mode.rgb ? _rgbPx(d,n) : _grayPx(d,n);
+}
+function ssim1ch(a, b, n) {
+  const C1=6.5025,C2=58.5225; // (0.01*255)², (0.03*255)²
+  let ma=0,mb=0;
+  for(let i=0;i<n;i++){ma+=a[i];mb+=b[i];} ma/=n;mb/=n;
+  let va=0,vb=0,vab=0;
+  for(let i=0;i<n;i++){const da=a[i]-ma,db=b[i]-mb;va+=da*da;vb+=db*db;vab+=da*db;}
+  va/=n;vb/=n;vab/=n;
+  return((2*ma*mb+C1)*(2*vab+C2))/((ma*ma+mb*mb+C1)*(va+vb+C2));
+}
+function ssimScore(query, index, n, rgb) {
+  if(rgb){
+    const sr=ssim1ch(query.subarray(0,n),   index.subarray(0,n),   n);
+    const sg=ssim1ch(query.subarray(n,2*n), index.subarray(n,2*n), n);
+    const sb=ssim1ch(query.subarray(2*n),   index.subarray(2*n),   n);
+    return (sr+sg+sb)/3;
+  }
+  return ssim1ch(query,index,n);
+}
+
 function canvasToFeat(src, sx, sy, sw, sh, size, rgb) {
   if (sw<4||sh<4) return null;
   const c=document.createElement('canvas'); c.width=size; c.height=size;
@@ -760,7 +808,9 @@ function imgToFeatMode(img, mode) {
 function classifyFsMode(feat, modeId, topK) {
   const idx=__fsIdx[modeId];
   if (!idx||!feat) return null;
-  const scored=idx.vectors.map((v,i)=>({name:idx.names[i],sim:cosineSim(feat,v)}));
+  const n = idx.pixSize*idx.pixSize;
+  const simFn = idx.ssim ? (q,v)=>ssimScore(q,v,n,idx.rgb) : cosineSim;
+  const scored=idx.vectors.map((v,i)=>({name:idx.names[i],sim:simFn(feat,v)}));
   scored.sort((a,b)=>b.sim-a.sim);
   const top=scored.slice(0,topK||5);
   return { class2:top[0].name, sim:top[0].sim, margin:top[0].sim-(top[1]?.sim??0), top };
@@ -772,8 +822,11 @@ async function ensureAllFsIndexes() {
   }
   for (const mode of FS_MODES) {
     if (__fsIdx[mode.id]) continue;
-    const vecs=__iconImgCache.map(({name,img})=>({name,vec:imgToFeatMode(img,mode)}));
-    __fsIdx[mode.id]={names:vecs.map(v=>v.name),vectors:vecs.map(v=>v.vec)};
+    const vecs=__iconImgCache.map(({name,img})=>({
+      name, vec: mode.ssim ? imgToPixels(img,mode) : imgToFeatMode(img,mode)
+    }));
+    __fsIdx[mode.id]={names:vecs.map(v=>v.name),vectors:vecs.map(v=>v.vec),
+                      ssim:!!mode.ssim,rgb:!!mode.rgb,pixSize:mode.size};
   }
   // also patch __iconFeatures so existing classifyFromFeature still works
   if (!__iconFeatures) __iconFeatures=__fsIdx.gray24;
@@ -877,11 +930,13 @@ async function runAutoScan() {
     // multi-mode feature extraction from raw + best crop positions
     const fsFeats = {}, fsRes = {};
     for (const mode of FS_MODES) {
-      const rf = canvasToFeat(ssCanvas, rawSx, rawSy, rawSw, rawSh, mode.size, mode.rgb);
-      const bf = best ? canvasToFeat(ssCanvas, best.sx, best.sy, best.sw, best.sh, mode.size, mode.rgb) : null;
-      fsFeats[mode.id] = { raw: rf, best: bf };
-      fsRes[mode.id]   = { raw: rf ? classifyFsMode(rf, mode.id, 5) : null,
-                           best: bf ? classifyFsMode(bf, mode.id, 5) : null };
+      const extract = (sx,sy,sw,sh) => mode.ssim
+        ? canvasToPixels(ssCanvas,sx,sy,sw,sh,mode.size,mode.rgb)
+        : canvasToFeat(ssCanvas,sx,sy,sw,sh,mode.size,mode.rgb);
+      const rf = extract(rawSx,rawSy,rawSw,rawSh);
+      const bf = best ? extract(best.sx,best.sy,best.sw,best.sh) : null;
+      fsFeats[mode.id] = { raw:rf, best:bf };
+      fsRes[mode.id]   = { raw:rf?classifyFsMode(rf,mode.id,5):null, best:bf?classifyFsMode(bf,mode.id,5):null };
     }
 
     autoScanRows.push({ i, rawRes, rawFeat, best, thumb: tc.toDataURL(), expected: null, expSimRaw: null, expSimRef: null, verdict: null, fsFeats, fsRes, fsExpSim: null, fsWinner: null });
@@ -1028,43 +1083,56 @@ function renderScanResults(container) {
       const wins = fsExpRows.filter(r => r.fsWinner === mode.id).length;
       return { mode, avgExp, correct, wins, n: mRows.length };
     });
-    const bestModeStat = modeStats.filter(s => s.avgExp != null).sort((a,b) => b.avgExp - a.avgExp)[0];
+    // two independent criteria — must not be mixed
+    const bestByAvg  = modeStats.filter(s=>s.avgExp!=null).sort((a,b)=>b.avgExp-a.avgExp)[0];
+    const bestByWins = modeStats.slice().sort((a,b)=>b.wins-a.wins)[0];
 
-    // mode summary table
+    // mode summary table — ★avg marks avg-sim winner, ★wins marks per-row wins winner
     let msTbl = `<table style="border-collapse:collapse;font-size:11px;margin-bottom:10px"><thead><tr>` +
-      ['mode','avg exp sim (best)','correct top1','wins (best per row)'].map(h =>
+      ['mode','avg exp sim (best)  ★avg','correct top1','per-row wins  ★wins'].map(h =>
         `<th style="padding:3px 10px 3px 0;color:#64748b;text-align:left">${h}</th>`).join('') + `</tr></thead><tbody>`;
     modeStats.forEach(({ mode, avgExp, correct, wins, n }) => {
-      const isBest = bestModeStat && mode.id === bestModeStat.mode.id;
+      const isAvgBest  = bestByAvg  && mode.id === bestByAvg.mode.id;
+      const isWinsBest = bestByWins && mode.id === bestByWins.mode.id;
+      const nameColor  = isAvgBest || isWinsBest ? '#fbbf24' : '#94a3b8';
       msTbl += `<tr>` +
-        `<td style="padding:2px 10px 2px 0;font-weight:700;color:${isBest?'#fbbf24':'#94a3b8'}">${escapeHtml(mode.label)}${isBest?' ★':''}</td>` +
-        `<td style="padding:2px 10px 2px 0;color:${avgExp>=0.72?'#86efac':avgExp>=0.60?'#fbbf24':'#f87171'}">${avgExp!=null?avgExp.toFixed(4):'—'}</td>` +
+        `<td style="padding:2px 10px 2px 0;font-weight:700;color:${nameColor}">${escapeHtml(mode.label)}</td>` +
+        `<td style="padding:2px 10px 2px 0;color:${avgExp>=0.72?'#86efac':avgExp>=0.60?'#fbbf24':'#f87171'}">${avgExp!=null?avgExp.toFixed(4):'—'}${isAvgBest?' <b style="color:#fbbf24">★avg</b>':''}</td>` +
         `<td style="padding:2px 10px 2px 0">${correct}/${n}</td>` +
-        `<td style="padding:2px 10px 2px 0;color:#a78bfa">${wins}</td>` +
+        `<td style="padding:2px 10px 2px 0;color:#a78bfa">${wins}${isWinsBest?' <b style="color:#fbbf24">★wins</b>':''}</td>` +
         `</tr>`;
     });
     msTbl += `</tbody></table>`;
+
+    // header badges — computed independently, shown separately
+    const sameWinner = bestByAvg?.mode.id === bestByWins?.mode.id;
+    const winnerBadge = sameWinner
+      ? `<span style="color:#fbbf24">winner (both): ${escapeHtml(bestByAvg?.mode.label??'—')}</span>`
+      : `<span style="color:#fbbf24">★avg: ${escapeHtml(bestByAvg?.mode.label??'—')}</span>` +
+        ` · <span style="color:#a78bfa">★wins: ${escapeHtml(bestByWins?.mode.label??'—')}</span>`;
 
     // per-row FS comparison table
     const scFmt = v => v==null ? '<span style="color:#475569">—</span>' :
       `<span style="color:${v>=0.72?'#86efac':v>=0.60?'#fbbf24':'#f87171'}">${v.toFixed(3)}</span>`;
 
-    const fsHeaders = ['#','expected', ...FS_MODES.flatMap(m=>[m.label+' top1', m.label+' exp_sim']), 'winner'];
+    const fsHeaders = ['#','expected', ...FS_MODES.flatMap(m=>[m.label+' top1', m.label+' exp']), '★wins'];
     let fsTbl = `<table style="border-collapse:collapse;font-size:10px;width:100%"><thead><tr>` +
       fsHeaders.map(h=>`<th style="padding:3px 6px;color:#64748b;white-space:nowrap;background:#0a0f1e;position:sticky;top:0">${h}</th>`).join('') +
       `</tr></thead><tbody>`;
 
     fsExpRows.forEach(({ i, expected, fsExpSim, fsRes, fsWinner }) => {
+      // per-row winner = mode with highest expected sim for THIS row
       const winMode = FS_MODES.find(m => m.id === fsWinner);
       let cells = `<td style="padding:3px 6px;color:#475569">${i}</td>` +
                   `<td style="padding:3px 6px;color:#c8a84b;font-weight:700">${escapeHtml(expected)}</td>`;
       FS_MODES.forEach(mode => {
-        const res   = fsRes?.[mode.id]?.best  ?? fsRes?.[mode.id]?.raw;
-        const expS  = fsExpSim?.[mode.id]?.best ?? fsExpSim?.[mode.id]?.raw;
+        const res     = fsRes?.[mode.id]?.best  ?? fsRes?.[mode.id]?.raw;
+        const expS    = fsExpSim?.[mode.id]?.best ?? fsExpSim?.[mode.id]?.raw;
         const correct = res?.class2?.toLowerCase() === expected.toLowerCase();
+        const isRowWin = mode.id === fsWinner;
         cells +=
           `<td style="padding:3px 6px;color:${correct?'#86efac':'#e2e8f0'}">${res ? escapeHtml(res.class2) : '—'}</td>` +
-          `<td style="padding:3px 6px">${scFmt(expS)}</td>`;
+          `<td style="padding:3px 6px;${isRowWin?'outline:1px solid #fbbf2444;':''}">${scFmt(expS)}</td>`;
       });
       cells += `<td style="padding:3px 6px;font-weight:700;color:#fbbf24">${winMode ? escapeHtml(winMode.label) : '—'}</td>`;
       fsTbl += `<tr>${cells}</tr>`;
@@ -1073,9 +1141,9 @@ function renderScanResults(container) {
 
     fsSectionHtml =
       `<div style="margin-top:14px;border-top:1px solid #1e293b;padding-top:12px">` +
-      `<div style="color:#a78bfa;font-size:12px;font-weight:700;margin-bottom:8px">` +
-      `Feature-Space Comparison — ${fsExpRows.length} labeled rows` +
-      (bestModeStat ? ` · <span style="color:#fbbf24">winner: ${escapeHtml(bestModeStat.mode.label)}</span>` : '') + `</div>` +
+      `<div style="color:#a78bfa;font-size:12px;font-weight:700;margin-bottom:4px">` +
+      `Feature-Space Comparison — ${fsExpRows.length} labeled rows · ${winnerBadge}</div>` +
+      `<div style="font-size:10px;color:#475569;margin-bottom:8px">★avg = best average expected sim · ★wins = most per-row wins · these metrics are computed independently</div>` +
       msTbl +
       `<div style="overflow-x:auto;max-height:380px;overflow-y:auto;border:1px solid #1e293b;border-radius:6px">${fsTbl}</div>` +
       `</div>`;
@@ -1134,8 +1202,10 @@ function runExpectedCompare() {
         const ev   = eidx >= 0 ? idx.vectors[eidx] : null;
         const rf   = row.fsFeats[mode.id]?.raw;
         const bf   = row.fsFeats[mode.id]?.best;
-        const rs   = ev && rf ? cosineSim(rf, ev) : null;
-        const bs   = ev && bf ? cosineSim(bf, ev) : null;
+        const n    = idx.pixSize * idx.pixSize;
+        const sim  = idx.ssim ? (q,i) => ssimScore(q,i,n,idx.rgb) : cosineSim;
+        const rs   = ev && rf ? sim(rf, ev) : null;
+        const bs   = ev && bf ? sim(bf, ev) : null;
         row.fsExpSim[mode.id] = { raw: rs, best: bs };
         const v = bs ?? rs ?? -Infinity;
         if (v > winSim) { winSim = v; winMode = mode.id; }
