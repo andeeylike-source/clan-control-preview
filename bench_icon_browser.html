@@ -600,19 +600,16 @@ ssCanvas.addEventListener('mouseup', async (e) => {
   await matchRegion(lastHighlight.x, lastHighlight.y, lastHighlight.w, lastHighlight.h);
 });
 
-// ── click-to-sample mode ──
+// ── click-to-sample mode — calls center-refine ──
 ssCanvas.addEventListener('click', async (e) => {
   if (!ssImage || document.querySelector('input[name=cropMode2]:checked').value !== 'click') return;
-  const sz = +document.getElementById('clickSize').value;
   const r = ssCanvas.getBoundingClientRect();
   const { x: cx, y: cy } = cssToCanvas(e.clientX - r.left, e.clientY - r.top);
-  const sx = Math.max(0, cx - Math.floor(sz / 2));
-  const sy = Math.max(0, cy - Math.floor(sz / 2));
-  const sw = Math.min(ssCanvas.width - sx, sz);
-  const sh = Math.min(ssCanvas.height - sy, sz);
-  lastHighlight = { x: sx, y: sy, w: sw, h: sh };
+  // show approximate highlight at raw size while computing
+  const rawSz = +document.getElementById('clickSize').value;
+  lastHighlight = { x: Math.max(0, cx - Math.floor(rawSz/2)), y: Math.max(0, cy - Math.floor(rawSz/2)), w: rawSz, h: rawSz };
   redraw(lastHighlight);
-  await matchRegion(sx, sy, sw, sh);
+  await matchClickRefine(cx, cy);
 });
 
 // ── preprocessing helpers (pure Canvas 2D, no libs) ──
@@ -814,6 +811,181 @@ async function matchRegion(sx, sy, sw, sh) {
   realResult.innerHTML = '';
   realResult.appendChild(strip);
   realResult.appendChild(verdict);
+}
+
+// ── center-refine: sweep offsets × sizes around click center ──
+async function matchClickRefine(cx, cy) {
+  realResult.innerHTML = '<span class="muted">center-refine sweep…</span>';
+  try { await ensureIconFeatures(); } catch(e) { realResult.innerHTML = '❌ feature-index: '+e.message; return; }
+
+  const expected = (document.getElementById('realLabel').value || '').trim();
+  const rawSz    = +document.getElementById('clickSize').value;
+
+  // ── raw crop (exact click, selected size) ──
+  const rawSx = Math.max(0, cx - Math.floor(rawSz/2));
+  const rawSy = Math.max(0, cy - Math.floor(rawSz/2));
+  const rawSw = Math.min(ssCanvas.width - rawSx, rawSz);
+  const rawSh = Math.min(ssCanvas.height - rawSy, rawSz);
+  const rawFeat = canvasRegionToFeature(ssCanvas, rawSx, rawSy, rawSw, rawSh, ICON_FEATURE_SIZE);
+  const rawRes  = rawFeat ? classifyFromFeature(rawFeat, 5) : null;
+
+  // ── refine sweep: offsets ±6px step 1, sizes [16,18,20,22,24] ──
+  const SWEEP_OFFSETS = [-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6];
+  const SWEEP_SIZES   = [16, 18, 20, 22, 24];
+  let best = null; // {sx,sy,sz,dx,dy,res}
+
+  for (const sz of SWEEP_SIZES) {
+    for (const dx of SWEEP_OFFSETS) {
+      for (const dy of SWEEP_OFFSETS) {
+        const sx = Math.max(0, cx + dx - Math.floor(sz/2));
+        const sy = Math.max(0, cy + dy - Math.floor(sz/2));
+        const sw = Math.min(ssCanvas.width - sx, sz);
+        const sh = Math.min(ssCanvas.height - sy, sz);
+        if (sw < 4 || sh < 4) continue;
+        const feat = canvasRegionToFeature(ssCanvas, sx, sy, sw, sh, ICON_FEATURE_SIZE);
+        if (!feat) continue;
+        const res = classifyFromFeature(feat, 5);
+        if (!res) continue;
+        if (!best || res.top[0].sim > best.res.top[0].sim) {
+          best = { sx, sy, sw, sh, sz, dx, dy, res };
+        }
+      }
+    }
+  }
+
+  // highlight best crop on canvas
+  if (best) { lastHighlight = { x: best.sx, y: best.sy, w: best.sw, h: best.sh }; redraw(lastHighlight); }
+
+  // ── build result UI ──
+  realResult.innerHTML = '';
+
+  // helper: one result card
+  function makeCard(label, sx, sy, sw, sh, res, accent) {
+    const card = document.createElement('div');
+    card.style.cssText = 'min-width:200px;background:#0d1524;border:1px solid '+(accent||'#1e293b')+';border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:5px;flex-shrink:0';
+
+    const h = document.createElement('div');
+    h.style.cssText = 'font-size:11px;font-weight:700;color:'+(accent||'#94a3b8')+';margin-bottom:2px';
+    h.textContent = label; card.appendChild(h);
+
+    if (!res) {
+      const nd = document.createElement('div'); nd.className='muted'; nd.style.fontSize='11px'; nd.textContent='—'; card.appendChild(nd);
+      return card;
+    }
+
+    // previews
+    const prow = document.createElement('div');
+    prow.style.cssText = 'display:flex;gap:8px;align-items:flex-end;margin-bottom:4px';
+
+    const thumb = document.createElement('canvas');
+    thumb.width = sw; thumb.height = sh;
+    thumb.style.cssText = 'width:64px;height:64px;border:1px solid #273449;border-radius:3px;image-rendering:pixelated';
+    thumb.getContext('2d').drawImage(ssCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+
+    const gp = makeGrayPreview(
+      (() => { const tc = document.createElement('canvas'); tc.width=sw; tc.height=sh; tc.getContext('2d').drawImage(ssCanvas,sx,sy,sw,sh,0,0,sw,sh); return tc; })(),
+      40
+    );
+
+    const col = document.createElement('div');
+    col.style.cssText = 'display:flex;flex-direction:column;gap:3px;align-items:center';
+    const lc = document.createElement('div'); lc.className='muted'; lc.style.fontSize='9px'; lc.textContent='crop '+sw+'×'+sh;
+    const lf = document.createElement('div'); lf.className='muted'; lf.style.fontSize='9px'; lf.textContent='feat 24×24';
+    col.append(lc, thumb, lf, gp);
+    prow.appendChild(col);
+    card.appendChild(prow);
+
+    const trigger = res.top[0].sim >= 0.78 && res.margin >= 0.05;
+    const isBad   = expected && res.class2.toLowerCase() !== expected.toLowerCase();
+    const nc      = expected ? (isBad ? '#f87171' : '#86efac') : '#e2e8f0';
+
+    const info = document.createElement('div');
+    info.style.cssText = 'font-size:11px;line-height:1.6';
+    info.innerHTML =
+      '<span class="muted">top1:</span> <b style="color:'+nc+'">'+escapeHtml(res.class2)+'</b><br>'+
+      '<span class="muted">sim:</span> '+res.top[0].sim.toFixed(4)+'<br>'+
+      '<span class="muted">margin:</span> '+res.margin.toFixed(4);
+    card.appendChild(info);
+
+    const badge = document.createElement('div');
+    badge.style.cssText = 'margin-top:5px;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;display:inline-block;'+
+      (trigger ? 'background:#14532d;color:#86efac' : 'background:#422006;color:#fbbf24');
+    badge.textContent = trigger ? '✓ TRIGGER' : '✗ NO TRIGGER';
+    card.appendChild(badge);
+
+    const mini = document.createElement('div');
+    mini.style.cssText = 'font-size:9px;color:#475569;margin-top:5px;line-height:1.6';
+    res.top.slice(0,5).forEach((t,i) => {
+      mini.innerHTML += (i+1)+'. '+escapeHtml(t.name)+' <span style="color:#64748b">'+t.sim.toFixed(3)+'</span><br>';
+    });
+    card.appendChild(mini);
+    return card;
+  }
+
+  // cards row
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start';
+
+  const rawCard = makeCard('raw ('+rawSz+'×'+rawSz+')', rawSx, rawSy, rawSw, rawSh, rawRes, '#334155');
+  row.appendChild(rawCard);
+
+  if (best) {
+    const bLabel = 'refined best  sz='+best.sz+'  offset=('+best.dx+','+best.dy+')';
+    const bCard  = makeCard(bLabel, best.sx, best.sy, best.sw, best.sh, best.res, '#4c1d95');
+    row.appendChild(bCard);
+  }
+  realResult.appendChild(row);
+
+  // ── mini-summary delta table ──
+  const rawSim  = rawRes  ? rawRes.top[0].sim  : null;
+  const bestSim = best    ? best.res.top[0].sim : null;
+  const rawMgn  = rawRes  ? rawRes.margin       : null;
+  const bestMgn = best    ? best.res.margin     : null;
+
+  const summary = document.createElement('div');
+  summary.style.cssText = 'margin-top:10px;font-size:11px;background:#0d1524;border:1px solid #1e293b;border-radius:6px;padding:10px;width:100%';
+  const dSim = (rawSim != null && bestSim != null) ? (bestSim - rawSim) : null;
+  const dMgn = (rawMgn != null && bestMgn != null) ? (bestMgn - rawMgn) : null;
+  const fmt  = v => v != null ? v.toFixed(4) : '—';
+  const fmtD = v => v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(4);
+  const dc   = v => v == null ? '' : (v > 0.01 ? 'color:#86efac' : v < -0.01 ? 'color:#f87171' : 'color:#94a3b8');
+
+  const totalCandidates = SWEEP_SIZES.length * SWEEP_OFFSETS.length * SWEEP_OFFSETS.length;
+  summary.innerHTML =
+    '<b style="color:#94a3b8">Center-refine summary</b> <span class="muted">('+totalCandidates+' candidates: '+SWEEP_SIZES.length+' sizes × '+SWEEP_OFFSETS.length+'×'+SWEEP_OFFSETS.length+' offsets)</span><br><br>'+
+    '<table style="width:auto;font-size:11px"><thead><tr>'+
+    '<th style="text-align:left;padding:3px 12px 3px 0;color:#64748b">metric</th>'+
+    '<th style="text-align:right;padding:3px 12px;color:#64748b">raw</th>'+
+    '<th style="text-align:right;padding:3px 12px;color:#64748b">refined</th>'+
+    '<th style="text-align:right;padding:3px 0;color:#64748b">Δ</th>'+
+    '</tr></thead><tbody>'+
+    '<tr><td style="padding:2px 12px 2px 0">top1</td>'+
+    '<td style="text-align:right;padding:2px 12px">'+(rawRes?escapeHtml(rawRes.class2):'—')+'</td>'+
+    '<td style="text-align:right;padding:2px 12px">'+(best?escapeHtml(best.res.class2):'—')+'</td>'+
+    '<td style="text-align:right">'+(rawRes&&best&&rawRes.class2===best.res.class2?'same':'<span style="color:#fbbf24">changed</span>')+'</td></tr>'+
+    '<tr><td style="padding:2px 12px 2px 0">sim</td>'+
+    '<td style="text-align:right;padding:2px 12px">'+fmt(rawSim)+'</td>'+
+    '<td style="text-align:right;padding:2px 12px">'+fmt(bestSim)+'</td>'+
+    '<td style="text-align:right"><span style="'+dc(dSim)+'">'+fmtD(dSim)+'</span></td></tr>'+
+    '<tr><td style="padding:2px 12px 2px 0">margin</td>'+
+    '<td style="text-align:right;padding:2px 12px">'+fmt(rawMgn)+'</td>'+
+    '<td style="text-align:right;padding:2px 12px">'+fmt(bestMgn)+'</td>'+
+    '<td style="text-align:right"><span style="'+dc(dMgn)+'">'+fmtD(dMgn)+'</span></td></tr>'+
+    '<tr><td style="padding:2px 12px 2px 0">TRIGGER</td>'+
+    '<td style="text-align:right;padding:2px 12px">'+(rawRes&&rawRes.top[0].sim>=0.78&&rawRes.margin>=0.05?'<span style="color:#86efac">YES</span>':'<span style="color:#fbbf24">NO</span>')+'</td>'+
+    '<td style="text-align:right;padding:2px 12px">'+(best&&best.res.top[0].sim>=0.78&&best.res.margin>=0.05?'<span style="color:#86efac">YES</span>':'<span style="color:#fbbf24">NO</span>')+'</td>'+
+    '<td></td></tr>'+
+    '</tbody></table>';
+
+  if (dSim != null) {
+    const conclusion = dSim > 0.05 ? '✓ Local search дал значимый прирост (Δsim='+fmtD(dSim)+'). Улучшение лупы помогает.' :
+                       dSim > 0.01 ? '~ Незначительный прирост (Δsim='+fmtD(dSim)+'). Локальный поиск слегка помогает.' :
+                                     '✗ Local search не помог (Δsim≈'+fmtD(dSim)+'). Проблема не в локализации — нужен другой подход.';
+    const cc = dSim > 0.05 ? '#86efac' : dSim > 0.01 ? '#fbbf24' : '#f87171';
+    summary.innerHTML += '<br><span style="color:'+cc+'">'+conclusion+'</span>';
+  }
+
+  realResult.appendChild(summary);
 }
 
 // toggle click-size selector visibility
