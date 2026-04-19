@@ -120,9 +120,10 @@
   <div class="muted">
     Загрузи полный CC screenshot → выдели crop (<b>drag-rect</b>) или кликни (<b>click-sample</b>) →
     <b>A/B preprocessing bench</b>: один и тот же crop прогоняется через 6 режимов preprocessing side-by-side,
-    чтобы найти, какой из них реально поднимает sim до prod-threshold.
+    чтобы найти, какой из них реально поднимает sim до prod-threshold.<br>
+    Включи <b>Calibration mode</b> + введи expected class → каждый клик/crop сохраняется в таблицу со статистикой.
   </div>
-  <div class="row" style="margin-top:10px;gap:16px">
+  <div class="row" style="margin-top:10px;gap:16px;flex-wrap:wrap">
     <input type="file" id="realFile" accept="image/*">
     <label style="gap:4px"><input type="radio" name="cropMode2" value="drag" checked> drag-rect</label>
     <label style="gap:4px"><input type="radio" name="cropMode2" value="click"> click-sample</label>
@@ -132,13 +133,31 @@
         <option value="32">32</option><option value="40" selected>40</option><option value="56">56</option>
       </select> px
     </span>
-    <input type="text" id="realLabel" placeholder="expected class2 (optional)" style="width:180px">
+    <label style="gap:5px;cursor:pointer;user-select:none"><input type="checkbox" id="calibMode"> <b>Calibration mode</b></label>
+    <span>
+      <input type="text" id="realLabel" placeholder="expected class2 (optional)" style="width:200px;background:#0b1220;color:#e2e8f0;border:1px solid #273449;border-radius:4px;padding:3px 8px;font-size:12px">
+      <span id="calibRequiredNote" style="display:none;color:#fbbf24;font-size:11px;margin-left:4px">⚠ required in calibration mode</span>
+    </span>
   </div>
   <div style="margin-top:10px;position:relative;overflow:auto;max-height:620px;border:1px solid #1e293b;border-radius:6px;background:#060d1a">
     <div id="ssPlaceholder" style="padding:48px;text-align:center;color:#64748b;font-size:12px">Загрузите screenshot выше</div>
     <canvas id="ssCanvas" style="display:none;cursor:crosshair;max-width:100%;max-height:620px"></canvas>
   </div>
   <div id="realResult" style="margin-top:10px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap"></div>
+
+  <!-- Calibration dataset section (shown only when calibMode is on) -->
+  <div id="calibSection" style="display:none;margin-top:18px;border-top:1px solid #1e293b;padding-top:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <b style="color:#94a3b8;font-size:13px">Calibration set — <span id="calibCount">0</span> crop(s)</b>
+      <div style="display:flex;gap:8px">
+        <button id="calibExportJSON" style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:4px 11px;font-size:11px;cursor:pointer">Export JSON</button>
+        <button id="calibExportCSV"  style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:4px 11px;font-size:11px;cursor:pointer">Export CSV</button>
+        <button id="calibClear"      style="background:#2d1b1b;color:#f87171;border:1px solid #5b2121;border-radius:5px;padding:4px 11px;font-size:11px;cursor:pointer">Clear</button>
+      </div>
+    </div>
+    <div id="calibSummary" style="background:#0d1524;border:1px solid #1e293b;border-radius:6px;padding:10px;font-size:11px;margin-bottom:10px"></div>
+    <div id="calibTableWrap" style="overflow-x:auto"></div>
+  </div>
 </div>
 
 <script>
@@ -529,6 +548,154 @@ const ssCanvas = document.getElementById('ssCanvas');
 const ssCtx = ssCanvas.getContext('2d', { willReadFrequently: true });
 const ssPlaceholder = document.getElementById('ssPlaceholder');
 const realResult = document.getElementById('realResult');
+
+// ── Calibration dataset ──────────────────────────────────────────────────────
+const calibrationSet = [];
+
+function saveCalibrationEntry(entry) {
+  calibrationSet.push(entry);
+  renderCalibration();
+}
+
+function renderCalibration() {
+  const countEl   = document.getElementById('calibCount');
+  const summaryEl = document.getElementById('calibSummary');
+  const tableWrap = document.getElementById('calibTableWrap');
+  if (!countEl) return;
+  countEl.textContent = calibrationSet.length;
+
+  if (calibrationSet.length === 0) {
+    summaryEl.innerHTML = '<span style="color:#475569">Нет данных</span>';
+    tableWrap.innerHTML = '';
+    return;
+  }
+
+  // ── summary stats ──
+  const n          = calibrationSet.length;
+  const rawOk      = calibrationSet.filter(e => e.raw_correct).length;
+  const refRows    = calibrationSet.filter(e => e.ref_top1 != null);
+  const refOk      = refRows.filter(e => e.ref_correct).length;
+  const avgSimRaw  = calibrationSet.reduce((a, e) => a + e.raw_sim, 0) / n;
+  const avgSimRef  = refRows.length ? refRows.reduce((a, e) => a + e.ref_sim, 0) / refRows.length : null;
+  const improved   = refRows.filter(e => !e.raw_correct && e.ref_correct).length;
+  const worsened   = refRows.filter(e => e.raw_correct && !e.ref_correct).length;
+  const rawTrigger = calibrationSet.filter(e => e.raw_trigger).length;
+  const refTrigger = refRows.filter(e => e.ref_trigger).length;
+
+  // top confusions on raw
+  const confMap = {};
+  calibrationSet.filter(e => !e.raw_correct).forEach(e => {
+    const k = escapeHtml(e.expected) + ' → ' + escapeHtml(e.raw_top1);
+    confMap[k] = (confMap[k] || 0) + 1;
+  });
+  const topConf = Object.entries(confMap).sort((a,b) => b[1]-a[1]).slice(0,5);
+
+  const pct = (a, b) => b ? (a/b*100).toFixed(1)+'%' : '—';
+  const f4  = v => v != null ? v.toFixed(4) : '—';
+
+  summaryEl.innerHTML =
+    '<table style="border-collapse:collapse;font-size:11px"><tbody>'+
+    '<tr><td style="color:#64748b;padding:2px 16px 2px 0">accuracy raw</td>'+
+        '<td><b style="color:'+(rawOk/n>=0.8?'#86efac':'#fbbf24')+'">'+pct(rawOk,n)+'</b> ('+rawOk+'/'+n+')</td></tr>'+
+    '<tr><td style="color:#64748b;padding:2px 16px 2px 0">accuracy refined</td>'+
+        '<td>'+(refRows.length?'<b style="color:'+(refOk/refRows.length>=0.8?'#86efac':'#fbbf24')+'">'+pct(refOk,refRows.length)+'</b> ('+refOk+'/'+refRows.length+')':'<span style="color:#475569">—</span>')+'</td></tr>'+
+    '<tr><td style="color:#64748b;padding:2px 16px 2px 0">avg sim raw</td>'+
+        '<td>'+f4(avgSimRaw)+'</td></tr>'+
+    '<tr><td style="color:#64748b;padding:2px 16px 2px 0">avg sim refined</td>'+
+        '<td>'+f4(avgSimRef)+'</td></tr>'+
+    '<tr><td style="color:#64748b;padding:2px 16px 2px 0">TRIGGER raw / refined</td>'+
+        '<td>'+rawTrigger+'/'+n+' → '+(refRows.length?refTrigger+'/'+refRows.length:'—')+'</td></tr>'+
+    '<tr><td style="color:#64748b;padding:2px 16px 2px 0">refine improved / worsened</td>'+
+        '<td><span style="color:#86efac">+'+improved+'</span> / <span style="color:#f87171">−'+worsened+'</span>'+(refRows.length===0?' (drag mode — no refine)':'')+'</td></tr>'+
+    '</tbody></table>'+
+    (topConf.length ?
+      '<div style="margin-top:8px;color:#64748b">Top confusions (raw):</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">'+
+        topConf.map(([k,c]) => '<span style="background:#1e293b;border-radius:4px;padding:1px 7px;font-size:10px">'+k+' <b style="color:#fbbf24">×'+c+'</b></span>').join('')+
+      '</div>'
+      : '');
+
+  // ── table of entries ──
+  const cols = ['#','expected','raw top1','raw sim','raw mgn','raw ok','raw trig',
+                 'ref top1','ref sim','ref mgn','ref ok','ref trig','mode','sz','dx','dy'];
+  let tHTML = '<table style="border-collapse:collapse;font-size:10px;min-width:900px"><thead><tr>'+
+    cols.map(c => '<th style="padding:3px 8px;border-bottom:1px solid #1e293b;text-align:left;color:#64748b;white-space:nowrap">'+c+'</th>').join('')+
+    '</tr></thead><tbody>';
+
+  calibrationSet.forEach((e, i) => {
+    const rawOkCell  = e.raw_correct ? '<span style="color:#86efac">✓</span>' : '<span style="color:#f87171">✗</span>';
+    const refOkCell  = e.ref_top1 == null ? '—' : (e.ref_correct ? '<span style="color:#86efac">✓</span>' : '<span style="color:#f87171">✗</span>');
+    const rawTrCell  = e.raw_trigger ? '<span style="color:#86efac">Y</span>' : '<span style="color:#fbbf24">N</span>';
+    const refTrCell  = e.ref_top1 == null ? '—' : (e.ref_trigger ? '<span style="color:#86efac">Y</span>' : '<span style="color:#fbbf24">N</span>');
+    const rowBg      = i % 2 === 0 ? '' : 'background:#0a1020';
+    tHTML += '<tr style="'+rowBg+'">'+
+      '<td style="padding:2px 8px;color:#475569">'+(i+1)+'</td>'+
+      '<td style="padding:2px 8px;color:#c8a84b;font-weight:700">'+escapeHtml(e.expected)+'</td>'+
+      '<td style="padding:2px 8px;color:'+(e.raw_correct?'#86efac':'#f87171')+'">'+escapeHtml(e.raw_top1)+'</td>'+
+      '<td style="padding:2px 8px">'+e.raw_sim.toFixed(4)+'</td>'+
+      '<td style="padding:2px 8px">'+e.raw_margin.toFixed(4)+'</td>'+
+      '<td style="padding:2px 8px;text-align:center">'+rawOkCell+'</td>'+
+      '<td style="padding:2px 8px;text-align:center">'+rawTrCell+'</td>'+
+      '<td style="padding:2px 8px;color:'+(e.ref_top1==null?'#475569':e.ref_correct?'#86efac':'#f87171')+'">'+escapeHtml(e.ref_top1||'—')+'</td>'+
+      '<td style="padding:2px 8px">'+(e.ref_sim!=null?e.ref_sim.toFixed(4):'—')+'</td>'+
+      '<td style="padding:2px 8px">'+(e.ref_margin!=null?e.ref_margin.toFixed(4):'—')+'</td>'+
+      '<td style="padding:2px 8px;text-align:center">'+refOkCell+'</td>'+
+      '<td style="padding:2px 8px;text-align:center">'+refTrCell+'</td>'+
+      '<td style="padding:2px 8px;color:#64748b">'+escapeHtml(e.mode)+'</td>'+
+      '<td style="padding:2px 8px">'+escapeHtml(String(e.crop_sz||e.crop_w||'?'))+'</td>'+
+      '<td style="padding:2px 8px">'+(e.best_dx!=null?e.best_dx:'—')+'</td>'+
+      '<td style="padding:2px 8px">'+(e.best_dy!=null?e.best_dy:'—')+'</td>'+
+      '</tr>';
+  });
+  tHTML += '</tbody></table>';
+  tableWrap.innerHTML = tHTML;
+}
+
+function calibExport(fmt) {
+  if (calibrationSet.length === 0) { alert('Calibration set пуст'); return; }
+  let content, mime, ext;
+  if (fmt === 'json') {
+    content = JSON.stringify(calibrationSet, null, 2);
+    mime = 'application/json'; ext = 'json';
+  } else {
+    const cols = ['expected','raw_top1','raw_sim','raw_margin','raw_correct','raw_trigger',
+                  'ref_top1','ref_sim','ref_margin','ref_correct','ref_trigger','mode','crop_sz','best_dx','best_dy'];
+    const rows = calibrationSet.map(e =>
+      cols.map(c => {
+        const v = e[c] != null ? e[c] : '';
+        return '"'+String(v).replace(/"/g,'""')+'"';
+      }).join(',')
+    );
+    content = cols.join(',') + '\n' + rows.join('\n');
+    mime = 'text/csv'; ext = 'csv';
+  }
+  const blob = new Blob([content], { type: mime });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: 'calibration_set.'+ext });
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+}
+
+// ── calibration mode toggle ──
+document.getElementById('calibMode').addEventListener('change', () => {
+  const on = document.getElementById('calibMode').checked;
+  document.getElementById('calibSection').style.display = on ? '' : 'none';
+  document.getElementById('calibRequiredNote').style.display = on ? '' : 'none';
+  if (on) {
+    document.getElementById('realLabel').placeholder = 'expected class2 (REQUIRED)';
+    renderCalibration();
+  } else {
+    document.getElementById('realLabel').placeholder = 'expected class2 (optional)';
+  }
+});
+document.getElementById('calibExportJSON').addEventListener('click', () => calibExport('json'));
+document.getElementById('calibExportCSV').addEventListener('click',  () => calibExport('csv'));
+document.getElementById('calibClear').addEventListener('click', () => {
+  if (!calibrationSet.length || confirm('Очистить calibration set ('+calibrationSet.length+' записей)?')) {
+    calibrationSet.length = 0;
+    renderCalibration();
+  }
+});
 let ssImage = null;
 let isDragging = false;
 let dragStart = { x: 0, y: 0 };
@@ -698,10 +865,14 @@ function makeGrayPreview(src, displayPx) {
 
 // ── A/B preprocessing bench ──
 async function matchRegion(sx, sy, sw, sh) {
+  const expected = (document.getElementById('realLabel').value || '').trim();
+  const calibOn  = document.getElementById('calibMode').checked;
+  if (calibOn && !expected) {
+    realResult.innerHTML = '<span style="color:#fbbf24">⚠ Calibration mode включён — введи expected class2 перед crop.</span>';
+    return;
+  }
   realResult.innerHTML = '<span class="muted">матчу…</span>';
   try { await ensureIconFeatures(); } catch(e) { realResult.innerHTML = '❌ feature-index: ' + e.message; return; }
-
-  const expected = (document.getElementById('realLabel').value || '').trim();
 
   // extract raw crop
   const raw = document.createElement('canvas');
@@ -811,14 +982,49 @@ async function matchRegion(sx, sy, sw, sh) {
   realResult.innerHTML = '';
   realResult.appendChild(strip);
   realResult.appendChild(verdict);
+
+  // ── save to calibration set if calibration mode is on ──
+  if (calibOn && expected) {
+    const rawMode = modeData[0]; // first = 'raw'
+    const rawRes  = rawMode && rawMode.res;
+    // best = highest sim among triggered, else highest sim overall
+    const bestMode = triggered.length
+      ? triggered.reduce((a, m) => m.res.top[0].sim > a.res.top[0].sim ? m : a)
+      : modeData.filter(m => m.res).reduce((a, m) => m.res.top[0].sim > a.res.top[0].sim ? m : a, modeData.find(m => m.res));
+    const bestRes  = bestMode && bestMode.res;
+    if (rawRes) {
+      saveCalibrationEntry({
+        expected,
+        raw_top1:    rawRes.class2,
+        raw_sim:     rawRes.top[0].sim,
+        raw_margin:  rawRes.margin,
+        raw_correct: rawRes.class2.toLowerCase() === expected.toLowerCase(),
+        raw_trigger: rawRes.top[0].sim >= 0.78 && rawRes.margin >= 0.05,
+        ref_top1:    bestRes && bestMode !== rawMode ? bestRes.class2 : null,
+        ref_sim:     bestRes && bestMode !== rawMode ? bestRes.top[0].sim : null,
+        ref_margin:  bestRes && bestMode !== rawMode ? bestRes.margin : null,
+        ref_correct: bestRes && bestMode !== rawMode ? (bestRes.class2.toLowerCase() === expected.toLowerCase()) : null,
+        ref_trigger: bestRes && bestMode !== rawMode ? (bestRes.top[0].sim >= 0.78 && bestRes.margin >= 0.05) : null,
+        mode:        'drag:'+( bestMode && bestMode !== rawMode ? bestMode.label : 'raw'),
+        crop_w:      sw,
+        crop_sz:     sw+'×'+sh,
+        best_dx:     null,
+        best_dy:     null,
+      });
+    }
+  }
 }
 
 // ── center-refine: sweep offsets × sizes around click center ──
 async function matchClickRefine(cx, cy) {
+  const expected = (document.getElementById('realLabel').value || '').trim();
+  const calibOn  = document.getElementById('calibMode').checked;
+  if (calibOn && !expected) {
+    realResult.innerHTML = '<span style="color:#fbbf24">⚠ Calibration mode включён — введи expected class2 перед кликом.</span>';
+    return;
+  }
   realResult.innerHTML = '<span class="muted">center-refine sweep…</span>';
   try { await ensureIconFeatures(); } catch(e) { realResult.innerHTML = '❌ feature-index: '+e.message; return; }
-
-  const expected = (document.getElementById('realLabel').value || '').trim();
   const rawSz    = +document.getElementById('clickSize').value;
 
   // ── raw crop (exact click, selected size) ──
@@ -986,6 +1192,28 @@ async function matchClickRefine(cx, cy) {
   }
 
   realResult.appendChild(summary);
+
+  // ── save to calibration set if calibration mode is on ──
+  if (calibOn && expected && rawRes) {
+    saveCalibrationEntry({
+      expected,
+      raw_top1:    rawRes.class2,
+      raw_sim:     rawRes.top[0].sim,
+      raw_margin:  rawRes.margin,
+      raw_correct: rawRes.class2.toLowerCase() === expected.toLowerCase(),
+      raw_trigger: rawRes.top[0].sim >= 0.78 && rawRes.margin >= 0.05,
+      ref_top1:    best ? best.res.class2 : null,
+      ref_sim:     best ? best.res.top[0].sim : null,
+      ref_margin:  best ? best.res.margin : null,
+      ref_correct: best ? (best.res.class2.toLowerCase() === expected.toLowerCase()) : null,
+      ref_trigger: best ? (best.res.top[0].sim >= 0.78 && best.res.margin >= 0.05) : null,
+      mode:        'click',
+      crop_sz:     rawSz,
+      best_sz:     best ? best.sz : null,
+      best_dx:     best ? best.dx : null,
+      best_dy:     best ? best.dy : null,
+    });
+  }
 }
 
 // toggle click-size selector visibility
