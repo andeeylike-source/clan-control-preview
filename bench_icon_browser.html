@@ -37,6 +37,9 @@
   Честный тест локального browser-side matcher’а (cosine sim в 24×24 grayscale feature space).
   Без Gemini, без roster, без icon_matcher lookup, без profa/class3 fallback.
   Основной analyze-flow (<code>BASA (1).html</code>) не затронут.
+  <span style="color:#86efac">✓ benchmark aligned with production feature model</span>:
+  feature extraction использует mid-gray bg (luma=128) — совпадает с формулой index (<code>(1-alpha)*128</code>).
+  Визуальный composite по-прежнему рендерится на реальный фон для preview.
 </div>
 
 <div class="card">
@@ -238,11 +241,19 @@ async function ensureIconFeatures() {
   return __iconFeatures;
 }
 
-// ── composite renderer — точно как в bench_icon_gemini.html, чтобы сравнения были сопоставимы ──
+// ── composite renderer ──
+// canvas  — visual display (realistic dark/cc bg for preview)
+// featCanvas — feature extraction canvas with mid-gray bg (luma=128),
+//              aligned with imgToFeature index formula: (1-alpha)*128.
+//              Fix for background luma mismatch: old bench used #0d1524 (luma≈20) for
+//              the query while index treats transparent pixels as luma=128 — Δ≈108 per pixel.
 function renderComposite(img, iconSize, bgMode) {
   const pad = Math.max(6, Math.round(iconSize * 0.5));
   const W = iconSize + pad*2;
   const H = iconSize + pad*2;
+  const smoothing = iconSize <= 24 ? 'medium' : 'high';
+
+  // visual canvas (for preview only)
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const cx = c.getContext('2d');
@@ -255,20 +266,32 @@ function renderComposite(img, iconSize, bgMode) {
     cx.fillStyle = '#0d1524'; cx.fillRect(0,0,W,H);
   }
   cx.imageSmoothingEnabled = true;
-  cx.imageSmoothingQuality = iconSize <= 24 ? 'medium' : 'high';
+  cx.imageSmoothingQuality = smoothing;
   cx.drawImage(img, pad, pad, iconSize, iconSize);
-  return { canvas:c, pad, W, H, iconSize };
+
+  // feature canvas: mid-gray bg matches index formula (1-alpha)*128
+  const fc = document.createElement('canvas');
+  fc.width = W; fc.height = H;
+  const fcx = fc.getContext('2d');
+  fcx.fillStyle = 'rgb(128,128,128)';
+  fcx.fillRect(0, 0, W, H);
+  fcx.imageSmoothingEnabled = true;
+  fcx.imageSmoothingQuality = smoothing;
+  fcx.drawImage(img, pad, pad, iconSize, iconSize);
+
+  return { canvas:c, featCanvas:fc, pad, W, H, iconSize };
 }
 
-// Match one composite. mode: 'centered' (single exact crop) or 'sweep' (±tolerance px around center, best sim).
+// Match one composite. Uses featCanvas (mid-gray bg) for feature extraction,
+// not the visual canvas — this aligns query with the index feature model.
 function matchComposite(compo, mode, tolerance) {
-  const { canvas, pad, iconSize } = compo;
+  const { featCanvas, pad, iconSize } = compo;
   if (mode === 'sweep' && tolerance > 0) {
     let best = null;
     const step = Math.max(1, Math.round(tolerance / 2));
     for (let dx = -tolerance; dx <= tolerance; dx += step) {
       for (let dy = -tolerance; dy <= tolerance; dy += step) {
-        const feat = canvasRegionToFeature(canvas, pad+dx, pad+dy, iconSize, iconSize, ICON_FEATURE_SIZE);
+        const feat = canvasRegionToFeature(featCanvas, pad+dx, pad+dy, iconSize, iconSize, ICON_FEATURE_SIZE);
         if (!feat) continue;
         const r = classifyFromFeature(feat, 3);
         if (!r) continue;
@@ -277,7 +300,7 @@ function matchComposite(compo, mode, tolerance) {
     }
     return best;
   } else {
-    const feat = canvasRegionToFeature(canvas, pad, pad, iconSize, iconSize, ICON_FEATURE_SIZE);
+    const feat = canvasRegionToFeature(featCanvas, pad, pad, iconSize, iconSize, ICON_FEATURE_SIZE);
     return classifyFromFeature(feat, 3);
   }
 }
