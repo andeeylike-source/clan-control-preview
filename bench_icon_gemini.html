@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Gemini class-icon benchmark (isolated)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root { color-scheme: dark; }
+  body { background:#0b1220; color:#e2e8f0; font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; margin:0; padding:20px; }
+  h1 { font-size:16px; margin:0 0 10px; color:#a78bfa; }
+  h2 { font-size:13px; margin:16px 0 6px; color:#94a3b8; }
+  .row { display:flex; flex-wrap:wrap; gap:12px; margin:6px 0; align-items:center; }
+  .card { background:#111a2e; border:1px solid #1e2a45; border-radius:10px; padding:12px; margin-bottom:12px; }
+  label { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#cbd5e1; }
+  input[type=number], input[type=text], input[type=password] { background:#0b1220; color:#e2e8f0; border:1px solid #273449; border-radius:6px; padding:6px 8px; font-size:12px; }
+  button { background:#6366f1; color:white; border:none; border-radius:8px; padding:8px 14px; font-weight:600; cursor:pointer; font-size:12px; }
+  button:disabled { opacity:.5; cursor:default; }
+  button.secondary { background:#1e293b; color:#94a3b8; }
+  .muted { color:#64748b; font-size:11px; }
+  table { width:100%; border-collapse:collapse; font-size:11px; margin-top:6px; }
+  th, td { text-align:left; padding:4px 8px; border-bottom:1px solid #1e293b; vertical-align:top; }
+  th { color:#64748b; font-weight:500; background:#0d152a; position:sticky; top:0; }
+  tr.ok td { color:#86efac; }
+  tr.bad td { color:#fca5a5; }
+  tr.err td { color:#fbbf24; }
+  #progressWrap { background:#1e293b; border-radius:6px; overflow:hidden; height:8px; width:100%; }
+  #progressBar { height:100%; background:#6366f1; width:0%; transition:width .2s; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:8px; font-size:11px; }
+  .preview { display:flex; gap:6px; align-items:center; background:#0d152a; border:1px solid #1e293b; border-radius:6px; padding:6px; }
+  .preview canvas { image-rendering:pixelated; }
+  code { background:#0d152a; border:1px solid #1e293b; border-radius:4px; padding:1px 4px; font-size:11px; }
+</style>
+</head>
+<body>
+<h1>Gemini class-icon benchmark (isolated)</h1>
+<div class="muted">
+  Честный тест Gemini 2.0 Flash Lite на распознавании L2 class-иконок.
+  Без roster, без icon_matcher, без fallback — только crop → Gemini → class name.
+  Основной analyze-flow (<code>BASA (1).html</code>) не затронут.
+</div>
+
+<div class="card">
+  <h2>1. API key (OpenRouter)</h2>
+  <div class="row">
+    <label><input type="radio" name="keySrc" value="ls" checked> Использовать ключи из localStorage <code>clanControl_geminiKeys</code></label>
+    <label><input type="radio" name="keySrc" value="manual"> Ввести вручную</label>
+  </div>
+  <div class="row" id="manualKeyRow" style="display:none">
+    <input type="password" id="manualKey" placeholder="sk-or-v1-..." style="width:360px">
+  </div>
+  <div id="keyStatus" class="muted">—</div>
+</div>
+
+<div class="card">
+  <h2>2. Настройки теста</h2>
+  <div class="row">
+    <label>Классы:
+      <select id="classMode">
+        <option value="all">все (72)</option>
+        <option value="random" selected>случайная выборка</option>
+        <option value="curated">только core-подозрения</option>
+      </select>
+    </label>
+    <label>N случайных: <input type="number" id="randomN" value="12" min="1" max="72" style="width:60px"></label>
+    <label>Задержка между запросами (мс): <input type="number" id="delayMs" value="1500" min="500" max="10000" style="width:80px"></label>
+  </div>
+  <div class="row">
+    <span class="muted">Размеры иконки (px):</span>
+    <label><input type="checkbox" class="sizeBox" value="56" checked> 56</label>
+    <label><input type="checkbox" class="sizeBox" value="40" checked> 40</label>
+    <label><input type="checkbox" class="sizeBox" value="32" checked> 32</label>
+    <label><input type="checkbox" class="sizeBox" value="24" checked> 24</label>
+    <label><input type="checkbox" class="sizeBox" value="20"> 20</label>
+    <label><input type="checkbox" class="sizeBox" value="16"> 16</label>
+  </div>
+  <div class="row">
+    <span class="muted">Фон:</span>
+    <label><input type="radio" name="bg" value="solid" checked> тёмный solid <code>#0d1524</code></label>
+    <label><input type="radio" name="bg" value="cc"> CC-style row (градиент + рамка)</label>
+  </div>
+  <div class="row">
+    <button id="btnRun">▶ Старт</button>
+    <button id="btnStop" class="secondary" disabled>■ Стоп</button>
+    <button id="btnExport" class="secondary" disabled>📋 Экспорт CSV</button>
+    <span id="plan" class="muted">—</span>
+  </div>
+</div>
+
+<div class="card">
+  <h2>3. Progress</h2>
+  <div id="progressWrap"><div id="progressBar"></div></div>
+  <div id="progressText" class="muted" style="margin-top:6px">ожидание…</div>
+</div>
+
+<div class="card">
+  <h2>4. Preview (пример composites по выбранным размерам)</h2>
+  <div id="previewGrid" class="grid"></div>
+</div>
+
+<div class="card">
+  <h2>5. Результаты (live)</h2>
+  <div style="max-height:420px;overflow:auto;border:1px solid #1e293b;border-radius:6px">
+    <table id="resultsTable">
+      <thead><tr>
+        <th>#</th><th>expected</th><th>size</th><th>gemini raw</th><th>gemini match</th><th>status</th><th>ms</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>6. Summary</h2>
+  <div id="summary" class="muted">—</div>
+</div>
+
+<script>
+// ── L2 class list — совпадает с именами файлов в extracted_site_icons_v3/ ──
+const CLASS_NAMES = [
+  "Abyss Walker","Adventurer","Arbalester","Arcana Lord","Archmage","Berserker","Bishop",
+  "Bladedancer","Bounty Hunter","Cardinal","Dark Avenger","Destroyer","Dominator",
+  "Doombringer","Doomcryer","Dreadnought","Duelist","Elemental Master","Elemental Summoner",
+  "Elven Elder","Eva_s Saint","Eva_s Templar","Female Soulbreaker","Fortune Seeker",
+  "Ghost Hunter","Ghost Sentinel","Gladiator","Grand Khavatari","Hawkeye","Hell Knight",
+  "Hierophant","Inspector","Judicator","Maestro","Male Soulbreaker","Moonlight Sentinel",
+  "Mystic Muse","Necromancer","Overlord","Paladin","Phantom Ranger","Phantom Summoner",
+  "Phoenix Knight","Plains Walker","Prophet","Sagittarius","Shillien Elder","Shillien Knight",
+  "Shillien Saint","Shillien Templar","Silver Ranger","Sorcerer","Soulhound","Soultaker",
+  "Spectral Dancer","Spectral Master","Spellhowler","Spellsinger","Storm Screamer",
+  "Sword Muse","Sword Singer","Temple Knight","Titan","Treasure Hunter","Trickster","Tyrant",
+  "Warcryer","Warlock","Warlord","Warsmith","Wind Rider","АВ_ПВ"
+];
+const ICON_DIR = "extracted_site_icons_v3/";
+// Куратед подмножество: представители разных ролей + пары, которые исторически путаются
+const CURATED = [
+  "Bishop","Cardinal","Shillien Elder","Shillien Saint","Elven Elder","Eva_s Saint",
+  "Prophet","Hierophant","Warcryer","Doomcryer","Overlord","Dominator",
+  "Warlord","Dreadnought","Gladiator","Duelist","Paladin","Phoenix Knight",
+  "Dark Avenger","Hell Knight","Treasure Hunter","Adventurer","Bounty Hunter","Fortune Seeker",
+  "Hawkeye","Sagittarius","Warsmith","Maestro",
+  "Sorcerer","Archmage","Necromancer","Soultaker","Warlock","Arcana Lord",
+  "Temple Knight","Eva_s Templar","Sword Singer","Sword Muse","Plains Walker","Wind Rider",
+  "Silver Ranger","Moonlight Sentinel","Spellsinger","Mystic Muse",
+  "Elemental Summoner","Elemental Master","Bladedancer","Spectral Dancer",
+  "Shillien Knight","Shillien Templar","Abyss Walker","Ghost Hunter",
+  "Phantom Ranger","Ghost Sentinel","Spellhowler","Storm Screamer",
+  "Phantom Summoner","Spectral Master","Destroyer","Titan","Tyrant","Grand Khavatari",
+  "Berserker","Doombringer","Male Soulbreaker","Inspector","Female Soulbreaker","Judicator",
+  "Arbalester","Trickster","Soulhound","АВ_ПВ"
+];
+
+// ── API key handling ──
+function getKeysFromLS() {
+  try { return JSON.parse(localStorage.getItem('clanControl_geminiKeys') || '[]'); } catch(e){ return []; }
+}
+function currentKey() {
+  const mode = document.querySelector('input[name=keySrc]:checked').value;
+  if (mode === 'manual') return document.getElementById('manualKey').value.trim();
+  const keys = getKeysFromLS().filter(k => k && !k.exhausted && k.key).map(k => k.key);
+  return keys[0] || '';
+}
+function advanceKey() {
+  const keys = getKeysFromLS();
+  if (!keys.length) return false;
+  keys[0].exhausted = true;
+  try { localStorage.setItem('clanControl_geminiKeys', JSON.stringify(keys)); } catch(e){}
+  return getKeysFromLS().some(k => k && !k.exhausted);
+}
+function refreshKeyStatus() {
+  const mode = document.querySelector('input[name=keySrc]:checked').value;
+  const el = document.getElementById('keyStatus');
+  if (mode === 'manual') { el.textContent = 'ручной ввод'; return; }
+  const all = getKeysFromLS();
+  const ok = all.filter(k => k && !k.exhausted && k.key).length;
+  el.textContent = 'в localStorage: всего ' + all.length + ', активных ' + ok;
+}
+document.querySelectorAll('input[name=keySrc]').forEach(r => r.addEventListener('change', () => {
+  document.getElementById('manualKeyRow').style.display = (document.querySelector('input[name=keySrc]:checked').value === 'manual') ? '' : 'none';
+  refreshKeyStatus();
+}));
+refreshKeyStatus();
+
+// ── icon loading & composite rendering ──
+const imgCache = {};
+function loadIcon(name) {
+  if (imgCache[name]) return imgCache[name];
+  imgCache[name] = new Promise((resolve, reject) => {
+    const im = new Image();
+    im.crossOrigin = 'anonymous';
+    im.onload = () => resolve(im);
+    im.onerror = () => reject(new Error('load failed: ' + name));
+    im.src = ICON_DIR + encodeURIComponent(name) + '.png';
+  });
+  return imgCache[name];
+}
+function renderComposite(img, iconSize, bgMode) {
+  // Canvas с отступами вокруг иконки (как бы «строка таблицы»). Полный размер — iconSize + padding.
+  const pad = Math.max(6, Math.round(iconSize * 0.5));
+  const W = iconSize + pad * 2;
+  const H = iconSize + pad * 2;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const cx = c.getContext('2d');
+  if (bgMode === 'cc') {
+    const g = cx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#111a2e'); g.addColorStop(1,'#0b1324');
+    cx.fillStyle = g; cx.fillRect(0,0,W,H);
+    cx.strokeStyle = '#1e2a45'; cx.lineWidth = 1; cx.strokeRect(0.5,0.5,W-1,H-1);
+  } else {
+    cx.fillStyle = '#0d1524'; cx.fillRect(0,0,W,H);
+  }
+  cx.imageSmoothingEnabled = true;
+  cx.imageSmoothingQuality = iconSize <= 24 ? 'medium' : 'high';
+  cx.drawImage(img, pad, pad, iconSize, iconSize);
+  return c;
+}
+
+async function refreshPreview() {
+  const grid = document.getElementById('previewGrid');
+  grid.innerHTML = '';
+  const sizes = [...document.querySelectorAll('.sizeBox:checked')].map(b => +b.value);
+  const bg = document.querySelector('input[name=bg]:checked').value;
+  // Покажем 3 примера × выбранные размеры
+  const sample = ['Bishop','Soulhound','АВ_ПВ'];
+  for (const name of sample) {
+    try {
+      const img = await loadIcon(name);
+      const wrap = document.createElement('div');
+      wrap.className = 'preview';
+      const label = document.createElement('div'); label.textContent = name; label.style.width='110px';
+      wrap.appendChild(label);
+      for (const s of sizes) { wrap.appendChild(renderComposite(img, s, bg)); }
+      grid.appendChild(wrap);
+    } catch(e){}
+  }
+}
+document.querySelectorAll('.sizeBox').forEach(b => b.addEventListener('change', refreshPreview));
+document.querySelectorAll('input[name=bg]').forEach(r => r.addEventListener('change', refreshPreview));
+refreshPreview();
+
+// ── Gemini call ──
+function normalizeAnswer(raw) {
+  if (!raw) return '';
+  let s = String(raw).trim();
+  s = s.replace(/^```.*?\n?/,'').replace(/```$/,'').trim();
+  s = s.replace(/^["'`\s.]+|["'`\s.]+$/g,'');
+  // gemini sometimes writes "Eva's" instead of "Eva_s"
+  s = s.replace(/Eva['\u2019]s/ig, "Eva_s");
+  return s;
+}
+function resolveToKnown(answerRaw) {
+  const norm = normalizeAnswer(answerRaw);
+  if (!norm) return null;
+  // exact match case-insensitive
+  const hit = CLASS_NAMES.find(n => n.toLowerCase() === norm.toLowerCase());
+  if (hit) return hit;
+  // Abyss/Plains Walker shared icon → treat as АВ_ПВ
+  if (/abyss\s*walker|plains\s*walker|ghost\s*hunter|wind\s*rider/i.test(norm)) {
+    // оставляем точное имя, чтобы выявить путаницу stage2/stage3 — само по себе "Ghost Hunter" ≠ "Abyss Walker"
+    const alt = CLASS_NAMES.find(n => n.toLowerCase() === norm.toLowerCase());
+    if (alt) return alt;
+  }
+  // partial contains (e.g. gemini ответил "Bishop (Cardinal)")
+  const contains = CLASS_NAMES.find(n => norm.toLowerCase().includes(n.toLowerCase()));
+  if (contains) return contains;
+  return null;
+}
+async function callGemini(dataUrl, apiKey) {
+  const whitelist = CLASS_NAMES.join(', ');
+  const prompt = 'You see exactly ONE Lineage 2 second-class icon centered on a dark background. Reply with ONLY the class name — nothing else. It MUST be one of these exact strings (case-sensitive): ' + whitelist + '. If you cannot decide, pick the single most likely one. No quotes, no punctuation, no explanation.';
+  const t0 = performance.now();
+  const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'Authorization':'Bearer ' + apiKey,
+      'HTTP-Referer':'https://andeeylike-source.github.io/clan-control-preview/',
+      'X-Title':'CC icon bench'
+    },
+    body: JSON.stringify({
+      model:'google/gemini-2.0-flash-lite-001',
+      max_tokens: 32,
+      messages:[{ role:'user', content:[
+        { type:'image_url', image_url:{ url: dataUrl } },
+        { type:'text', text: prompt }
+      ]}]
+    })
+  });
+  const dt = Math.round(performance.now() - t0);
+  const j = await resp.json().catch(()=>({}));
+  if (!resp.ok) {
+    const msg = (j.error && j.error.message) || ('HTTP '+resp.status);
+    return { ok:false, status:resp.status, error:msg, ms:dt };
+  }
+  const raw = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+  return { ok:true, raw:raw, ms:dt };
+}
+
+// ── bench driver ──
+let stopFlag = false;
+function buildPlan() {
+  const mode = document.getElementById('classMode').value;
+  let list;
+  if (mode === 'all') list = CLASS_NAMES.slice();
+  else if (mode === 'curated') list = CURATED.slice();
+  else {
+    const n = Math.max(1, Math.min(72, +document.getElementById('randomN').value || 12));
+    const shuffled = CLASS_NAMES.slice().sort(() => Math.random()-0.5);
+    list = shuffled.slice(0, n);
+  }
+  const sizes = [...document.querySelectorAll('.sizeBox:checked')].map(b => +b.value);
+  const plan = [];
+  for (const cls of list) for (const s of sizes) plan.push({ cls, size:s });
+  return plan;
+}
+function updatePlan() {
+  const p = buildPlan();
+  document.getElementById('plan').textContent = 'План: ' + p.length + ' вызовов (' + (new Set(p.map(x=>x.cls)).size) + ' классов × ' + (new Set(p.map(x=>x.size)).size) + ' размеров)';
+}
+document.getElementById('classMode').addEventListener('change', updatePlan);
+document.getElementById('randomN').addEventListener('change', updatePlan);
+document.querySelectorAll('.sizeBox').forEach(b => b.addEventListener('change', updatePlan));
+updatePlan();
+
+const results = [];
+function renderRow(r, idx) {
+  const tr = document.createElement('tr');
+  tr.className = r.status === 'ok' ? 'ok' : (r.status === 'err' ? 'err' : 'bad');
+  tr.innerHTML = '<td>'+(idx+1)+'</td><td>'+r.expected+'</td><td>'+r.size+'</td>'
+    + '<td>'+ (r.raw ? escapeHtml(r.raw) : '') +'</td>'
+    + '<td>'+ (r.match || '') +'</td>'
+    + '<td>'+ r.status +(r.error?': '+escapeHtml(r.error):'') +'</td>'
+    + '<td>'+ (r.ms||'') +'</td>';
+  document.querySelector('#resultsTable tbody').appendChild(tr);
+}
+function escapeHtml(s) { return String(s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function renderSummary() {
+  if (!results.length) { document.getElementById('summary').textContent = '—'; return; }
+  const bySize = {};
+  const confusion = {};
+  let total = 0, correct = 0, errors = 0;
+  for (const r of results) {
+    total++;
+    if (r.status === 'err') { errors++; continue; }
+    bySize[r.size] = bySize[r.size] || { n:0, ok:0 };
+    bySize[r.size].n++;
+    if (r.status === 'ok') { correct++; bySize[r.size].ok++; }
+    else {
+      const k = r.expected + ' → ' + (r.match || '(' + (r.raw||'∅') + ')');
+      confusion[k] = (confusion[k] || 0) + 1;
+    }
+  }
+  const lines = [];
+  lines.push('Всего: '+total+', правильно: '+correct+' ('+(total?((correct/total)*100).toFixed(1):'0')+'%), ошибок API: '+errors);
+  lines.push('Точность по размерам:');
+  Object.keys(bySize).map(Number).sort((a,b)=>b-a).forEach(s => {
+    const b = bySize[s];
+    lines.push('  ' + s + 'px  — ' + b.ok + '/' + b.n + '  (' + ((b.ok/b.n)*100).toFixed(1) + '%)');
+  });
+  const confTop = Object.entries(confusion).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  if (confTop.length) {
+    lines.push('Топ путаниц:');
+    confTop.forEach(([k,v]) => lines.push('  '+v+' × '+k));
+  }
+  document.getElementById('summary').innerHTML = '<pre style="white-space:pre-wrap;color:#e2e8f0;font:12px monospace">'+escapeHtml(lines.join('\n'))+'</pre>';
+}
+
+async function run() {
+  stopFlag = false;
+  results.length = 0;
+  document.querySelector('#resultsTable tbody').innerHTML = '';
+  renderSummary();
+  const plan = buildPlan();
+  const delay = +document.getElementById('delayMs').value || 1500;
+  const bg = document.querySelector('input[name=bg]:checked').value;
+  document.getElementById('btnRun').disabled = true;
+  document.getElementById('btnStop').disabled = false;
+  document.getElementById('btnExport').disabled = true;
+  const bar = document.getElementById('progressBar');
+  const txt = document.getElementById('progressText');
+  let apiKey = currentKey();
+  if (!apiKey) {
+    txt.textContent = '❌ нет API ключа — введи вручную или добавь в localStorage через основной сайт';
+    document.getElementById('btnRun').disabled = false;
+    document.getElementById('btnStop').disabled = true;
+    return;
+  }
+  for (let i=0; i<plan.length; i++) {
+    if (stopFlag) break;
+    const { cls, size } = plan[i];
+    txt.textContent = (i+1)+'/'+plan.length+'  '+cls+' @'+size+'px';
+    bar.style.width = ((i/plan.length)*100).toFixed(1)+'%';
+    let img;
+    try { img = await loadIcon(cls); }
+    catch(e) { results.push({ expected:cls, size, status:'err', error:'icon load: '+e.message }); renderRow(results[results.length-1], results.length-1); continue; }
+    const canvas = renderComposite(img, size, bg);
+    const dataUrl = canvas.toDataURL('image/png');
+    let r;
+    try { r = await callGemini(dataUrl, apiKey); }
+    catch(e) { r = { ok:false, error:e.message, ms:0 }; }
+    if (!r.ok) {
+      // попробуем следующий ключ при rate/credits
+      if (r.status === 429 || r.status === 401 || (r.error && /quota|credits|afford/i.test(r.error))) {
+        if (advanceKey()) { apiKey = currentKey(); refreshKeyStatus(); i--; await new Promise(r=>setTimeout(r,1000)); continue; }
+      }
+      results.push({ expected:cls, size, status:'err', error:r.error, ms:r.ms });
+    } else {
+      const match = resolveToKnown(r.raw);
+      const ok = match && match.toLowerCase() === cls.toLowerCase();
+      results.push({ expected:cls, size, raw:r.raw, match: match || null, status: ok ? 'ok' : 'bad', ms:r.ms });
+    }
+    renderRow(results[results.length-1], results.length-1);
+    renderSummary();
+    if (i < plan.length-1) await new Promise(r=>setTimeout(r, delay));
+  }
+  bar.style.width = '100%';
+  txt.textContent = stopFlag ? 'остановлено' : 'готово';
+  document.getElementById('btnRun').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+  document.getElementById('btnExport').disabled = results.length === 0;
+}
+
+document.getElementById('btnRun').addEventListener('click', run);
+document.getElementById('btnStop').addEventListener('click', () => { stopFlag = true; });
+document.getElementById('btnExport').addEventListener('click', () => {
+  const header = ['idx','expected','size','raw','match','status','error','ms'];
+  const rows = [header.join(',')].concat(results.map((r,i) => [
+    i+1, r.expected, r.size, JSON.stringify(r.raw||''), r.match||'', r.status, JSON.stringify(r.error||''), r.ms||''
+  ].join(',')));
+  const blob = new Blob([rows.join('\n')], { type:'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'gemini_icon_bench_' + (new Date().toISOString().replace(/[:.]/g,'-')) + '.csv';
+  a.click();
+});
+</script>
+</body>
+</html>
