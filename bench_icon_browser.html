@@ -706,6 +706,79 @@ function calibExport(fmt) {
 
 // ── AUTO CC ROW SCAN ─────────────────────────────────────────────────────────
 
+// ── Multi-mode feature-space comparison ──────────────────────────────────────
+const FS_MODES = [
+  { id: 'gray24', label: 'gray 24×24', size: 24, rgb: false },
+  { id: 'rgb24',  label: 'RGB  24×24', size: 24, rgb: true  },
+  { id: 'gray32', label: 'gray 32×32', size: 32, rgb: false },
+  { id: 'rgb32',  label: 'RGB  32×32', size: 32, rgb: true  },
+];
+const __fsIdx = {};
+let __iconImgCache = null;
+
+function _grayVec(data, n) {
+  const v = new Float32Array(n); let s = 0;
+  for (let i=0,j=0; i<data.length; i+=4,j++) {
+    const a=data[i+3]/255, g=0.299*data[i]+0.587*data[i+1]+0.114*data[i+2];
+    v[j]=a*g+(1-a)*128; s+=v[j];
+  }
+  const m=s/n; let nr=0;
+  for (let i=0;i<n;i++) { v[i]-=m; nr+=v[i]*v[i]; }
+  nr=Math.sqrt(nr)||1;
+  for (let i=0;i<n;i++) v[i]/=nr;
+  return v;
+}
+function _rgbVec(data, n) {
+  const r=new Float32Array(n),g=new Float32Array(n),b=new Float32Array(n);
+  let sr=0,sg=0,sb=0;
+  for (let i=0,j=0;i<data.length;i+=4,j++) {
+    const a=data[i+3]/255;
+    r[j]=a*data[i]+(1-a)*128; g[j]=a*data[i+1]+(1-a)*128; b[j]=a*data[i+2]+(1-a)*128;
+    sr+=r[j]; sg+=g[j]; sb+=b[j];
+  }
+  const mr=sr/n,mg=sg/n,mb=sb/n; let nr=0,ng=0,nb=0;
+  for (let i=0;i<n;i++) { r[i]-=mr; g[i]-=mg; b[i]-=mb; nr+=r[i]*r[i]; ng+=g[i]*g[i]; nb+=b[i]*b[i]; }
+  nr=Math.sqrt(nr)||1; ng=Math.sqrt(ng)||1; nb=Math.sqrt(nb)||1;
+  for (let i=0;i<n;i++) { r[i]/=nr; g[i]/=ng; b[i]/=nb; }
+  const v=new Float32Array(n*3); v.set(r,0); v.set(g,n); v.set(b,n*2); return v;
+}
+function canvasToFeat(src, sx, sy, sw, sh, size, rgb) {
+  if (sw<4||sh<4) return null;
+  const c=document.createElement('canvas'); c.width=size; c.height=size;
+  const ctx=c.getContext('2d',{willReadFrequently:true});
+  ctx.drawImage(src,sx,sy,sw,sh,0,0,size,size);
+  const d=ctx.getImageData(0,0,size,size).data, n=size*size;
+  return rgb ? _rgbVec(d,n) : _grayVec(d,n);
+}
+function imgToFeatMode(img, mode) {
+  const c=document.createElement('canvas'); c.width=mode.size; c.height=mode.size;
+  const ctx=c.getContext('2d',{willReadFrequently:true});
+  ctx.drawImage(img,0,0,mode.size,mode.size);
+  const d=ctx.getImageData(0,0,mode.size,mode.size).data, n=mode.size*mode.size;
+  return mode.rgb ? _rgbVec(d,n) : _grayVec(d,n);
+}
+function classifyFsMode(feat, modeId, topK) {
+  const idx=__fsIdx[modeId];
+  if (!idx||!feat) return null;
+  const scored=idx.vectors.map((v,i)=>({name:idx.names[i],sim:cosineSim(feat,v)}));
+  scored.sort((a,b)=>b.sim-a.sim);
+  const top=scored.slice(0,topK||5);
+  return { class2:top[0].name, sim:top[0].sim, margin:top[0].sim-(top[1]?.sim??0), top };
+}
+async function ensureAllFsIndexes() {
+  if (!__iconImgCache) {
+    const imgs=await Promise.all(CLASS_NAMES.map(n=>loadIcon(n,{}).then(im=>({name:n,img:im})).catch(()=>null)));
+    __iconImgCache=imgs.filter(Boolean);
+  }
+  for (const mode of FS_MODES) {
+    if (__fsIdx[mode.id]) continue;
+    const vecs=__iconImgCache.map(({name,img})=>({name,vec:imgToFeatMode(img,mode)}));
+    __fsIdx[mode.id]={names:vecs.map(v=>v.name),vectors:vecs.map(v=>v.vec)};
+  }
+  // also patch __iconFeatures so existing classifyFromFeature still works
+  if (!__iconFeatures) __iconFeatures=__fsIdx.gray24;
+}
+
 let autoScanRows = [];
 
 function getAutoScanParams() {
@@ -750,7 +823,7 @@ async function runAutoScan() {
   document.getElementById('asBtnExportJSON').style.display = 'none';
   document.getElementById('asBtnExportCSV').style.display  = 'none';
 
-  try { await ensureIconFeatures(); }
+  try { await ensureAllFsIndexes(); }
   catch(e) { prog.textContent = '❌ ' + e.message; btnRun.disabled = false; return; }
 
   const p = getAutoScanParams();
@@ -801,7 +874,17 @@ async function runAutoScan() {
     tc.width = rawSw; tc.height = rawSh;
     tc.getContext('2d').drawImage(ssCanvas, rawSx, rawSy, rawSw, rawSh, 0, 0, rawSw, rawSh);
 
-    autoScanRows.push({ i, rawRes, rawFeat, best, thumb: tc.toDataURL(), expected: null, expSimRaw: null, expSimRef: null, verdict: null });
+    // multi-mode feature extraction from raw + best crop positions
+    const fsFeats = {}, fsRes = {};
+    for (const mode of FS_MODES) {
+      const rf = canvasToFeat(ssCanvas, rawSx, rawSy, rawSw, rawSh, mode.size, mode.rgb);
+      const bf = best ? canvasToFeat(ssCanvas, best.sx, best.sy, best.sw, best.sh, mode.size, mode.rgb) : null;
+      fsFeats[mode.id] = { raw: rf, best: bf };
+      fsRes[mode.id]   = { raw: rf ? classifyFsMode(rf, mode.id, 5) : null,
+                           best: bf ? classifyFsMode(bf, mode.id, 5) : null };
+    }
+
+    autoScanRows.push({ i, rawRes, rawFeat, best, thumb: tc.toDataURL(), expected: null, expSimRaw: null, expSimRef: null, verdict: null, fsFeats, fsRes, fsExpSim: null, fsWinner: null });
   }
 
   prog.textContent = 'done — ' + autoScanRows.length + ' rows scanned';
@@ -927,8 +1010,80 @@ function renderScanResults(container) {
   });
   tHTML += `</tbody></table>`;
 
+  // ── FS comparison section ──
+  let fsSectionHtml = '';
+  const fsExpRows = autoScanRows.filter(r => r.fsExpSim);
+  if (expMode && fsExpRows.length) {
+    // per-mode stats
+    const modeStats = FS_MODES.map(mode => {
+      const mRows = fsExpRows.filter(r => r.fsExpSim[mode.id]);
+      const avgExp = mRows.length ? mRows.reduce((a,r) => {
+        const v = r.fsExpSim[mode.id].best ?? r.fsExpSim[mode.id].raw ?? 0;
+        return a + v;
+      }, 0) / mRows.length : null;
+      const correct = mRows.filter(r => {
+        const res = r.fsRes?.[mode.id]?.best ?? r.fsRes?.[mode.id]?.raw;
+        return res?.class2?.toLowerCase() === r.expected.toLowerCase();
+      }).length;
+      const wins = fsExpRows.filter(r => r.fsWinner === mode.id).length;
+      return { mode, avgExp, correct, wins, n: mRows.length };
+    });
+    const bestModeStat = modeStats.filter(s => s.avgExp != null).sort((a,b) => b.avgExp - a.avgExp)[0];
+
+    // mode summary table
+    let msTbl = `<table style="border-collapse:collapse;font-size:11px;margin-bottom:10px"><thead><tr>` +
+      ['mode','avg exp sim (best)','correct top1','wins (best per row)'].map(h =>
+        `<th style="padding:3px 10px 3px 0;color:#64748b;text-align:left">${h}</th>`).join('') + `</tr></thead><tbody>`;
+    modeStats.forEach(({ mode, avgExp, correct, wins, n }) => {
+      const isBest = bestModeStat && mode.id === bestModeStat.mode.id;
+      msTbl += `<tr>` +
+        `<td style="padding:2px 10px 2px 0;font-weight:700;color:${isBest?'#fbbf24':'#94a3b8'}">${escapeHtml(mode.label)}${isBest?' ★':''}</td>` +
+        `<td style="padding:2px 10px 2px 0;color:${avgExp>=0.72?'#86efac':avgExp>=0.60?'#fbbf24':'#f87171'}">${avgExp!=null?avgExp.toFixed(4):'—'}</td>` +
+        `<td style="padding:2px 10px 2px 0">${correct}/${n}</td>` +
+        `<td style="padding:2px 10px 2px 0;color:#a78bfa">${wins}</td>` +
+        `</tr>`;
+    });
+    msTbl += `</tbody></table>`;
+
+    // per-row FS comparison table
+    const scFmt = v => v==null ? '<span style="color:#475569">—</span>' :
+      `<span style="color:${v>=0.72?'#86efac':v>=0.60?'#fbbf24':'#f87171'}">${v.toFixed(3)}</span>`;
+
+    const fsHeaders = ['#','expected', ...FS_MODES.flatMap(m=>[m.label+' top1', m.label+' exp_sim']), 'winner'];
+    let fsTbl = `<table style="border-collapse:collapse;font-size:10px;width:100%"><thead><tr>` +
+      fsHeaders.map(h=>`<th style="padding:3px 6px;color:#64748b;white-space:nowrap;background:#0a0f1e;position:sticky;top:0">${h}</th>`).join('') +
+      `</tr></thead><tbody>`;
+
+    fsExpRows.forEach(({ i, expected, fsExpSim, fsRes, fsWinner }) => {
+      const winMode = FS_MODES.find(m => m.id === fsWinner);
+      let cells = `<td style="padding:3px 6px;color:#475569">${i}</td>` +
+                  `<td style="padding:3px 6px;color:#c8a84b;font-weight:700">${escapeHtml(expected)}</td>`;
+      FS_MODES.forEach(mode => {
+        const res   = fsRes?.[mode.id]?.best  ?? fsRes?.[mode.id]?.raw;
+        const expS  = fsExpSim?.[mode.id]?.best ?? fsExpSim?.[mode.id]?.raw;
+        const correct = res?.class2?.toLowerCase() === expected.toLowerCase();
+        cells +=
+          `<td style="padding:3px 6px;color:${correct?'#86efac':'#e2e8f0'}">${res ? escapeHtml(res.class2) : '—'}</td>` +
+          `<td style="padding:3px 6px">${scFmt(expS)}</td>`;
+      });
+      cells += `<td style="padding:3px 6px;font-weight:700;color:#fbbf24">${winMode ? escapeHtml(winMode.label) : '—'}</td>`;
+      fsTbl += `<tr>${cells}</tr>`;
+    });
+    fsTbl += `</tbody></table>`;
+
+    fsSectionHtml =
+      `<div style="margin-top:14px;border-top:1px solid #1e293b;padding-top:12px">` +
+      `<div style="color:#a78bfa;font-size:12px;font-weight:700;margin-bottom:8px">` +
+      `Feature-Space Comparison — ${fsExpRows.length} labeled rows` +
+      (bestModeStat ? ` · <span style="color:#fbbf24">winner: ${escapeHtml(bestModeStat.mode.label)}</span>` : '') + `</div>` +
+      msTbl +
+      `<div style="overflow-x:auto;max-height:380px;overflow-y:auto;border:1px solid #1e293b;border-radius:6px">${fsTbl}</div>` +
+      `</div>`;
+  }
+
   container.innerHTML = summHtml +
-    `<div style="overflow-x:auto;max-height:520px;overflow-y:auto;border:1px solid #1e293b;border-radius:6px">${tHTML}</div>`;
+    `<div style="overflow-x:auto;max-height:520px;overflow-y:auto;border:1px solid #1e293b;border-radius:6px">${tHTML}</div>` +
+    fsSectionHtml;
 
   // restore expected select values (persisted in row.expected)
   if (expMode) {
@@ -963,10 +1118,30 @@ function runExpectedCompare() {
     const bestExpSim = row.expSimRef != null ? Math.max(row.expSimRaw ?? -1, row.expSimRef) : row.expSimRaw;
     const top1sim    = row.best?.res.top[0].sim ?? row.rawRes?.top[0].sim ?? null;
 
-    if (bestExpSim == null) { row.verdict = null; return; }
-    if (bestExpSim < 0.50)                           row.verdict = 'feature-space';
-    else if (top1sim != null && top1sim - bestExpSim <= 0.05) row.verdict = 'grid/crop';
-    else                                             row.verdict = 'ambiguous';
+    if (bestExpSim == null) { row.verdict = null; }
+    else if (bestExpSim < 0.50)                                   row.verdict = 'feature-space';
+    else if (top1sim != null && top1sim - bestExpSim <= 0.05)     row.verdict = 'grid/crop';
+    else                                                           row.verdict = 'ambiguous';
+
+    // ── multi-mode expected sim ──
+    if (row.fsFeats) {
+      row.fsExpSim = {};
+      let winSim = -Infinity, winMode = null;
+      for (const mode of FS_MODES) {
+        const idx = __fsIdx[mode.id];
+        if (!idx) continue;
+        const eidx = idx.names.indexOf(row.expected);
+        const ev   = eidx >= 0 ? idx.vectors[eidx] : null;
+        const rf   = row.fsFeats[mode.id]?.raw;
+        const bf   = row.fsFeats[mode.id]?.best;
+        const rs   = ev && rf ? cosineSim(rf, ev) : null;
+        const bs   = ev && bf ? cosineSim(bf, ev) : null;
+        row.fsExpSim[mode.id] = { raw: rs, best: bs };
+        const v = bs ?? rs ?? -Infinity;
+        if (v > winSim) { winSim = v; winMode = mode.id; }
+      }
+      row.fsWinner = winMode;
+    }
   });
 
   if (count === 0) { alert('Выбери expected class хотя бы для одной строки'); return; }
@@ -975,24 +1150,34 @@ function runExpectedCompare() {
 
 function autoScanExport(fmt) {
   if (!autoScanRows.length) { alert('Нет данных'); return; }
-  const data = autoScanRows.map(({ i, rawRes, best, expected, expSimRaw, expSimRef, verdict }) => ({
-    row:         i,
-    raw_top1:    rawRes?.class2 ?? null,
-    raw_sim:     rawRes ? rawRes.top[0].sim  : null,
-    raw_margin:  rawRes ? rawRes.margin      : null,
-    raw_trigger: rawRes ? (rawRes.top[0].sim >= 0.78 && rawRes.margin >= 0.05) : null,
-    ref_top1:    best?.res.class2 ?? null,
-    ref_sim:     best ? best.res.top[0].sim  : null,
-    ref_margin:  best ? best.res.margin      : null,
-    ref_trigger: best ? (best.res.top[0].sim >= 0.78 && best.res.margin >= 0.05) : null,
-    best_sz:     best?.sz ?? null,
-    best_dx:     best?.dx ?? null,
-    best_dy:     best?.dy ?? null,
-    expected:    expected ?? null,
-    exp_sim_raw: expSimRaw ?? null,
-    exp_sim_ref: expSimRef ?? null,
-    verdict:     verdict ?? null,
-  }));
+  const data = autoScanRows.map(({ i, rawRes, best, expected, expSimRaw, expSimRef, verdict, fsExpSim, fsWinner }) => {
+    const row = {
+      row:         i,
+      raw_top1:    rawRes?.class2 ?? null,
+      raw_sim:     rawRes ? rawRes.top[0].sim  : null,
+      raw_margin:  rawRes ? rawRes.margin      : null,
+      raw_trigger: rawRes ? (rawRes.top[0].sim >= 0.78 && rawRes.margin >= 0.05) : null,
+      ref_top1:    best?.res.class2 ?? null,
+      ref_sim:     best ? best.res.top[0].sim  : null,
+      ref_margin:  best ? best.res.margin      : null,
+      ref_trigger: best ? (best.res.top[0].sim >= 0.78 && best.res.margin >= 0.05) : null,
+      best_sz:     best?.sz ?? null,
+      best_dx:     best?.dx ?? null,
+      best_dy:     best?.dy ?? null,
+      expected:    expected ?? null,
+      exp_sim_raw: expSimRaw ?? null,
+      exp_sim_ref: expSimRef ?? null,
+      verdict:     verdict ?? null,
+      fs_winner:   fsWinner ?? null,
+    };
+    // add per-mode exp sim
+    FS_MODES.forEach(mode => {
+      const s = fsExpSim?.[mode.id];
+      row[mode.id + '_exp_raw']  = s?.raw  ?? null;
+      row[mode.id + '_exp_best'] = s?.best ?? null;
+    });
+    return row;
+  });
   let content, mime, ext;
   if (fmt === 'json') {
     content = JSON.stringify(data, null, 2); mime = 'application/json'; ext = 'json';
