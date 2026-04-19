@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Browser icon matcher benchmark (isolated)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root { color-scheme: dark; }
+  body { background:#0b1220; color:#e2e8f0; font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; margin:0; padding:20px; }
+  h1 { font-size:16px; margin:0 0 10px; color:#a78bfa; }
+  h2 { font-size:13px; margin:16px 0 6px; color:#94a3b8; }
+  .row { display:flex; flex-wrap:wrap; gap:12px; margin:6px 0; align-items:center; }
+  .card { background:#111a2e; border:1px solid #1e2a45; border-radius:10px; padding:12px; margin-bottom:12px; }
+  label { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#cbd5e1; }
+  input[type=number], input[type=text] { background:#0b1220; color:#e2e8f0; border:1px solid #273449; border-radius:6px; padding:6px 8px; font-size:12px; }
+  button { background:#6366f1; color:white; border:none; border-radius:8px; padding:8px 14px; font-weight:600; cursor:pointer; font-size:12px; }
+  button:disabled { opacity:.5; cursor:default; }
+  button.secondary { background:#1e293b; color:#94a3b8; }
+  .muted { color:#64748b; font-size:11px; }
+  table { width:100%; border-collapse:collapse; font-size:11px; margin-top:6px; }
+  th, td { text-align:left; padding:4px 8px; border-bottom:1px solid #1e293b; vertical-align:top; }
+  th { color:#64748b; font-weight:500; background:#0d152a; position:sticky; top:0; }
+  tr.ok td { color:#86efac; }
+  tr.bad td { color:#fca5a5; }
+  tr.warn td { color:#fbbf24; }
+  #progressWrap { background:#1e293b; border-radius:6px; overflow:hidden; height:8px; width:100%; }
+  #progressBar { height:100%; background:#a78bfa; width:0%; transition:width .2s; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:8px; font-size:11px; }
+  .preview { display:flex; gap:6px; align-items:center; background:#0d152a; border:1px solid #1e293b; border-radius:6px; padding:6px; }
+  code { background:#0d152a; border:1px solid #1e293b; border-radius:4px; padding:1px 4px; font-size:11px; }
+  pre { white-space:pre-wrap; color:#e2e8f0; font:12px monospace; margin:0; }
+</style>
+</head>
+<body>
+<h1>Browser icon matcher benchmark (isolated)</h1>
+<div class="muted">
+  Честный тест локального browser-side matcher’а (cosine sim в 24×24 grayscale feature space).
+  Без Gemini, без roster, без icon_matcher lookup, без profa/class3 fallback.
+  Основной analyze-flow (<code>BASA (1).html</code>) не затронут.
+</div>
+
+<div class="card">
+  <h2>1. Настройки теста</h2>
+  <div class="row">
+    <label>Классы:
+      <select id="classMode">
+        <option value="all" selected>все (72)</option>
+        <option value="random">случайная выборка</option>
+        <option value="curated">core-подозрения (stage2↔stage3 пары)</option>
+      </select>
+    </label>
+    <label>N случайных: <input type="number" id="randomN" value="24" min="1" max="72" style="width:60px"></label>
+  </div>
+  <div class="row">
+    <span class="muted">Размеры иконки (px):</span>
+    <label><input type="checkbox" class="sizeBox" value="56" checked> 56</label>
+    <label><input type="checkbox" class="sizeBox" value="40" checked> 40</label>
+    <label><input type="checkbox" class="sizeBox" value="32" checked> 32</label>
+    <label><input type="checkbox" class="sizeBox" value="24" checked> 24</label>
+    <label><input type="checkbox" class="sizeBox" value="20" checked> 20</label>
+    <label><input type="checkbox" class="sizeBox" value="16" checked> 16</label>
+  </div>
+  <div class="row">
+    <span class="muted">Фон:</span>
+    <label><input type="checkbox" class="bgBox" value="solid" checked> solid <code>#0d1524</code></label>
+    <label><input type="checkbox" class="bgBox" value="cc" checked> CC-style row</label>
+  </div>
+  <div class="row">
+    <span class="muted">Режим crop:</span>
+    <label><input type="radio" name="cropMode" value="centered" checked> centered (идеальный crop)</label>
+    <label><input type="radio" name="cropMode" value="sweep"> sweep ±tolerance</label>
+    <label>tolerance px: <input type="number" id="tolerance" value="4" min="0" max="16" step="2" style="width:60px"></label>
+  </div>
+  <div class="row">
+    <span class="muted">Пороги prod (совпадают с BASA (1).html):</span>
+    <label>sim ≥ <input type="number" id="thSim" value="0.78" step="0.01" min="0" max="1" style="width:70px"></label>
+    <label>margin ≥ <input type="number" id="thMargin" value="0.05" step="0.01" min="0" max="1" style="width:70px"></label>
+  </div>
+  <div class="row">
+    <button id="btnRun">▶ Старт</button>
+    <button id="btnStop" class="secondary" disabled>■ Стоп</button>
+    <button id="btnExport" class="secondary" disabled>📋 Экспорт CSV</button>
+    <span id="plan" class="muted">—</span>
+  </div>
+</div>
+
+<div class="card">
+  <h2>2. Preview (пример composites)</h2>
+  <div id="previewGrid" class="grid"></div>
+</div>
+
+<div class="card">
+  <h2>3. Progress</h2>
+  <div id="progressWrap"><div id="progressBar"></div></div>
+  <div id="progressText" class="muted" style="margin-top:6px">ожидание…</div>
+</div>
+
+<div class="card">
+  <h2>4. Результаты (live)</h2>
+  <div style="max-height:420px;overflow:auto;border:1px solid #1e293b;border-radius:6px">
+    <table id="resultsTable">
+      <thead><tr>
+        <th>#</th><th>expected</th><th>size</th><th>bg</th><th>top1</th><th>sim</th><th>margin</th><th>second</th><th>prod_ok</th><th>status</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>5. Summary</h2>
+  <div id="summary"><pre>—</pre></div>
+</div>
+
+<div class="card">
+  <h2>6. Real CC crop (опциональный hook)</h2>
+  <div class="muted">Загрузи любое изображение — harness прогонит его через тот же matcher и покажет top-3. Ожидаемый класс укажи в поле рядом — можно не заполнять.</div>
+  <div class="row" style="margin-top:8px">
+    <input type="file" id="realFile" accept="image/*">
+    <input type="text" id="realLabel" placeholder="expected class2 (optional)" style="width:220px">
+    <button id="btnReal" class="secondary">проверить</button>
+  </div>
+  <div id="realResult" style="margin-top:8px"></div>
+</div>
+
+<script>
+// ── L2 class list — совпадает с именами файлов в extracted_site_icons_v3/ ──
+const CLASS_NAMES = [
+  "Abyss Walker","Adventurer","Arbalester","Arcana Lord","Archmage","Berserker","Bishop",
+  "Bladedancer","Bounty Hunter","Cardinal","Dark Avenger","Destroyer","Dominator",
+  "Doombringer","Doomcryer","Dreadnought","Duelist","Elemental Master","Elemental Summoner",
+  "Elven Elder","Eva_s Saint","Eva_s Templar","Female Soulbreaker","Fortune Seeker",
+  "Ghost Hunter","Ghost Sentinel","Gladiator","Grand Khavatari","Hawkeye","Hell Knight",
+  "Hierophant","Inspector","Judicator","Maestro","Male Soulbreaker","Moonlight Sentinel",
+  "Mystic Muse","Necromancer","Overlord","Paladin","Phantom Ranger","Phantom Summoner",
+  "Phoenix Knight","Plains Walker","Prophet","Sagittarius","Shillien Elder","Shillien Knight",
+  "Shillien Saint","Shillien Templar","Silver Ranger","Sorcerer","Soulhound","Soultaker",
+  "Spectral Dancer","Spectral Master","Spellhowler","Spellsinger","Storm Screamer",
+  "Sword Muse","Sword Singer","Temple Knight","Titan","Treasure Hunter","Trickster","Tyrant",
+  "Warcryer","Warlock","Warlord","Warsmith","Wind Rider","АВ_ПВ"
+];
+const ICON_DIR = "extracted_site_icons_v3/";
+const CURATED = [
+  "Bishop","Cardinal","Shillien Elder","Shillien Saint","Elven Elder","Eva_s Saint",
+  "Prophet","Hierophant","Warcryer","Doomcryer","Overlord","Dominator",
+  "Warlord","Dreadnought","Gladiator","Duelist","Paladin","Phoenix Knight",
+  "Dark Avenger","Hell Knight","Treasure Hunter","Adventurer","Bounty Hunter","Fortune Seeker",
+  "Hawkeye","Sagittarius","Warsmith","Maestro",
+  "Sorcerer","Archmage","Necromancer","Soultaker","Warlock","Arcana Lord",
+  "Temple Knight","Eva_s Templar","Sword Singer","Sword Muse","Plains Walker","Wind Rider",
+  "Silver Ranger","Moonlight Sentinel","Spellsinger","Mystic Muse",
+  "Elemental Summoner","Elemental Master","Bladedancer","Spectral Dancer",
+  "Shillien Knight","Shillien Templar","Abyss Walker","Ghost Hunter",
+  "Phantom Ranger","Ghost Sentinel","Spellhowler","Storm Screamer",
+  "Phantom Summoner","Spectral Master","Destroyer","Titan","Tyrant","Grand Khavatari",
+  "Berserker","Doombringer","Male Soulbreaker","Inspector","Female Soulbreaker","Judicator",
+  "Arbalester","Trickster","Soulhound","АВ_ПВ"
+];
+
+// ── browser matcher — copy of logic from BASA (1).html (prototype) ──
+const ICON_FEATURE_SIZE = 24;
+let __iconFeatures = null;
+function imgToFeature(img, size) {
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx = c.getContext('2d', { willReadFrequently:true });
+  ctx.drawImage(img, 0, 0, size, size);
+  const data = ctx.getImageData(0, 0, size, size).data;
+  const v = new Float32Array(size * size);
+  let sum = 0;
+  for (let i=0, j=0; i<data.length; i+=4, j++) {
+    const a = data[i+3]/255;
+    const g = 0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2];
+    v[j] = a*g + (1-a)*128; sum += v[j];
+  }
+  const mean = sum/v.length;
+  let norm = 0;
+  for (let i=0; i<v.length; i++) { v[i]-=mean; norm+=v[i]*v[i]; }
+  norm = Math.sqrt(norm) || 1;
+  for (let i=0; i<v.length; i++) v[i]/=norm;
+  return v;
+}
+function canvasRegionToFeature(srcCanvas, sx, sy, sw, sh, size) {
+  if (sw < 4 || sh < 4) return null;
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const cx = c.getContext('2d', { willReadFrequently:true });
+  cx.drawImage(srcCanvas, sx, sy, sw, sh, 0, 0, size, size);
+  const data = cx.getImageData(0, 0, size, size).data;
+  const v = new Float32Array(size*size);
+  let sum = 0;
+  for (let i=0, j=0; i<data.length; i+=4, j++) {
+    const a = data[i+3]/255;
+    const g = 0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2];
+    v[j] = a*g + (1-a)*128; sum += v[j];
+  }
+  const mean = sum/v.length;
+  let norm = 0;
+  for (let i=0; i<v.length; i++) { v[i]-=mean; norm+=v[i]*v[i]; }
+  norm = Math.sqrt(norm) || 1;
+  for (let i=0; i<v.length; i++) v[i]/=norm;
+  return v;
+}
+function cosineSim(a, b) { let s=0; for (let i=0;i<a.length;i++) s+=a[i]*b[i]; return s; }
+function classifyFromFeature(feat, topK) {
+  if (!feat || !__iconFeatures) return null;
+  const vs = __iconFeatures.vectors, ns = __iconFeatures.names;
+  const k = topK || 3;
+  const scored = new Array(vs.length);
+  for (let i=0; i<vs.length; i++) scored[i] = { name: ns[i], sim: cosineSim(feat, vs[i]) };
+  scored.sort((a,b)=>b.sim-a.sim);
+  const top = scored.slice(0, k);
+  return {
+    class2: top[0].name,
+    similarity: top[0].sim,
+    margin: top[0].sim - (top[1] ? top[1].sim : 0),
+    second: top[1] ? top[1].name : null,
+    secondSimilarity: top[1] ? top[1].sim : 0,
+    top: top
+  };
+}
+function loadIcon(name, cache) {
+  if (cache && cache[name]) return cache[name];
+  const p = new Promise((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = () => reject(new Error('load failed: ' + name));
+    im.src = ICON_DIR + encodeURIComponent(name) + '.png';
+  });
+  if (cache) cache[name] = p;
+  return p;
+}
+async function ensureIconFeatures() {
+  if (__iconFeatures) return __iconFeatures;
+  const items = await Promise.all(CLASS_NAMES.map(n => loadIcon(n, {}).then(im => ({ name:n, vec: imgToFeature(im, ICON_FEATURE_SIZE) })).catch(()=>null)));
+  const ok = items.filter(Boolean);
+  __iconFeatures = { names: ok.map(x=>x.name), vectors: ok.map(x=>x.vec) };
+  return __iconFeatures;
+}
+
+// ── composite renderer — точно как в bench_icon_gemini.html, чтобы сравнения были сопоставимы ──
+function renderComposite(img, iconSize, bgMode) {
+  const pad = Math.max(6, Math.round(iconSize * 0.5));
+  const W = iconSize + pad*2;
+  const H = iconSize + pad*2;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const cx = c.getContext('2d');
+  if (bgMode === 'cc') {
+    const g = cx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#111a2e'); g.addColorStop(1,'#0b1324');
+    cx.fillStyle = g; cx.fillRect(0,0,W,H);
+    cx.strokeStyle = '#1e2a45'; cx.lineWidth = 1; cx.strokeRect(0.5,0.5,W-1,H-1);
+  } else {
+    cx.fillStyle = '#0d1524'; cx.fillRect(0,0,W,H);
+  }
+  cx.imageSmoothingEnabled = true;
+  cx.imageSmoothingQuality = iconSize <= 24 ? 'medium' : 'high';
+  cx.drawImage(img, pad, pad, iconSize, iconSize);
+  return { canvas:c, pad, W, H, iconSize };
+}
+
+// Match one composite. mode: 'centered' (single exact crop) or 'sweep' (±tolerance px around center, best sim).
+function matchComposite(compo, mode, tolerance) {
+  const { canvas, pad, iconSize } = compo;
+  if (mode === 'sweep' && tolerance > 0) {
+    let best = null;
+    const step = Math.max(1, Math.round(tolerance / 2));
+    for (let dx = -tolerance; dx <= tolerance; dx += step) {
+      for (let dy = -tolerance; dy <= tolerance; dy += step) {
+        const feat = canvasRegionToFeature(canvas, pad+dx, pad+dy, iconSize, iconSize, ICON_FEATURE_SIZE);
+        if (!feat) continue;
+        const r = classifyFromFeature(feat, 3);
+        if (!r) continue;
+        if (!best || r.similarity > best.similarity) best = r;
+      }
+    }
+    return best;
+  } else {
+    const feat = canvasRegionToFeature(canvas, pad, pad, iconSize, iconSize, ICON_FEATURE_SIZE);
+    return classifyFromFeature(feat, 3);
+  }
+}
+
+// ── preview ──
+async function refreshPreview() {
+  const grid = document.getElementById('previewGrid');
+  grid.innerHTML = '';
+  const sizes = [...document.querySelectorAll('.sizeBox:checked')].map(b => +b.value);
+  const bgs = [...document.querySelectorAll('.bgBox:checked')].map(b => b.value);
+  const bgMain = bgs[0] || 'solid';
+  const sample = ['Bishop','Soulhound','Ghost Hunter'];
+  for (const name of sample) {
+    try {
+      const im = await loadIcon(name, {});
+      const wrap = document.createElement('div');
+      wrap.className = 'preview';
+      const label = document.createElement('div'); label.textContent = name; label.style.width='120px';
+      wrap.appendChild(label);
+      for (const s of sizes) wrap.appendChild(renderComposite(im, s, bgMain).canvas);
+      grid.appendChild(wrap);
+    } catch(e){}
+  }
+}
+document.querySelectorAll('.sizeBox, .bgBox').forEach(b => b.addEventListener('change', refreshPreview));
+refreshPreview();
+
+// ── bench driver ──
+let stopFlag = false;
+function buildPlan() {
+  const mode = document.getElementById('classMode').value;
+  let list;
+  if (mode === 'all') list = CLASS_NAMES.slice();
+  else if (mode === 'curated') list = CURATED.slice();
+  else {
+    const n = Math.max(1, Math.min(72, +document.getElementById('randomN').value || 24));
+    list = CLASS_NAMES.slice().sort(()=>Math.random()-0.5).slice(0,n);
+  }
+  const sizes = [...document.querySelectorAll('.sizeBox:checked')].map(b => +b.value);
+  const bgs = [...document.querySelectorAll('.bgBox:checked')].map(b => b.value);
+  const plan = [];
+  for (const cls of list) for (const s of sizes) for (const bg of bgs) plan.push({ cls, size:s, bg });
+  return plan;
+}
+function updatePlan() {
+  const p = buildPlan();
+  document.getElementById('plan').textContent = 'План: ' + p.length + ' вызовов (' +
+    (new Set(p.map(x=>x.cls)).size) + ' классов × ' +
+    (new Set(p.map(x=>x.size)).size) + ' размеров × ' +
+    (new Set(p.map(x=>x.bg)).size) + ' фонов)';
+}
+document.getElementById('classMode').addEventListener('change', updatePlan);
+document.getElementById('randomN').addEventListener('change', updatePlan);
+document.querySelectorAll('.sizeBox, .bgBox').forEach(b => b.addEventListener('change', updatePlan));
+updatePlan();
+
+const results = [];
+function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function renderRow(r, idx) {
+  const tr = document.createElement('tr');
+  tr.className = r.status === 'ok' ? 'ok' : (r.status === 'err' ? 'warn' : 'bad');
+  tr.innerHTML =
+    '<td>'+(idx+1)+'</td>'+
+    '<td>'+escapeHtml(r.expected)+'</td>'+
+    '<td>'+r.size+'</td>'+
+    '<td>'+r.bg+'</td>'+
+    '<td>'+escapeHtml(r.top1||'')+'</td>'+
+    '<td>'+(r.sim!=null?r.sim.toFixed(3):'')+'</td>'+
+    '<td>'+(r.margin!=null?r.margin.toFixed(3):'')+'</td>'+
+    '<td>'+escapeHtml(r.second||'')+'</td>'+
+    '<td>'+(r.prodOk ? '✓' : '')+'</td>'+
+    '<td>'+r.status+(r.error?': '+escapeHtml(r.error):'')+'</td>';
+  document.querySelector('#resultsTable tbody').appendChild(tr);
+}
+function renderSummary() {
+  if (!results.length) { document.getElementById('summary').innerHTML = '<pre>—</pre>'; return; }
+  const bySize = {}, byBg = {}, bySizeBg = {};
+  const confusion = {};
+  const prodTrig = { total:0, trig:0, trig_correct:0 };
+  let total=0, correct=0, err=0;
+  for (const r of results) {
+    total++;
+    if (r.status === 'err') { err++; continue; }
+    bySize[r.size] = bySize[r.size] || { n:0, ok:0 };
+    byBg[r.bg] = byBg[r.bg] || { n:0, ok:0 };
+    const kSB = r.size + '|' + r.bg;
+    bySizeBg[kSB] = bySizeBg[kSB] || { n:0, ok:0, size:r.size, bg:r.bg };
+    bySize[r.size].n++; byBg[r.bg].n++; bySizeBg[kSB].n++;
+    if (r.status === 'ok') { correct++; bySize[r.size].ok++; byBg[r.bg].ok++; bySizeBg[kSB].ok++; }
+    else {
+      const k = r.expected + ' → ' + (r.top1||'∅');
+      confusion[k] = (confusion[k]||0)+1;
+    }
+    prodTrig.total++;
+    if (r.prodOk) {
+      prodTrig.trig++;
+      if (r.status === 'ok') prodTrig.trig_correct++;
+    }
+  }
+  const lines = [];
+  lines.push('Всего: '+total+', совпало: '+correct+' ('+(total?((correct/total)*100).toFixed(1):'0')+'%), ошибок: '+err);
+  lines.push('');
+  lines.push('Точность по размерам:');
+  Object.keys(bySize).map(Number).sort((a,b)=>b-a).forEach(s => {
+    const b = bySize[s]; lines.push('  ' + s + 'px — ' + b.ok + '/' + b.n + ' (' + ((b.ok/b.n)*100).toFixed(1) + '%)');
+  });
+  lines.push('');
+  lines.push('Точность по фонам:');
+  Object.keys(byBg).forEach(bg => {
+    const b = byBg[bg]; lines.push('  ' + bg + ' — ' + b.ok + '/' + b.n + ' (' + ((b.ok/b.n)*100).toFixed(1) + '%)');
+  });
+  lines.push('');
+  lines.push('Размер × фон:');
+  Object.values(bySizeBg).sort((a,b)=> (b.size-a.size) || a.bg.localeCompare(b.bg)).forEach(v => {
+    lines.push('  ' + v.size + 'px  ' + v.bg.padEnd(6) + ' — ' + v.ok + '/' + v.n + ' (' + ((v.ok/v.n)*100).toFixed(1) + '%)');
+  });
+  lines.push('');
+  lines.push('Production-пороги (sim≥'+document.getElementById('thSim').value+', margin≥'+document.getElementById('thMargin').value+'):');
+  lines.push('  триггер '+prodTrig.trig+'/'+prodTrig.total+' ('+(prodTrig.total?((prodTrig.trig/prodTrig.total)*100).toFixed(1):'0')+'%), из них правильных: '+prodTrig.trig_correct+'/'+prodTrig.trig+' ('+(prodTrig.trig?((prodTrig.trig_correct/prodTrig.trig)*100).toFixed(1):'0')+'%)');
+  lines.push('  (precision@thr = доля правильных среди срабатываний; recall@thr = доля срабатываний среди всех правильных)');
+  const recall = total ? (prodTrig.trig_correct / total) : 0;
+  lines.push('  recall@thr (среди всех попыток): '+(recall*100).toFixed(1)+'%');
+  const confTop = Object.entries(confusion).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  if (confTop.length) {
+    lines.push('');
+    lines.push('Топ путаниц:');
+    confTop.forEach(([k,v]) => lines.push('  '+v+' × '+k));
+  }
+  document.getElementById('summary').innerHTML = '<pre>'+escapeHtml(lines.join('\n'))+'</pre>';
+}
+
+async function run() {
+  stopFlag = false;
+  results.length = 0;
+  document.querySelector('#resultsTable tbody').innerHTML = '';
+  renderSummary();
+  document.getElementById('btnRun').disabled = true;
+  document.getElementById('btnStop').disabled = false;
+  document.getElementById('btnExport').disabled = true;
+
+  const txt = document.getElementById('progressText');
+  txt.textContent = 'строю feature-index…';
+  try { await ensureIconFeatures(); }
+  catch(e) { txt.textContent = '❌ не удалось построить feature-index: ' + e.message; return; }
+
+  const plan = buildPlan();
+  const cropMode = document.querySelector('input[name=cropMode]:checked').value;
+  const tol = Math.max(0, +document.getElementById('tolerance').value || 0);
+  const thSim = +document.getElementById('thSim').value || 0.78;
+  const thMargin = +document.getElementById('thMargin').value || 0.05;
+  const iconCache = {};
+  const bar = document.getElementById('progressBar');
+
+  const T0 = performance.now();
+  for (let i=0; i<plan.length; i++) {
+    if (stopFlag) break;
+    const { cls, size, bg } = plan[i];
+    txt.textContent = (i+1) + '/' + plan.length + '  ' + cls + ' @' + size + 'px ' + bg;
+    bar.style.width = ((i/plan.length)*100).toFixed(1) + '%';
+    let img;
+    try { img = await loadIcon(cls, iconCache); }
+    catch(e) { results.push({ expected:cls, size, bg, status:'err', error:'icon load failed' }); renderRow(results[results.length-1], results.length-1); continue; }
+    const compo = renderComposite(img, size, bg);
+    const r = matchComposite(compo, cropMode, tol);
+    if (!r) {
+      results.push({ expected:cls, size, bg, status:'err', error:'classify returned null' });
+    } else {
+      const ok = r.class2 && r.class2.toLowerCase() === cls.toLowerCase();
+      const prodOk = r.similarity >= thSim && r.margin >= thMargin;
+      results.push({
+        expected:cls, size, bg,
+        top1:r.class2, sim:r.similarity, margin:r.margin,
+        second:r.second, prodOk,
+        status: ok ? 'ok' : 'bad'
+      });
+    }
+    renderRow(results[results.length-1], results.length-1);
+    if ((i % 20) === 0) renderSummary(); // live partial summary
+    // yield to keep UI responsive
+    if ((i % 8) === 0) await new Promise(r=>setTimeout(r,0));
+  }
+  const dt = Math.round(performance.now() - T0);
+  bar.style.width = '100%';
+  txt.textContent = (stopFlag ? 'остановлено' : 'готово') + ' — ' + results.length + ' прогонов за ' + dt + ' мс';
+  renderSummary();
+  document.getElementById('btnRun').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+  document.getElementById('btnExport').disabled = results.length === 0;
+}
+
+document.getElementById('btnRun').addEventListener('click', run);
+document.getElementById('btnStop').addEventListener('click', () => { stopFlag = true; });
+document.getElementById('btnExport').addEventListener('click', () => {
+  const header = ['idx','expected','size','bg','top1','sim','margin','second','prod_ok','status','error'];
+  const rows = [header.join(',')].concat(results.map((r,i) => [
+    i+1, JSON.stringify(r.expected), r.size, r.bg,
+    JSON.stringify(r.top1||''),
+    r.sim!=null?r.sim.toFixed(4):'', r.margin!=null?r.margin.toFixed(4):'',
+    JSON.stringify(r.second||''),
+    r.prodOk?1:0, r.status, JSON.stringify(r.error||'')
+  ].join(',')));
+  const blob = new Blob([rows.join('\n')], { type:'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'bench_icon_browser_' + (new Date().toISOString().replace(/[:.]/g,'-')) + '.csv';
+  a.click();
+});
+
+// ── Real CC crop hook (optional) ──
+document.getElementById('btnReal').addEventListener('click', async () => {
+  const fileInput = document.getElementById('realFile');
+  const expected = document.getElementById('realLabel').value.trim();
+  const outEl = document.getElementById('realResult');
+  if (!fileInput.files || !fileInput.files[0]) { outEl.innerHTML = '<span class="muted">файл не выбран</span>'; return; }
+  outEl.innerHTML = '<span class="muted">матчу…</span>';
+  try { await ensureIconFeatures(); } catch(e) { outEl.innerHTML = '❌ feature-index: '+e.message; return; }
+  const file = fileInput.files[0];
+  const dataUrl = await new Promise(res => { const fr = new FileReader(); fr.onload = ()=>res(fr.result); fr.readAsDataURL(file); });
+  const im = await new Promise((res, rej)=>{ const i = new Image(); i.onload = ()=>res(i); i.onerror = rej; i.src = dataUrl; });
+  // crop вся картинка → 24×24 feature (сравниваем как есть, пользователь сам выбирает crop)
+  const c = document.createElement('canvas');
+  c.width = im.naturalWidth; c.height = im.naturalHeight;
+  c.getContext('2d').drawImage(im, 0, 0);
+  const feat = canvasRegionToFeature(c, 0, 0, c.width, c.height, ICON_FEATURE_SIZE);
+  const r = classifyFromFeature(feat, 5);
+  if (!r) { outEl.innerHTML = '❌ classify failed'; return; }
+  const lines = [];
+  lines.push('file: ' + escapeHtml(file.name) + '  ('+c.width+'×'+c.height+')');
+  if (expected) {
+    const ok = r.class2.toLowerCase() === expected.toLowerCase();
+    lines.push((ok?'✓':'✗') + ' expected: ' + escapeHtml(expected) + ' / top1: ' + escapeHtml(r.class2));
+  }
+  lines.push('top-5:');
+  r.top.forEach((t,i) => lines.push('  '+(i+1)+'. '+t.name+'  sim='+t.sim.toFixed(3)));
+  lines.push('margin: ' + r.margin.toFixed(3));
+  outEl.innerHTML = '<pre>'+lines.join('\n')+'</pre>';
+});
+</script>
+</body>
+</html>
