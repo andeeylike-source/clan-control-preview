@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Class2 Icon Catalog — Clan Control</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #111;
+    color: #e8e8e8;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    padding: 24px 16px 48px;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    color: #c8a84b;
+    margin-bottom: 6px;
+  }
+
+  .subtitle {
+    text-align: center;
+    font-size: .78rem;
+    color: #666;
+    margin-bottom: 20px;
+  }
+
+  .search-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+
+  #search {
+    width: 320px;
+    max-width: 100%;
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 8px;
+    color: #e8e8e8;
+    font-size: .95rem;
+    padding: 9px 14px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  #search:focus { border-color: #c8a84b; }
+  #search::placeholder { color: #555; }
+
+  .count {
+    text-align: center;
+    font-size: .78rem;
+    color: #555;
+    margin-bottom: 18px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 14px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .card {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 14px 10px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    transition: border-color .18s, background .18s;
+  }
+  .card:hover {
+    border-color: #c8a84b44;
+    background: #1f1f1f;
+  }
+
+  .card.hidden { display: none; }
+
+  .class-label {
+    font-size: .75rem;
+    font-weight: 600;
+    color: #ccc;
+    text-align: center;
+    line-height: 1.3;
+    word-break: break-word;
+  }
+
+  .in-db-badge {
+    font-size: .65rem;
+    color: #6dbf6d;
+    border: 1px solid #3a6b3a;
+    border-radius: 4px;
+    padding: 1px 5px;
+    background: #1a2e1a;
+  }
+
+  .sizes {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .size-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .size-item img {
+    display: block;
+    image-rendering: pixelated;
+    background: #222;
+    border-radius: 4px;
+    border: 1px solid #333;
+  }
+
+  .size-label {
+    font-size: .6rem;
+    color: #555;
+  }
+
+  .no-results {
+    text-align: center;
+    color: #555;
+    margin-top: 60px;
+    font-size: .9rem;
+  }
+</style>
+</head>
+<body>
+
+<h1>Class2 Icon Catalog</h1>
+<p class="subtitle">Clan Control · extracted_site_icons_v3 · read-only preview</p>
+
+<div class="search-wrap">
+  <input id="search" type="search" placeholder="Поиск по имени класса…" autocomplete="off" spellcheck="false">
+</div>
+
+<p class="count" id="count"></p>
+
+<div class="grid" id="grid"></div>
+<p class="no-results" id="noResults" style="display:none">Ничего не найдено</p>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────────
+// All icons present in extracted_site_icons_v3/ (72 files).
+// Keys that also exist in CLASS2_ICONS (used for live icon matching) are flagged.
+const ALL_ICONS = [
+  "Abyss Walker",
+  "Adventurer",
+  "Arbalester",
+  "Arcana Lord",
+  "Archmage",
+  "Berserker",
+  "Bishop",
+  "Bladedancer",
+  "Bounty Hunter",
+  "Cardinal",
+  "Dark Avenger",
+  "Destroyer",
+  "Dominator",
+  "Doombringer",
+  "Doomcryer",
+  "Dreadnought",
+  "Duelist",
+  "Elemental Master",
+  "Elemental Summoner",
+  "Elven Elder",
+  "Eva_s Saint",
+  "Eva_s Templar",
+  "Female Soulbreaker",
+  "Fortune Seeker",
+  "Ghost Hunter",
+  "Ghost Sentinel",
+  "Gladiator",
+  "Grand Khavatari",
+  "Hawkeye",
+  "Hell Knight",
+  "Hierophant",
+  "Inspector",
+  "Judicator",
+  "Maestro",
+  "Male Soulbreaker",
+  "Moonlight Sentinel",
+  "Mystic Muse",
+  "Necromancer",
+  "Overlord",
+  "Paladin",
+  "Phantom Ranger",
+  "Phantom Summoner",
+  "Phoenix Knight",
+  "Plains Walker",
+  "Prophet",
+  "Sagittarius",
+  "Shillien Elder",
+  "Shillien Knight",
+  "Shillien Saint",
+  "Shillien Templar",
+  "Silver Ranger",
+  "Sorcerer",
+  "Soulhound",
+  "Soultaker",
+  "Spectral Dancer",
+  "Spectral Master",
+  "Spellhowler",
+  "Spellsinger",
+  "Storm Screamer",
+  "Sword Muse",
+  "Sword Singer",
+  "Temple Knight",
+  "Titan",
+  "Treasure Hunter",
+  "Trickster",
+  "Tyrant",
+  "Warcryer",
+  "Warlock",
+  "Warlord",
+  "Warsmith",
+  "Wind Rider",
+  "АВ_ПВ"
+];
+
+// Keys present in CLASS2_ICONS (used for live icon matching in BASA (1).html)
+const IN_DB = new Set([
+  "Female Soulbreaker","Inspector","Male Soulbreaker","Arbalester","Berserker",
+  "Destroyer","Overlord","Warcryer","Gladiator","Warlord","Paladin","Dark Avenger",
+  "Treasure Hunter","Hawkeye","Temple Knight","Sword Singer","Plains Walker",
+  "Silver Ranger","Sorcerer","Necromancer","Warlock","Spellsinger",
+  "Elemental Summoner","Shillien Knight","Bladedancer","Phantom Ranger",
+  "Spellhowler","Shillien Elder","Bishop","Elven Elder","Prophet",
+  "Phantom Summoner","Tyrant","Bounty Hunter","Warsmith","Abyss Walker"
+]);
+
+const SIZES = [56, 40, 32, 24];
+const ICON_DIR = "extracted_site_icons_v3/";
+
+// ── RENDER ─────────────────────────────────────────────────────────────────────
+const grid = document.getElementById('grid');
+const countEl = document.getElementById('count');
+const noResults = document.getElementById('noResults');
+
+function buildCards() {
+  grid.innerHTML = '';
+  ALL_ICONS.forEach(name => {
+    const src = ICON_DIR + encodeURIComponent(name) + '.png';
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.dataset.name = name.toLowerCase();
+
+    const label = document.createElement('div');
+    label.className = 'class-label';
+    label.textContent = name;
+
+    const sizes = document.createElement('div');
+    sizes.className = 'sizes';
+    SIZES.forEach(px => {
+      const wrap = document.createElement('div');
+      wrap.className = 'size-item';
+      const img = document.createElement('img');
+      img.src = src;
+      img.width = px;
+      img.height = px;
+      img.alt = name;
+      img.title = name + ' · ' + px + 'px';
+      const lbl = document.createElement('span');
+      lbl.className = 'size-label';
+      lbl.textContent = px;
+      wrap.append(img, lbl);
+      sizes.appendChild(wrap);
+    });
+
+    card.appendChild(sizes);
+    card.appendChild(label);
+
+    if (IN_DB.has(name)) {
+      const badge = document.createElement('span');
+      badge.className = 'in-db-badge';
+      badge.textContent = 'CLASS2_ICONS';
+      badge.title = 'Этот класс есть в CLASS2_ICONS — используется для live-распознавания';
+      card.appendChild(badge);
+    }
+
+    grid.appendChild(card);
+  });
+}
+
+function updateCount(visible) {
+  countEl.textContent = `Показано: ${visible} / ${ALL_ICONS.length}`;
+}
+
+function filterCards(q) {
+  const cards = grid.querySelectorAll('.card');
+  let visible = 0;
+  cards.forEach(c => {
+    const match = !q || c.dataset.name.includes(q);
+    c.classList.toggle('hidden', !match);
+    if (match) visible++;
+  });
+  noResults.style.display = visible === 0 ? '' : 'none';
+  updateCount(visible);
+}
+
+buildCards();
+updateCount(ALL_ICONS.length);
+
+// ── SEARCH ─────────────────────────────────────────────────────────────────────
+document.getElementById('search').addEventListener('input', e => {
+  filterCards(e.target.value.trim().toLowerCase());
+});
+</script>
+</body>
+</html>
