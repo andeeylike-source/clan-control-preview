@@ -5291,18 +5291,15 @@ function enrichDayAnalyzePlayer(player, dateStr) {
     if (!player) return player;
     const resolvedName = resolveAlias(player.name || '');
     const rosterMatch = roster.find(r => normalizeNick(r.name) === normalizeNick(resolvedName));
-    // icon_browser (prototype) выше Gemini class2 — доверяем локальному compare против CLASS2_ICONS,
-    // только если confidence прошёл порог (p.class2_browser_ok === true).
+    // class2 source priority: icon_browser > icon_matcher > null
+    // Gemini class2 demoted to debug/telemetry only — benchmark proved it unreliable as source of truth.
     let class2 = null;
     let class2Source = null;
     if (player.class2_browser_ok && player.class2_browser) {
         class2 = player.class2_browser;
         class2Source = 'icon_browser';
-    } else if (player.class2) {
-        class2 = player.class2;
-        class2Source = 'gemini';
     }
-    // Fallback: если ни icon_browser, ни Gemini class2 не дали результата — добираем из icon_matcher по нику
+    // Fallback: icon_matcher by nick (unified/review lookup)
     if (!class2) {
         const iconClass = getIconMatcherClass2ByNick(resolvedName);
         if (iconClass) { class2 = iconClass; class2Source = 'icon_matcher'; }
@@ -5313,11 +5310,12 @@ function enrichDayAnalyzePlayer(player, dateStr) {
     let profa = hasResolvedProfa(player.profa) ? player.profa : null;
     let profaSource = profa ? 'player' : null;
     if (!profa && hasResolvedProfa(storedDayProfa)) { profa = storedDayProfa; profaSource = 'stored_day'; }
-    // Gemini/icon_browser class2 → однозначный class3: доверяем свежему распознаванию больше, чем ростеру (ростер может быть устаревшим)
-    if (!profa && (class2Source === 'gemini' || class2Source === 'icon_browser') && class3options.length === 1) { profa = class3options[0]; profaSource = 'class3options'; }
+    // icon_browser class2 → unambiguous class3 (length===1 only): fresh recognition > stale roster
+    // Shared-icon cases (length>1, e.g. АВ_ПВ→[Abyss Walker,Plains Walker]) → no auto-profa, go to manual picker
+    if (!profa && class2Source === 'icon_browser' && class3options.length === 1) { profa = class3options[0]; profaSource = 'class3options'; }
     if (!profa && rosterProfa) { profa = rosterProfa; profaSource = 'roster'; }
-    // Оставшийся fallback: class3options из icon_matcher (не gemini) или если gemini дал >1 вариант
-    if (!profa && class3options.length === 1) { profa = class3options[0]; profaSource = 'class3options'; }
+    // icon_matcher fallback: auto-profa only when unambiguous
+    if (!profa && class2Source === 'icon_matcher' && class3options.length === 1) { profa = class3options[0]; profaSource = 'class3options'; }
     // [DIAG-TEMP] diagnosis-only logging for specific nicks — remove after investigation
     try {
         const _DIAG_TARGETS = ['крыжовник','benj1r0s','heartlessking','morevnutri','unholyholy','vizavi','памперс','фор'];
