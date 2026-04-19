@@ -127,6 +127,7 @@
     <input type="file" id="realFile" accept="image/*">
     <label style="gap:4px"><input type="radio" name="cropMode2" value="drag" checked> drag-rect</label>
     <label style="gap:4px"><input type="radio" name="cropMode2" value="click"> click-sample</label>
+    <label style="gap:4px;color:#a78bfa"><input type="radio" name="cropMode2" value="auto"> <b>auto row scan</b></label>
     <span id="clickSizeWrap" class="muted" style="display:none">size:
       <select id="clickSize" style="background:#0b1220;color:#e2e8f0;border:1px solid #273449;border-radius:4px;padding:2px 4px;font-size:12px">
         <option value="16">16</option><option value="20">20</option><option value="24">24</option>
@@ -144,6 +145,31 @@
     <canvas id="ssCanvas" style="display:none;cursor:crosshair;max-width:100%;max-height:620px"></canvas>
   </div>
   <div id="realResult" style="margin-top:10px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap"></div>
+
+  <!-- AUTO CC ROW SCAN panel (shown when auto radio selected) -->
+  <div id="autoScanPanel" style="display:none;margin-top:18px;border-top:1px solid #1e293b;padding-top:14px">
+    <div style="color:#a78bfa;font-size:12px;font-weight:700;margin-bottom:4px">AUTO CC ROW SCAN</div>
+    <div class="muted" style="font-size:11px;margin-bottom:10px">
+      Кликни по первой иконке на canvas → задаётся начало сканирования (Icon X / Icon Y).
+      Подбери Row H и размер иконки так чтобы сетка совпала со строками.
+      Затем жми <b>▶ Run scan</b>.
+    </div>
+    <div class="row" style="gap:14px;flex-wrap:wrap">
+      <label>Icon X <input type="number" id="asScanX" value="30" min="0" max="9999" style="width:60px"> px</label>
+      <label>Icon Y <input type="number" id="asScanY" value="60" min="0" max="9999" style="width:60px"> px</label>
+      <label>Row H  <input type="number" id="asRowH"  value="24" min="4" max="300"  style="width:55px"> px</label>
+      <label>Icon W <input type="number" id="asIconW" value="22" min="4" max="200"  style="width:55px"> px</label>
+      <label>Icon H <input type="number" id="asIconH" value="22" min="4" max="200"  style="width:55px"> px</label>
+      <label>Max rows <input type="number" id="asNRows" value="25" min="1" max="200" style="width:50px"></label>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button id="asBtnRun" style="background:#4c1d95;border:none;border-radius:8px;padding:7px 16px;color:#e9d5ff;font-weight:700;font-size:12px;cursor:pointer">▶ Run scan</button>
+      <button id="asBtnExportJSON" style="display:none;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:4px 11px;font-size:11px;cursor:pointer">Export JSON</button>
+      <button id="asBtnExportCSV"  style="display:none;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:4px 11px;font-size:11px;cursor:pointer">Export CSV</button>
+      <span id="asScanProgress" style="font-size:11px;color:#64748b"></span>
+    </div>
+    <div id="asScanResult" style="margin-top:14px"></div>
+  </div>
 
   <!-- Calibration dataset section (shown only when calibMode is on) -->
   <div id="calibSection" style="display:none;margin-top:18px;border-top:1px solid #1e293b;padding-top:14px">
@@ -676,6 +702,211 @@ function calibExport(fmt) {
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
 }
 
+// ── AUTO CC ROW SCAN ─────────────────────────────────────────────────────────
+
+let autoScanRows = [];
+
+function getAutoScanParams() {
+  return {
+    x:     +document.getElementById('asScanX').value || 30,
+    y:     +document.getElementById('asScanY').value || 60,
+    rowH:  +document.getElementById('asRowH').value  || 24,
+    iconW: +document.getElementById('asIconW').value || 22,
+    iconH: +document.getElementById('asIconH').value || 22,
+    nRows: +document.getElementById('asNRows').value || 25,
+  };
+}
+
+function drawAutoScanOverlay() {
+  if (!ssImage) return;
+  const p = getAutoScanParams();
+  const lw = Math.max(1, Math.round(ssCanvas.width / 800));
+  ssCtx.save();
+  for (let i = 0; i < p.nRows; i++) {
+    const ry = p.y + i * p.rowH;
+    if (ry > ssCanvas.height + 4) break;
+    ssCtx.strokeStyle = i === 0 ? '#a78bfa' : (i % 2 === 0 ? 'rgba(167,139,250,0.5)' : 'rgba(100,116,139,0.4)');
+    ssCtx.lineWidth = lw;
+    ssCtx.setLineDash(i === 0 ? [] : [3, 2]);
+    ssCtx.strokeRect(p.x + 0.5, ry + 0.5, p.iconW, p.iconH);
+    ssCtx.setLineDash([]);
+    ssCtx.fillStyle = 'rgba(200,168,75,0.9)';
+    ssCtx.font = Math.max(8, Math.round(ssCanvas.width / 140)) + 'px monospace';
+    ssCtx.fillText(i, p.x + p.iconW + 3, ry + p.iconH * 0.7 + 1);
+  }
+  ssCtx.restore();
+}
+
+async function runAutoScan() {
+  if (!ssImage) { document.getElementById('asScanProgress').textContent = '⚠ загрузи screenshot'; return; }
+  const prog     = document.getElementById('asScanProgress');
+  const resultEl = document.getElementById('asScanResult');
+  const btnRun   = document.getElementById('asBtnRun');
+  btnRun.disabled = true;
+  prog.textContent = 'building icon index…';
+  resultEl.innerHTML = '';
+  document.getElementById('asBtnExportJSON').style.display = 'none';
+  document.getElementById('asBtnExportCSV').style.display  = 'none';
+
+  try { await ensureIconFeatures(); }
+  catch(e) { prog.textContent = '❌ ' + e.message; btnRun.disabled = false; return; }
+
+  const p = getAutoScanParams();
+  const SWEEP_OFFSETS = [-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6];
+  const SWEEP_SIZES   = [16,18,20,22,24];
+
+  autoScanRows = [];
+
+  for (let i = 0; i < p.nRows; i++) {
+    const ry = p.y + i * p.rowH;
+    if (ry + p.iconH > ssCanvas.height + 4) break;
+
+    prog.textContent = 'row ' + (i+1) + ' / ' + p.nRows + '…';
+    await new Promise(r => setTimeout(r, 0)); // yield to UI
+
+    const cx = p.x + Math.floor(p.iconW / 2);
+    const cy = ry  + Math.floor(p.iconH / 2);
+
+    // raw crop at configured size
+    const rawSx = Math.max(0, cx - Math.floor(p.iconW / 2));
+    const rawSy = Math.max(0, cy - Math.floor(p.iconH / 2));
+    const rawSw = Math.min(ssCanvas.width  - rawSx, p.iconW);
+    const rawSh = Math.min(ssCanvas.height - rawSy, p.iconH);
+    const rawFeat = canvasRegionToFeature(ssCanvas, rawSx, rawSy, rawSw, rawSh, ICON_FEATURE_SIZE);
+    const rawRes  = rawFeat ? classifyFromFeature(rawFeat, 5) : null;
+
+    // center-refine sweep
+    let best = null;
+    for (const sz of SWEEP_SIZES) {
+      for (const dx of SWEEP_OFFSETS) {
+        for (const dy of SWEEP_OFFSETS) {
+          const sx = Math.max(0, cx + dx - Math.floor(sz / 2));
+          const sy = Math.max(0, cy + dy - Math.floor(sz / 2));
+          const sw = Math.min(ssCanvas.width  - sx, sz);
+          const sh = Math.min(ssCanvas.height - sy, sz);
+          if (sw < 4 || sh < 4) continue;
+          const feat = canvasRegionToFeature(ssCanvas, sx, sy, sw, sh, ICON_FEATURE_SIZE);
+          if (!feat) continue;
+          const res = classifyFromFeature(feat, 5);
+          if (!res) continue;
+          if (!best || res.top[0].sim > best.res.top[0].sim) best = { sx, sy, sw, sh, sz, dx, dy, res };
+        }
+      }
+    }
+
+    // thumbnail (raw crop area)
+    const tc = document.createElement('canvas');
+    tc.width = rawSw; tc.height = rawSh;
+    tc.getContext('2d').drawImage(ssCanvas, rawSx, rawSy, rawSw, rawSh, 0, 0, rawSw, rawSh);
+
+    autoScanRows.push({ i, rawRes, best, thumb: tc.toDataURL() });
+  }
+
+  prog.textContent = 'done — ' + autoScanRows.length + ' rows scanned';
+  btnRun.disabled = false;
+  renderScanResults(resultEl);
+  document.getElementById('asBtnExportJSON').style.display = '';
+  document.getElementById('asBtnExportCSV').style.display  = '';
+  // redraw without overlay boxes obscuring results
+  redraw(null);
+}
+
+function renderScanResults(container) {
+  if (!autoScanRows.length) { container.innerHTML = '<span class="muted">нет данных</span>'; return; }
+
+  const n = autoScanRows.length;
+  const refTrigged  = autoScanRows.filter(r => r.best    && r.best.res.top[0].sim    >= 0.78 && r.best.res.margin    >= 0.05).length;
+  const rawTrigged  = autoScanRows.filter(r => r.rawRes  && r.rawRes.top[0].sim      >= 0.78 && r.rawRes.margin      >= 0.05).length;
+  const refImproved = autoScanRows.filter(r => r.rawRes  && r.best  && r.best.res.top[0].sim > r.rawRes.top[0].sim + 0.005).length;
+  const top1Changed = autoScanRows.filter(r => r.rawRes  && r.best  && r.rawRes.class2 !== r.best.res.class2).length;
+  const validRaw    = autoScanRows.filter(r => r.rawRes);
+  const validRef    = autoScanRows.filter(r => r.best);
+  const avgSimRaw   = validRaw.length ? (validRaw.reduce((a,r) => a + r.rawRes.top[0].sim, 0) / validRaw.length) : 0;
+  const avgSimRef   = validRef.length ? (validRef.reduce((a,r) => a + r.best.res.top[0].sim, 0) / validRef.length) : 0;
+
+  const summHtml =
+    `<div style="background:#0d1524;border:1px solid #1e293b;border-radius:6px;padding:10px 14px;font-size:11px;margin-bottom:10px;display:flex;gap:20px;flex-wrap:wrap">` +
+    `<span><b style="color:#94a3b8">${n}</b> <span class="muted">rows</span></span>` +
+    `<span><b style="color:#86efac">${refTrigged}</b> <span class="muted">TRIGGER (refined)</span></span>` +
+    `<span><b style="color:#fbbf24">${rawTrigged}</b> <span class="muted">TRIGGER (raw)</span></span>` +
+    `<span><b style="color:#a78bfa">${refImproved}</b> <span class="muted">refine ↑ sim</span></span>` +
+    `<span><b style="color:#f87171">${top1Changed}</b> <span class="muted">refine changed top1</span></span>` +
+    `<span class="muted">avg sim: raw <b style="color:#e2e8f0">${avgSimRaw.toFixed(3)}</b> → ref <b style="color:#e2e8f0">${avgSimRef.toFixed(3)}</b></span>` +
+    `</div>`;
+
+  let tHTML = `<table style="border-collapse:collapse;font-size:10px;width:100%"><thead><tr>` +
+    [`#`,`crop`,`raw top1`,`raw sim`,`raw mgn`,`ref top1`,`ref sim`,`ref mgn`,`TRIGGER`,`best sz`,`dx,dy`]
+    .map(h => `<th style="padding:3px 6px;color:#64748b;white-space:nowrap;background:#0d152a;position:sticky;top:0">${h}</th>`).join('') +
+    `</tr></thead><tbody>`;
+
+  autoScanRows.forEach(({ i, rawRes, best, thumb }) => {
+    const rawT = rawRes  && rawRes.top[0].sim  >= 0.78 && rawRes.margin  >= 0.05;
+    const refT = best    && best.res.top[0].sim >= 0.78 && best.res.margin >= 0.05;
+    const chg  = rawRes  && best && rawRes.class2 !== best.res.class2;
+    const bg   = refT ? 'background:#071a10' : rawT ? 'background:#141007' : (i%2===0 ? '' : 'background:#0a1020');
+
+    tHTML +=
+      `<tr style="${bg}">` +
+      `<td style="padding:3px 6px;color:#475569">${i}</td>` +
+      `<td style="padding:3px 6px"><img src="${thumb}" width="28" height="28" style="image-rendering:pixelated;border:1px solid #1e293b;border-radius:3px;vertical-align:middle"></td>` +
+      `<td style="padding:3px 6px">${rawRes ? escapeHtml(rawRes.class2) : '<span style="color:#475569">—</span>'}</td>` +
+      `<td style="padding:3px 6px;color:${rawRes && rawRes.top[0].sim>=0.72?'#86efac':rawRes&&rawRes.top[0].sim>=0.6?'#fbbf24':'#f87171'}">${rawRes ? rawRes.top[0].sim.toFixed(3) : '—'}</td>` +
+      `<td style="padding:3px 6px">${rawRes ? rawRes.margin.toFixed(3) : '—'}</td>` +
+      `<td style="padding:3px 6px;color:${chg?'#fbbf24':'#e2e8f0'}">${best ? escapeHtml(best.res.class2) : '—'}</td>` +
+      `<td style="padding:3px 6px;color:${best&&best.res.top[0].sim>=0.72?'#86efac':best&&best.res.top[0].sim>=0.6?'#fbbf24':'#f87171'}">${best ? best.res.top[0].sim.toFixed(3) : '—'}</td>` +
+      `<td style="padding:3px 6px">${best ? best.res.margin.toFixed(3) : '—'}</td>` +
+      `<td style="padding:3px 6px;text-align:center">${refT?'<b style="color:#86efac">YES</b>':rawT?'<span style="color:#fbbf24">raw</span>':'<span style="color:#475569">NO</span>'}</td>` +
+      `<td style="padding:3px 6px">${best ? best.sz : '—'}</td>` +
+      `<td style="padding:3px 6px;color:#64748b">${best ? best.dx+','+best.dy : '—'}</td>` +
+      `</tr>`;
+  });
+  tHTML += `</tbody></table>`;
+
+  container.innerHTML = summHtml + `<div style="overflow-x:auto;max-height:480px;overflow-y:auto;border:1px solid #1e293b;border-radius:6px">${tHTML}</div>`;
+}
+
+function autoScanExport(fmt) {
+  if (!autoScanRows.length) { alert('Нет данных'); return; }
+  const data = autoScanRows.map(({ i, rawRes, best }) => ({
+    row:         i,
+    raw_top1:    rawRes?.class2 ?? null,
+    raw_sim:     rawRes ? rawRes.top[0].sim  : null,
+    raw_margin:  rawRes ? rawRes.margin      : null,
+    raw_trigger: rawRes ? (rawRes.top[0].sim >= 0.78 && rawRes.margin >= 0.05) : null,
+    ref_top1:    best?.res.class2 ?? null,
+    ref_sim:     best ? best.res.top[0].sim  : null,
+    ref_margin:  best ? best.res.margin      : null,
+    ref_trigger: best ? (best.res.top[0].sim >= 0.78 && best.res.margin >= 0.05) : null,
+    best_sz:     best?.sz ?? null,
+    best_dx:     best?.dx ?? null,
+    best_dy:     best?.dy ?? null,
+  }));
+  let content, mime, ext;
+  if (fmt === 'json') {
+    content = JSON.stringify(data, null, 2); mime = 'application/json'; ext = 'json';
+  } else {
+    const cols = Object.keys(data[0]);
+    content = cols.join(',') + '\n' +
+      data.map(r => cols.map(c => { const v = r[c] ?? ''; return '"'+String(v).replace(/"/g,'""')+'"'; }).join(',')).join('\n');
+    mime = 'text/csv'; ext = 'csv';
+  }
+  const blob = new Blob([content], { type: mime });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: 'auto_scan.'+ext });
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+}
+
+// wire up auto-scan controls
+document.getElementById('asBtnRun').addEventListener('click', runAutoScan);
+document.getElementById('asBtnExportJSON').addEventListener('click', () => autoScanExport('json'));
+document.getElementById('asBtnExportCSV').addEventListener('click',  () => autoScanExport('csv'));
+
+// redraw overlay when params change
+['asScanX','asScanY','asRowH','asIconW','asIconH','asNRows'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => redraw(null));
+});
+
 // ── calibration mode toggle ──
 document.getElementById('calibMode').addEventListener('change', () => {
   const on = document.getElementById('calibMode').checked;
@@ -720,6 +951,7 @@ function redraw(hl) {
     ssCtx.strokeRect(hl.x + 0.5, hl.y + 0.5, hl.w, hl.h);
     ssCtx.restore();
   }
+  if (document.querySelector('input[name=cropMode2]:checked')?.value === 'auto') drawAutoScanOverlay();
 }
 
 document.getElementById('realFile').addEventListener('change', async (e) => {
@@ -769,7 +1001,18 @@ ssCanvas.addEventListener('mouseup', async (e) => {
 
 // ── click-to-sample mode — calls center-refine ──
 ssCanvas.addEventListener('click', async (e) => {
-  if (!ssImage || document.querySelector('input[name=cropMode2]:checked').value !== 'click') return;
+  if (!ssImage) return;
+  const mode = document.querySelector('input[name=cropMode2]:checked').value;
+  // auto mode: click sets scan origin
+  if (mode === 'auto') {
+    const r = ssCanvas.getBoundingClientRect();
+    const { x: cx, y: cy } = cssToCanvas(e.clientX - r.left, e.clientY - r.top);
+    document.getElementById('asScanX').value = cx;
+    document.getElementById('asScanY').value = cy;
+    redraw(null);
+    return;
+  }
+  if (mode !== 'click') return;
   const r = ssCanvas.getBoundingClientRect();
   const { x: cx, y: cy } = cssToCanvas(e.clientX - r.left, e.clientY - r.top);
   // show approximate highlight at raw size while computing
@@ -1216,10 +1459,12 @@ async function matchClickRefine(cx, cy) {
   }
 }
 
-// toggle click-size selector visibility
+// toggle click-size selector + auto-scan panel visibility
 document.querySelectorAll('input[name=cropMode2]').forEach(rb => rb.addEventListener('change', () => {
-  document.getElementById('clickSizeWrap').style.display =
-    document.querySelector('input[name=cropMode2]:checked').value === 'click' ? '' : 'none';
+  const v = document.querySelector('input[name=cropMode2]:checked').value;
+  document.getElementById('clickSizeWrap').style.display  = v === 'click' ? '' : 'none';
+  document.getElementById('autoScanPanel').style.display  = v === 'auto'  ? '' : 'none';
+  if (v === 'auto') redraw(null); // draw overlay immediately on switch
 }));
 </script>
 </body>
