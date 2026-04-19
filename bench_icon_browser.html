@@ -164,6 +164,8 @@
     </div>
     <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button id="asBtnRun" style="background:#4c1d95;border:none;border-radius:8px;padding:7px 16px;color:#e9d5ff;font-weight:700;font-size:12px;cursor:pointer">▶ Run scan</button>
+      <label style="gap:5px;cursor:pointer;user-select:none;padding:0 4px"><input type="checkbox" id="asExpMode"> <b style="color:#fbbf24;font-size:12px">Expected-compare</b></label>
+      <button id="asBtnCompare" style="display:none;background:#78350f;border:none;border-radius:8px;padding:7px 14px;color:#fde68a;font-weight:700;font-size:12px;cursor:pointer">▶ Compare</button>
       <button id="asBtnExportJSON" style="display:none;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:4px 11px;font-size:11px;cursor:pointer">Export JSON</button>
       <button id="asBtnExportCSV"  style="display:none;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:4px 11px;font-size:11px;cursor:pointer">Export CSV</button>
       <span id="asScanProgress" style="font-size:11px;color:#64748b"></span>
@@ -789,7 +791,7 @@ async function runAutoScan() {
           if (!feat) continue;
           const res = classifyFromFeature(feat, 5);
           if (!res) continue;
-          if (!best || res.top[0].sim > best.res.top[0].sim) best = { sx, sy, sw, sh, sz, dx, dy, res };
+          if (!best || res.top[0].sim > best.res.top[0].sim) best = { sx, sy, sw, sh, sz, dx, dy, res, feat };
         }
       }
     }
@@ -799,7 +801,7 @@ async function runAutoScan() {
     tc.width = rawSw; tc.height = rawSh;
     tc.getContext('2d').drawImage(ssCanvas, rawSx, rawSy, rawSw, rawSh, 0, 0, rawSw, rawSh);
 
-    autoScanRows.push({ i, rawRes, best, thumb: tc.toDataURL() });
+    autoScanRows.push({ i, rawRes, rawFeat, best, thumb: tc.toDataURL(), expected: null, expSimRaw: null, expSimRef: null, verdict: null });
   }
 
   prog.textContent = 'done — ' + autoScanRows.length + ' rows scanned';
@@ -814,60 +816,166 @@ async function runAutoScan() {
 function renderScanResults(container) {
   if (!autoScanRows.length) { container.innerHTML = '<span class="muted">нет данных</span>'; return; }
 
-  const n = autoScanRows.length;
-  const refTrigged  = autoScanRows.filter(r => r.best    && r.best.res.top[0].sim    >= 0.78 && r.best.res.margin    >= 0.05).length;
-  const rawTrigged  = autoScanRows.filter(r => r.rawRes  && r.rawRes.top[0].sim      >= 0.78 && r.rawRes.margin      >= 0.05).length;
-  const refImproved = autoScanRows.filter(r => r.rawRes  && r.best  && r.best.res.top[0].sim > r.rawRes.top[0].sim + 0.005).length;
-  const top1Changed = autoScanRows.filter(r => r.rawRes  && r.best  && r.rawRes.class2 !== r.best.res.class2).length;
+  const expMode = document.getElementById('asExpMode')?.checked;
+  const n       = autoScanRows.length;
+
+  // base stats
+  const refTrigged  = autoScanRows.filter(r => r.best   && r.best.res.top[0].sim   >= 0.78 && r.best.res.margin   >= 0.05).length;
+  const rawTrigged  = autoScanRows.filter(r => r.rawRes && r.rawRes.top[0].sim      >= 0.78 && r.rawRes.margin     >= 0.05).length;
+  const refImproved = autoScanRows.filter(r => r.rawRes && r.best && r.best.res.top[0].sim > r.rawRes.top[0].sim + 0.005).length;
+  const top1Changed = autoScanRows.filter(r => r.rawRes && r.best && r.rawRes.class2 !== r.best.res.class2).length;
   const validRaw    = autoScanRows.filter(r => r.rawRes);
   const validRef    = autoScanRows.filter(r => r.best);
-  const avgSimRaw   = validRaw.length ? (validRaw.reduce((a,r) => a + r.rawRes.top[0].sim, 0) / validRaw.length) : 0;
-  const avgSimRef   = validRef.length ? (validRef.reduce((a,r) => a + r.best.res.top[0].sim, 0) / validRef.length) : 0;
+  const avgSimRaw   = validRaw.length ? validRaw.reduce((a,r) => a + r.rawRes.top[0].sim, 0) / validRaw.length : 0;
+  const avgSimRef   = validRef.length ? validRef.reduce((a,r) => a + r.best.res.top[0].sim, 0) / validRef.length : 0;
 
-  const summHtml =
-    `<div style="background:#0d1524;border:1px solid #1e293b;border-radius:6px;padding:10px 14px;font-size:11px;margin-bottom:10px;display:flex;gap:20px;flex-wrap:wrap">` +
+  // expected-compare stats (from already-run compare)
+  const expRows      = autoScanRows.filter(r => r.expected && r.expSimRaw != null);
+  const avgExpSimRaw = expRows.length ? expRows.reduce((a,r) => a + r.expSimRaw, 0) / expRows.length : null;
+  const expRefRows   = expRows.filter(r => r.expSimRef != null);
+  const avgExpSimRef = expRefRows.length ? expRefRows.reduce((a,r) => a + r.expSimRef, 0) / expRefRows.length : null;
+  const correctRef   = expRows.filter(r => r.best?.res.class2?.toLowerCase()  === r.expected.toLowerCase()).length;
+  const correctRaw   = expRows.filter(r => r.rawRes?.class2?.toLowerCase()    === r.expected.toLowerCase()).length;
+  const closeButLost = expRows.filter(r => {
+    const bestExp = r.expSimRef != null ? Math.max(r.expSimRaw, r.expSimRef) : r.expSimRaw;
+    return bestExp >= 0.65 && r.best?.res.class2?.toLowerCase() !== r.expected.toLowerCase();
+  }).length;
+  const expFarAway  = expRows.filter(r => (r.expSimRef != null ? Math.max(r.expSimRaw, r.expSimRef) : r.expSimRaw) < 0.50).length;
+  const gridCropCnt = expRows.filter(r => r.verdict === 'grid/crop').length;
+  const fSpaceCnt   = expRows.filter(r => r.verdict === 'feature-space').length;
+
+  // summary block
+  let summHtml =
+    `<div style="background:#0d1524;border:1px solid #1e293b;border-radius:6px;padding:10px 14px;font-size:11px;margin-bottom:10px;display:flex;gap:18px;flex-wrap:wrap">` +
     `<span><b style="color:#94a3b8">${n}</b> <span class="muted">rows</span></span>` +
-    `<span><b style="color:#86efac">${refTrigged}</b> <span class="muted">TRIGGER (refined)</span></span>` +
+    `<span><b style="color:#86efac">${refTrigged}</b> <span class="muted">TRIGGER (ref)</span></span>` +
     `<span><b style="color:#fbbf24">${rawTrigged}</b> <span class="muted">TRIGGER (raw)</span></span>` +
-    `<span><b style="color:#a78bfa">${refImproved}</b> <span class="muted">refine ↑ sim</span></span>` +
-    `<span><b style="color:#f87171">${top1Changed}</b> <span class="muted">refine changed top1</span></span>` +
-    `<span class="muted">avg sim: raw <b style="color:#e2e8f0">${avgSimRaw.toFixed(3)}</b> → ref <b style="color:#e2e8f0">${avgSimRef.toFixed(3)}</b></span>` +
-    `</div>`;
+    `<span><b style="color:#a78bfa">${refImproved}</b> <span class="muted">refine ↑</span></span>` +
+    `<span><b style="color:#f87171">${top1Changed}</b> <span class="muted">top1 changed</span></span>` +
+    `<span class="muted">avg sim raw <b style="color:#e2e8f0">${avgSimRaw.toFixed(3)}</b> → ref <b style="color:#e2e8f0">${avgSimRef.toFixed(3)}</b></span>`;
+  if (expRows.length) {
+    summHtml +=
+      `<span style="border-left:1px solid #334155;padding-left:14px"><b style="color:#fbbf24">EXP-CMP</b> ${expRows.length} rows</span>` +
+      `<span class="muted">avg exp sim raw <b style="color:#e2e8f0">${avgExpSimRaw?.toFixed(3)??'—'}</b> ref <b style="color:#e2e8f0">${avgExpSimRef?.toFixed(3)??'—'}</b></span>` +
+      `<span><b style="color:#86efac">${correctRef}</b>/<b style="color:#fbbf24">${correctRaw}</b> <span class="muted">correct ref/raw</span></span>` +
+      `<span><b style="color:#fbbf24">${closeButLost}</b> <span class="muted">close-but-lost ≥0.65</span></span>` +
+      `<span><b style="color:#f87171">${expFarAway}</b> <span class="muted">far &lt;0.50</span></span>` +
+      `<span><span style="color:#86efac">${gridCropCnt} grid/crop</span> · <span style="color:#f87171">${fSpaceCnt} feat-space</span></span>`;
+  }
+  summHtml += `</div>`;
+  if (expMode && expRows.length) {
+    const dominantVerdict = gridCropCnt > fSpaceCnt ? 'grid/crop' : fSpaceCnt > gridCropCnt ? 'feature-space' : 'mixed';
+    const verdictColor = dominantVerdict === 'grid/crop' ? '#86efac' : dominantVerdict === 'feature-space' ? '#f87171' : '#fbbf24';
+    const verdictExpl  = dominantVerdict === 'grid/crop'
+      ? 'Expected sim ≈ top1 sim → matcher recognises the icon, crop localisation is off. Fix: align grid precisely.'
+      : dominantVerdict === 'feature-space'
+      ? 'Expected sim is low even with best crop → feature extractor cannot bridge live-render vs index PNG gap. Fix: different feature space / matcher.'
+      : 'Mixed — some rows grid-crop issue, some feature-space issue.';
+    summHtml += `<div style="background:#0d1524;border:1px solid #334155;border-radius:6px;padding:8px 12px;font-size:11px;margin-bottom:10px">` +
+      `<b style="color:${verdictColor}">Dominant verdict: ${dominantVerdict}</b> — ${verdictExpl}</div>`;
+  }
+
+  // build column headers
+  const baseHdrs = ['#','crop','raw top1','raw sim','raw mgn','ref top1','ref sim','ref mgn','TRIGGER','best sz','dx,dy'];
+  const expHdrs  = expMode ? ['expected','exp sim raw','exp sim ref','Δ (top1−exp)','verdict'] : [];
+  const th = h => `<th style="padding:3px 6px;color:#64748b;white-space:nowrap;background:#0d152a;position:sticky;top:0">${h}</th>`;
 
   let tHTML = `<table style="border-collapse:collapse;font-size:10px;width:100%"><thead><tr>` +
-    [`#`,`crop`,`raw top1`,`raw sim`,`raw mgn`,`ref top1`,`ref sim`,`ref mgn`,`TRIGGER`,`best sz`,`dx,dy`]
-    .map(h => `<th style="padding:3px 6px;color:#64748b;white-space:nowrap;background:#0d152a;position:sticky;top:0">${h}</th>`).join('') +
-    `</tr></thead><tbody>`;
+    [...baseHdrs, ...expHdrs].map(th).join('') + `</tr></thead><tbody>`;
 
-  autoScanRows.forEach(({ i, rawRes, best, thumb }) => {
-    const rawT = rawRes  && rawRes.top[0].sim  >= 0.78 && rawRes.margin  >= 0.05;
-    const refT = best    && best.res.top[0].sim >= 0.78 && best.res.margin >= 0.05;
-    const chg  = rawRes  && best && rawRes.class2 !== best.res.class2;
+  // pre-build select options once
+  const optHTML = '<option value="">—</option>' +
+    CLASS_NAMES.map(cn => `<option value="${escapeHtml(cn)}">${escapeHtml(cn)}</option>`).join('');
+
+  const sc = v => v == null ? '' : v >= 0.72 ? 'color:#86efac' : v >= 0.60 ? 'color:#fbbf24' : 'color:#f87171';
+
+  autoScanRows.forEach(row => {
+    const { i, rawRes, best, thumb, expected, expSimRaw, expSimRef, verdict } = row;
+    const rawT = rawRes && rawRes.top[0].sim >= 0.78 && rawRes.margin >= 0.05;
+    const refT = best   && best.res.top[0].sim >= 0.78 && best.res.margin >= 0.05;
+    const chg  = rawRes && best && rawRes.class2 !== best.res.class2;
     const bg   = refT ? 'background:#071a10' : rawT ? 'background:#141007' : (i%2===0 ? '' : 'background:#0a1020');
 
-    tHTML +=
-      `<tr style="${bg}">` +
+    let cells =
       `<td style="padding:3px 6px;color:#475569">${i}</td>` +
       `<td style="padding:3px 6px"><img src="${thumb}" width="28" height="28" style="image-rendering:pixelated;border:1px solid #1e293b;border-radius:3px;vertical-align:middle"></td>` +
       `<td style="padding:3px 6px">${rawRes ? escapeHtml(rawRes.class2) : '<span style="color:#475569">—</span>'}</td>` +
-      `<td style="padding:3px 6px;color:${rawRes && rawRes.top[0].sim>=0.72?'#86efac':rawRes&&rawRes.top[0].sim>=0.6?'#fbbf24':'#f87171'}">${rawRes ? rawRes.top[0].sim.toFixed(3) : '—'}</td>` +
+      `<td style="padding:3px 6px;${sc(rawRes?.top[0].sim)}">${rawRes ? rawRes.top[0].sim.toFixed(3) : '—'}</td>` +
       `<td style="padding:3px 6px">${rawRes ? rawRes.margin.toFixed(3) : '—'}</td>` +
       `<td style="padding:3px 6px;color:${chg?'#fbbf24':'#e2e8f0'}">${best ? escapeHtml(best.res.class2) : '—'}</td>` +
-      `<td style="padding:3px 6px;color:${best&&best.res.top[0].sim>=0.72?'#86efac':best&&best.res.top[0].sim>=0.6?'#fbbf24':'#f87171'}">${best ? best.res.top[0].sim.toFixed(3) : '—'}</td>` +
+      `<td style="padding:3px 6px;${sc(best?.res.top[0].sim)}">${best ? best.res.top[0].sim.toFixed(3) : '—'}</td>` +
       `<td style="padding:3px 6px">${best ? best.res.margin.toFixed(3) : '—'}</td>` +
       `<td style="padding:3px 6px;text-align:center">${refT?'<b style="color:#86efac">YES</b>':rawT?'<span style="color:#fbbf24">raw</span>':'<span style="color:#475569">NO</span>'}</td>` +
       `<td style="padding:3px 6px">${best ? best.sz : '—'}</td>` +
-      `<td style="padding:3px 6px;color:#64748b">${best ? best.dx+','+best.dy : '—'}</td>` +
-      `</tr>`;
+      `<td style="padding:3px 6px;color:#64748b">${best ? best.dx+','+best.dy : '—'}</td>`;
+
+    if (expMode) {
+      const bestExpSim = expSimRef != null ? Math.max(expSimRaw ?? -1, expSimRef) : expSimRaw;
+      const top1sim    = best?.res.top[0].sim ?? rawRes?.top[0].sim;
+      const delta      = top1sim != null && bestExpSim != null ? top1sim - bestExpSim : null;
+      const vc = verdict === 'grid/crop' ? '#86efac' : verdict === 'feature-space' ? '#f87171' : verdict ? '#fbbf24' : '#475569';
+      const vl = verdict === 'grid/crop' ? 'grid/crop' : verdict === 'feature-space' ? 'feat-space' : verdict === 'ambiguous' ? 'ambig' : '—';
+
+      cells +=
+        `<td style="padding:2px 4px"><select id="asExpSel_${i}" style="background:#0b1220;color:#e2e8f0;border:1px solid #273449;border-radius:3px;padding:1px 2px;font-size:10px;max-width:130px">${optHTML}</select></td>` +
+        `<td style="padding:3px 6px;${sc(expSimRaw)}">${expSimRaw != null ? expSimRaw.toFixed(3) : '—'}</td>` +
+        `<td style="padding:3px 6px;${sc(expSimRef)}">${expSimRef != null ? expSimRef.toFixed(3) : '—'}</td>` +
+        `<td style="padding:3px 6px;color:${delta==null?'#475569':delta<=0.05?'#86efac':delta<=0.15?'#fbbf24':'#f87171'}">${delta!=null?(delta>=0?'+':'')+delta.toFixed(3):'—'}</td>` +
+        `<td style="padding:3px 6px"><b style="color:${vc}">${vl}</b></td>`;
+    }
+    tHTML += `<tr style="${bg}">${cells}</tr>`;
   });
   tHTML += `</tbody></table>`;
 
-  container.innerHTML = summHtml + `<div style="overflow-x:auto;max-height:480px;overflow-y:auto;border:1px solid #1e293b;border-radius:6px">${tHTML}</div>`;
+  container.innerHTML = summHtml +
+    `<div style="overflow-x:auto;max-height:520px;overflow-y:auto;border:1px solid #1e293b;border-radius:6px">${tHTML}</div>`;
+
+  // restore expected select values (persisted in row.expected)
+  if (expMode) {
+    autoScanRows.forEach(({ i, expected }) => {
+      const s = document.getElementById('asExpSel_' + i);
+      if (s && expected) s.value = expected;
+    });
+  }
+}
+
+function runExpectedCompare() {
+  if (!autoScanRows.length) return;
+  if (!__iconFeatures) { alert('Icon features not loaded — run scan first'); return; }
+
+  let count = 0;
+  autoScanRows.forEach(row => {
+    const sel = document.getElementById('asExpSel_' + row.i);
+    if (sel) row.expected = sel.value || null;
+
+    if (!row.expected) {
+      row.expSimRaw = null; row.expSimRef = null; row.verdict = null;
+      return;
+    }
+    count++;
+    const idx    = __iconFeatures.names.indexOf(row.expected);
+    const expVec = idx >= 0 ? __iconFeatures.vectors[idx] : null;
+
+    row.expSimRaw = expVec && row.rawFeat      ? cosineSim(row.rawFeat,   expVec) : null;
+    row.expSimRef = expVec && row.best?.feat   ? cosineSim(row.best.feat, expVec) : null;
+
+    // verdict
+    const bestExpSim = row.expSimRef != null ? Math.max(row.expSimRaw ?? -1, row.expSimRef) : row.expSimRaw;
+    const top1sim    = row.best?.res.top[0].sim ?? row.rawRes?.top[0].sim ?? null;
+
+    if (bestExpSim == null) { row.verdict = null; return; }
+    if (bestExpSim < 0.50)                           row.verdict = 'feature-space';
+    else if (top1sim != null && top1sim - bestExpSim <= 0.05) row.verdict = 'grid/crop';
+    else                                             row.verdict = 'ambiguous';
+  });
+
+  if (count === 0) { alert('Выбери expected class хотя бы для одной строки'); return; }
+  renderScanResults(document.getElementById('asScanResult'));
 }
 
 function autoScanExport(fmt) {
   if (!autoScanRows.length) { alert('Нет данных'); return; }
-  const data = autoScanRows.map(({ i, rawRes, best }) => ({
+  const data = autoScanRows.map(({ i, rawRes, best, expected, expSimRaw, expSimRef, verdict }) => ({
     row:         i,
     raw_top1:    rawRes?.class2 ?? null,
     raw_sim:     rawRes ? rawRes.top[0].sim  : null,
@@ -880,6 +988,10 @@ function autoScanExport(fmt) {
     best_sz:     best?.sz ?? null,
     best_dx:     best?.dx ?? null,
     best_dy:     best?.dy ?? null,
+    expected:    expected ?? null,
+    exp_sim_raw: expSimRaw ?? null,
+    exp_sim_ref: expSimRef ?? null,
+    verdict:     verdict ?? null,
   }));
   let content, mime, ext;
   if (fmt === 'json') {
@@ -899,8 +1011,14 @@ function autoScanExport(fmt) {
 
 // wire up auto-scan controls
 document.getElementById('asBtnRun').addEventListener('click', runAutoScan);
+document.getElementById('asBtnCompare').addEventListener('click', runExpectedCompare);
 document.getElementById('asBtnExportJSON').addEventListener('click', () => autoScanExport('json'));
 document.getElementById('asBtnExportCSV').addEventListener('click',  () => autoScanExport('csv'));
+document.getElementById('asExpMode').addEventListener('change', () => {
+  const on = document.getElementById('asExpMode').checked;
+  document.getElementById('asBtnCompare').style.display = on ? '' : 'none';
+  if (autoScanRows.length) renderScanResults(document.getElementById('asScanResult'));
+});
 
 // redraw overlay when params change
 ['asScanX','asScanY','asRowH','asIconW','asIconH','asNRows'].forEach(id => {
