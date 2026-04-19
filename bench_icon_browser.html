@@ -790,6 +790,141 @@ function ssimScore(query, index, n, rgb) {
   return ssim1ch(query,index,n);
 }
 
+// ── AUGMENTED TEMPLATE BANK ───────────────────────────────────────────────────
+// Browser-side live-style variants per catalog PNG. No external APIs.
+// class score = best-variant cosine sim (RGB32 normalized feature space).
+const AUG_SIZE = 32;
+
+function _augBlur(d,w,h){
+  const o=new Uint8ClampedArray(d.length);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    let r=0,g=0,b=0,a=0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      const px=Math.min(w-1,Math.max(0,x+dx)),py=Math.min(h-1,Math.max(0,y+dy));
+      const i=(py*w+px)*4;r+=d[i];g+=d[i+1];b+=d[i+2];a+=d[i+3];
+    }
+    const i=(y*w+x)*4;o[i]=r/9;o[i+1]=g/9;o[i+2]=b/9;o[i+3]=a/9;
+  }
+  return o;
+}
+function _augSharpen(d,w,h){
+  const bl=_augBlur(d,w,h),o=new Uint8ClampedArray(d.length);
+  for(let i=0;i<d.length;i+=4){
+    o[i]=Math.min(255,Math.max(0,2*d[i]-bl[i]));
+    o[i+1]=Math.min(255,Math.max(0,2*d[i+1]-bl[i+1]));
+    o[i+2]=Math.min(255,Math.max(0,2*d[i+2]-bl[i+2]));
+    o[i+3]=d[i+3];
+  }
+  return o;
+}
+function _augContrast(d,f){
+  const o=new Uint8ClampedArray(d.length);
+  for(let i=0;i<d.length;i+=4){
+    o[i]=Math.min(255,Math.max(0,(d[i]-128)*f+128));
+    o[i+1]=Math.min(255,Math.max(0,(d[i+1]-128)*f+128));
+    o[i+2]=Math.min(255,Math.max(0,(d[i+2]-128)*f+128));
+    o[i+3]=d[i+3];
+  }
+  return o;
+}
+function _augSat(d,f){
+  const o=new Uint8ClampedArray(d.length);
+  for(let i=0;i<d.length;i+=4){
+    const gr=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+    o[i]=Math.min(255,Math.max(0,gr+(d[i]-gr)*f));
+    o[i+1]=Math.min(255,Math.max(0,gr+(d[i+1]-gr)*f));
+    o[i+2]=Math.min(255,Math.max(0,gr+(d[i+2]-gr)*f));
+    o[i+3]=d[i+3];
+  }
+  return o;
+}
+function _augGamma(d,g){
+  const o=new Uint8ClampedArray(d.length);
+  for(let i=0;i<d.length;i+=4){
+    o[i]=Math.min(255,Math.round(Math.pow(d[i]/255,g)*255));
+    o[i+1]=Math.min(255,Math.round(Math.pow(d[i+1]/255,g)*255));
+    o[i+2]=Math.min(255,Math.round(Math.pow(d[i+2]/255,g)*255));
+    o[i+3]=d[i+3];
+  }
+  return o;
+}
+function _augDegrade(d,w,h){
+  const tmp=document.createElement('canvas');tmp.width=w;tmp.height=h;
+  const tctx=tmp.getContext('2d',{willReadFrequently:true});
+  const id=tctx.createImageData(w,h);id.data.set(d);tctx.putImageData(id,0,0);
+  const c1=document.createElement('canvas');c1.width=8;c1.height=8;
+  const x1=c1.getContext('2d',{willReadFrequently:true});
+  x1.imageSmoothingEnabled=true;x1.imageSmoothingQuality='low';x1.drawImage(tmp,0,0,8,8);
+  const c2=document.createElement('canvas');c2.width=w;c2.height=h;
+  const x2=c2.getContext('2d',{willReadFrequently:true});
+  x2.imageSmoothingEnabled=true;x2.imageSmoothingQuality='low';x2.drawImage(c1,0,0,w,h);
+  return x2.getImageData(0,0,w,h).data;
+}
+function _augBgBlend(d,bg255){
+  const o=new Uint8ClampedArray(d.length);
+  for(let i=0;i<d.length;i+=4){
+    const a=d[i+3]/255;
+    o[i]=Math.round(a*d[i]+(1-a)*bg255);
+    o[i+1]=Math.round(a*d[i+1]+(1-a)*bg255);
+    o[i+2]=Math.round(a*d[i+2]+(1-a)*bg255);
+    o[i+3]=255;
+  }
+  return o;
+}
+const AUG_DEFS = [
+  { id:'base',     label:'base',        fn:(d,w,h)=>d },
+  { id:'blur',     label:'blur',        fn:(d,w,h)=>_augBlur(d,w,h) },
+  { id:'sharp',    label:'sharpen',     fn:(d,w,h)=>_augSharpen(d,w,h) },
+  { id:'cont_dn',  label:'contrast-',   fn:(d,w,h)=>_augContrast(d,0.7) },
+  { id:'cont_up',  label:'contrast+',   fn:(d,w,h)=>_augContrast(d,1.4) },
+  { id:'sat_dn',   label:'sat-',        fn:(d,w,h)=>_augSat(d,0.4) },
+  { id:'gamma_dk', label:'gamma dark',  fn:(d,w,h)=>_augGamma(d,1.5) },
+  { id:'gamma_lt', label:'gamma light', fn:(d,w,h)=>_augGamma(d,0.65) },
+  { id:'degrade',  label:'degrade',     fn:(d,w,h)=>_augDegrade(d,w,h) },
+  { id:'bg_dark',  label:'bg dark',     fn:(d,w,h)=>_augBgBlend(d,25) },
+  { id:'bg_light', label:'bg light',    fn:(d,w,h)=>_augBgBlend(d,217) },
+];
+
+let __augBank = null; // Object: className -> [{variantId, label, vec}]
+
+async function buildAugBank() {
+  if (__augBank) return;
+  if (!__iconImgCache) {
+    const imgs=await Promise.all(CLASS_NAMES.map(n=>loadIcon(n,{}).then(im=>({name:n,img:im})).catch(()=>null)));
+    __iconImgCache=imgs.filter(Boolean);
+  }
+  __augBank = {};
+  const sz=AUG_SIZE, n=sz*sz;
+  for (const {name,img} of __iconImgCache) {
+    const base=document.createElement('canvas');base.width=sz;base.height=sz;
+    const bctx=base.getContext('2d',{willReadFrequently:true});
+    bctx.drawImage(img,0,0,sz,sz);
+    const baseData=bctx.getImageData(0,0,sz,sz).data;
+    __augBank[name]=AUG_DEFS.map(aug=>({
+      variantId:aug.id, label:aug.label,
+      vec: _rgbVec(aug.fn(baseData,sz,sz), n)
+    }));
+  }
+}
+
+function classifyAugBank(feat, topK) {
+  if (!__augBank||!feat) return null;
+  const scores=[];
+  for (const [name,variants] of Object.entries(__augBank)) {
+    let best=-Infinity,bestV=null;
+    for (const v of variants){const s=cosineSim(feat,v.vec);if(s>best){best=s;bestV=v.variantId;}}
+    scores.push({name,sim:best,variant:bestV});
+  }
+  scores.sort((a,b)=>b.sim-a.sim);
+  const top=scores.slice(0,topK||5);
+  return{class2:top[0].name,sim:top[0].sim,variant:top[0].variant,margin:top[0].sim-(top[1]?.sim??0),top};
+}
+
+function augExpSimForClass(className, feat) {
+  if (!__augBank||!feat||!__augBank[className]) return null;
+  return Math.max(...__augBank[className].map(v=>cosineSim(feat,v.vec)));
+}
+
 function canvasToFeat(src, sx, sy, sw, sh, size, rgb) {
   if (sw<4||sh<4) return null;
   const c=document.createElement('canvas'); c.width=size; c.height=size;
@@ -876,7 +1011,7 @@ async function runAutoScan() {
   document.getElementById('asBtnExportJSON').style.display = 'none';
   document.getElementById('asBtnExportCSV').style.display  = 'none';
 
-  try { await ensureAllFsIndexes(); }
+  try { await ensureAllFsIndexes(); await buildAugBank(); }
   catch(e) { prog.textContent = '❌ ' + e.message; btnRun.disabled = false; return; }
 
   const p = getAutoScanParams();
@@ -939,7 +1074,14 @@ async function runAutoScan() {
       fsRes[mode.id]   = { raw:rf?classifyFsMode(rf,mode.id,5):null, best:bf?classifyFsMode(bf,mode.id,5):null };
     }
 
-    autoScanRows.push({ i, rawRes, rawFeat, best, thumb: tc.toDataURL(), expected: null, expSimRaw: null, expSimRef: null, verdict: null, fsFeats, fsRes, fsExpSim: null, fsWinner: null });
+    // aug-bank: RGB32 normalized feat → best-variant matching
+    const augRawFeat  = canvasToFeat(ssCanvas, rawSx, rawSy, rawSw, rawSh, AUG_SIZE, true);
+    const augBestFeat = best ? canvasToFeat(ssCanvas, best.sx, best.sy, best.sw, best.sh, AUG_SIZE, true) : null;
+    const augRes = {
+      raw:  augRawFeat  ? classifyAugBank(augRawFeat)  : null,
+      best: augBestFeat ? classifyAugBank(augBestFeat) : null,
+    };
+    autoScanRows.push({ i, rawRes, rawFeat, best, thumb: tc.toDataURL(), expected: null, expSimRaw: null, expSimRef: null, verdict: null, fsFeats, fsRes, fsExpSim: null, fsWinner: null, augFeat:{raw:augRawFeat,best:augBestFeat}, augRes, augExpSim:null });
   }
 
   prog.textContent = 'done — ' + autoScanRows.length + ' rows scanned';
@@ -1083,9 +1225,16 @@ function renderScanResults(container) {
       const wins = fsExpRows.filter(r => r.fsWinner === mode.id).length;
       return { mode, avgExp, correct, wins, n: mRows.length };
     });
-    // two independent criteria — must not be mixed
-    const bestByAvg  = modeStats.filter(s=>s.avgExp!=null).sort((a,b)=>b.avgExp-a.avgExp)[0];
-    const bestByWins = modeStats.slice().sort((a,b)=>b.wins-a.wins)[0];
+    // aug-bank stats
+    const augBankRows = fsExpRows.filter(r => r.augExpSim);
+    const augAvgExpV  = augBankRows.length ? augBankRows.reduce((a,r)=>a+(r.augExpSim.best??r.augExpSim.raw??0),0)/augBankRows.length : null;
+    const augCorrectV = augBankRows.filter(r=>(r.augRes?.best??r.augRes?.raw)?.class2?.toLowerCase()===r.expected.toLowerCase()).length;
+    const augWinsV    = fsExpRows.filter(r=>r.fsWinner==='__aug__').length;
+    const augStat     = { mode:{id:'__aug__',label:`aug-bank RGB32 (${AUG_DEFS.length} var)`}, avgExp:augAvgExpV, correct:augCorrectV, wins:augWinsV, n:augBankRows.length };
+    // two independent criteria — must not be mixed; aug included
+    const allStats   = [...modeStats, augStat];
+    const bestByAvg  = allStats.filter(s=>s.avgExp!=null).sort((a,b)=>b.avgExp-a.avgExp)[0];
+    const bestByWins = allStats.slice().sort((a,b)=>b.wins-a.wins)[0];
 
     // mode summary table — ★avg marks avg-sim winner, ★wins marks per-row wins winner
     let msTbl = `<table style="border-collapse:collapse;font-size:11px;margin-bottom:10px"><thead><tr>` +
@@ -1102,6 +1251,19 @@ function renderScanResults(container) {
         `<td style="padding:2px 10px 2px 0;color:#a78bfa">${wins}${isWinsBest?' <b style="color:#fbbf24">★wins</b>':''}</td>` +
         `</tr>`;
     });
+    // aug-bank row in mode table
+    { const {avgExp,correct,wins,n} = augStat;
+      const isAvgBest  = bestByAvg?.mode?.id  === '__aug__';
+      const isWinsBest = bestByWins?.mode?.id === '__aug__';
+      const nc = isAvgBest||isWinsBest ? '#fbbf24':'#94a3b8';
+      const avgColor = avgExp!=null?(avgExp>=0.72?'#86efac':avgExp>=0.60?'#fbbf24':'#f87171'):'#475569';
+      msTbl += `<tr>`+
+        `<td style="padding:2px 10px 2px 0;font-weight:700;color:${nc}">${escapeHtml(augStat.mode.label)}</td>`+
+        `<td style="padding:2px 10px 2px 0;color:${avgColor}">${avgExp!=null?avgExp.toFixed(4):'—'}${isAvgBest?' <b style="color:#fbbf24">★avg</b>':''}</td>`+
+        `<td style="padding:2px 10px 2px 0">${correct}/${n}</td>`+
+        `<td style="padding:2px 10px 2px 0;color:#a78bfa">${wins}${isWinsBest?' <b style="color:#fbbf24">★wins</b>':''}</td>`+
+        `</tr>`;
+    }
     msTbl += `</tbody></table>`;
 
     // header badges — computed independently, shown separately
@@ -1115,14 +1277,13 @@ function renderScanResults(container) {
     const scFmt = v => v==null ? '<span style="color:#475569">—</span>' :
       `<span style="color:${v>=0.72?'#86efac':v>=0.60?'#fbbf24':'#f87171'}">${v.toFixed(3)}</span>`;
 
-    const fsHeaders = ['#','expected', ...FS_MODES.flatMap(m=>[m.label+' top1', m.label+' exp']), '★wins'];
+    const fsHeaders = ['#','expected', ...FS_MODES.flatMap(m=>[m.label+' top1', m.label+' exp']), 'aug top1', 'aug exp', '★wins'];
     let fsTbl = `<table style="border-collapse:collapse;font-size:10px;width:100%"><thead><tr>` +
       fsHeaders.map(h=>`<th style="padding:3px 6px;color:#64748b;white-space:nowrap;background:#0a0f1e;position:sticky;top:0">${h}</th>`).join('') +
       `</tr></thead><tbody>`;
 
-    fsExpRows.forEach(({ i, expected, fsExpSim, fsRes, fsWinner }) => {
-      // per-row winner = mode with highest expected sim for THIS row
-      const winMode = FS_MODES.find(m => m.id === fsWinner);
+    fsExpRows.forEach(({ i, expected, fsExpSim, fsRes, fsWinner, augRes, augExpSim }) => {
+      const winLabel = fsWinner==='__aug__' ? 'aug-bank' : (FS_MODES.find(m=>m.id===fsWinner)?.label??'—');
       let cells = `<td style="padding:3px 6px;color:#475569">${i}</td>` +
                   `<td style="padding:3px 6px;color:#c8a84b;font-weight:700">${escapeHtml(expected)}</td>`;
       FS_MODES.forEach(mode => {
@@ -1134,7 +1295,14 @@ function renderScanResults(container) {
           `<td style="padding:3px 6px;color:${correct?'#86efac':'#e2e8f0'}">${res ? escapeHtml(res.class2) : '—'}</td>` +
           `<td style="padding:3px 6px;${isRowWin?'outline:1px solid #fbbf2444;':''}">${scFmt(expS)}</td>`;
       });
-      cells += `<td style="padding:3px 6px;font-weight:700;color:#fbbf24">${winMode ? escapeHtml(winMode.label) : '—'}</td>`;
+      const augR  = augRes?.best ?? augRes?.raw;
+      const augE  = augExpSim?.best ?? augExpSim?.raw;
+      const augOk = augR?.class2?.toLowerCase() === expected.toLowerCase();
+      const augIsWin = fsWinner === '__aug__';
+      cells +=
+        `<td style="padding:3px 6px;color:${augOk?'#86efac':'#e2e8f0'}">${augR?escapeHtml(augR.class2)+` <span style="color:#475569;font-size:9px">[${augR.variant??''}]</span>`:'—'}</td>`+
+        `<td style="padding:3px 6px;${augIsWin?'outline:1px solid #fbbf2444;':''}">${scFmt(augE)}</td>`;
+      cells += `<td style="padding:3px 6px;font-weight:700;color:#fbbf24">${winLabel}</td>`;
       fsTbl += `<tr>${cells}</tr>`;
     });
     fsTbl += `</tbody></table>`;
@@ -1211,6 +1379,14 @@ function runExpectedCompare() {
         if (v > winSim) { winSim = v; winMode = mode.id; }
       }
       row.fsWinner = winMode;
+      // aug-bank expected sim — include in winner race
+      if (__augBank && row.augFeat) {
+        const rs = augExpSimForClass(row.expected, row.augFeat.raw);
+        const bs = augExpSimForClass(row.expected, row.augFeat.best);
+        row.augExpSim = { raw: rs, best: bs };
+        const augBest = bs != null ? bs : (rs ?? -Infinity);
+        if (augBest > winSim) row.fsWinner = '__aug__';
+      } else { row.augExpSim = null; }
     }
   });
 
