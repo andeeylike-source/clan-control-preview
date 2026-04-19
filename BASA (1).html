@@ -5093,6 +5093,167 @@ const CLASS2_TO_CLASS3 = {
 };
 
 function getClass2Icon(n) { return n ? CLASS2_ICONS[n] || null : null; }
+
+// ─── BROWSER ICON MATCHER (prototype) ──────────────────────────────────────
+// One-time feature index from CLASS2_ICONS data-URLs → 24x24 grayscale float vectors.
+// Per-row crop is fed to classifyIconFromCrop() → best class2 + confidence.
+const ICON_FEATURE_SIZE = 24;
+const ICON_FEATURE_LEN = ICON_FEATURE_SIZE * ICON_FEATURE_SIZE;
+let __iconFeatures = null; // { names:[], vectors:[Float32Array] }
+let __iconFeaturesBuilding = null;
+function __imgToFeature(img, size) {
+    const c = document.createElement('canvas');
+    c.width = size; c.height = size;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, size, size);
+    const data = ctx.getImageData(0, 0, size, size).data;
+    const v = new Float32Array(size * size);
+    let sum = 0;
+    for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+        // alpha-aware grayscale (transparent bg = mid gray)
+        const a = data[i + 3] / 255;
+        const g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        v[j] = a * g + (1 - a) * 128;
+        sum += v[j];
+    }
+    const mean = sum / v.length;
+    let norm = 0;
+    for (let i = 0; i < v.length; i++) { v[i] -= mean; norm += v[i] * v[i]; }
+    norm = Math.sqrt(norm) || 1;
+    for (let i = 0; i < v.length; i++) v[i] /= norm;
+    return v;
+}
+function __imageDataRegionToFeature(ctx, sx, sy, sw, sh, size) {
+    if (sw < 4 || sh < 4) return null;
+    const c = document.createElement('canvas');
+    c.width = size; c.height = size;
+    const cx = c.getContext('2d', { willReadFrequently: true });
+    cx.drawImage(ctx.canvas, sx, sy, sw, sh, 0, 0, size, size);
+    const data = cx.getImageData(0, 0, size, size).data;
+    const v = new Float32Array(size * size);
+    let sum = 0;
+    for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+        const a = data[i + 3] / 255;
+        const g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        v[j] = a * g + (1 - a) * 128;
+        sum += v[j];
+    }
+    const mean = sum / v.length;
+    let norm = 0;
+    for (let i = 0; i < v.length; i++) { v[i] -= mean; norm += v[i] * v[i]; }
+    norm = Math.sqrt(norm) || 1;
+    for (let i = 0; i < v.length; i++) v[i] /= norm;
+    return v;
+}
+function __cosineSim(a, b) {
+    let s = 0;
+    for (let i = 0; i < a.length; i++) s += a[i] * b[i];
+    return s;
+}
+function ensureIconFeatures() {
+    if (__iconFeatures) return Promise.resolve(__iconFeatures);
+    if (__iconFeaturesBuilding) return __iconFeaturesBuilding;
+    const names = Object.keys(CLASS2_ICONS);
+    __iconFeaturesBuilding = Promise.all(names.map(n => new Promise(res => {
+        const im = new Image();
+        im.onload = () => { try { res({ name: n, vec: __imgToFeature(im, ICON_FEATURE_SIZE) }); } catch(e) { res(null); } };
+        im.onerror = () => res(null);
+        im.src = CLASS2_ICONS[n];
+    }))).then(items => {
+        const ok = items.filter(Boolean);
+        __iconFeatures = { names: ok.map(x => x.name), vectors: ok.map(x => x.vec) };
+        __iconFeaturesBuilding = null;
+        return __iconFeatures;
+    });
+    return __iconFeaturesBuilding;
+}
+function classifyIconFromFeature(feat) {
+    if (!feat || !__iconFeatures) return null;
+    const vs = __iconFeatures.vectors, ns = __iconFeatures.names;
+    let bestI = -1, bestS = -Infinity, secondS = -Infinity, secondI = -1;
+    for (let i = 0; i < vs.length; i++) {
+        const s = __cosineSim(feat, vs[i]);
+        if (s > bestS) { secondS = bestS; secondI = bestI; bestS = s; bestI = i; }
+        else if (s > secondS) { secondS = s; secondI = i; }
+    }
+    if (bestI < 0) return null;
+    return {
+        class2: ns[bestI],
+        similarity: bestS,
+        margin: bestS - secondS,
+        second: secondI >= 0 ? ns[secondI] : null,
+        secondSimilarity: secondS
+    };
+}
+// Given already-rendered canvas of a screenshot, normalized bbox and rows_count,
+// returns [{rowIndex, class2, similarity, margin, second, secondSimilarity} | null] per row.
+function classifyRowsFromCanvas(ctx, bbox, rowsCount) {
+    if (!ctx || !bbox || !rowsCount || rowsCount < 1) return [];
+    const W = ctx.canvas.width, H = ctx.canvas.height;
+    const bx = Math.max(0, Math.floor(bbox.x * W));
+    const by = Math.max(0, Math.floor(bbox.y * H));
+    const bw = Math.min(W - bx, Math.floor(bbox.w * W));
+    const bh = Math.min(H - by, Math.floor(bbox.h * H));
+    if (bw < 10 || bh < 10) return [];
+    const rowH = bh / rowsCount;
+    // Icon band: icon sits in column 2 of "Член группы" table (after nick).
+    // Search x centers within [0.30 .. 0.60] of bbox width, stride ≈ 2px, keep best match per row.
+    const iconSide = Math.max(12, Math.min(rowH * 0.92, rowH - 2));
+    const searchLeft  = bx + Math.floor(bw * 0.28);
+    const searchRight = bx + Math.floor(bw * 0.62) - Math.floor(iconSide);
+    const stride = Math.max(1, Math.floor(iconSide * 0.12));
+    const out = [];
+    for (let r = 0; r < rowsCount; r++) {
+        const rowCenterY = by + rowH * (r + 0.5);
+        const sy = Math.max(0, Math.floor(rowCenterY - iconSide / 2));
+        let best = null;
+        for (let sx = searchLeft; sx <= searchRight; sx += stride) {
+            const feat = __imageDataRegionToFeature(ctx, sx, sy, Math.floor(iconSide), Math.floor(iconSide), ICON_FEATURE_SIZE);
+            if (!feat) continue;
+            const m = classifyIconFromFeature(feat);
+            if (!m) continue;
+            if (!best || m.similarity > best.similarity) { best = Object.assign({ rowIndex: r, sx, sy, side: Math.floor(iconSide) }, m); }
+        }
+        out.push(best);
+    }
+    return out;
+}
+// Load a dataURL into a canvas sized to natural dimensions, with an optional max side downscale (mobile-safe).
+function loadDataUrlToCanvas(dataUrl, maxSide) {
+    return new Promise((resolve, reject) => {
+        const im = new Image();
+        im.onload = () => {
+            try {
+                let w = im.naturalWidth, h = im.naturalHeight;
+                if (maxSide && Math.max(w, h) > maxSide) {
+                    const k = maxSide / Math.max(w, h);
+                    w = Math.round(w * k); h = Math.round(h * k);
+                }
+                const c = document.createElement('canvas');
+                c.width = w; c.height = h;
+                const cx = c.getContext('2d', { willReadFrequently: true });
+                cx.drawImage(im, 0, 0, w, h);
+                resolve(cx);
+            } catch(e) { reject(e); }
+        };
+        im.onerror = reject;
+        im.src = dataUrl;
+    });
+}
+// High-level: given a shot dataUrl, parsed.group_window_bbox and parsed.rows_count → matches array.
+async function matchIconsForShot(dataUrl, bbox, rowsCount) {
+    if (!bbox || !rowsCount) return [];
+    try { await ensureIconFeatures(); } catch(e) { return []; }
+    let ctx;
+    try { ctx = await loadDataUrlToCanvas(dataUrl, 1800); } catch(e) { return []; }
+    try {
+        return classifyRowsFromCanvas(ctx, bbox, rowsCount);
+    } finally {
+        ctx.canvas.width = 0; ctx.canvas.height = 0;
+    }
+}
+// ─── END BROWSER ICON MATCHER ──────────────────────────────────────────────
+
 function getClass3Options(n) { return CLASS2_TO_CLASS3[n] || []; }
 function resolveClass2ToClass3(n) {
     if (!n) return [];
@@ -5130,9 +5291,18 @@ function enrichDayAnalyzePlayer(player, dateStr) {
     if (!player) return player;
     const resolvedName = resolveAlias(player.name || '');
     const rosterMatch = roster.find(r => normalizeNick(r.name) === normalizeNick(resolvedName));
-    let class2 = player.class2 || null;
-    let class2Source = class2 ? 'gemini' : null;
-    // Fallback: если Gemini class2 пуст — добираем class из icon_matcher (unified.json/review.json) по нику
+    // icon_browser (prototype) выше Gemini class2 — доверяем локальному compare против CLASS2_ICONS,
+    // только если confidence прошёл порог (p.class2_browser_ok === true).
+    let class2 = null;
+    let class2Source = null;
+    if (player.class2_browser_ok && player.class2_browser) {
+        class2 = player.class2_browser;
+        class2Source = 'icon_browser';
+    } else if (player.class2) {
+        class2 = player.class2;
+        class2Source = 'gemini';
+    }
+    // Fallback: если ни icon_browser, ни Gemini class2 не дали результата — добираем из icon_matcher по нику
     if (!class2) {
         const iconClass = getIconMatcherClass2ByNick(resolvedName);
         if (iconClass) { class2 = iconClass; class2Source = 'icon_matcher'; }
@@ -5143,8 +5313,8 @@ function enrichDayAnalyzePlayer(player, dateStr) {
     let profa = hasResolvedProfa(player.profa) ? player.profa : null;
     let profaSource = profa ? 'player' : null;
     if (!profa && hasResolvedProfa(storedDayProfa)) { profa = storedDayProfa; profaSource = 'stored_day'; }
-    // Gemini class2 → однозначный class3: доверяем Gemini больше, чем ростеру (ростер может быть устаревшим)
-    if (!profa && class2Source === 'gemini' && class3options.length === 1) { profa = class3options[0]; profaSource = 'class3options'; }
+    // Gemini/icon_browser class2 → однозначный class3: доверяем свежему распознаванию больше, чем ростеру (ростер может быть устаревшим)
+    if (!profa && (class2Source === 'gemini' || class2Source === 'icon_browser') && class3options.length === 1) { profa = class3options[0]; profaSource = 'class3options'; }
     if (!profa && rosterProfa) { profa = rosterProfa; profaSource = 'roster'; }
     // Оставшийся fallback: class3options из icon_matcher (не gemini) или если gemini дал >1 вариант
     if (!profa && class3options.length === 1) { profa = class3options[0]; profaSource = 'class3options'; }
@@ -7885,13 +8055,15 @@ function getClass2IconByClass3(c3) {
 Также прочитай из окна "Командный канал": общее число игроков и всех лидеров с их суммарной статой.` : ''}
 
 Верни ТОЛЬКО JSON без markdown:
-{"pack_name":"ИМЯ ПАКА","pack_leader":"ИМЯ ЛИДЕРА","total_count":9,${isFirst ? '"raid_total":67,"command_channel":[{"leader":"ВИЗАРД","members":9,"kills":6,"deaths":87,"pvp_dmg":370,"pve_dmg":717}],' : ''}"players":[{"name":"ВИЗАРД","class2":"Bishop","kills":0,"deaths":16,"pvp_dmg":0,"pve_dmg":0},{"name":"Ник","class2":null,"kills":4,"deaths":9,"pvp_dmg":139,"pve_dmg":16}]}
+{"pack_name":"ИМЯ ПАКА","pack_leader":"ИМЯ ЛИДЕРА","total_count":9,"group_window_bbox":{"x":0.05,"y":0.12,"w":0.42,"h":0.55},"rows_count":9,${isFirst ? '"raid_total":67,"command_channel":[{"leader":"ВИЗАРД","members":9,"kills":6,"deaths":87,"pvp_dmg":370,"pve_dmg":717}],' : ''}"players":[{"name":"ВИЗАРД","class2":"Bishop","kills":0,"deaths":16,"pvp_dmg":0,"pve_dmg":0},{"name":"Ник","class2":null,"kills":4,"deaths":9,"pvp_dmg":139,"pve_dmg":16}]}
 
 Требования:
 - pack_name = заголовок окна ГРУППЫ (верхняя строка окна с таблицей "Член группы")
 - pack_leader = имя из строки "Лидер: ИМЯ" внутри окна ГРУППЫ
 - total_count = число из строки "Состав: N чел." окна ГРУППЫ${isFirst ? '\n- raid_total = второе число из "Состав: N груп. / N чел." командного канала\n- command_channel = все строки таблицы командного канала' : ''}
 - players = ВСЕ строки таблицы "Член группы" включая лидера
+- group_window_bbox = нормализованный 0..1 bounding box ТОЛЬКО табличной части окна ГРУППЫ (строки таблицы "Член группы" от первой до последней строки участника; БЕЗ шапки окна и БЕЗ строк "Лидер:"/"Состав:"/заголовков колонок). x=left, y=top, w=width, h=height относительно размеров всего изображения. Если не можешь определить точно — верни null.
+- rows_count = количество строк участников внутри group_window_bbox (равно длине players)
 
 КРИТИЧЕСКИ ВАЖНО — порядок колонок в таблице "Член группы":
   1. Имя персонажа
@@ -7978,6 +8150,51 @@ function getClass2IconByClass3(c3) {
 
                     // Поддержка нового формата {total_count, players} и старого формата []
                     const players = Array.isArray(parsed) ? parsed : (parsed.players || []);
+
+                    // ===== BROWSER ICON MATCHER (prototype, B1) =====
+                    // Использует parsed.group_window_bbox + parsed.rows_count, полученные от Gemini,
+                    // чтобы вырезать иконку класса из каждой строки и сравнить с CLASS2_ICONS.
+                    try {
+                        const bbox = parsed && parsed.group_window_bbox;
+                        const rowsCount = parsed && parsed.rows_count;
+                        const bboxOk = bbox && typeof bbox === 'object' &&
+                            ['x','y','w','h'].every(k => typeof bbox[k] === 'number' && bbox[k] >= 0 && bbox[k] <= 1) &&
+                            bbox.w > 0.05 && bbox.h > 0.05;
+                        if (bboxOk && rowsCount > 0 && Array.isArray(players) && players.length > 0) {
+                            const matches = await matchIconsForShot(shot.dataUrl, bbox, Math.min(rowsCount, players.length));
+                            // Пороги prototype: cos similarity ≥ 0.78 и margin ≥ 0.05 → доверяем
+                            const TH_SIM = 0.78, TH_MARGIN = 0.05;
+                            matches.forEach((m, idx) => {
+                                if (!m || idx >= players.length) return;
+                                const p = players[idx];
+                                if (!p) return;
+                                p.class2_browser = m.class2;
+                                p.class2_browser_confidence = m.similarity;
+                                p.class2_browser_margin = m.margin;
+                                if (m.similarity >= TH_SIM && m.margin >= TH_MARGIN) {
+                                    p.class2_browser_ok = true;
+                                }
+                            });
+                            try {
+                                console.log('[ICON-BROWSER]', {
+                                    screen: i + 1,
+                                    pack: parsed.pack_name || null,
+                                    rowsCount,
+                                    matched: matches.filter(Boolean).length,
+                                    rows: matches.map((m, idx) => m ? {
+                                        idx, name: (players[idx] && players[idx].name) || null,
+                                        top: m.class2, sim: +m.similarity.toFixed(3),
+                                        margin: +m.margin.toFixed(3), second: m.second,
+                                        ok: !!(players[idx] && players[idx].class2_browser_ok)
+                                    } : { idx, skipped: true })
+                                });
+                            } catch(_){}
+                        } else {
+                            console.log('[ICON-BROWSER] skip screen ' + (i + 1) + ': bbox/rows missing', { bbox, rowsCount });
+                        }
+                    } catch (iconErr) {
+                        console.warn('[ICON-BROWSER] failed on screen ' + (i + 1) + ':', iconErr && iconErr.message);
+                    }
 
                     // [DIAG-TEMP] raw Gemini players for target nicks — remove after investigation
                     try {
@@ -8095,8 +8312,21 @@ function getClass2IconByClass3(c3) {
                                 allPlayers[key].pvp_dmg  = Math.max(allPlayers[key].pvp_dmg  || 0, p.pvp_dmg  || 0);
                                 allPlayers[key].pve_dmg  = Math.max(allPlayers[key].pve_dmg  || 0, p.pve_dmg  || 0);
                                 if (!allPlayers[key].class2 && p.class2) allPlayers[key].class2 = p.class2;
+                                // browser icon matcher: keep strongest match across screens
+                                if (p.class2_browser_ok && (!allPlayers[key].class2_browser_ok || (p.class2_browser_confidence || 0) > (allPlayers[key].class2_browser_confidence || 0))) {
+                                    allPlayers[key].class2_browser = p.class2_browser;
+                                    allPlayers[key].class2_browser_confidence = p.class2_browser_confidence;
+                                    allPlayers[key].class2_browser_margin = p.class2_browser_margin;
+                                    allPlayers[key].class2_browser_ok = true;
+                                }
                             } else {
-                                allPlayers[key] = { name: p.name, kills: p.kills||0, deaths: p.deaths||0, pvp_dmg: p.pvp_dmg||0, pve_dmg: p.pve_dmg||0, class2: p.class2||null };
+                                allPlayers[key] = {
+                                    name: p.name, kills: p.kills||0, deaths: p.deaths||0, pvp_dmg: p.pvp_dmg||0, pve_dmg: p.pve_dmg||0, class2: p.class2||null,
+                                    class2_browser: p.class2_browser_ok ? p.class2_browser : null,
+                                    class2_browser_confidence: p.class2_browser_ok ? p.class2_browser_confidence : null,
+                                    class2_browser_margin: p.class2_browser_ok ? p.class2_browser_margin : null,
+                                    class2_browser_ok: !!p.class2_browser_ok
+                                };
                             }
                         });
                     }
@@ -8172,8 +8402,20 @@ function getClass2IconByClass3(c3) {
                             rebuiltPlayers[key].pve_dmg = p.pve_dmg||0;
                         }
                         if (!rebuiltPlayers[key].class2 && p.class2) rebuiltPlayers[key].class2 = p.class2;
+                        if (p.class2_browser_ok && (!rebuiltPlayers[key].class2_browser_ok || (p.class2_browser_confidence||0) > (rebuiltPlayers[key].class2_browser_confidence||0))) {
+                            rebuiltPlayers[key].class2_browser = p.class2_browser;
+                            rebuiltPlayers[key].class2_browser_confidence = p.class2_browser_confidence;
+                            rebuiltPlayers[key].class2_browser_margin = p.class2_browser_margin;
+                            rebuiltPlayers[key].class2_browser_ok = true;
+                        }
                     } else {
-                        rebuiltPlayers[key] = { name: p.name, kills: p.kills||0, deaths: p.deaths||0, pvp_dmg: p.pvp_dmg||0, pve_dmg: p.pve_dmg||0, class2: p.class2||null };
+                        rebuiltPlayers[key] = {
+                            name: p.name, kills: p.kills||0, deaths: p.deaths||0, pvp_dmg: p.pvp_dmg||0, pve_dmg: p.pve_dmg||0, class2: p.class2||null,
+                            class2_browser: p.class2_browser_ok ? p.class2_browser : null,
+                            class2_browser_confidence: p.class2_browser_ok ? p.class2_browser_confidence : null,
+                            class2_browser_margin: p.class2_browser_ok ? p.class2_browser_margin : null,
+                            class2_browser_ok: !!p.class2_browser_ok
+                        };
                     }
                 });
             });
@@ -8233,6 +8475,12 @@ function getClass2IconByClass3(c3) {
                     merged[k].pvp_dmg += p.pvp_dmg; merged[k].pve_dmg += p.pve_dmg;
                     if (!merged[k].class2 && p.class2) merged[k].class2 = p.class2;
                     if (!merged[k].profa && p.profa) merged[k].profa = p.profa;
+                    if (p.class2_browser_ok && (!merged[k].class2_browser_ok || (p.class2_browser_confidence||0) > (merged[k].class2_browser_confidence||0))) {
+                        merged[k].class2_browser = p.class2_browser;
+                        merged[k].class2_browser_confidence = p.class2_browser_confidence;
+                        merged[k].class2_browser_margin = p.class2_browser_margin;
+                        merged[k].class2_browser_ok = true;
+                    }
                 } else merged[k] = {...p};
             });
             dayLastParsed = Object.values(merged);
@@ -8419,7 +8667,7 @@ function getClass2IconByClass3(c3) {
                     ? p.profa
                     : (inRoster && hasResolvedProfa(inRoster.profa) ? inRoster.profa : (p.profa || '—'));
                 const currentProfaLabel = currentProfa && currentProfa !== '—' ? (PROFA_NAMES[currentProfa] || currentProfa) : '';
-                const _c2SrcLabel = {'gemini':'G','icon_matcher':'IM'}[p.class2Source] || null;
+                const _c2SrcLabel = {'gemini':'G','icon_matcher':'IM','icon_browser':'IB'}[p.class2Source] || null;
                 const _pSrcLabel = {'player':'P','stored_day':'S','roster':'R','class3options':'C3'}[p.profaSource] || null;
 
                 const class2Html = class2src
