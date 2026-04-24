@@ -1506,6 +1506,11 @@ function runExpectedCompare() {
         const rs = realBankExpSim(row.expected, row.augFeat.raw);
         const bs = realBankExpSim(row.expected, row.augFeat.best);
         row.rbExpSim = { raw: rs, best: bs };
+        // refresh rbRes — was computed at scan-time when bank may have been empty
+        row.rbRes = {
+          raw:  row.augFeat.raw  ? classifyRealBank(row.augFeat.raw)  : null,
+          best: row.augFeat.best ? classifyRealBank(row.augFeat.best) : null,
+        };
         const rbBest = bs ?? rs ?? -Infinity;
         if (rbBest > winSim) row.fsWinner = '__rb__';
       } else { row.rbExpSim = null; }
