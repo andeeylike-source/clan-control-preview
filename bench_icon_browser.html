@@ -161,6 +161,7 @@
       <label>Icon W <input type="number" id="asIconW" value="22" min="4" max="200"  style="width:55px"> px</label>
       <label>Icon H <input type="number" id="asIconH" value="22" min="4" max="200"  style="width:55px"> px</label>
       <label>Max rows <input type="number" id="asNRows" value="25" min="1" max="200" style="width:50px"></label>
+      <button id="asBtnPreset" class="secondary" style="border:1px solid #334155;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer">⚙ CC preset</button>
     </div>
     <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button id="asBtnRun" style="background:#4c1d95;border:none;border-radius:8px;padding:7px 16px;color:#e9d5ff;font-weight:700;font-size:12px;cursor:pointer">▶ Run scan</button>
@@ -168,6 +169,7 @@
       <button id="asBtnCompare" style="display:none;background:#78350f;border:none;border-radius:8px;padding:7px 14px;color:#fde68a;font-weight:700;font-size:12px;cursor:pointer">▶ Compare</button>
       <button id="asBtnExportJSON" style="display:none;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:4px 11px;font-size:11px;cursor:pointer">Export JSON</button>
       <button id="asBtnExportCSV"  style="display:none;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:4px 11px;font-size:11px;cursor:pointer">Export CSV</button>
+      <button id="asBtnAddRB" style="display:none;background:#1a2d1a;color:#86efac;border:1px solid #2d5a2d;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">➕ Add labeled rows to real-bank</button>
       <span id="asScanProgress" style="font-size:11px;color:#64748b"></span>
     </div>
     <div id="asScanResult" style="margin-top:14px"></div>
@@ -932,6 +934,29 @@ function augExpSimForClass(className, feat) {
 // Uses labeled real CC crops (from calibration mode) as templates.
 // class score = best cosine sim among real crops of that class (RGB32).
 let __realBank = null; // Object: className -> [{feat, meta}]
+let __rbSavedRowIds = new Set(); // scan row indices already added to real-bank
+
+function addScanRowsToRealBank() {
+  let added = 0;
+  autoScanRows.forEach(row => {
+    const cb = document.getElementById('asRbChk_' + row.i);
+    if (!cb?.checked) return;
+    const sel = document.getElementById('asExpSel_' + row.i);
+    const expected = sel?.value || row.expected;
+    if (!expected) return;
+    const feat = row.augFeat?.best ?? row.augFeat?.raw;
+    if (!feat) return;
+    calibrationSet.push({ expected, crop_feat: feat, crop_sz: row.best?.sz ?? '?', _fromScan: true });
+    row.expected = expected;
+    __rbSavedRowIds.add(row.i);
+    added++;
+  });
+  if (added === 0) { alert('Отметь хотя бы одну строку с выбранным expected классом'); return; }
+  buildRealBank();
+  renderScanResults(document.getElementById('asScanResult'));
+  if (document.getElementById('calibMode')?.checked) renderCalibration();
+  document.getElementById('asScanProgress').textContent = `✓ ${added} rows added to real-bank (total: ${realBankSize()})`;
+}
 
 function buildRealBank() {
   // always rebuild from current calibrationSet (may grow between runs)
@@ -1059,6 +1084,7 @@ async function runAutoScan() {
   const SWEEP_SIZES   = [16,18,20,22,24];
 
   autoScanRows = [];
+  __rbSavedRowIds = new Set();
 
   for (let i = 0; i < p.nRows; i++) {
     const ry = p.y + i * p.rowH;
@@ -1134,6 +1160,7 @@ async function runAutoScan() {
   renderScanResults(resultEl);
   document.getElementById('asBtnExportJSON').style.display = '';
   document.getElementById('asBtnExportCSV').style.display  = '';
+  document.getElementById('asBtnAddRB').style.display      = '';
   // redraw without overlay boxes obscuring results
   redraw(null);
 }
@@ -1201,8 +1228,8 @@ function renderScanResults(container) {
   }
 
   // build column headers
-  const baseHdrs = ['#','crop','raw top1','raw sim','raw mgn','ref top1','ref sim','ref mgn','TRIGGER','best sz','dx,dy'];
-  const expHdrs  = expMode ? ['expected','exp sim raw','exp sim ref','Δ (top1−exp)','verdict'] : [];
+  const baseHdrs = ['#','☑','crop','raw top1','raw sim','raw mgn','ref top1','ref sim','ref mgn','TRIGGER','best sz','dx,dy','expected class','rb'];
+  const expHdrs  = expMode ? ['exp sim raw','exp sim ref','Δ (top1−exp)','verdict'] : [];
   const th = h => `<th style="padding:3px 6px;color:#64748b;white-space:nowrap;background:#0d152a;position:sticky;top:0">${h}</th>`;
 
   let tHTML = `<table style="border-collapse:collapse;font-size:10px;width:100%"><thead><tr>` +
@@ -1221,8 +1248,10 @@ function renderScanResults(container) {
     const chg  = rawRes && best && rawRes.class2 !== best.res.class2;
     const bg   = refT ? 'background:#071a10' : rawT ? 'background:#141007' : (i%2===0 ? '' : 'background:#0a1020');
 
+    const rbSaved = __rbSavedRowIds.has(i);
     let cells =
       `<td style="padding:3px 6px;color:#475569">${i}</td>` +
+      `<td style="padding:3px 6px;text-align:center"><input type="checkbox" id="asRbChk_${i}" style="cursor:pointer"${rbSaved?' disabled checked':''}></td>` +
       `<td style="padding:3px 6px"><img src="${thumb}" width="28" height="28" style="image-rendering:pixelated;border:1px solid #1e293b;border-radius:3px;vertical-align:middle"></td>` +
       `<td style="padding:3px 6px">${rawRes ? escapeHtml(rawRes.class2) : '<span style="color:#475569">—</span>'}</td>` +
       `<td style="padding:3px 6px;${sc(rawRes?.top[0].sim)}">${rawRes ? rawRes.top[0].sim.toFixed(3) : '—'}</td>` +
@@ -1232,7 +1261,9 @@ function renderScanResults(container) {
       `<td style="padding:3px 6px">${best ? best.res.margin.toFixed(3) : '—'}</td>` +
       `<td style="padding:3px 6px;text-align:center">${refT?'<b style="color:#86efac">YES</b>':rawT?'<span style="color:#fbbf24">raw</span>':'<span style="color:#475569">NO</span>'}</td>` +
       `<td style="padding:3px 6px">${best ? best.sz : '—'}</td>` +
-      `<td style="padding:3px 6px;color:#64748b">${best ? best.dx+','+best.dy : '—'}</td>`;
+      `<td style="padding:3px 6px;color:#64748b">${best ? best.dx+','+best.dy : '—'}</td>` +
+      `<td style="padding:2px 4px"><select id="asExpSel_${i}" style="background:#0b1220;color:#e2e8f0;border:1px solid #273449;border-radius:3px;padding:1px 2px;font-size:10px;max-width:130px">${optHTML}</select></td>` +
+      `<td style="padding:3px 6px;text-align:center">${rbSaved?'<span style="color:#86efac">saved</span>':'<span style="color:#475569">—</span>'}</td>`;
 
     if (expMode) {
       const bestExpSim = expSimRef != null ? Math.max(expSimRaw ?? -1, expSimRef) : expSimRaw;
@@ -1242,7 +1273,6 @@ function renderScanResults(container) {
       const vl = verdict === 'grid/crop' ? 'grid/crop' : verdict === 'feature-space' ? 'feat-space' : verdict === 'ambiguous' ? 'ambig' : '—';
 
       cells +=
-        `<td style="padding:2px 4px"><select id="asExpSel_${i}" style="background:#0b1220;color:#e2e8f0;border:1px solid #273449;border-radius:3px;padding:1px 2px;font-size:10px;max-width:130px">${optHTML}</select></td>` +
         `<td style="padding:3px 6px;${sc(expSimRaw)}">${expSimRaw != null ? expSimRaw.toFixed(3) : '—'}</td>` +
         `<td style="padding:3px 6px;${sc(expSimRef)}">${expSimRef != null ? expSimRef.toFixed(3) : '—'}</td>` +
         `<td style="padding:3px 6px;color:${delta==null?'#475569':delta<=0.05?'#86efac':delta<=0.15?'#fbbf24':'#f87171'}">${delta!=null?(delta>=0?'+':'')+delta.toFixed(3):'—'}</td>` +
@@ -1407,13 +1437,11 @@ function renderScanResults(container) {
     `<div style="overflow-x:auto;max-height:520px;overflow-y:auto;border:1px solid #1e293b;border-radius:6px">${tHTML}</div>` +
     fsSectionHtml;
 
-  // restore expected select values (persisted in row.expected)
-  if (expMode) {
-    autoScanRows.forEach(({ i, expected }) => {
-      const s = document.getElementById('asExpSel_' + i);
-      if (s && expected) s.value = expected;
-    });
-  }
+  // restore expected select values (persisted in row.expected) — selects always rendered now
+  autoScanRows.forEach(({ i, expected }) => {
+    const s = document.getElementById('asExpSel_' + i);
+    if (s && expected) s.value = expected;
+  });
 }
 
 function runExpectedCompare() {
@@ -1539,6 +1567,16 @@ document.getElementById('asBtnRun').addEventListener('click', runAutoScan);
 document.getElementById('asBtnCompare').addEventListener('click', runExpectedCompare);
 document.getElementById('asBtnExportJSON').addEventListener('click', () => autoScanExport('json'));
 document.getElementById('asBtnExportCSV').addEventListener('click',  () => autoScanExport('csv'));
+document.getElementById('asBtnAddRB').addEventListener('click', addScanRowsToRealBank);
+document.getElementById('asBtnPreset').addEventListener('click', () => {
+  document.getElementById('asScanX').value = 545;
+  document.getElementById('asScanY').value = 111;
+  document.getElementById('asRowH').value  = 18;
+  document.getElementById('asIconW').value = 21;
+  document.getElementById('asIconH').value = 18;
+  document.getElementById('asNRows').value = 8;
+  redraw(null);
+});
 document.getElementById('asExpMode').addEventListener('change', () => {
   const on = document.getElementById('asExpMode').checked;
   document.getElementById('asBtnCompare').style.display = on ? '' : 'none';
