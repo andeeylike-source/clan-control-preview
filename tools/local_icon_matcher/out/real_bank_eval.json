@@ -1,117 +1,112 @@
 {
   "status": "OK",
-  "data_source": "pseudo_gt_fallback (audit+roi, GT=matcher best_match)",
-  "primary_blocked": true,
-  "primary_block_reason": "labeled crop PNGs absent from repo",
-  "n_samples": 15,
-  "n_classes_in_test": 13,
-  "top1_accuracy": 0.5333,
-  "top3_accuracy": 0.6667,
-  "low_conf_rate": 0.5333,
+  "data_source": "labeled_crops",
+  "primary_blocked": false,
+  "primary_block_reason": null,
+  "n_samples": 10,
+  "n_classes_in_test": 10,
+  "top1_accuracy": 0.1,
+  "top3_accuracy": 0.2,
+  "low_conf_rate": 0.6,
   "sufficient_classes": [],
   "insufficient_classes": [
-    "Arcana Lord",
-    "Cardinal",
-    "Doombringer",
-    "Elven Elder",
-    "Eva_s Saint",
-    "Ghost Hunter",
-    "Hawkeye",
+    "Arbalester",
+    "Bounty Hunter",
+    "Necromancer",
     "Paladin",
-    "Phoenix Knight",
+    "Shillien Elder",
     "Shillien Knight",
-    "Silver Ranger",
-    "Spectral Dancer",
-    "Trickster"
+    "Sword Muse",
+    "Treasure Hunter",
+    "Tyrant",
+    "Warcryer"
   ],
   "per_class": {
-    "Arcana Lord": {
-      "n": 1,
-      "top1_acc": 1.0
-    },
-    "Cardinal": {
-      "n": 1,
-      "top1_acc": 1.0
-    },
-    "Doombringer": {
-      "n": 1,
-      "top1_acc": 1.0
-    },
-    "Elven Elder": {
-      "n": 2,
-      "top1_acc": 1.0
-    },
-    "Eva_s Saint": {
-      "n": 1,
-      "top1_acc": 1.0
-    },
-    "Ghost Hunter": {
+    "Arbalester": {
       "n": 1,
       "top1_acc": 0.0
     },
-    "Hawkeye": {
-      "n": 2,
+    "Bounty Hunter": {
+      "n": 1,
+      "top1_acc": 0.0
+    },
+    "Necromancer": {
+      "n": 1,
       "top1_acc": 0.0
     },
     "Paladin": {
       "n": 1,
-      "top1_acc": 1.0
+      "top1_acc": 0.0
     },
-    "Phoenix Knight": {
+    "Shillien Elder": {
       "n": 1,
-      "top1_acc": 1.0
+      "top1_acc": 0.0
     },
     "Shillien Knight": {
       "n": 1,
       "top1_acc": 0.0
     },
-    "Silver Ranger": {
+    "Sword Muse": {
       "n": 1,
       "top1_acc": 0.0
     },
-    "Spectral Dancer": {
+    "Treasure Hunter": {
       "n": 1,
       "top1_acc": 0.0
     },
-    "Trickster": {
+    "Tyrant": {
       "n": 1,
       "top1_acc": 0.0
+    },
+    "Warcryer": {
+      "n": 1,
+      "top1_acc": 1.0
     }
   },
   "top_confusions": [
     {
-      "true": "Spectral Dancer",
-      "pred": "Paladin",
+      "true": "Arbalester",
+      "pred": "Soulhound",
       "count": 1
     },
     {
-      "true": "Silver Ranger",
-      "pred": "Sword Muse",
-      "count": 1
-    },
-    {
-      "true": "Trickster",
-      "pred": "Paladin",
-      "count": 1
-    },
-    {
-      "true": "Ghost Hunter",
-      "pred": "Warcryer",
-      "count": 1
-    },
-    {
-      "true": "Hawkeye",
-      "pred": "Overlord",
-      "count": 1
-    },
-    {
-      "true": "Hawkeye",
-      "pred": "Sword Muse",
+      "true": "Paladin",
+      "pred": "Spectral Dancer",
       "count": 1
     },
     {
       "true": "Shillien Knight",
-      "pred": "Dreadnought",
+      "pred": "Spectral Dancer",
+      "count": 1
+    },
+    {
+      "true": "Bounty Hunter",
+      "pred": "Treasure Hunter",
+      "count": 1
+    },
+    {
+      "true": "Shillien Elder",
+      "pred": "Storm Screamer",
+      "count": 1
+    },
+    {
+      "true": "Sword Muse",
+      "pred": "Overlord",
+      "count": 1
+    },
+    {
+      "true": "Necromancer",
+      "pred": "Soulhound",
+      "count": 1
+    },
+    {
+      "true": "Treasure Hunter",
+      "pred": "Paladin",
+      "count": 1
+    },
+    {
+      "true": "Tyrant",
+      "pred": "Sword Muse",
       "count": 1
     }
   ],
@@ -122,5 +117,5 @@
     "classes": 72,
     "templates": 72
   },
-  "note": "pseudo_gt: GT labels come from previous matcher best_match, not human annotation"
+  "note": ""
 }

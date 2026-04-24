@@ -1,0 +1,204 @@
+{
+  "n_samples": 10,
+  "n_classes": 10,
+  "templates": {
+    "dir": "C:\\Users\\AiRe1n\\Desktop\\DEV_SAVE_20260405_203533\\сайт\\clan-control-github\\extracted_site_icons_v3",
+    "classes": 72
+  },
+  "best_mode": "gray_p2",
+  "best_top1": 0.2,
+  "modes": {
+    "gray_p0": {
+      "top1_acc": 0.1,
+      "top3_acc": 0.2,
+      "low_conf_rate": 0.6,
+      "n": 10
+    },
+    "rgb_p0": {
+      "top1_acc": 0.1,
+      "top3_acc": 0.2,
+      "low_conf_rate": 0.7,
+      "n": 10
+    },
+    "gray_p2": {
+      "top1_acc": 0.2,
+      "top3_acc": 0.2,
+      "low_conf_rate": 0.7,
+      "n": 10
+    },
+    "rgb_p2": {
+      "top1_acc": 0.2,
+      "top3_acc": 0.3,
+      "low_conf_rate": 0.6,
+      "n": 10
+    },
+    "gray_p4": {
+      "top1_acc": 0.1,
+      "top3_acc": 0.3,
+      "low_conf_rate": 0.5,
+      "n": 10
+    },
+    "rgb_p4": {
+      "top1_acc": 0.2,
+      "top3_acc": 0.4,
+      "low_conf_rate": 0.6,
+      "n": 10
+    },
+    "gray_p6": {
+      "top1_acc": 0.1,
+      "top3_acc": 0.3,
+      "low_conf_rate": 0.7,
+      "n": 10
+    },
+    "rgb_p6": {
+      "top1_acc": 0.1,
+      "top3_acc": 0.5,
+      "low_conf_rate": 0.8,
+      "n": 10
+    }
+  },
+  "per_sample_best": [
+    {
+      "cls": "Arbalester",
+      "top1": "Soulhound",
+      "score": 0.4247,
+      "margin": 0.0862,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": false,
+      "top3": [
+        "Soulhound",
+        "Overlord",
+        "Sword Muse"
+      ]
+    },
+    {
+      "cls": "Paladin",
+      "top1": "Spectral Dancer",
+      "score": 0.2452,
+      "margin": 0.0897,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": false,
+      "top3": [
+        "Spectral Dancer",
+        "Wind Rider",
+        "Archmage"
+      ]
+    },
+    {
+      "cls": "Shillien Knight",
+      "top1": "Ghost Hunter",
+      "score": 0.2748,
+      "margin": 0.0011,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": true,
+      "top3": [
+        "Ghost Hunter",
+        "Wind Rider",
+        "Male Soulbreaker"
+      ]
+    },
+    {
+      "cls": "Warcryer",
+      "top1": "Warcryer",
+      "score": 0.4731,
+      "margin": 0.1172,
+      "correct": true,
+      "in_top3": true,
+      "low_conf": false,
+      "top3": [
+        "Warcryer",
+        "Shillien Knight",
+        "Overlord"
+      ]
+    },
+    {
+      "cls": "Bounty Hunter",
+      "top1": "Treasure Hunter",
+      "score": 0.4967,
+      "margin": 0.0382,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": true,
+      "top3": [
+        "Treasure Hunter",
+        "Inspector",
+        "Sword Singer"
+      ]
+    },
+    {
+      "cls": "Shillien Elder",
+      "top1": "Wind Rider",
+      "score": 0.322,
+      "margin": 0.0014,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": true,
+      "top3": [
+        "Wind Rider",
+        "Soulhound",
+        "Arbalester"
+      ]
+    },
+    {
+      "cls": "Sword Muse",
+      "top1": "Overlord",
+      "score": 0.3455,
+      "margin": 0.0404,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": true,
+      "top3": [
+        "Overlord",
+        "Soulhound",
+        "Wind Rider"
+      ]
+    },
+    {
+      "cls": "Necromancer",
+      "top1": "Soulhound",
+      "score": 0.4892,
+      "margin": 0.0322,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": true,
+      "top3": [
+        "Soulhound",
+        "Inspector",
+        "Arbalester"
+      ]
+    },
+    {
+      "cls": "Treasure Hunter",
+      "top1": "Treasure Hunter",
+      "score": 0.5425,
+      "margin": 0.0232,
+      "correct": true,
+      "in_top3": true,
+      "low_conf": true,
+      "top3": [
+        "Treasure Hunter",
+        "Elven Elder",
+        "Paladin"
+      ]
+    },
+    {
+      "cls": "Tyrant",
+      "top1": "Sword Muse",
+      "score": 0.4344,
+      "margin": 0.0143,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": true,
+      "top3": [
+        "Sword Muse",
+        "Shillien Elder",
+        "Sword Singer"
+      ]
+    }
+  ],
+  "verdict": "FEATURE_SPACE_DEAD",
+  "verdict_reason": "best=gray_p2 top1=20.0%; padding/RGB improves over gray_p0 baseline"
+}

@@ -1,18 +1,15 @@
-true\pred,Arcana Lord,Cardinal,Doombringer,Dreadnought,Elven Elder,Eva_s Saint,Ghost Hunter,Hawkeye,Overlord,Paladin,Phoenix Knight,Shillien Knight,Silver Ranger,Spectral Dancer,Sword Muse,Trickster,Warcryer
-Arcana Lord,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-Cardinal,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-Doombringer,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-Dreadnought,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-Elven Elder,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0
-Eva_s Saint,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0
-Ghost Hunter,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
-Hawkeye,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0
-Overlord,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-Paladin,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0
-Phoenix Knight,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0
-Shillien Knight,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0
-Silver Ranger,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0
-Spectral Dancer,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0
-Sword Muse,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-Trickster,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0
-Warcryer,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+true\pred,Arbalester,Bounty Hunter,Necromancer,Overlord,Paladin,Shillien Elder,Shillien Knight,Soulhound,Spectral Dancer,Storm Screamer,Sword Muse,Treasure Hunter,Tyrant,Warcryer
+Arbalester,0,0,0,0,0,0,0,1,0,0,0,0,0,0
+Bounty Hunter,0,0,0,0,0,0,0,0,0,0,0,1,0,0
+Necromancer,0,0,0,0,0,0,0,1,0,0,0,0,0,0
+Overlord,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+Paladin,0,0,0,0,0,0,0,0,1,0,0,0,0,0
+Shillien Elder,0,0,0,0,0,0,0,0,0,1,0,0,0,0
+Shillien Knight,0,0,0,0,0,0,0,0,1,0,0,0,0,0
+Soulhound,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+Spectral Dancer,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+Storm Screamer,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+Sword Muse,0,0,0,1,0,0,0,0,0,0,0,0,0,0
+Treasure Hunter,0,0,0,0,1,0,0,0,0,0,0,0,0,0
+Tyrant,0,0,0,0,0,0,0,0,0,0,1,0,0,0
+Warcryer,0,0,0,0,0,0,0,0,0,0,0,0,0,1
