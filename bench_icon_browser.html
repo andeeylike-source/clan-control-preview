@@ -1451,7 +1451,7 @@ function runExpectedCompare() {
   let count = 0;
   autoScanRows.forEach(row => {
     const sel = document.getElementById('asExpSel_' + row.i);
-    if (sel) row.expected = sel.value || null;
+    if (sel) row.expected = sel.value || row.expected || null;
 
     if (!row.expected) {
       row.expSimRaw = null; row.expSimRef = null; row.verdict = null;
