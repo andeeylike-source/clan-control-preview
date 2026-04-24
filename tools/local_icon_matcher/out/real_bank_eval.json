@@ -1,0 +1,126 @@
+{
+  "status": "OK",
+  "data_source": "pseudo_gt_fallback (audit+roi, GT=matcher best_match)",
+  "primary_blocked": true,
+  "primary_block_reason": "labeled crop PNGs absent from repo",
+  "n_samples": 15,
+  "n_classes_in_test": 13,
+  "top1_accuracy": 0.5333,
+  "top3_accuracy": 0.6667,
+  "low_conf_rate": 0.5333,
+  "sufficient_classes": [],
+  "insufficient_classes": [
+    "Arcana Lord",
+    "Cardinal",
+    "Doombringer",
+    "Elven Elder",
+    "Eva_s Saint",
+    "Ghost Hunter",
+    "Hawkeye",
+    "Paladin",
+    "Phoenix Knight",
+    "Shillien Knight",
+    "Silver Ranger",
+    "Spectral Dancer",
+    "Trickster"
+  ],
+  "per_class": {
+    "Arcana Lord": {
+      "n": 1,
+      "top1_acc": 1.0
+    },
+    "Cardinal": {
+      "n": 1,
+      "top1_acc": 1.0
+    },
+    "Doombringer": {
+      "n": 1,
+      "top1_acc": 1.0
+    },
+    "Elven Elder": {
+      "n": 2,
+      "top1_acc": 1.0
+    },
+    "Eva_s Saint": {
+      "n": 1,
+      "top1_acc": 1.0
+    },
+    "Ghost Hunter": {
+      "n": 1,
+      "top1_acc": 0.0
+    },
+    "Hawkeye": {
+      "n": 2,
+      "top1_acc": 0.0
+    },
+    "Paladin": {
+      "n": 1,
+      "top1_acc": 1.0
+    },
+    "Phoenix Knight": {
+      "n": 1,
+      "top1_acc": 1.0
+    },
+    "Shillien Knight": {
+      "n": 1,
+      "top1_acc": 0.0
+    },
+    "Silver Ranger": {
+      "n": 1,
+      "top1_acc": 0.0
+    },
+    "Spectral Dancer": {
+      "n": 1,
+      "top1_acc": 0.0
+    },
+    "Trickster": {
+      "n": 1,
+      "top1_acc": 0.0
+    }
+  },
+  "top_confusions": [
+    {
+      "true": "Spectral Dancer",
+      "pred": "Paladin",
+      "count": 1
+    },
+    {
+      "true": "Silver Ranger",
+      "pred": "Sword Muse",
+      "count": 1
+    },
+    {
+      "true": "Trickster",
+      "pred": "Paladin",
+      "count": 1
+    },
+    {
+      "true": "Ghost Hunter",
+      "pred": "Warcryer",
+      "count": 1
+    },
+    {
+      "true": "Hawkeye",
+      "pred": "Overlord",
+      "count": 1
+    },
+    {
+      "true": "Hawkeye",
+      "pred": "Sword Muse",
+      "count": 1
+    },
+    {
+      "true": "Shillien Knight",
+      "pred": "Dreadnought",
+      "count": 1
+    }
+  ],
+  "verdict": "INCONCLUSIVE",
+  "verdict_reason": "No classes with >= 4 samples; need more labeled data",
+  "bank": {
+    "dir": "C:\\Users\\AiRe1n\\Desktop\\DEV_SAVE_20260405_203533\\сайт\\clan-control-github\\extracted_site_icons_v3",
+    "classes": 72,
+    "templates": 72
+  },
+  "note": "pseudo_gt: GT labels come from previous matcher best_match, not human annotation"
+}
