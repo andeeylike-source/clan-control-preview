@@ -1,0 +1,247 @@
+{
+  "verdict": "HOG_KNN_DEAD",
+  "n_samples": 10,
+  "n_classes": 10,
+  "top1_accuracy": 0.0,
+  "top3_accuracy": 0.0,
+  "low_conf_rate": 1.0,
+  "model": "HOG_cosine_kNN",
+  "hog_params": {
+    "feat_size": 32,
+    "cell_px": 8,
+    "block_cells": 2,
+    "orientations": 9,
+    "feat_dim": 324
+  },
+  "aug_params": {
+    "live_sizes": [
+      [
+        18,
+        16
+      ],
+      [
+        20,
+        18
+      ],
+      [
+        22,
+        18
+      ]
+    ],
+    "jpeg_quals": [
+      null,
+      40,
+      55,
+      65,
+      75
+    ],
+    "noise_sigmas": [
+      0,
+      8,
+      15
+    ],
+    "brightnesses": [
+      0.85,
+      1.0,
+      1.15
+    ],
+    "shifts": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        -1,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        -1
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        -2,
+        0
+      ]
+    ],
+    "n_aug_per_class": 945
+  },
+  "per_sample": [
+    {
+      "cls": "Arbalester",
+      "top1": "Moonlight Sentinel",
+      "score": 0.9777,
+      "margin": 0.003,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": true,
+      "top3": [
+        "Moonlight Sentinel",
+        "Arcana Lord",
+        "Sword Muse"
+      ],
+      "screen": "photo_2026-03-26_22-45-09 (3).jpg",
+      "row": 1
+    },
+    {
+      "cls": "Paladin",
+      "top1": "Gladiator",
+      "score": 0.9777,
+      "margin": 0.0025,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": true,
+      "top3": [
+        "Gladiator",
+        "Hierophant",
+        "Phantom Summoner"
+      ],
+      "screen": "photo_2026-03-26_22-45-09 (3).jpg",
+      "row": 3
+    },
+    {
+      "cls": "Shillien Knight",
+      "top1": "Eva_s Templar",
+      "score": 0.9772,
+      "margin": 0.0005,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": true,
+      "top3": [
+        "Eva_s Templar",
+        "Tyrant",
+        "Hierophant"
+      ],
+      "screen": "photo_2026-03-26_22-45-09 (3).jpg",
+      "row": 5
+    },
+    {
+      "cls": "Warcryer",
+      "top1": "Duelist",
+      "score": 0.9606,
+      "margin": 0.0004,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": true,
+      "top3": [
+        "Duelist",
+        "Dominator",
+        "Adventurer"
+      ],
+      "screen": "photo_2026-03-26_22-45-09 (3).jpg",
+      "row": 6
+    },
+    {
+      "cls": "Bounty Hunter",
+      "top1": "Arbalester",
+      "score": 0.9747,
+      "margin": 0.006,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": true,
+      "top3": [
+        "Arbalester",
+        "Phantom Summoner",
+        "Berserker"
+      ],
+      "screen": "photo_2026-03-26_22-45-09 (3).jpg",
+      "row": 7
+    },
+    {
+      "cls": "Shillien Elder",
+      "top1": "Shillien Templar",
+      "score": 0.9376,
+      "margin": 0.0005,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": true,
+      "top3": [
+        "Shillien Templar",
+        "Eva_s Templar",
+        "Gladiator"
+      ],
+      "screen": "photo_2026-03-26_22-45-09 (4).jpg",
+      "row": 6
+    },
+    {
+      "cls": "Sword Muse",
+      "top1": "Doomcryer",
+      "score": 0.9597,
+      "margin": 0.0043,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": true,
+      "top3": [
+        "Doomcryer",
+        "Sagittarius",
+        "Hierophant"
+      ],
+      "screen": "photo_2026-03-26_22-45-09 (5).jpg",
+      "row": 2
+    },
+    {
+      "cls": "Necromancer",
+      "top1": "Tyrant",
+      "score": 0.9753,
+      "margin": 0.0077,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": true,
+      "top3": [
+        "Tyrant",
+        "Gladiator",
+        "Spellsinger"
+      ],
+      "screen": "photo_2026-03-26_22-45-09 (5).jpg",
+      "row": 6
+    },
+    {
+      "cls": "Treasure Hunter",
+      "top1": "Phantom Summoner",
+      "score": 0.9684,
+      "margin": 0.0008,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": true,
+      "top3": [
+        "Phantom Summoner",
+        "Phoenix Knight",
+        "Arbalester"
+      ],
+      "screen": "photo_2026-03-26_22-45-09.jpg",
+      "row": 1
+    },
+    {
+      "cls": "Tyrant",
+      "top1": "Eva_s Templar",
+      "score": 0.9712,
+      "margin": 0.0025,
+      "correct": false,
+      "in_top3": false,
+      "low_conf": true,
+      "top3": [
+        "Eva_s Templar",
+        "Warcryer",
+        "Shillien Templar"
+      ],
+      "screen": "photo_2026-03-26_22-45-09.jpg",
+      "row": 6
+    }
+  ],
+  "missing_deps": [
+    "scikit-learn (LinearSVC/SVC-RBF)",
+    "scikit-image (hog)"
+  ],
+  "pip_install": "pip install scikit-learn scikit-image"
+}
