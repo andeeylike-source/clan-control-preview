@@ -1,0 +1,287 @@
+{
+  "model": "MobileNetV2_pretrained_ImageNet",
+  "embed_dim": 1280,
+  "n_templates": 72,
+  "n_test": 10,
+  "best_mode": "pad_square",
+  "verdict": "CNN_DEAD",
+  "modes": {
+    "direct_resize": {
+      "top1_acc": 0.0,
+      "top3_acc": 0.1,
+      "low_conf": 1.0,
+      "n": 10,
+      "per_sample": [
+        {
+          "gt_class": "Arbalester",
+          "pred_class": "Cardinal",
+          "pred_score": 0.4408,
+          "margin": 0.0356,
+          "top3": [
+            "Cardinal",
+            "Adventurer",
+            "Shillien Saint"
+          ],
+          "ok1": false,
+          "ok3": false
+        },
+        {
+          "gt_class": "Paladin",
+          "pred_class": "Cardinal",
+          "pred_score": 0.4339,
+          "margin": 0.0738,
+          "top3": [
+            "Cardinal",
+            "Warlord",
+            "Adventurer"
+          ],
+          "ok1": false,
+          "ok3": false
+        },
+        {
+          "gt_class": "Shillien Knight",
+          "pred_class": "Adventurer",
+          "pred_score": 0.3812,
+          "margin": 0.0002,
+          "top3": [
+            "Adventurer",
+            "Cardinal",
+            "Shillien Saint"
+          ],
+          "ok1": false,
+          "ok3": false
+        },
+        {
+          "gt_class": "Warcryer",
+          "pred_class": "Cardinal",
+          "pred_score": 0.473,
+          "margin": 0.0085,
+          "top3": [
+            "Cardinal",
+            "Adventurer",
+            "Bishop"
+          ],
+          "ok1": false,
+          "ok3": false
+        },
+        {
+          "gt_class": "Bounty Hunter",
+          "pred_class": "Adventurer",
+          "pred_score": 0.4488,
+          "margin": 0.0215,
+          "top3": [
+            "Adventurer",
+            "Cardinal",
+            "Prophet"
+          ],
+          "ok1": false,
+          "ok3": false
+        },
+        {
+          "gt_class": "Shillien Elder",
+          "pred_class": "Cardinal",
+          "pred_score": 0.4245,
+          "margin": 0.0015,
+          "top3": [
+            "Cardinal",
+            "Warlord",
+            "Adventurer"
+          ],
+          "ok1": false,
+          "ok3": false
+        },
+        {
+          "gt_class": "Sword Muse",
+          "pred_class": "Cardinal",
+          "pred_score": 0.4228,
+          "margin": 0.0102,
+          "top3": [
+            "Cardinal",
+            "Adventurer",
+            "Bishop"
+          ],
+          "ok1": false,
+          "ok3": false
+        },
+        {
+          "gt_class": "Necromancer",
+          "pred_class": "Warlord",
+          "pred_score": 0.5089,
+          "margin": 0.0182,
+          "top3": [
+            "Warlord",
+            "Cardinal",
+            "Bishop"
+          ],
+          "ok1": false,
+          "ok3": false
+        },
+        {
+          "gt_class": "Treasure Hunter",
+          "pred_class": "Cardinal",
+          "pred_score": 0.4237,
+          "margin": 0.0071,
+          "top3": [
+            "Cardinal",
+            "Adventurer",
+            "Treasure Hunter"
+          ],
+          "ok1": false,
+          "ok3": true
+        },
+        {
+          "gt_class": "Tyrant",
+          "pred_class": "Cardinal",
+          "pred_score": 0.4364,
+          "margin": 0.0352,
+          "top3": [
+            "Cardinal",
+            "Bishop",
+            "Warlord"
+          ],
+          "ok1": false,
+          "ok3": false
+        }
+      ]
+    },
+    "pad_square": {
+      "top1_acc": 0.1,
+      "top3_acc": 0.3,
+      "low_conf": 1.0,
+      "n": 10,
+      "per_sample": [
+        {
+          "gt_class": "Arbalester",
+          "pred_class": "Cardinal",
+          "pred_score": 0.4818,
+          "margin": 0.0627,
+          "top3": [
+            "Cardinal",
+            "Adventurer",
+            "Mystic Muse"
+          ],
+          "ok1": false,
+          "ok3": false
+        },
+        {
+          "gt_class": "Paladin",
+          "pred_class": "Cardinal",
+          "pred_score": 0.4682,
+          "margin": 0.0794,
+          "top3": [
+            "Cardinal",
+            "Warlord",
+            "Adventurer"
+          ],
+          "ok1": false,
+          "ok3": false
+        },
+        {
+          "gt_class": "Shillien Knight",
+          "pred_class": "Cardinal",
+          "pred_score": 0.4434,
+          "margin": 0.0241,
+          "top3": [
+            "Cardinal",
+            "Soulhound",
+            "Adventurer"
+          ],
+          "ok1": false,
+          "ok3": false
+        },
+        {
+          "gt_class": "Warcryer",
+          "pred_class": "Cardinal",
+          "pred_score": 0.4784,
+          "margin": 0.0234,
+          "top3": [
+            "Cardinal",
+            "Warcryer",
+            "Adventurer"
+          ],
+          "ok1": false,
+          "ok3": true
+        },
+        {
+          "gt_class": "Bounty Hunter",
+          "pred_class": "Adventurer",
+          "pred_score": 0.471,
+          "margin": 0.0067,
+          "top3": [
+            "Adventurer",
+            "Prophet",
+            "Cardinal"
+          ],
+          "ok1": false,
+          "ok3": false
+        },
+        {
+          "gt_class": "Shillien Elder",
+          "pred_class": "Warlord",
+          "pred_score": 0.4239,
+          "margin": 0.0125,
+          "top3": [
+            "Warlord",
+            "Cardinal",
+            "Adventurer"
+          ],
+          "ok1": false,
+          "ok3": false
+        },
+        {
+          "gt_class": "Sword Muse",
+          "pred_class": "Cardinal",
+          "pred_score": 0.4347,
+          "margin": 0.0162,
+          "top3": [
+            "Cardinal",
+            "Adventurer",
+            "Soulhound"
+          ],
+          "ok1": false,
+          "ok3": false
+        },
+        {
+          "gt_class": "Necromancer",
+          "pred_class": "Cardinal",
+          "pred_score": 0.4925,
+          "margin": 0.0033,
+          "top3": [
+            "Cardinal",
+            "Warlord",
+            "Necromancer"
+          ],
+          "ok1": false,
+          "ok3": true
+        },
+        {
+          "gt_class": "Treasure Hunter",
+          "pred_class": "Treasure Hunter",
+          "pred_score": 0.4624,
+          "margin": 0.0254,
+          "top3": [
+            "Treasure Hunter",
+            "Cardinal",
+            "Adventurer"
+          ],
+          "ok1": true,
+          "ok3": true
+        },
+        {
+          "gt_class": "Tyrant",
+          "pred_class": "Cardinal",
+          "pred_score": 0.4509,
+          "margin": 0.0205,
+          "top3": [
+            "Cardinal",
+            "Warcryer",
+            "Necromancer"
+          ],
+          "ok1": false,
+          "ok3": false
+        }
+      ]
+    }
+  },
+  "elapsed_s": 6.4
+}

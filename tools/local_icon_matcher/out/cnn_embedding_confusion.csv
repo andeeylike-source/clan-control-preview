@@ -1,0 +1,11 @@
+gt\pred,Adventurer,Arbalester,Bounty Hunter,Cardinal,Necromancer,Paladin,Shillien Elder,Shillien Knight,Sword Muse,Treasure Hunter,Tyrant,Warcryer,Warlord
+Arbalester,0,0,0,1,0,0,0,0,0,0,0,0,0
+Bounty Hunter,1,0,0,0,0,0,0,0,0,0,0,0,0
+Necromancer,0,0,0,1,0,0,0,0,0,0,0,0,0
+Paladin,0,0,0,1,0,0,0,0,0,0,0,0,0
+Shillien Elder,0,0,0,0,0,0,0,0,0,0,0,0,1
+Shillien Knight,0,0,0,1,0,0,0,0,0,0,0,0,0
+Sword Muse,0,0,0,1,0,0,0,0,0,0,0,0,0
+Treasure Hunter,0,0,0,0,0,0,0,0,0,1,0,0,0
+Tyrant,0,0,0,1,0,0,0,0,0,0,0,0,0
+Warcryer,0,0,0,1,0,0,0,0,0,0,0,0,0
