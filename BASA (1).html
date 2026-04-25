@@ -3086,6 +3086,7 @@
             <div onclick="showPage('profile')" id="nav-profile" class="nav-item" style="display:none">👤 Профиль</div>
             <div onclick="showPage('packs')" id="nav-packs" class="nav-item">⚔️ Рейд Паки</div>
             <div onclick="showPage('archive')" id="nav-archive" class="nav-item">🗄️ Архив</div>
+            <div onclick="showPage('lite')" id="nav-lite" class="nav-item" title="Лёгкий режим: состав + посещаемость КМ">⚡ Lite</div>
         </nav>
         <div style="margin-top:auto;padding-top:12px;border-top:1px solid #1e2530;display:flex;flex-direction:column;gap:2px">
             <div style="font-size:9px;font-weight:800;color:#334155;text-transform:uppercase;letter-spacing:.1em;padding:4px 16px 4px">Система</div>
@@ -3130,6 +3131,102 @@
                 <div class="dash-card"><div class="dash-card-title">📈 Растут</div><div id="dashTopGrowing"></div></div>
                 <div class="dash-card"><div class="dash-card-title">📉 Падают</div><div id="dashTopFalling"></div></div>
                 <div class="dash-card"><div class="dash-card-title">💎 Редкие таланты</div><div style="font-size:10px;color:#475569;margin-bottom:6px">Ходят редко, но когда приходят — играют лучше многих</div><div id="dashRareGems"></div></div>
+            </div>
+        </section>
+
+<!-- LITE: лёгкий режим (состав + посещаемость КМ) -->
+        <section id="page-lite" class="page-section">
+            <style>
+                #page-lite .lite-block{background:#12171f;border:1px solid #1e2530;border-radius:14px;padding:16px;margin-bottom:16px}
+                #page-lite .lite-block h2{font-size:14px;font-weight:800;color:#cbd5e1;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+                #page-lite .lite-block .lite-hint{font-size:11px;color:#64748b;margin-bottom:12px}
+                #page-lite .lite-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+                #page-lite .lite-btn{display:inline-flex;align-items:center;gap:8px;border:none;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s}
+                #page-lite .lite-btn-blue{background:#1e3a5f;color:#60a5fa}
+                #page-lite .lite-btn-blue:hover{background:#1e4a7f}
+                #page-lite .lite-btn-violet{background:#3b1d6b;color:#c4b5fd}
+                #page-lite .lite-btn-violet:hover{background:#4c1d95}
+                #page-lite .lite-btn-ghost{background:#1a1f29;color:#94a3b8;border:1px solid #2d3748}
+                #page-lite .lite-btn-ghost:hover{background:#1e2530;color:#cbd5e1}
+                #page-lite .lite-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}
+                #page-lite .lite-stat{background:#0b0e14;border:1px solid #1e2530;border-radius:12px;padding:14px;text-align:center}
+                #page-lite .lite-stat .num{font-size:26px;font-weight:900;line-height:1}
+                #page-lite .lite-stat .label{font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:.05em;margin-top:6px}
+                #page-lite .lite-table-wrap{overflow-x:auto;border-radius:10px;border:1px solid #1e2530}
+                #page-lite table.lite-table{width:100%;border-collapse:collapse;min-width:480px}
+                #page-lite table.lite-table th{position:sticky;top:0;background:#0b0e14;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:.05em;text-align:left;padding:8px 10px;border-bottom:1px solid #1e2530;cursor:pointer;user-select:none}
+                #page-lite table.lite-table td{padding:8px 10px;border-bottom:1px solid #1a1f29;font-size:12px;color:#cbd5e1}
+                #page-lite table.lite-table tr:hover td{background:#0b0e14}
+                #page-lite .lite-pct-bar{display:inline-block;width:80px;height:6px;background:#1e2530;border-radius:3px;overflow:hidden;vertical-align:middle;margin-right:6px}
+                #page-lite .lite-pct-fill{height:100%;border-radius:3px}
+                #page-lite .lite-streak-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+                #page-lite .lite-chip{background:#0b0e14;border:1px solid #1e2530;border-radius:8px;padding:6px 10px;font-size:12px;color:#cbd5e1;display:inline-flex;align-items:center;gap:6px}
+                #page-lite .lite-chip .s{font-weight:900;font-size:13px}
+                #page-lite .lite-empty{color:#22c55e;font-size:12px;font-weight:600}
+                #page-lite .lite-bucket{margin-bottom:14px}
+                #page-lite .lite-bucket .lite-bucket-title{font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+                #page-lite .lite-bucket .lite-cnt{background:#1e2530;color:#cbd5e1;border-radius:10px;padding:1px 8px;font-size:10px}
+                #page-lite .lite-import-status{display:none;margin-top:10px;font-size:12px;padding:8px 12px;border-radius:8px}
+                @media (max-width: 720px){
+                    #page-lite .lite-stats{grid-template-columns:repeat(2,1fr)}
+                    #page-lite .lite-stat .num{font-size:22px}
+                    #page-lite .lite-actions{flex-direction:column;align-items:stretch}
+                    #page-lite .lite-btn{justify-content:center;width:100%}
+                }
+            </style>
+            <div class="flex justify-between items-center mb-4" style="flex-wrap:wrap;gap:10px">
+                <div>
+                    <h1 class="text-3xl font-bold">⚡ Lite</h1>
+                    <div class="text-slate-500 text-sm mt-1">Лёгкий режим: состав, КМ, посещаемость, пропуски подряд</div>
+                </div>
+                <button onclick="renderLite()" class="lite-btn lite-btn-ghost" title="Пересчитать">🔄 Обновить</button>
+            </div>
+
+            <div class="lite-block">
+                <h2>1. Состав клана</h2>
+                <div class="lite-hint">Загрузи скриншоты окна «Информация о Клане». OCR и парсинг — общие с разделом «Клан».</div>
+                <div class="lite-actions">
+                    <label class="lite-btn lite-btn-blue">
+                        📸 Загрузить скрины состава
+                        <input type="file" accept="image/*" multiple style="display:none" onchange="liteHandleClanScreenshots(event)">
+                    </label>
+                    <button class="lite-btn lite-btn-ghost" onclick="showPage('roster')">→ Открыть «Клан» (подробности и правки)</button>
+                </div>
+                <div id="liteClanStatus" class="lite-import-status"></div>
+            </div>
+
+            <div class="lite-block">
+                <h2>2. Скрины ЦЦ / КМ</h2>
+                <div class="lite-hint">Загрузка скринов КМ идёт через модалку дня (там же выбирается событие, OCR и применение в ростер).</div>
+                <div class="lite-actions">
+                    <button class="lite-btn lite-btn-violet" onclick="liteOpenTodayKm()">📅 Открыть сегодня (загрузить скрины КМ)</button>
+                    <button class="lite-btn lite-btn-ghost" onclick="showPage('calendar')">→ Календарь КМ</button>
+                    <button class="lite-btn lite-btn-ghost" onclick="showPage('screenshots')">→ История КМ</button>
+                </div>
+            </div>
+
+            <div class="lite-block">
+                <h2>3. Результат</h2>
+                <div class="lite-hint">Сводка по текущему ростеру и всем дням КМ из локальной базы.</div>
+                <div class="lite-stats" id="liteStats"></div>
+
+                <div style="font-size:12px;font-weight:800;color:#cbd5e1;margin:18px 0 8px">Посещаемость</div>
+                <div class="lite-table-wrap">
+                    <table class="lite-table" id="liteTable">
+                        <thead>
+                            <tr>
+                                <th onclick="liteSort('name')">Ник</th>
+                                <th onclick="liteSort('pct')" style="text-align:right">КМ %</th>
+                                <th onclick="liteSort('att')" style="text-align:right">был / всего</th>
+                                <th onclick="liteSort('streak')" style="text-align:right">подряд пропущено</th>
+                            </tr>
+                        </thead>
+                        <tbody id="liteTableBody"></tbody>
+                    </table>
+                </div>
+
+                <div style="font-size:12px;font-weight:800;color:#cbd5e1;margin:18px 0 8px">Списки по пропускам подряд</div>
+                <div id="liteBuckets"></div>
             </div>
         </section>
 
@@ -4906,6 +5003,7 @@
             if(pageId === 'archive') renderArchive();
             if(pageId === 'stats') renderStats();
             if(pageId === 'screenshots') renderScreenshotArchive();
+            if(pageId === 'lite') renderLite();
             if(pageId === 'settings') { renderApiKeys(); renderAliases(); renderValueWeightsUI(); }
             // Обновляем hash в URL (кроме профиля — у него свой hash)
             if (pageId !== 'profile') {
@@ -6692,6 +6790,150 @@ function getClass2IconByClass3(c3) {
                 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">${summaryHtml}</div>
                 ${playersHtml}
             `;
+        }
+
+        // ===== LITE MODE =====
+        let liteSortKey = 'pct';
+        let liteSortDir = 'asc'; // pct asc → худшие сверху
+        function liteSort(key){
+            if (liteSortKey === key) liteSortDir = liteSortDir === 'asc' ? 'desc' : 'asc';
+            else { liteSortKey = key; liteSortDir = (key === 'name') ? 'asc' : (key === 'streak' ? 'desc' : 'asc'); }
+            renderLite();
+        }
+        function liteOpenTodayKm(){
+            try {
+                const t = (typeof todayStr === 'function') ? todayStr() : new Date().toISOString().slice(0,10);
+                if (typeof openDayModal === 'function') openDayModal(t);
+                else showPage('calendar');
+            } catch(e) { showPage('calendar'); }
+        }
+        function liteHandleClanScreenshots(event){
+            // Переиспользуем существующий handleClanScreenshots (он пишет в DOM элементы страницы Клан)
+            const st = document.getElementById('liteClanStatus');
+            if (st) {
+                st.style.display = 'block';
+                st.style.cssText = 'display:block;margin-top:10px;background:#1e1b4b;border:1px solid #6366f144;color:#a5b4fc;font-size:12px;padding:8px 12px;border-radius:8px';
+                st.innerHTML = '⏳ Запустил OCR — подробный статус и предпросмотр в разделе «Клан». <a href="javascript:showPage(\'roster\')" style="color:#a5b4fc;text-decoration:underline">Открыть</a>';
+            }
+            try { handleClanScreenshots(event); } catch(e) {
+                if (st) { st.style.background='#7f1d1d22'; st.style.borderColor='#ef444444'; st.style.color='#f87171'; st.textContent = '❌ ' + (e.message || 'Ошибка'); }
+            }
+            // Через ~3s — пересчитать сводку (на случай быстрого добавления)
+            setTimeout(renderLite, 3000);
+            setTimeout(renderLite, 12000);
+        }
+        function renderLite(){
+            const statsEl = document.getElementById('liteStats');
+            const tbody = document.getElementById('liteTableBody');
+            const bucketsEl = document.getElementById('liteBuckets');
+            if (!statsEl || !tbody || !bucketsEl) return;
+
+            const allDates = Object.keys(appliedStatsByDate || {}).sort();
+            const totalDates = allDates.length;
+
+            // history: per roster player → presence per date + last-seen
+            const playerHistory = {};
+            (roster || []).forEach(p => {
+                const key = normalizeNick(p.name);
+                playerHistory[key] = { name: p.name, attended: 0, streak: 0, lastSeen: null };
+            });
+            allDates.forEach(d => {
+                const snap = appliedStatsByDate[d];
+                const presentKeys = new Set(
+                    (snap && snap.players ? snap.players : [])
+                        .map(p => normalizeNick(resolveAlias(p.name)))
+                );
+                Object.keys(playerHistory).forEach(key => {
+                    if (presentKeys.has(key)) { playerHistory[key].attended++; playerHistory[key].lastSeen = d; }
+                });
+            });
+            // current streak (с конца, подряд без попадания)
+            Object.values(playerHistory).forEach(ph => {
+                let s = 0;
+                for (let i = allDates.length - 1; i >= 0; i--) {
+                    const snap = appliedStatsByDate[allDates[i]];
+                    const present = (snap && snap.players ? snap.players : [])
+                        .some(p => normalizeNick(resolveAlias(p.name)) === normalizeNick(ph.name));
+                    if (!present) s++; else break;
+                }
+                ph.streak = s;
+            });
+
+            const list = Object.values(playerHistory);
+            const totalRoster = list.length;
+            const neverCount = list.filter(p => p.attended === 0 && totalDates > 0).length;
+            const ge3 = list.filter(p => p.streak >= 3 && totalDates >= 3).length;
+            const ge5 = list.filter(p => p.streak >= 5 && totalDates >= 5).length;
+
+            statsEl.innerHTML = [
+                ['#cbd5e1', totalRoster, 'Всего в клане'],
+                ['#60a5fa', totalDates, 'КМ обработано'],
+                ['#94a3b8', neverCount, 'Не ходят вообще'],
+                ['#f59e0b', ge3, '3+ подряд'],
+                ['#ef4444', ge5, '5+ подряд'],
+            ].map(([c,n,l]) => `<div class="lite-stat"><div class="num" style="color:${c}">${n}</div><div class="label">${l}</div></div>`).join('');
+
+            // Таблица
+            const rows = list.map(ph => ({
+                name: ph.name,
+                attended: ph.attended,
+                streak: ph.streak,
+                pct: totalDates > 0 ? Math.round(ph.attended * 100 / totalDates) : 0
+            }));
+            const dir = liteSortDir === 'asc' ? 1 : -1;
+            rows.sort((a,b) => {
+                if (liteSortKey === 'name') return a.name.localeCompare(b.name) * dir;
+                if (liteSortKey === 'att')  return ((a.attended - b.attended) || (a.pct - b.pct)) * dir;
+                if (liteSortKey === 'streak') return ((a.streak - b.streak) || (a.pct - b.pct)) * dir;
+                return ((a.pct - b.pct) || (a.attended - b.attended)) * dir;
+            });
+
+            if (totalDates === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="color:#64748b;padding:14px;text-align:center;font-style:italic">Нет данных КМ. Загрузи скрины через блок 2.</td></tr>';
+            } else if (rows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="color:#64748b;padding:14px;text-align:center;font-style:italic">Нет игроков в ростере. Загрузи состав через блок 1.</td></tr>';
+            } else {
+                tbody.innerHTML = rows.map(r => {
+                    const pctColor = r.pct >= 70 ? '#22c55e' : r.pct >= 40 ? '#f59e0b' : '#ef4444';
+                    const stColor = r.streak >= 5 ? '#ef4444' : r.streak >= 3 ? '#f59e0b' : '#475569';
+                    return `<tr>
+                        <td style="font-weight:600">${r.name}</td>
+                        <td style="text-align:right">
+                            <span class="lite-pct-bar"><span class="lite-pct-fill" style="width:${r.pct}%;background:${pctColor}"></span></span>
+                            <span style="color:${pctColor};font-weight:700">${r.pct}%</span>
+                        </td>
+                        <td style="text-align:right;color:#94a3b8">${r.attended} / ${totalDates}</td>
+                        <td style="text-align:right;color:${stColor};font-weight:${r.streak>=3?'800':'500'}">${r.streak}</td>
+                    </tr>`;
+                }).join('');
+            }
+
+            // Bucket lists
+            function bucket(label, predicate){
+                const items = list.filter(predicate).sort((a,b) => b.streak - a.streak || a.name.localeCompare(b.name));
+                const inner = items.length === 0
+                    ? '<div class="lite-empty">✅ Пусто</div>'
+                    : '<div class="lite-streak-list">' + items.map(p => {
+                        const last = p.lastSeen ? p.lastSeen : '—';
+                        return `<span class="lite-chip" title="Последний раз: ${last}">${p.name}<span class="s" style="color:#ef4444">${p.streak}</span></span>`;
+                    }).join('') + '</div>';
+                return `<div class="lite-bucket">
+                    <div class="lite-bucket-title">${label} <span class="lite-cnt">${items.length}</span></div>
+                    ${inner}
+                </div>`;
+            }
+            const noData = totalDates === 0 || list.length === 0;
+            if (noData) {
+                bucketsEl.innerHTML = '<div style="color:#64748b;font-size:12px;font-style:italic">Нет данных для расчёта.</div>';
+            } else {
+                bucketsEl.innerHTML =
+                    bucket('Не ходят вообще', p => p.attended === 0) +
+                    bucket('Не были 3+ КМ подряд', p => p.streak >= 3) +
+                    bucket('Не были 4+ КМ подряд', p => p.streak >= 4) +
+                    bucket('Не были 5+ КМ подряд', p => p.streak >= 5) +
+                    bucket('Не были 6+ КМ подряд', p => p.streak >= 6) +
+                    bucket('Не были 7+ КМ подряд', p => p.streak >= 7);
+            }
         }
 
         function renderStats() {
