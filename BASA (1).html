@@ -8657,13 +8657,17 @@ function getClass2IconByClass3(c3) {
                 const badgeText = isNew ? 'NEW' : pacLabel;
 
                 // Иконка 2й профы + кнопка/список выбора 3й
-                const class2 = p.class2 || null;
+                // icon_browser / icon_matcher — все матчеры признаны ненадёжными, не показываем
+                const _matcherDerived = p.class2Source === 'icon_browser' || p.class2Source === 'icon_matcher';
+                const _profaFromMatcher = _matcherDerived && p.profaSource === 'class3options';
+                const class2 = (!_matcherDerived && p.class2) ? p.class2 : null;
                 const class2src = class2 ? getClass2Icon(class2) : null;
                 const class3options = class2 ? resolveClass2ToClass3(class2) : [];
                 // Если profaSource уже определён в analyze-flow — доверяем ему, не подменяем ростером
-                const currentProfa = (p.profa && p.profaSource)
+                // Но если профа пришла от матчера через class3options — не доверяем
+                const currentProfa = (!_profaFromMatcher && p.profa && p.profaSource)
                     ? p.profa
-                    : (inRoster && hasResolvedProfa(inRoster.profa) ? inRoster.profa : (p.profa || '—'));
+                    : (inRoster && hasResolvedProfa(inRoster.profa) ? inRoster.profa : (!_profaFromMatcher ? (p.profa || '—') : '—'));
                 const currentProfaLabel = currentProfa && currentProfa !== '—' ? (PROFA_NAMES[currentProfa] || currentProfa) : '';
                 const _c2SrcLabel = {'gemini':'G','icon_matcher':'IM','icon_browser':'IB'}[p.class2Source] || null;
                 const _pSrcLabel = {'player':'P','stored_day':'S','roster':'R','class3options':'C3'}[p.profaSource] || null;
@@ -8688,6 +8692,8 @@ function getClass2IconByClass3(c3) {
                         return `<option value="${c3}">${c3} (${sn})</option>`;
                     }).join('');
                     profaHtml = `<select onchange="dayLastParsed[${i}].profa=this.value;renderDayAnalyzedPlayers(dayLastParsed)" style="background:#0b0e14;border:1px solid #6366f1;border-radius:4px;color:#a5b4fc;font-size:10px;padding:1px 4px;cursor:pointer;max-width:110px"><option value="">Выбери...</option>${opts}</select>`;
+                } else if (_profaFromMatcher || (!currentProfa || currentProfa === '—')) {
+                    profaHtml = `<span style="font-size:9px;color:#475569;border:1px dashed #2d3748;border-radius:4px;padding:1px 5px">профа не назначена</span>`;
                 }
 
                 return `<div style="background:#1a1f29;border-radius:8px;padding:8px 10px;border:1px solid #1e2530">
@@ -8857,7 +8863,9 @@ function getClass2IconByClass3(c3) {
                 const resolvedName = resolveAlias(p.name);
                 const normKey = normalizeNick(resolvedName);
                 const detectedProfa = p.profa && p.profa !== '—' ? p.profa : null;
-                const detectedProfaValue = hasResolvedProfa(detectedProfa) ? detectedProfa : null;
+                // Block matcher-derived profas: icon_browser/icon_matcher → class3options is unreliable
+                const _pfMatcherDerived = (p.profaSource === 'class3options') && (p.class2Source === 'icon_browser' || p.class2Source === 'icon_matcher');
+                const detectedProfaValue = (hasResolvedProfa(detectedProfa) && !_pfMatcherDerived) ? detectedProfa : null;
                 let existing = roster.find(r => normalizeNick(r.name) === normKey);
 
                 // 2. Если не нашли — fuzzy match (отличие в 1-2 символа)
