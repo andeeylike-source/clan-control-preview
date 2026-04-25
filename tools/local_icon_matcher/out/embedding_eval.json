@@ -1,0 +1,192 @@
+{
+  "matcher": "ORB+TM_fused (cv2, no torch/onnx)",
+  "resize": [
+    32,
+    32
+  ],
+  "top_k_feat": 5,
+  "n_templates": 72,
+  "n_test": 10,
+  "top1_acc": 0.1,
+  "top3_acc": 0.2,
+  "low_conf": 1.0,
+  "verdict": "EMBEDDING_DEAD",
+  "missing_deps": [
+    "torch (CNN embeddings)",
+    "onnxruntime",
+    "scikit-image"
+  ],
+  "per_sample": [
+    {
+      "gt_class": "Arbalester",
+      "pred_class": "Soulhound",
+      "pred_score": 0.3365,
+      "top3": [
+        "Soulhound",
+        "Sword Muse",
+        "Arbalester"
+      ],
+      "ok1": false,
+      "ok3": true,
+      "gt_rank": 3,
+      "orb_pred": "Abyss Walker",
+      "orb_score": 0.0,
+      "tm_pred": "Soulhound",
+      "tm_score": 0.673
+    },
+    {
+      "gt_class": "Paladin",
+      "pred_class": "Spectral Dancer",
+      "pred_score": 0.3055,
+      "top3": [
+        "Spectral Dancer",
+        "Phantom Summoner",
+        "Archmage"
+      ],
+      "ok1": false,
+      "ok3": false,
+      "gt_rank": 6,
+      "orb_pred": "Abyss Walker",
+      "orb_score": 0.0,
+      "tm_pred": "Spectral Dancer",
+      "tm_score": 0.611
+    },
+    {
+      "gt_class": "Shillien Knight",
+      "pred_class": "Spectral Dancer",
+      "pred_score": 0.3042,
+      "top3": [
+        "Spectral Dancer",
+        "Ghost Hunter",
+        "Overlord"
+      ],
+      "ok1": false,
+      "ok3": false,
+      "gt_rank": 35,
+      "orb_pred": "Abyss Walker",
+      "orb_score": 0.0,
+      "tm_pred": "Spectral Dancer",
+      "tm_score": 0.6084
+    },
+    {
+      "gt_class": "Warcryer",
+      "pred_class": "Warcryer",
+      "pred_score": 0.2955,
+      "top3": [
+        "Warcryer",
+        "Doombringer",
+        "Wind Rider"
+      ],
+      "ok1": true,
+      "ok3": true,
+      "gt_rank": 1,
+      "orb_pred": "Abyss Walker",
+      "orb_score": 0.0,
+      "tm_pred": "Warcryer",
+      "tm_score": 0.5909
+    },
+    {
+      "gt_class": "Bounty Hunter",
+      "pred_class": "Treasure Hunter",
+      "pred_score": 0.3663,
+      "top3": [
+        "Treasure Hunter",
+        "Sword Muse",
+        "Inspector"
+      ],
+      "ok1": false,
+      "ok3": false,
+      "gt_rank": 30,
+      "orb_pred": "Abyss Walker",
+      "orb_score": 0.0,
+      "tm_pred": "Treasure Hunter",
+      "tm_score": 0.7326
+    },
+    {
+      "gt_class": "Shillien Elder",
+      "pred_class": "Storm Screamer",
+      "pred_score": 0.317,
+      "top3": [
+        "Storm Screamer",
+        "Wind Rider",
+        "Archmage"
+      ],
+      "ok1": false,
+      "ok3": false,
+      "gt_rank": 43,
+      "orb_pred": "Abyss Walker",
+      "orb_score": 0.0,
+      "tm_pred": "Storm Screamer",
+      "tm_score": 0.634
+    },
+    {
+      "gt_class": "Sword Muse",
+      "pred_class": "Overlord",
+      "pred_score": 0.3159,
+      "top3": [
+        "Overlord",
+        "Wind Rider",
+        "Spectral Dancer"
+      ],
+      "ok1": false,
+      "ok3": false,
+      "gt_rank": 22,
+      "orb_pred": "Abyss Walker",
+      "orb_score": 0.0,
+      "tm_pred": "Overlord",
+      "tm_score": 0.6318
+    },
+    {
+      "gt_class": "Necromancer",
+      "pred_class": "Soulhound",
+      "pred_score": 0.3614,
+      "top3": [
+        "Soulhound",
+        "Arbalester",
+        "Inspector"
+      ],
+      "ok1": false,
+      "ok3": false,
+      "gt_rank": 47,
+      "orb_pred": "Abyss Walker",
+      "orb_score": 0.0,
+      "tm_pred": "Soulhound",
+      "tm_score": 0.7228
+    },
+    {
+      "gt_class": "Treasure Hunter",
+      "pred_class": "Paladin",
+      "pred_score": 0.3703,
+      "top3": [
+        "Paladin",
+        "Arbalester",
+        "Elven Elder"
+      ],
+      "ok1": false,
+      "ok3": false,
+      "gt_rank": 4,
+      "orb_pred": "Abyss Walker",
+      "orb_score": 0.0,
+      "tm_pred": "Paladin",
+      "tm_score": 0.7406
+    },
+    {
+      "gt_class": "Tyrant",
+      "pred_class": "Sword Muse",
+      "pred_score": 0.3548,
+      "top3": [
+        "Sword Muse",
+        "Warcryer",
+        "Shillien Knight"
+      ],
+      "ok1": false,
+      "ok3": false,
+      "gt_rank": 11,
+      "orb_pred": "Abyss Walker",
+      "orb_score": 0.0,
+      "tm_pred": "Sword Muse",
+      "tm_score": 0.7096
+    }
+  ],
+  "elapsed_s": 1.4
+}

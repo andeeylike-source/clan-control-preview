@@ -1,0 +1,11 @@
+gt\pred,Arbalester,Bounty Hunter,Necromancer,Overlord,Paladin,Shillien Elder,Shillien Knight,Soulhound,Spectral Dancer,Storm Screamer,Sword Muse,Treasure Hunter,Tyrant,Warcryer
+Arbalester,0,0,0,0,0,0,0,1,0,0,0,0,0,0
+Bounty Hunter,0,0,0,0,0,0,0,0,0,0,0,1,0,0
+Necromancer,0,0,0,0,0,0,0,1,0,0,0,0,0,0
+Paladin,0,0,0,0,0,0,0,0,1,0,0,0,0,0
+Shillien Elder,0,0,0,0,0,0,0,0,0,1,0,0,0,0
+Shillien Knight,0,0,0,0,0,0,0,0,1,0,0,0,0,0
+Sword Muse,0,0,0,1,0,0,0,0,0,0,0,0,0,0
+Treasure Hunter,0,0,0,0,1,0,0,0,0,0,0,0,0,0
+Tyrant,0,0,0,0,0,0,0,0,0,0,1,0,0,0
+Warcryer,0,0,0,0,0,0,0,0,0,0,0,0,0,1
