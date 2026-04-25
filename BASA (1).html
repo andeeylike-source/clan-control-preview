@@ -8696,6 +8696,19 @@ function getClass2IconByClass3(c3) {
                     profaHtml = `<span style="font-size:9px;color:#475569;border:1px dashed #2d3748;border-radius:4px;padding:1px 5px">профа не назначена</span>`;
                 }
 
+                // Inline profa picker — показывается только если профа не назначена
+                const _needsPicker = !currentProfa || currentProfa === '—';
+                let pickerHtml = '';
+                if (_needsPicker) {
+                    const _P8 = ['Ghost Sentinel','Storm Screamer','Archmage','Dominator','Cardinal','Sword Muse','Spectral Dancer','Hierophant'];
+                    const _p8Btns = _P8.map(pf => {
+                        const short = PROFA_NAMES[pf] || pf;
+                        return `<button onclick="dayLastParsed[${i}].profa='${pf.replace(/'/g,"\\'")}';dayLastParsed[${i}].profaSource='manual';renderDayAnalyzedPlayers(dayLastParsed)" style="background:#151b25;border:1px solid #2d3748;border-radius:5px;padding:2px 7px;font-size:10px;cursor:pointer;color:#64748b;white-space:nowrap">${short}</button>`;
+                    }).join('');
+                    const _allOpts = Object.keys(PROFA_NAMES).map(pf => `<option value="${pf}">${pf} (${PROFA_NAMES[pf]})</option>`).join('');
+                    pickerHtml = `<div style="margin-top:5px;padding:5px 7px;background:#0b0e14;border:1px solid #1e293b;border-radius:6px"><div style="font-size:9px;color:#475569;margin-bottom:4px">&#9998; Выбрать профу:</div><div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px">${_p8Btns}</div><select onchange="if(this.value){dayLastParsed[${i}].profa=this.value;dayLastParsed[${i}].profaSource='manual';renderDayAnalyzedPlayers(dayLastParsed)}" style="background:#0b0e14;border:1px solid #2d3748;border-radius:5px;color:#64748b;font-size:10px;padding:2px 5px;width:100%;cursor:pointer;box-sizing:border-box"><option value="">Все профы...</option>${_allOpts}</select></div>`;
+                }
+
                 return `<div style="background:#1a1f29;border-radius:8px;padding:8px 10px;border:1px solid #1e2530">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
                         <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
@@ -8707,6 +8720,7 @@ function getClass2IconByClass3(c3) {
                         </div>
                         <button onclick="dayLastParsed.splice(${i},1);renderDayAnalyzedPlayers(dayLastParsed)" style="color:#64748b;background:none;border:none;cursor:pointer;font-size:12px">✕</button>
                     </div>
+                    ${pickerHtml}
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px">
                         ${[['⚔️','kills','Убийства'],['💀','deaths','Смерти'],['🗡️','pvp_dmg','PvP урон'],['🐉','pve_dmg','PvE урон']].map(([icon,key,label])=>`
                         <div>
