@@ -8556,6 +8556,13 @@ function getClass2IconByClass3(c3) {
                         return `<option value="${c3}">${c3} (${sn})</option>`;
                     }).join('');
                     profaHtml = `<select onchange="dayLastParsed[${i}].profa=this.value;renderDayAnalyzedPlayers(dayLastParsed)" style="background:#0b0e14;border:1px solid #6366f1;border-radius:4px;color:#a5b4fc;font-size:10px;padding:1px 4px;cursor:pointer;max-width:110px"><option value="">Выбери...</option>${opts}</select>`;
+                } else {
+                    // class2 неизвестен — показываем полный picker по PROFA_NAMES
+                    const allOpts = Object.keys(PROFA_NAMES).map(pf => {
+                        const sn = PROFA_NAMES[pf];
+                        return `<option value="${pf}">${pf} (${sn})</option>`;
+                    }).join('');
+                    profaHtml = `<select onchange="dayLastParsed[${i}].profa=this.value;renderDayAnalyzedPlayers(dayLastParsed)" style="background:#0b0e14;border:1px solid #475569;border-radius:4px;color:#94a3b8;font-size:10px;padding:1px 4px;cursor:pointer;max-width:120px"><option value="">— профа не выбрана —</option>${allOpts}</select>`;
                 }
 
                 return `<div style="background:#1a1f29;border-radius:8px;padding:8px 10px;border:1px solid #1e2530">
@@ -8750,14 +8757,14 @@ function getClass2IconByClass3(c3) {
                     }
                 }
 
-                // Профа назначается ТОЛЬКО через попап — здесь не трогаем
+                const pickedProfa = (p.profa && p.profa !== '—') ? p.profa : null;
                 if (!existing) {
                     roster.push({
                         id: Date.now() + Math.random(),
                         name: resolvedName,
                         rank: 'ИГРОК',
-                        profa: '—',
-                        profas: [],
+                        profa: pickedProfa || '—',
+                        profas: pickedProfa ? [pickedProfa] : [],
                         pac: 'СОЛО',
                         attendance: 0,
                         isNew: true
@@ -8768,6 +8775,19 @@ function getClass2IconByClass3(c3) {
                     if (p.name !== resolvedName || p.name !== existing.name) {
                         nickAliases[p.name.toLowerCase()] = existing.name;
                         nickAliases[p.name] = existing.name;
+                    }
+                    // Если ручная профа выбрана и в ростере пусто — записать без попапа
+                    if (pickedProfa) {
+                        const rosterProfa = existing.profa && existing.profa !== '—' ? existing.profa : null;
+                        const rosterProfas = Array.isArray(existing.profas) ? existing.profas.filter(x => x && x !== '—') : [];
+                        if (!rosterProfa && rosterProfas.length === 0) {
+                            existing.profa = pickedProfa;
+                            existing.profas = [pickedProfa];
+                        } else if (rosterProfa && rosterProfa !== pickedProfa && !rosterProfas.includes(pickedProfa)) {
+                            // Конфликт — другая реальная профа уже есть
+                            profaConflicts.push({ player: existing, detectedProfa: pickedProfa, currentProfas: rosterProfas.length ? rosterProfas : [rosterProfa] });
+                        }
+                        // Если та же профа уже есть — ничего не делаем
                     }
                 }
             });
