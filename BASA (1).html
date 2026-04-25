@@ -10696,6 +10696,42 @@ function getClass2IconByClass3(c3) {
                 const sortedProfas = getSortedProfas(kills);
                 const selected = profaAssignSelected[player.id];
 
+                // --- Suggestion pills: class2_browser → class3options (top-3) ---
+                const _cls2hint = (player.class2_browser_ok && player.class2_browser) ? player.class2_browser : (player.class2 || null);
+                const _class3opts = (_cls2hint && typeof resolveClass2ToClass3 === 'function') ? resolveClass2ToClass3(_cls2hint).slice(0, 3) : [];
+                let suggHtml = '';
+                if (_class3opts.length > 0) {
+                    const _isConf = !!(player.class2_browser_ok && player.class2_browser);
+                    const _confPct = (_isConf && player.class2_browser_confidence) ? ' (' + Math.round(player.class2_browser_confidence * 100) + '%)' : '';
+                    const _hintLabel = _isConf ? ('&#128161; ' + player.class2_browser + _confPct + ':') : '&#128161; Подсказка:';
+                    const _pillsHtml = _class3opts.map(pf => {
+                        const _isSel = selected === pf;
+                        const _src3 = typeof getProfaIcon === 'function' ? getProfaIcon(pf) : null;
+                        const _short = (typeof PROFA_NAMES !== 'undefined' && PROFA_NAMES[pf]) ? PROFA_NAMES[pf] : pf;
+                        const _imgH = _src3 ? '<img src="' + _src3 + '" style="width:18px;height:18px;border-radius:50%;flex-shrink:0">' : '';
+                        const _bg = _isSel ? '#22c55e22' : (_isConf ? '#6366f122' : '#1a2535');
+                        const _bd = _isSel ? '#22c55e' : (_isConf ? '#6366f188' : '#334155');
+                        const _cl = _isSel ? '#4ade80' : (_isConf ? '#a5b4fc' : '#94a3b8');
+                        return '<button onclick="selectProfa(' + idx + ',\'' + pf.replace(/'/g, "\\'") + '\')" style="display:inline-flex;align-items:center;gap:4px;background:' + _bg + ';border:1px solid ' + _bd + ';border-radius:7px;padding:4px 8px;font-size:11px;cursor:pointer;color:' + _cl + ';font-weight:600">' + _imgH + _short + (_isSel ? ' ✓' : '') + '</button>';
+                    }).join('');
+                    suggHtml = '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-bottom:8px;padding:6px 8px;background:#0d1117;border:1px solid #1e293b;border-radius:7px">' +
+                        '<span style="font-size:10px;color:#475569;margin-right:2px">' + _hintLabel + '</span>' + _pillsHtml + '</div>';
+                }
+
+                // --- Icon preview in header ---
+                const _ic2src = (player.class2_browser_ok && player.class2_browser && typeof getClass2Icon === 'function')
+                    ? getClass2Icon(player.class2_browser) : null;
+                const _iconPreviewHtml = _ic2src
+                    ? '<img src="' + _ic2src + '" title="' + player.class2_browser + '" style="width:20px;height:20px;border-radius:50%;border:1px solid #6366f144;flex-shrink:0">'
+                    : '';
+
+                // --- Bulk apply by same normalized name ---
+                const _normSelf = typeof normalizeNick === 'function' ? normalizeNick(player.name) : player.name.toLowerCase();
+                const _sameCount = profaAssignQueue.filter(it => (typeof normalizeNick === 'function' ? normalizeNick(it.player.name) : it.player.name.toLowerCase()) === _normSelf).length;
+                const _bulkHtml = (selected && _sameCount > 1)
+                    ? '<button onmousedown="event.preventDefault();_bulkApplyProfa(\'' + _normSelf.replace(/'/g, "\\'") + '\',\'' + selected.replace(/'/g, "\\'") + '\')" style="margin-top:5px;font-size:10px;color:#f59e0b;background:#1c1a0e;border:1px solid #78350f;border-radius:6px;padding:3px 8px;cursor:pointer">Назначить всем с этим ником (' + _sameCount + ')</button>'
+                    : '';
+
                 const roleHint = '';
 
                 // Фиксированный топ-8 для всех
@@ -10738,10 +10774,12 @@ function getClass2IconByClass3(c3) {
 
                 return '<div style="background:#0b0e14;border:1px solid #1e2530;border-radius:10px;padding:12px 14px">' +
                     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
+                        _iconPreviewHtml +
                         '<span style="font-size:14px;font-weight:700;color:#e2e8f0">' + player.name + '</span>' +
                         roleHint +
                         '<span style="font-size:11px;color:#475569;margin-left:auto">⚔️ ' + kills + ' киллов</span>' +
                     '</div>' +
+                    suggHtml +
                     '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">' + btnHtml + '</div>' +
                     '<div style="position:relative;display:flex;gap:6px;align-items:center">' +
                         '<div id="' + "profaIconWrap_" + idx + '" style="display:none;align-items:center;flex-shrink:0;margin-left:4px"></div>' +
@@ -10754,9 +10792,18 @@ function getClass2IconByClass3(c3) {
                         'style="background:#22c55e;border:none;border-radius:7px;padding:5px 10px;color:#000;font-weight:700;font-size:13px;cursor:pointer;opacity:0.4;transition:opacity .2s;flex-shrink:0">✓</button>' +
                         '<div id="' + ddId + '" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1f29;border:1px solid #6366f1;border-radius:8px;max-height:200px;overflow-y:auto;z-index:9999;margin-top:2px"></div>' +
                     '</div>' +
+                    _bulkHtml +
                     (selected ? '<div style="margin-top:6px;font-size:11px;color:#22c55e">✓ Выбрано: ' + selected.replace(/\s*\([^)]+\)\s*$/, '') + ' (' + (PROFA_NAMES[selected]||selected) + ')' + '</div>' : '') +
                 '</div>';
             }).join('');
+        }
+
+        function _bulkApplyProfa(normName, profa) {
+            profaAssignQueue.forEach(function(it) {
+                const n = typeof normalizeNick === 'function' ? normalizeNick(it.player.name) : it.player.name.toLowerCase();
+                if (n === normName) profaAssignSelected[it.player.id] = profa;
+            });
+            renderProfaAssignList();
         }
 
         const pendingProfas = {}; // idx -> profa (предварительный выбор)
