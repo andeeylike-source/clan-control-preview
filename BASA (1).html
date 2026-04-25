@@ -10696,26 +10696,31 @@ function getClass2IconByClass3(c3) {
                 const sortedProfas = getSortedProfas(kills);
                 const selected = profaAssignSelected[player.id];
 
-                // --- Suggestion pills: class2_browser → class3options (top-3) ---
-                const _cls2hint = (player.class2_browser_ok && player.class2_browser) ? player.class2_browser : (player.class2 || null);
+                // --- Suggestion pills: icon_browser > roster.class2 > icon_matcher fallback ---
+                const _cls2hint = (player.class2_browser_ok && player.class2_browser)
+                    ? player.class2_browser
+                    : (player.class2 || (typeof getIconMatcherClass2ByNick === 'function' ? getIconMatcherClass2ByNick(player.name) : null));
                 const _class3opts = (_cls2hint && typeof resolveClass2ToClass3 === 'function') ? resolveClass2ToClass3(_cls2hint).slice(0, 3) : [];
                 let suggHtml = '';
                 if (_class3opts.length > 0) {
                     const _isConf = !!(player.class2_browser_ok && player.class2_browser);
                     const _confPct = (_isConf && player.class2_browser_confidence) ? ' (' + Math.round(player.class2_browser_confidence * 100) + '%)' : '';
-                    const _hintLabel = _isConf ? ('&#128161; ' + player.class2_browser + _confPct + ':') : '&#128161; Подсказка:';
+                    const _src = _isConf ? 'icon_browser' : (_cls2hint ? 'matcher' : '');
+                    const _hintLabel = '&#128161; ' + _cls2hint + _confPct + ' (' + _src + '):';
                     const _pillsHtml = _class3opts.map(pf => {
                         const _isSel = selected === pf;
                         const _src3 = typeof getProfaIcon === 'function' ? getProfaIcon(pf) : null;
                         const _short = (typeof PROFA_NAMES !== 'undefined' && PROFA_NAMES[pf]) ? PROFA_NAMES[pf] : pf;
                         const _imgH = _src3 ? '<img src="' + _src3 + '" style="width:18px;height:18px;border-radius:50%;flex-shrink:0">' : '';
-                        const _bg = _isSel ? '#22c55e22' : (_isConf ? '#6366f122' : '#1a2535');
-                        const _bd = _isSel ? '#22c55e' : (_isConf ? '#6366f188' : '#334155');
-                        const _cl = _isSel ? '#4ade80' : (_isConf ? '#a5b4fc' : '#94a3b8');
-                        return '<button onclick="selectProfa(' + idx + ',\'' + pf.replace(/'/g, "\\'") + '\')" style="display:inline-flex;align-items:center;gap:4px;background:' + _bg + ';border:1px solid ' + _bd + ';border-radius:7px;padding:4px 8px;font-size:11px;cursor:pointer;color:' + _cl + ';font-weight:600">' + _imgH + _short + (_isSel ? ' ✓' : '') + '</button>';
+                        const _bg = _isSel ? '#22c55e22' : (_isConf ? '#6366f122' : '#1e3a2a');
+                        const _bd = _isSel ? '#22c55e' : (_isConf ? '#6366f188' : '#2d5a3d');
+                        const _cl = _isSel ? '#4ade80' : (_isConf ? '#a5b4fc' : '#86efac');
+                        return '<button onclick="selectProfa(' + idx + ',\'' + pf.replace(/'/g, "\\'") + '\')" style="display:inline-flex;align-items:center;gap:4px;background:' + _bg + ';border:1px solid ' + _bd + ';border-radius:7px;padding:4px 8px;font-size:11px;cursor:pointer;color:' + _cl + ';font-weight:600">' + _imgH + _short + (_isSel ? ' \u2713' : '') + '</button>';
                     }).join('');
-                    suggHtml = '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-bottom:8px;padding:6px 8px;background:#0d1117;border:1px solid #1e293b;border-radius:7px">' +
-                        '<span style="font-size:10px;color:#475569;margin-right:2px">' + _hintLabel + '</span>' + _pillsHtml + '</div>';
+                    suggHtml = '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-bottom:8px;padding:6px 8px;background:#0d1a12;border:1px solid #1e3a2a;border-radius:7px">' +
+                        '<span style="font-size:10px;color:#4b7a5c;margin-right:2px">' + _hintLabel + '</span>' + _pillsHtml + '</div>';
+                } else {
+                    suggHtml = '<div style="margin-bottom:8px;padding:4px 8px;font-size:10px;color:#334155">&#128161; нет подсказки</div>';
                 }
 
                 // --- Icon preview in header ---
