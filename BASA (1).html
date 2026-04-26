@@ -7731,6 +7731,7 @@ function getClass2IconByClass3(c3) {
         let dayCommandChannel = []; // лидеры паков из командного канала
         let dayPackLeaders = {}; // { packName: leaderName }
         let dayScreenPlayersMap = {}; // { packName: [players] } — игроки каждого пака со скрина
+        let dayScreenShotMap = {};   // { packName: dataUrl } — скрин каждого пака
 
         // ===== ПУЛ API КЛЮЧЕЙ GEMINI (из localStorage) =====
         function getGeminiKeys() {
@@ -8005,6 +8006,7 @@ function getClass2IconByClass3(c3) {
             let packLeaders = {};
             // screenPlayersMap: { packName: [players] } — игроки каждого пака со своего скрина
             const screenPlayersMap = {};
+            const screenShotDataMap = {}; // { packName: dataUrl }
 
             for (let i = 0; i < shots.length; i++) {
                 const shot = shots[i];
@@ -8196,6 +8198,7 @@ function getClass2IconByClass3(c3) {
                         // Сохраняем игроков этого скрина в screenPlayersMap по имени пака
                         if (parsed.pack_name && players.length > 0) {
                             screenPlayersMap[parsed.pack_name] = players.map(p => ({...p}));
+                            screenShotDataMap[parsed.pack_name] = shots[i].dataUrl;
                         }
                         players.forEach(p => {
                             if (!p.name) return;
@@ -8314,6 +8317,7 @@ function getClass2IconByClass3(c3) {
             dayCommandChannel = commandChannel;
             dayPackLeaders = packLeaders;
             dayScreenPlayersMap = screenPlayersMap;
+            dayScreenShotMap = screenShotDataMap;
 
             btn.disabled = false;
             btn.innerText = '🔍 Анализировать';
@@ -8363,6 +8367,9 @@ function getClass2IconByClass3(c3) {
             });
             dayLastParsed = Object.values(merged);
 
+            // AUTO icon recognition — local cosine matcher (read-only diagnostic, writes only on trigger)
+            await runLocalIconMatcher(dateStr);
+
             setDayStatus('loading', `✅ Распознано ${dayLastParsed.length} игроков. Проверяю похожие ники...`);
 
             // Проверяем похожие ники — пользователь подтверждает
@@ -8395,6 +8402,166 @@ function getClass2IconByClass3(c3) {
         }
 
 
+
+        // ── LOCAL ICON MATCHER (bench_icon_browser cosine sweep, read-only unless trigger) ──
+        const _CC_CLASS_NAMES = [
+            "Abyss Walker","Adventurer","Arbalester","Arcana Lord","Archmage","Berserker","Bishop",
+            "Bladedancer","Bounty Hunter","Cardinal","Dark Avenger","Destroyer","Dominator",
+            "Doombringer","Doomcryer","Dreadnought","Duelist","Elemental Master","Elemental Summoner",
+            "Elven Elder","Eva_s Saint","Eva_s Templar","Female Soulbreaker","Fortune Seeker",
+            "Ghost Hunter","Ghost Sentinel","Gladiator","Grand Khavatari","Hawkeye","Hell Knight",
+            "Hierophant","Inspector","Judicator","Maestro","Male Soulbreaker","Moonlight Sentinel",
+            "Mystic Muse","Necromancer","Overlord","Paladin","Phantom Ranger","Phantom Summoner",
+            "Phoenix Knight","Plains Walker","Prophet","Sagittarius","Shillien Elder","Shillien Knight",
+            "Shillien Saint","Shillien Templar","Silver Ranger","Sorcerer","Soulhound","Soultaker",
+            "Spectral Dancer","Spectral Master","Spellhowler","Spellsinger","Storm Screamer",
+            "Sword Muse","Sword Singer","Temple Knight","Titan","Treasure Hunter","Trickster","Tyrant",
+            "Warcryer","Warlock","Warlord","Warsmith","Wind Rider","АВ_ПВ"
+        ];
+        const _CC_FEAT_SIZE = 24;
+        const _CC_ICON_DIR  = 'extracted_site_icons_v3/';
+        let   _ccIconFeatures = null;
+
+        function _ccImgToFeature(img, size) {
+            const c = document.createElement('canvas'); c.width = size; c.height = size;
+            const ctx = c.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(img, 0, 0, size, size);
+            const data = ctx.getImageData(0, 0, size, size).data;
+            const v = new Float32Array(size * size); let sum = 0;
+            for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+                const a = data[i+3]/255, g = 0.299*data[i]+0.587*data[i+1]+0.114*data[i+2];
+                v[j] = a*g+(1-a)*128; sum += v[j];
+            }
+            const mean = sum/v.length; let norm = 0;
+            for (let i = 0; i < v.length; i++) { v[i] -= mean; norm += v[i]*v[i]; }
+            norm = Math.sqrt(norm)||1;
+            for (let i = 0; i < v.length; i++) v[i] /= norm;
+            return v;
+        }
+
+        function _ccCanvasRegionToFeature(sc, sx, sy, sw, sh, size) {
+            if (sw < 4 || sh < 4) return null;
+            const c = document.createElement('canvas'); c.width = size; c.height = size;
+            const ctx = c.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(sc, sx, sy, sw, sh, 0, 0, size, size);
+            const data = ctx.getImageData(0, 0, size, size).data;
+            const v = new Float32Array(size * size); let sum = 0;
+            for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+                const a = data[i+3]/255, g = 0.299*data[i]+0.587*data[i+1]+0.114*data[i+2];
+                v[j] = a*g+(1-a)*128; sum += v[j];
+            }
+            const mean = sum/v.length; let norm = 0;
+            for (let i = 0; i < v.length; i++) { v[i] -= mean; norm += v[i]*v[i]; }
+            norm = Math.sqrt(norm)||1;
+            for (let i = 0; i < v.length; i++) v[i] /= norm;
+            return v;
+        }
+
+        function _ccCosineSim(a, b) { let s=0; for (let i=0;i<a.length;i++) s+=a[i]*b[i]; return s; }
+
+        function _ccClassify(feat) {
+            if (!feat || !_ccIconFeatures) return null;
+            const vs = _ccIconFeatures.vectors, ns = _ccIconFeatures.names;
+            const scored = vs.map((v,i) => ({ name: ns[i], sim: _ccCosineSim(feat,v) }));
+            scored.sort((a,b) => b.sim - a.sim);
+            return { class2: scored[0].name, similarity: scored[0].sim,
+                     margin: scored[0].sim-(scored[1]?scored[1].sim:0), top3: scored.slice(0,3) };
+        }
+
+        async function _ccEnsureFeatures() {
+            if (_ccIconFeatures) return;
+            const items = await Promise.all(_CC_CLASS_NAMES.map(n => new Promise(res => {
+                const img = new Image(); img.crossOrigin='anonymous';
+                img.onload = () => res({ name:n, vec: _ccImgToFeature(img, _CC_FEAT_SIZE) });
+                img.onerror = () => res(null);
+                img.src = _CC_ICON_DIR + encodeURIComponent(n) + '.png';
+            })));
+            const ok = items.filter(Boolean);
+            _ccIconFeatures = { names: ok.map(x=>x.name), vectors: ok.map(x=>x.vec) };
+        }
+
+        function _ccGetGeometry(imgW, imgH) {
+            // Calibrated for 1920×1080 CC/KM screenshots
+            return {
+                x: Math.round(545/1920*imgW), y: Math.round(111/1080*imgH),
+                rowH: Math.round(24/1080*imgH), iconW: Math.round(22/1920*imgW),
+                iconH: Math.round(22/1080*imgH), nRows: 9
+            };
+        }
+
+        async function runLocalIconMatcher(dateStr) {
+            try {
+                await _ccEnsureFeatures();
+                if (!_ccIconFeatures || _ccIconFeatures.names.length === 0) return;
+                const SWEEP_OFF = [-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6];
+                const SWEEP_SZ  = [16,18,20,22,24];
+                const TRIG_SIM  = 0.78, TRIG_MAR = 0.05;
+
+                for (const [packName, dataUrl] of Object.entries(dayScreenShotMap)) {
+                    const packPlayers = dayScreenPlayersMap[packName];
+                    if (!packPlayers || packPlayers.length === 0) continue;
+
+                    const img = await new Promise((res,rej) => {
+                        const im = new Image();
+                        im.onload = () => res(im); im.onerror = rej; im.src = dataUrl;
+                    });
+                    const sc = document.createElement('canvas');
+                    sc.width = img.naturalWidth; sc.height = img.naturalHeight;
+                    sc.getContext('2d', { willReadFrequently:true }).drawImage(img, 0, 0);
+                    const geo = _ccGetGeometry(sc.width, sc.height);
+
+                    for (let rowIdx = 0; rowIdx < packPlayers.length; rowIdx++) {
+                        const pp = packPlayers[rowIdx];
+                        if (!pp || !pp.name) continue;
+                        const normName = normalizeNick(pp.name);
+                        const target = dayLastParsed.find(p => normalizeNick(p.name) === normName);
+                        if (!target) continue;
+
+                        const ry = geo.y + rowIdx * geo.rowH;
+                        if (ry + geo.iconH > sc.height + 4) break;
+                        const cx = geo.x + Math.floor(geo.iconW/2);
+                        const cy = ry   + Math.floor(geo.iconH/2);
+
+                        let best = null;
+                        for (const sz of SWEEP_SZ) {
+                            for (const dx of SWEEP_OFF) {
+                                for (const dy of SWEEP_OFF) {
+                                    const sx = Math.max(0, cx+dx-Math.floor(sz/2));
+                                    const sy = Math.max(0, cy+dy-Math.floor(sz/2));
+                                    const sw = Math.min(sc.width-sx,  sz);
+                                    const sh = Math.min(sc.height-sy, sz);
+                                    if (sw<4||sh<4) continue;
+                                    const feat = _ccCanvasRegionToFeature(sc,sx,sy,sw,sh,_CC_FEAT_SIZE);
+                                    if (!feat) continue;
+                                    const res = _ccClassify(feat);
+                                    if (!res) continue;
+                                    if (!best || res.similarity > best.similarity) best = res;
+                                }
+                            }
+                        }
+                        if (!best) continue;
+
+                        target.matcher_top1    = best.class2;
+                        target.matcher_sim     = best.similarity;
+                        target.matcher_margin  = best.margin;
+                        target.matcher_top3    = best.top3;
+                        target.matcher_source  = 'bench_local_matcher';
+                        target.matcher_trigger = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
+
+                        if (target.matcher_trigger) {
+                            target.class2       = best.class2;
+                            target.class2Source = 'bench_local_matcher';
+                            const c3opts = resolveClass2ToClass3(best.class2);
+                            if (c3opts.length === 1) {
+                                target.profa       = c3opts[0];
+                                target.profaSource = 'bench_local_matcher';
+                            }
+                        }
+                    }
+                }
+            } catch(e) { console.warn('[icon-matcher]', e); }
+        }
+        // ── END LOCAL ICON MATCHER ──
 
         // Алиасы для поиска проф (рус + сокращения + англ варианты)
         const PROFA_SEARCH_ALIASES = {
@@ -8565,6 +8732,11 @@ function getClass2IconByClass3(c3) {
                     profaHtml = `<select onchange="dayLastParsed[${i}].profa=this.value;renderDayAnalyzedPlayers(dayLastParsed)" style="background:#0b0e14;border:1px solid #475569;border-radius:4px;color:#94a3b8;font-size:10px;padding:1px 4px;cursor:pointer;max-width:120px"><option value="">— профа не выбрана —</option>${allOpts}</select>`;
                 }
 
+                const matcherBadge = p.matcher_top1
+                    ? (p.matcher_trigger
+                        ? `<span title="AUTO: sim=${(p.matcher_sim*100).toFixed(0)}% margin=${(p.matcher_margin*100).toFixed(0)}%" style="font-size:9px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 5px;flex-shrink:0">✓ ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
+                        : `<span title="no trigger: top3=${p.matcher_top3?p.matcher_top3.map(x=>x.name+' '+Math.round(x.sim*100)+'%').join(', '):''}" style="font-size:9px;color:#94a3b8;background:#0f172a;border-radius:3px;padding:1px 5px;flex-shrink:0">${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}% Δ${(p.matcher_margin*100).toFixed(0)}%</span>`)
+                    : '';
                 return `<div style="background:#1a1f29;border-radius:8px;padding:8px 10px;border:1px solid #1e2530">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
                         <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
@@ -8572,6 +8744,7 @@ function getClass2IconByClass3(c3) {
                             ${class2Html}
                             <input value="${p.name}" oninput="dayLastParsed[${i}]._rawName=dayLastParsed[${i}]._rawName||dayLastParsed[${i}].name; dayLastParsed[${i}].name=this.value" onblur="saveAlias(dayLastParsed[${i}]._rawName||dayLastParsed[${i}].name, this.value)" onclick="let v=this.value,l=v.length;this.setSelectionRange(l,l)" style="background:#0b0e14;border:1px solid #2d3748;border-radius:6px;padding:3px 8px;color:white;font-weight:700;font-size:13px;width:130px">
                             ${profaHtml}
+                            ${matcherBadge}
                         </div>
                         <button onclick="dayLastParsed.splice(${i},1);renderDayAnalyzedPlayers(dayLastParsed)" style="color:#64748b;background:none;border:none;cursor:pointer;font-size:12px">✕</button>
                     </div>
@@ -8757,7 +8930,9 @@ function getClass2IconByClass3(c3) {
                     }
                 }
 
-                const pickedProfa = (p.profa && p.profa !== '—') ? p.profa : null;
+                // matcher guard: never write to roster if matcher didn't trigger
+                const pickedProfa = (p.profa && p.profa !== '—' &&
+                    !(p.profaSource === 'bench_local_matcher' && !p.matcher_trigger)) ? p.profa : null;
                 if (!existing) {
                     roster.push({
                         id: Date.now() + Math.random(),
