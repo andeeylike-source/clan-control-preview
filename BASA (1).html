@@ -8482,33 +8482,58 @@ function getClass2IconByClass3(c3) {
             _ccIconFeatures = { names: ok.map(x=>x.name), vectors: ok.map(x=>x.vec) };
         }
 
-        function _ccGetGeometry(imgW, imgH) {
-            // ── Calibrated preset: Telegram/preview CC/KM screenshots (~760-800 × 440-480) ──
-            // Ground truth from locator_bakeoff (52 labels): x≈155, yFirst≈122, rowH≈17-18px
-            // Base reference: 772×460
-            const BASE_W = 772, BASE_H = 460;
-            if (imgW >= 720 && imgW <= 840 && imgH >= 420 && imgH <= 520) {
-                const scX = imgW / BASE_W, scY = imgH / BASE_H;
-                return {
-                    x:    Math.round(155  * scX),
-                    y:    Math.round(122  * scY),
-                    rowH: Math.round(17.5 * scY),
-                    iconW:Math.round(22   * scX),
-                    iconH:Math.round(22   * scY),
-                    nRows: 9,
-                    preset: 'GEOMETRY_CALIBRATED'
-                };
+        function _ccBuildGeometryCandidates(W, H) {
+            // GT calibrated base: 772×460, x=155, y=122, rowH=17.5, iconW=22, iconH=22
+            const B_W = 772, B_H = 460;
+            const mk = (x,y,rH,iW,iH,p) => ({x:Math.round(x),y:Math.round(y),rowH:Math.round(rH),iconW:Math.round(iW),iconH:Math.round(iH),nRows:9,preset:p});
+            return [
+                mk(155*W/B_W,         122*H/B_H, 17.5*H/B_H, 22*W/B_W,       22*H/B_H, 'LEFT_CAL'),
+                mk(W/2+155*(W/2)/B_W, 122*H/B_H, 17.5*H/B_H, 22*(W/2)/B_W,   22*H/B_H, 'RIGHT_CAL'),
+                mk(545/1920*W,        111/1080*H, 24/1080*H,  22/1920*W,      22/1080*H, 'FS_LEFT'),
+                mk(1505/1920*W,       111/1080*H, 24/1080*H,  22/1920*W,      22/1080*H, 'FS_RIGHT'),
+                mk(W*0.20,            H*0.265,    H*0.038,    W*0.028,        H*0.038,   'PROP_LEFT'),
+                mk(W*0.70,            H*0.265,    H*0.038,    W*0.028,        H*0.038,   'PROP_RIGHT'),
+            ];
+        }
+
+        function _ccScoreGeometry(sc, geo, nCheck) {
+            let validCount = 0, sumSat = 0, sumContrast = 0;
+            const rows = Math.min(nCheck, geo.nRows);
+            for (let r = 0; r < rows; r++) {
+                const cx = geo.x + Math.floor(geo.iconW/2);
+                const cy = geo.y + r*geo.rowH + Math.floor(geo.iconH/2);
+                if (cy >= sc.height || cx >= sc.width) continue;
+                const cq = _ccCropQuality(sc, cx, cy, 22);
+                if (cq.ok) { validCount++; sumSat += cq.saturation; sumContrast += cq.contrast; }
             }
-            // ── Fallback: 1920×1080 fullscreen ──
-            return {
-                x:    Math.round(545/1920*imgW),
-                y:    Math.round(111/1080*imgH),
-                rowH: Math.round(24 /1080*imgH),
-                iconW:Math.round(22 /1920*imgW),
-                iconH:Math.round(22 /1080*imgH),
-                nRows: 9,
-                preset: 'GEOMETRY_FULLSCREEN'
-            };
+            const avgSat = validCount > 0 ? sumSat/validCount : 0;
+            return { validCount, avgSat: Math.round(avgSat), score: validCount*20 + avgSat };
+        }
+
+        function _ccSelectBestGeometry(sc, nPlayers) {
+            const W = sc.width, H = sc.height;
+            const nCheck = Math.min(nPlayers, 4);
+            const candidates = _ccBuildGeometryCandidates(W, H);
+            let bestScore = -1, bestGeo = null, bestSc = null;
+            for (const geo of candidates) {
+                const s = _ccScoreGeometry(sc, geo, nCheck);
+                if (s.validCount >= 1 && s.score > bestScore) { bestScore = s.score; bestGeo = geo; bestSc = s; }
+            }
+            if (bestGeo) {
+                bestGeo.preset = `${bestGeo.preset}(vc=${bestSc.validCount} sat=${bestSc.avgSat})`;
+                return bestGeo;
+            }
+            // FULL_SCAN: sweep x 5%–90% in 2% steps
+            for (let xPct = 0.05; xPct <= 0.90; xPct += 0.02) {
+                const geo = { x:Math.round(W*xPct), y:Math.round(H*0.265), rowH:Math.round(H*0.038),
+                              iconW:Math.round(W*0.028), iconH:Math.round(H*0.038), nRows:9, preset:'' };
+                const s = _ccScoreGeometry(sc, geo, nCheck);
+                if (s.validCount >= 1 && s.score > bestScore) {
+                    bestScore = s.score; bestSc = s;
+                    bestGeo = {...geo, preset:`FULL_SCAN_x${Math.round(xPct*100)}(vc=${s.validCount} sat=${s.avgSat})`};
+                }
+            }
+            return bestGeo || null;
         }
 
         // Gemini icon locator — returns pixel coords of class icon per player, does NOT classify
@@ -8640,7 +8665,15 @@ ${playerList}
                     const sc = document.createElement('canvas');
                     sc.width = img.naturalWidth; sc.height = img.naturalHeight;
                     sc.getContext('2d', { willReadFrequently:true }).drawImage(img, 0, 0);
-                    const geo = _ccGetGeometry(sc.width, sc.height);
+                    const geo = _ccSelectBestGeometry(sc, packPlayers.length);
+                    if (!geo) {
+                        for (const pp of packPlayers) {
+                            if (!pp || !pp.name) continue;
+                            const t = dayLastParsed.find(p => normalizeNick(p.name) === normalizeNick(pp.name));
+                            if (t) { t.matcher_geoPreset = 'LOC_BAD_GEOMETRY'; t.matcher_locInvalid = true; t.matcher_pack = packName; }
+                        }
+                        continue;
+                    }
 
                     for (let rowIdx = 0; rowIdx < packPlayers.length; rowIdx++) {
                         const pp = packPlayers[rowIdx];
@@ -8921,7 +8954,9 @@ ${playerList}
                     ? `<img src="${p.matcher_cropUrl}" width="24" height="24" title="${_mbDebug}" style="image-rendering:pixelated;border:1px solid #334155;border-radius:2px;flex-shrink:0;vertical-align:middle">`
                     : '';
                 const matcherBadge = p.matcher_locInvalid
-                    ? `<span title="${_mbDebug}" style="font-size:9px;color:#f97316;background:#1c0a00;border-radius:3px;padding:1px 5px;flex-shrink:0">LOC BAD_CROP ${_mbLocStr}</span>`
+                    ? (p.matcher_geoPreset === 'LOC_BAD_GEOMETRY'
+                        ? `<span title="${_mbDebug}" style="font-size:9px;color:#ef4444;background:#1c0000;border-radius:3px;padding:1px 5px;flex-shrink:0">LOC BAD_GEOMETRY</span>`
+                        : `<span title="${_mbDebug}" style="font-size:9px;color:#f97316;background:#1c0a00;border-radius:3px;padding:1px 5px;flex-shrink:0">LOC BAD_CROP ${_mbLocStr}</span>`)
                     : (p.matcher_top1
                         ? (p.matcher_trigger
                             ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 5px;flex-shrink:0">✓ ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
