@@ -3733,6 +3733,7 @@
                     <div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:.05em">👥 Распознанные игроки</div>
                     <button id="dayListExpandBtn" onclick="window._dayListExpanded=!window._dayListExpanded;var l=document.getElementById('dayAnalyzedPlayersList');l.style.maxHeight=window._dayListExpanded?'none':'220px';this.textContent=window._dayListExpanded?'Свернуть':'Развернуть список'" style="font-size:10px;color:#6366f1;background:none;border:1px solid #2d3748;border-radius:6px;padding:2px 8px;cursor:pointer">Развернуть список</button>
                 </div>
+                <div id="dayGTDebugStrip" style="font-size:9px;color:#64748b;margin-bottom:3px;line-height:1.7;background:#0b0e14;border:1px solid #1e2530;border-radius:4px;padding:2px 6px;word-break:break-all"></div>
                 <div id="dayMatcherSummary" style="font-size:10px;color:#64748b;margin-bottom:4px;line-height:1.6"></div>
                 <div id="dayAnalyzedPlayersList" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:4px"></div>
                 <div id="dayReviewQueue" style="display:none;margin-top:10px">
@@ -8497,18 +8498,31 @@ function getClass2IconByClass3(c3) {
         async function _ccEnsureGTFeatures() {
             if (_ccGTExemplars !== null) return;
             _ccGTExemplars = [];
+            if (!window._gtDebug) window._gtDebug = {};
+            window._gtDebug.catalogUrl = _CC_GT_CATALOG_URL;
+            window._gtDebug.catalogFetch = 'pending';
             try {
                 const r = await fetch(_CC_GT_CATALOG_URL);
-                if (!r.ok) { console.warn('[gt-exemplar] fetch failed', r.status); return; }
+                if (!r.ok) {
+                    window._gtDebug.catalogFetch = 'http_error_' + r.status;
+                    console.warn('[gt-exemplar] fetch failed', r.status); return;
+                }
                 const entries = await r.json();
+                window._gtDebug.catalogEntries = entries.length;
                 await Promise.all(entries.map(e => new Promise(res => {
                     const img = new Image();
                     img.onload = () => { _ccGTExemplars.push({ class2: e.class2, vec: _ccImgToFeature(img, _CC_FEAT_SIZE) }); res(); };
                     img.onerror = () => res();
                     img.src = e.b64;
                 })));
-                console.log('[gt-exemplar] loaded', _ccGTExemplars.length, 'exemplars,', new Set(_ccGTExemplars.map(e=>e.class2)).size, 'classes');
-            } catch(err) { console.warn('[gt-exemplar]', err); }
+                window._gtDebug.catalogFetch = 'ok';
+                window._gtDebug.exemplarsLoaded = _ccGTExemplars.length;
+                window._gtDebug.classesLoaded = new Set(_ccGTExemplars.map(e=>e.class2)).size;
+                console.log('[gt-exemplar] loaded', _ccGTExemplars.length, 'exemplars,', window._gtDebug.classesLoaded, 'classes');
+            } catch(err) {
+                window._gtDebug.catalogFetch = 'exception:' + String(err).slice(0,80);
+                console.warn('[gt-exemplar]', err);
+            }
         }
 
         // Classify against GT exemplars: max-sim per class, then rank classes
@@ -8694,9 +8708,17 @@ ${playerList}
         }
 
         async function runLocalIconMatcher(dateStr) {
+            if (!window._gtDebug) window._gtDebug = {};
+            window._gtDebug.matcherRun = new Date().toISOString();
+            window._gtDebug.matcherSkipReason = null;
+            window._gtDebug.matcherProcessed = 0;
+            window._gtDebug.matcherError = null;
             try {
                 await _ccEnsureGTFeatures();
-                if (!_ccGTExemplars || _ccGTExemplars.length === 0) return;
+                if (!_ccGTExemplars || _ccGTExemplars.length === 0) {
+                    window._gtDebug.matcherSkipReason = 'exemplars_empty (loaded=' + (_ccGTExemplars ? _ccGTExemplars.length : 'null') + ')';
+                    return;
+                }
                 const SWEEP_OFF = [-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6];
                 const SWEEP_SZ  = [16,18,20,22,24];
                 // GT_EXEMPLAR calibrated thresholds (LOO: 0 FP @ 32.7% coverage)
@@ -8834,9 +8856,13 @@ ${playerList}
                             const _c3opts = resolveClass2ToClass3(best.class2);
                             if (_c3opts.length === 1) target.profa = _c3opts[0];
                         }
+                        window._gtDebug.matcherProcessed = (window._gtDebug.matcherProcessed || 0) + 1;
                     }
                 }
-            } catch(e) { console.warn('[icon-matcher]', e); }
+            } catch(e) {
+                window._gtDebug.matcherError = String(e).slice(0, 120);
+                console.warn('[icon-matcher]', e);
+            }
         }
         // ── END LOCAL ICON MATCHER ──
 
@@ -8982,6 +9008,28 @@ ${playerList}
             const _nBadCrop  = players.filter(p => p.matcher_locInvalid).length;
             const _nUnstable = players.filter(p => p.matcher_rowUnstable && !p.matcher_locInvalid).length;
             const _nNoMatch  = players.filter(p => !p.matcher_top1 && !p.matcher_locInvalid).length;
+            // ── GT_EX DEBUG STRIP (temporary diagnostics) ──
+            const _dbgEl = document.getElementById('dayGTDebugStrip');
+            if (_dbgEl) {
+                const _d = window._gtDebug || {};
+                const _matcherFields = players.filter(p => p.matcher_source === 'gt_exemplar_matcher').length;
+                const _srcCounts = {};
+                players.forEach(p => { const s = p.matcher_source || 'none'; _srcCounts[s] = (_srcCounts[s]||0)+1; });
+                const _srcStr = Object.entries(_srcCounts).map(([k,v])=>k+':'+v).join(', ');
+                const _err = _d.matcherError ? `<span style="color:#ef4444">matcherError: ${_d.matcherError}</span> · ` : '';
+                const _skip = _d.matcherSkipReason ? `<span style="color:#f97316">skipReason: ${_d.matcherSkipReason}</span> · ` : '';
+                _dbgEl.innerHTML =
+                    `<span style="color:#6366f1">gtExemplarsLoaded: ${_d.exemplarsLoaded??'?'}</span> · ` +
+                    `<span style="color:#6366f1">classes: ${_d.classesLoaded??'?'}</span> · ` +
+                    `<span style="color:#94a3b8">catalogFetch: ${_d.catalogFetch??'not_run'}</span> · ` +
+                    `<span style="color:#94a3b8">catalogEntries: ${_d.catalogEntries??'?'}</span> · ` +
+                    `<span style="color:#94a3b8">matcherProcessed: ${_d.matcherProcessed??0}</span> · ` +
+                    _skip + _err +
+                    `<span style="color:#64748b">matcherFields(src=gt): ${_matcherFields}/${_nTotal}</span> · ` +
+                    `<span style="color:#64748b">sources: [${_srcStr}]</span> · ` +
+                    `<span style="color:#475569">run: ${_d.matcherRun ? _d.matcherRun.slice(11,19) : '—'}</span>`;
+            }
+            // ── END DEBUG STRIP ──
             const _sumEl = document.getElementById('dayMatcherSummary');
             if (_sumEl && _nTotal) _sumEl.innerHTML =
                 `<span style="color:#86efac">GT_EX✓ ${_nGTTrig}</span> · ` +
