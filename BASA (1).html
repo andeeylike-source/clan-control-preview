@@ -8792,10 +8792,16 @@ ${playerList}
                         if (!best) continue;
 
                         // ── Row alignment guard
-                        //    Unstable if crop center (including dy) drifts >52% rowH from expected.
-                        const _yDrift = Math.abs(cy - expectedCY) + Math.abs(bestCropRect.dy);
-                        const _rowUnstable = (_yDrift + bestCropRect.sz / 2) > geo.rowH * 0.52
-                                             || Math.abs(bestCropRect.dy) >= 5;
+                        //    Unstable only when refinedCY has drifted into neighbor territory:
+                        //    |refinedCY - expectedCY| >= rowH/2  →  closer to neighbor than to own row.
+                        //    NOTE: dy is constrained to 0 for rowH≤22, so bestCropRect.dy never causes drift.
+                        const _yDrift    = Math.abs(cy - expectedCY);
+                        const _distToPrev = Math.abs(cy - prevRowCY);
+                        const _distToNext = Math.abs(cy - nextRowCY);
+                        const _rowUnstable = _yDrift * 2 >= geo.rowH;
+                        const _unstableReason = _rowUnstable
+                            ? `yDrift=${_yDrift} rowH/2=${(geo.rowH/2).toFixed(1)}`
+                            : '';
 
                         // Generate 48×48 data URL of the winning crop for debug preview
                         let cropUrl = '';
@@ -8812,14 +8818,18 @@ ${playerList}
                         target.matcher_source      = 'gt_exemplar_matcher';
                         // trigger = score passes threshold AND row is stable
                         target.matcher_trigger     = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR && !_rowUnstable;
-                        target.matcher_rowUnstable = _rowUnstable;
-                        target.matcher_pack        = packName;
-                        target.matcher_row         = rowIdx;
-                        target.matcher_cx          = cx;
-                        target.matcher_cy          = cy;
-                        target.matcher_expectedCY  = expectedCY;
-                        target.matcher_prevRowCY   = prevRowCY;
-                        target.matcher_nextRowCY   = nextRowCY;
+                        target.matcher_rowUnstable    = _rowUnstable;
+                        target.matcher_unstableReason = _unstableReason;
+                        target.matcher_yDrift         = _yDrift;
+                        target.matcher_distToPrev     = _distToPrev;
+                        target.matcher_distToNext     = _distToNext;
+                        target.matcher_pack           = packName;
+                        target.matcher_row            = rowIdx;
+                        target.matcher_cx             = cx;
+                        target.matcher_cy             = cy;
+                        target.matcher_expectedCY     = expectedCY;
+                        target.matcher_prevRowCY      = prevRowCY;
+                        target.matcher_nextRowCY      = nextRowCY;
                         target.matcher_crop        = bestCropRect;
                         target.matcher_cropUrl     = cropUrl;
                         target.matcher_locHit      = false;
@@ -9014,8 +9024,9 @@ ${playerList}
                     `name=${p.name} row=${p.matcher_row??'?'} pack=${p.matcher_pack||'?'}`,
                     `geo=${_mbLocStr}`,
                     `cx=${p.matcher_cx??'?'} cy=${p.matcher_cy??'?'} expCY=${p.matcher_expectedCY??'?'}`,
-                    p.matcher_prevRowCY != null ? `prevRow=${p.matcher_prevRowCY} nextRow=${p.matcher_nextRowCY}` : '',
-                    p.matcher_rowUnstable ? 'ROW_UNSTABLE' : '',
+                    p.matcher_yDrift != null ? `yDrift=${p.matcher_yDrift} rowH=${Math.round((p.matcher_nextRowCY??0)-(p.matcher_expectedCY??0))}` : '',
+                    p.matcher_prevRowCY != null ? `dPrev=${p.matcher_distToPrev} dNext=${p.matcher_distToNext}` : '',
+                    p.matcher_rowUnstable ? `ROW_UNSTABLE(${p.matcher_unstableReason||'?'})` : '',
                     _mbCqStr ? `cropQ: ${_mbCqStr}` : '',
                     _mbCrop ? `crop sx=${_mbCrop.sx} sy=${_mbCrop.sy} sw=${_mbCrop.sw} sh=${_mbCrop.sh}` : '',
                     _mbCrop ? `sweep sz=${_mbCrop.sz} dx=${_mbCrop.dx} dy=${_mbCrop.dy}` : '',
