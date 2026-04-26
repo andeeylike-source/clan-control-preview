@@ -8368,17 +8368,8 @@ function getClass2IconByClass3(c3) {
             });
             dayLastParsed = Object.values(merged);
 
-            // Gemini icon locator: get pixel coords per player, then feed to local cosine matcher
-            dayIconLocations = {};
-            setDayStatus('loading', '🔍 Локатор иконок (Gemini)...');
-            for (const [packName, dataUrl] of Object.entries(dayScreenShotMap)) {
-                const b64 = dataUrl.split(',')[1];
-                const mt  = dataUrl.split(';')[0].split(':')[1] || 'image/png';
-                await _ccLocateIcons(packName, b64, mt, dayScreenPlayersMap[packName] || []);
-                await new Promise(r => setTimeout(r, 800)); // rate-limit gap
-            }
-
-            // AUTO icon recognition — local cosine matcher (read-only diagnostic, writes only on trigger)
+            // AUTO icon recognition — calibrated geometry + local cosine matcher
+            // Gemini locator disabled (bakeoff: hit_8px=11.5%, Y systematically wrong)
             await runLocalIconMatcher(dateStr);
 
             setDayStatus('loading', `✅ Распознано ${dayLastParsed.length} игроков. Проверяю похожие ники...`);
@@ -8492,11 +8483,31 @@ function getClass2IconByClass3(c3) {
         }
 
         function _ccGetGeometry(imgW, imgH) {
-            // Calibrated for 1920×1080 CC/KM screenshots
+            // ── Calibrated preset: Telegram/preview CC/KM screenshots (~760-800 × 440-480) ──
+            // Ground truth from locator_bakeoff (52 labels): x≈155, yFirst≈122, rowH≈17-18px
+            // Base reference: 772×460
+            const BASE_W = 772, BASE_H = 460;
+            if (imgW >= 720 && imgW <= 840 && imgH >= 420 && imgH <= 520) {
+                const scX = imgW / BASE_W, scY = imgH / BASE_H;
+                return {
+                    x:    Math.round(155  * scX),
+                    y:    Math.round(122  * scY),
+                    rowH: Math.round(17.5 * scY),
+                    iconW:Math.round(22   * scX),
+                    iconH:Math.round(22   * scY),
+                    nRows: 9,
+                    preset: 'GEOMETRY_CALIBRATED'
+                };
+            }
+            // ── Fallback: 1920×1080 fullscreen ──
             return {
-                x: Math.round(545/1920*imgW), y: Math.round(111/1080*imgH),
-                rowH: Math.round(24/1080*imgH), iconW: Math.round(22/1920*imgW),
-                iconH: Math.round(22/1080*imgH), nRows: 9
+                x:    Math.round(545/1920*imgW),
+                y:    Math.round(111/1080*imgH),
+                rowH: Math.round(24 /1080*imgH),
+                iconW:Math.round(22 /1920*imgW),
+                iconH:Math.round(22 /1080*imgH),
+                nRows: 9,
+                preset: 'GEOMETRY_FULLSCREEN'
             };
         }
 
@@ -8638,32 +8649,25 @@ ${playerList}
                         const target = dayLastParsed.find(p => normalizeNick(p.name) === normName);
                         if (!target) continue;
 
-                        // Prefer Gemini locator coords; fallback to calibrated geometry
-                        const _locEntry = dayIconLocations[packName] && dayIconLocations[packName][normName];
-                        let cx, cy, _locHit = false;
-                        if (_locEntry && _locEntry.icon_center_x && _locEntry.icon_center_y) {
-                            cx = _locEntry.icon_center_x;
-                            cy = _locEntry.icon_center_y;
-                            _locHit = true;
-                        } else {
-                            const ry = geo.y + rowIdx * geo.rowH;
-                            if (ry + geo.iconH > sc.height + 4) break;
-                            cx = geo.x + Math.floor(geo.iconW/2);
-                            cy = ry    + Math.floor(geo.iconH/2);
-                        }
+                        // Calibrated geometry (Gemini locator disabled — poor Y accuracy)
+                        const ry = geo.y + rowIdx * geo.rowH;
+                        if (ry + geo.iconH > sc.height + 4) break;
+                        const cx = geo.x + Math.floor(geo.iconW/2);
+                        const cy = ry    + Math.floor(geo.iconH/2);
+                        const _locHit = false, _locEntry = null;
 
                         // Quality guard: check center crop before full sweep
                         const _cq = _ccCropQuality(sc, cx, cy, 22);
                         if (!_cq.ok) {
-                            target.matcher_top1      = null;
-                            target.matcher_locHit    = _locHit;
-                            target.matcher_locConf   = _locEntry ? _locEntry.confidence : null;
-                            target.matcher_locInvalid = true;
+                            target.matcher_top1       = null;
+                            target.matcher_locHit     = false;
+                            target.matcher_locInvalid  = true;
                             target.matcher_cropQuality = _cq;
-                            target.matcher_cx        = cx;
-                            target.matcher_cy        = cy;
-                            target.matcher_pack      = packName;
-                            target.matcher_row       = rowIdx;
+                            target.matcher_cx          = cx;
+                            target.matcher_cy          = cy;
+                            target.matcher_pack        = packName;
+                            target.matcher_row         = rowIdx;
+                            target.matcher_geoPreset   = geo.preset;
                             continue;
                         }
 
@@ -8709,10 +8713,11 @@ ${playerList}
                         target.matcher_cy        = cy;
                         target.matcher_crop      = bestCropRect;
                         target.matcher_cropUrl   = cropUrl;
-                        target.matcher_locHit      = _locHit;
-                        target.matcher_locConf     = _locEntry ? _locEntry.confidence : null;
+                        target.matcher_locHit      = false;
+                        target.matcher_locConf     = null;
                         target.matcher_locInvalid  = false;
                         target.matcher_cropQuality = _cq;
+                        target.matcher_geoPreset   = geo.preset;
 
                         if (target.matcher_trigger) {
                             target.class2       = best.class2;
@@ -8900,9 +8905,7 @@ ${playerList}
 
                 const _mbCrop = p.matcher_crop;
                 const _mbCq   = p.matcher_cropQuality;
-                const _mbLocStr = p.matcher_locHit
-                    ? `GEMINI conf=${((p.matcher_locConf||0)*100).toFixed(0)}%`
-                    : (p.matcher_cx != null ? 'GEOMETRY' : '—');
+                const _mbLocStr = p.matcher_geoPreset || (p.matcher_cx != null ? 'GEOMETRY' : '—');
                 const _mbCqStr = _mbCq ? `bri=${_mbCq.brightness} std=${_mbCq.contrast} sat=${_mbCq.saturation} (${_mbCq.reason})` : '';
                 const _mbDebug = (p.matcher_top1 || p.matcher_locInvalid) ? [
                     `pack=${p.matcher_pack||'?'} row=${p.matcher_row??'?'}`,
