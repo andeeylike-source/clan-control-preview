@@ -8691,8 +8691,8 @@ ${playerList}
                 if (!_ccGTExemplars || _ccGTExemplars.length === 0) return;
                 const SWEEP_OFF = [-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6];
                 const SWEEP_SZ  = [16,18,20,22,24];
-                // GT_EXEMPLAR diagnostic mode: thresholds kept, but trigger = false until calibrated
-                const TRIG_SIM  = 0.55, TRIG_MAR = 0.15;
+                // GT_EXEMPLAR calibrated thresholds (LOO: 0 FP @ 32.7% coverage)
+                const TRIG_SIM  = 0.60, TRIG_MAR = 0.08;
 
                 for (const [packName, dataUrl] of Object.entries(dayScreenShotMap)) {
                     const packPlayers = dayScreenPlayersMap[packName];
@@ -8779,9 +8779,7 @@ ${playerList}
                         target.matcher_margin  = best.margin;
                         target.matcher_top3    = best.top3;
                         target.matcher_source  = 'gt_exemplar_matcher';
-                        // Diagnostic mode: never auto-write until threshold calibrated on real data
-                        target.matcher_trigger = false;
-                        target.matcher_wouldTrigger = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
+                        target.matcher_trigger = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
                         target.matcher_pack      = packName;
                         target.matcher_row       = rowIdx;
                         target.matcher_cx        = cx;
@@ -8796,11 +8794,11 @@ ${playerList}
 
                         if (target.matcher_trigger) {
                             target.class2       = best.class2;
-                            target.class2Source = 'bench_local_matcher';
+                            target.class2Source = 'gt_exemplar_matcher';
                             const c3opts = resolveClass2ToClass3(best.class2);
                             if (c3opts.length === 1) {
                                 target.profa       = c3opts[0];
-                                target.profaSource = 'bench_local_matcher';
+                                target.profaSource = 'gt_exemplar_matcher';
                             }
                         }
                     }
@@ -8996,19 +8994,14 @@ ${playerList}
                     ? `<img src="${p.matcher_cropUrl}" width="24" height="24" title="${_mbDebug}" style="image-rendering:pixelated;border:1px solid #334155;border-radius:2px;flex-shrink:0;vertical-align:middle">`
                     : '';
                 const _mbIsGT = p.matcher_source === 'gt_exemplar_matcher';
-                const _mbWouldTrig = p.matcher_wouldTrigger;
                 const matcherBadge = p.matcher_locInvalid
                     ? (p.matcher_geoPreset === 'LOC_BAD_GEOMETRY'
                         ? `<span title="${_mbDebug}" style="font-size:9px;color:#ef4444;background:#1c0000;border-radius:3px;padding:1px 5px;flex-shrink:0">LOC BAD_GEOMETRY</span>`
                         : `<span title="${_mbDebug}" style="font-size:9px;color:#f97316;background:#1c0a00;border-radius:3px;padding:1px 5px;flex-shrink:0">LOC BAD_CROP ${_mbLocStr}</span>`)
                     : (p.matcher_top1
-                        ? (_mbIsGT
-                            ? (_mbWouldTrig
-                                ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#fde68a;background:#1c1500;border:1px solid #92400e;border-radius:3px;padding:1px 5px;flex-shrink:0">GT_EX~ ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
-                                : `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#78716c;background:#0f172a;border-radius:3px;padding:1px 5px;flex-shrink:0">GT_EX ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}% Δ${(p.matcher_margin*100).toFixed(0)}%</span>`)
-                            : (p.matcher_trigger
-                                ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 5px;flex-shrink:0">✓ ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
-                                : `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#94a3b8;background:#0f172a;border-radius:3px;padding:1px 5px;flex-shrink:0">${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}% Δ${(p.matcher_margin*100).toFixed(0)}%</span>`))
+                        ? (p.matcher_trigger
+                            ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 5px;flex-shrink:0">${_mbIsGT?'GT_EX':''}✓ ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
+                            : `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#78716c;background:#0f172a;border-radius:3px;padding:1px 5px;flex-shrink:0">${_mbIsGT?'GT_EX ':''}${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}% Δ${(p.matcher_margin*100).toFixed(0)}%</span>`)
                         : '');
                 return `<div style="background:#1a1f29;border-radius:8px;padding:8px 10px;border:1px solid #1e2530">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
