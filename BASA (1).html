@@ -3735,6 +3735,10 @@
                 </div>
                 <div id="dayMatcherSummary" style="font-size:10px;color:#64748b;margin-bottom:4px;line-height:1.6"></div>
                 <div id="dayAnalyzedPlayersList" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:4px"></div>
+                <div id="dayReviewQueue" style="display:none;margin-top:10px">
+                    <div style="font-size:10px;color:#f97316;text-transform:uppercase;font-weight:700;letter-spacing:.05em;margin-bottom:4px">⚠️ Проверить профы</div>
+                    <div id="dayReviewQueueList" style="display:flex;flex-direction:column;gap:4px"></div>
+                </div>
                 <div style="position:sticky;bottom:0;background:#12171f;padding:8px 0 2px;margin-top:8px">
                     <button onclick="applyDayParsedStats()" style="background:#22c55e;color:white;border:none;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;width:100%">✅ Применить в ростер</button>
                 </div>
@@ -8823,9 +8827,13 @@ ${playerList}
                         target.matcher_cropQuality = _cq;
                         target.matcher_geoPreset   = geo.preset;
 
-                        // AUTO-WRITE SUSPENDED — row alignment validation in progress.
-                        // trigger calculates above but nothing is written to roster.
-                        // if (target.matcher_trigger) { ... }
+                        // AUTO-WRITE: safe GT_EX only (trigger + not rowUnstable + not locInvalid)
+                        if (target.matcher_trigger && !_rowUnstable) {
+                            target.class2     = best.class2;
+                            target.profaSource = 'gt_exemplar_matcher';
+                            const _c3opts = resolveClass2ToClass3(best.class2);
+                            if (_c3opts.length === 1) target.profa = _c3opts[0];
+                        }
                     }
                 }
             } catch(e) { console.warn('[icon-matcher]', e); }
@@ -8999,8 +9007,17 @@ ${playerList}
                     ? `<img src="${class2src}" title="${class2}" style="width:18px;height:18px;border-radius:50%;border:1px solid #2d3748;flex-shrink:0">`
                     : '';
 
+                // GT_EX confident: auto-written, no manual picker in main list
+                const _isGTConf = p.matcher_source === 'gt_exemplar_matcher' && p.matcher_trigger && !p.matcher_rowUnstable && !p.matcher_locInvalid;
+                // GT_EX suspect: has matcher data but not confident — picker only in review queue
+                const _isGTSusp = p.matcher_source === 'gt_exemplar_matcher' && !_isGTConf && (p.matcher_top1 || p.matcher_locInvalid);
                 let profaHtml = '';
-                if (currentProfa && currentProfa !== '—') {
+                if (_isGTConf || _isGTSusp) {
+                    // Main list: show profa icon if already set, no picker
+                    if (currentProfa && currentProfa !== '—') {
+                        profaHtml = profaIconHtml(currentProfa, 15);
+                    }
+                } else if (currentProfa && currentProfa !== '—') {
                     profaHtml = profaIconHtml(currentProfa, 15);
                 } else if (class3options.length === 1) {
                     const shortName = PROFA_NAMES[class3options[0]] || class3options[0];
@@ -9050,7 +9067,7 @@ ${playerList}
                         ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#fb923c;background:#1a0800;border:1px solid #7c2d12;border-radius:3px;padding:1px 5px;flex-shrink:0">ROW_UNSTABLE ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
                         : (p.matcher_top1
                             ? (p.matcher_trigger
-                                ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 5px;flex-shrink:0">${_mbIsGT?'GT_EX':''}✓ ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
+                                ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 5px;flex-shrink:0">${_mbIsGT?'AUTO GT_EX':''}✓ ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
                                 : `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#78716c;background:#0f172a;border-radius:3px;padding:1px 5px;flex-shrink:0">${_mbIsGT?'GT_EX ':''}${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}% Δ${(p.matcher_margin*100).toFixed(0)}%</span>`)
                             : ''));
                 return `<div style="background:#1a1f29;border-radius:8px;padding:8px 10px;border:1px solid #1e2530">
@@ -9073,6 +9090,57 @@ ${playerList}
                     </div>
                 </div>`;
             }).join('');
+
+            // ── REVIEW QUEUE: suspicious GT_EX players ──
+            const _GT_SIM_TRIG = 0.60, _GT_MAR_TRIG = 0.08;
+            const reviewEl = document.getElementById('dayReviewQueue');
+            const reviewListEl = document.getElementById('dayReviewQueueList');
+            const suspectPlayers = players.map((p, idx) => ({p, idx})).filter(({p}) =>
+                p.matcher_source === 'gt_exemplar_matcher' &&
+                !(p.matcher_trigger && !p.matcher_rowUnstable && !p.matcher_locInvalid) &&
+                (p.matcher_top1 || p.matcher_locInvalid || p.matcher_rowUnstable)
+            );
+            if (reviewEl && reviewListEl) {
+                reviewEl.style.display = suspectPlayers.length ? '' : 'none';
+                reviewListEl.innerHTML = suspectPlayers.map(({p, idx}) => {
+                    // Classify reasons
+                    const _reasons = [];
+                    if (p.matcher_locInvalid) _reasons.push('BAD_CROP');
+                    else if (p.matcher_rowUnstable) _reasons.push('ROW_UNSTABLE');
+                    else if (!p.matcher_top1) _reasons.push('UNCOVERED_CLASS');
+                    else {
+                        if ((p.matcher_sim || 0) < _GT_SIM_TRIG) _reasons.push('LOW_SIM');
+                        if ((p.matcher_margin || 0) < _GT_MAR_TRIG) _reasons.push('LOW_MARGIN');
+                    }
+                    if (p.matcher_top3 && p.matcher_top3.length > 1) {
+                        const topNames = p.matcher_top3.map(x => x.name || x.class2);
+                        if (new Set(topNames.slice(0,3)).size > 1) _reasons.push('AMBIGUOUS_TOP3');
+                    }
+                    const _reasonStr = _reasons.join(' · ') || '?';
+                    const _simStr = p.matcher_sim != null ? `sim ${(p.matcher_sim*100).toFixed(0)}%` : '';
+                    const _marStr = p.matcher_margin != null ? `Δ${(p.matcher_margin*100).toFixed(0)}%` : '';
+                    const _top3Str = p.matcher_top3 ? p.matcher_top3.slice(0,3).map(x => `${x.name||x.class2} ${Math.round((x.sim||x.similarity||0)*100)}%`).join(', ') : '';
+                    const _cropImgRq = p.matcher_cropUrl
+                        ? `<img src="${p.matcher_cropUrl}" width="32" height="32" style="image-rendering:pixelated;border:1px solid #7c2d12;border-radius:3px;flex-shrink:0">`
+                        : `<div style="width:32px;height:32px;background:#1c0a00;border:1px solid #7c2d12;border-radius:3px;flex-shrink:0"></div>`;
+                    // Manual picker — sets profaSource = manual_review
+                    const _allOpts = Object.keys(PROFA_NAMES).map(pf => {
+                        const sn = PROFA_NAMES[pf];
+                        return `<option value="${pf}"${p.profa===pf?' selected':''}>${pf} (${sn})</option>`;
+                    }).join('');
+                    const _pickerHtml = `<select onchange="dayLastParsed[${idx}].profa=this.value;dayLastParsed[${idx}].profaSource='manual_review';renderDayAnalyzedPlayers(dayLastParsed)" style="background:#0b0e14;border:1px solid #ea580c;border-radius:4px;color:#fdba74;font-size:10px;padding:2px 5px;cursor:pointer;max-width:140px"><option value="">— выбрать профу —</option>${_allOpts}</select>`;
+                    return `<div style="background:#1a1206;border:1px solid #7c2d12;border-radius:8px;padding:7px 10px;display:flex;flex-direction:column;gap:4px">
+                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                            ${_cropImgRq}
+                            <span style="font-weight:700;font-size:12px;color:#fbbf24">${p.name}</span>
+                            <span style="font-size:9px;color:#f97316;background:#1c0a00;border:1px solid #7c2d12;border-radius:3px;padding:1px 5px">${_reasonStr}</span>
+                            ${p.matcher_top1 ? `<span style="font-size:9px;color:#94a3b8">${p.matcher_top1} ${_simStr} ${_marStr}</span>` : ''}
+                        </div>
+                        ${_top3Str ? `<div style="font-size:9px;color:#64748b">top3: ${_top3Str}</div>` : ''}
+                        <div>${_pickerHtml}</div>
+                    </div>`;
+                }).join('');
+            }
         }
 
         // Хранит уже применённую статистику по датам для сравнения и защиты от двойного счёта
