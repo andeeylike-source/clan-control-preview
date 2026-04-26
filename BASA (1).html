@@ -8753,30 +8753,13 @@ ${playerList}
                             continue;
                         }
 
-                        // ── Local Y refinement: find best quality Y within ±floor(rowH/3)
-                        //    Stay within 45% of rowH from expectedCY to not cross into neighbors.
-                        const _yBudget = Math.min(Math.floor(geo.rowH / 3), Math.floor(geo.rowH * 0.44));
-                        let refinedCY = expectedCY;
-                        let _bestRefScore = _cq.saturation + _cq.contrast * 2;
-                        for (let yOff = -_yBudget; yOff <= _yBudget; yOff++) {
-                            if (yOff === 0) continue;
-                            const ty = expectedCY + yOff;
-                            if (ty < 0 || ty >= sc.height) continue;
-                            const q = _ccCropQuality(sc, cx, ty, 18);
-                            const score = q.ok ? (q.saturation + q.contrast * 2) : -1;
-                            if (score > _bestRefScore) { _bestRefScore = score; refinedCY = ty; }
-                        }
-                        const cy = refinedCY;
-
-                        // ── Constrained dy sweep: for tight rows (rowH≤22) sweep dx only.
-                        //    Even dy=1 with sz=24 can bleed into neighbor at rowH=17.
-                        const _dyLimit = geo.rowH <= 22 ? 0 : 3;
-                        const _sweepDY = SWEEP_OFF.filter(d => Math.abs(d) <= _dyLimit);
+                        // Use geometry-computed center directly (y-refine removed — was degrading crop quality)
+                        const cy = expectedCY;
 
                         let best = null, bestCropRect = null;
                         for (const sz of SWEEP_SZ) {
                             for (const dx of SWEEP_OFF) {
-                                for (const dy of _sweepDY) {
+                                for (const dy of SWEEP_OFF) {
                                     const sx = Math.max(0, cx+dx-Math.floor(sz/2));
                                     const sy = Math.max(0, cy+dy-Math.floor(sz/2));
                                     const sw = Math.min(sc.width-sx,  sz);
@@ -8795,10 +8778,8 @@ ${playerList}
                         }
                         if (!best) continue;
 
-                        // ── Row alignment guard
-                        //    Unstable only when refinedCY has drifted into neighbor territory:
-                        //    |refinedCY - expectedCY| >= rowH/2  →  closer to neighbor than to own row.
-                        //    NOTE: dy is constrained to 0 for rowH≤22, so bestCropRect.dy never causes drift.
+                        // ── Row alignment guard (debug-only — does NOT block trigger)
+                        //    Unstable when best crop dy shifted into neighbor territory.
                         const _yDrift    = Math.abs(cy - expectedCY);
                         const _distToPrev = Math.abs(cy - prevRowCY);
                         const _distToNext = Math.abs(cy - nextRowCY);
@@ -8820,8 +8801,8 @@ ${playerList}
                         target.matcher_margin      = best.margin;
                         target.matcher_top3        = best.top3;
                         target.matcher_source      = 'gt_exemplar_matcher';
-                        // trigger = score passes threshold AND row is stable
-                        target.matcher_trigger     = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR && !_rowUnstable;
+                        // trigger = score passes threshold (ROW_UNSTABLE is debug-only)
+                        target.matcher_trigger     = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
                         target.matcher_rowUnstable    = _rowUnstable;
                         target.matcher_unstableReason = _unstableReason;
                         target.matcher_yDrift         = _yDrift;
