@@ -8722,32 +8722,57 @@ ${playerList}
                         const target = dayLastParsed.find(p => normalizeNick(p.name) === normName);
                         if (!target) continue;
 
-                        // Calibrated geometry (Gemini locator disabled — poor Y accuracy)
+                        // Expected row position
                         const ry = geo.y + rowIdx * geo.rowH;
                         if (ry + geo.iconH > sc.height + 4) break;
                         const cx = geo.x + Math.floor(geo.iconW/2);
-                        const cy = ry    + Math.floor(geo.iconH/2);
+                        const expectedCY = ry + Math.floor(geo.iconH/2);
+                        const prevRowCY = expectedCY - geo.rowH;
+                        const nextRowCY = expectedCY + geo.rowH;
                         const _locHit = false, _locEntry = null;
 
-                        // Quality guard: check center crop before full sweep
-                        const _cq = _ccCropQuality(sc, cx, cy, 22);
+                        // Quality guard at expected center
+                        const _cq = _ccCropQuality(sc, cx, expectedCY, 22);
                         if (!_cq.ok) {
-                            target.matcher_top1       = null;
-                            target.matcher_locHit     = false;
+                            target.matcher_top1        = null;
+                            target.matcher_locHit      = false;
                             target.matcher_locInvalid  = true;
                             target.matcher_cropQuality = _cq;
                             target.matcher_cx          = cx;
-                            target.matcher_cy          = cy;
+                            target.matcher_cy          = expectedCY;
+                            target.matcher_expectedCY  = expectedCY;
+                            target.matcher_prevRowCY   = prevRowCY;
+                            target.matcher_nextRowCY   = nextRowCY;
                             target.matcher_pack        = packName;
                             target.matcher_row         = rowIdx;
                             target.matcher_geoPreset   = geo.preset;
                             continue;
                         }
 
+                        // ── Local Y refinement: find best quality Y within ±floor(rowH/3)
+                        //    Stay within 45% of rowH from expectedCY to not cross into neighbors.
+                        const _yBudget = Math.min(Math.floor(geo.rowH / 3), Math.floor(geo.rowH * 0.44));
+                        let refinedCY = expectedCY;
+                        let _bestRefScore = _cq.saturation + _cq.contrast * 2;
+                        for (let yOff = -_yBudget; yOff <= _yBudget; yOff++) {
+                            if (yOff === 0) continue;
+                            const ty = expectedCY + yOff;
+                            if (ty < 0 || ty >= sc.height) continue;
+                            const q = _ccCropQuality(sc, cx, ty, 18);
+                            const score = q.ok ? (q.saturation + q.contrast * 2) : -1;
+                            if (score > _bestRefScore) { _bestRefScore = score; refinedCY = ty; }
+                        }
+                        const cy = refinedCY;
+
+                        // ── Constrained dy sweep: for tight rows (rowH≤22) sweep dx only.
+                        //    Even dy=1 with sz=24 can bleed into neighbor at rowH=17.
+                        const _dyLimit = geo.rowH <= 22 ? 0 : 3;
+                        const _sweepDY = SWEEP_OFF.filter(d => Math.abs(d) <= _dyLimit);
+
                         let best = null, bestCropRect = null;
                         for (const sz of SWEEP_SZ) {
                             for (const dx of SWEEP_OFF) {
-                                for (const dy of SWEEP_OFF) {
+                                for (const dy of _sweepDY) {
                                     const sx = Math.max(0, cx+dx-Math.floor(sz/2));
                                     const sy = Math.max(0, cy+dy-Math.floor(sz/2));
                                     const sw = Math.min(sc.width-sx,  sz);
@@ -8766,6 +8791,12 @@ ${playerList}
                         }
                         if (!best) continue;
 
+                        // ── Row alignment guard
+                        //    Unstable if crop center (including dy) drifts >52% rowH from expected.
+                        const _yDrift = Math.abs(cy - expectedCY) + Math.abs(bestCropRect.dy);
+                        const _rowUnstable = (_yDrift + bestCropRect.sz / 2) > geo.rowH * 0.52
+                                             || Math.abs(bestCropRect.dy) >= 5;
+
                         // Generate 48×48 data URL of the winning crop for debug preview
                         let cropUrl = '';
                         if (bestCropRect) {
@@ -8774,33 +8805,32 @@ ${playerList}
                             cropUrl = dc.toDataURL();
                         }
 
-                        target.matcher_top1    = best.class2;
-                        target.matcher_sim     = best.similarity;
-                        target.matcher_margin  = best.margin;
-                        target.matcher_top3    = best.top3;
-                        target.matcher_source  = 'gt_exemplar_matcher';
-                        target.matcher_trigger = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
-                        target.matcher_pack      = packName;
-                        target.matcher_row       = rowIdx;
-                        target.matcher_cx        = cx;
-                        target.matcher_cy        = cy;
-                        target.matcher_crop      = bestCropRect;
-                        target.matcher_cropUrl   = cropUrl;
+                        target.matcher_top1        = best.class2;
+                        target.matcher_sim         = best.similarity;
+                        target.matcher_margin      = best.margin;
+                        target.matcher_top3        = best.top3;
+                        target.matcher_source      = 'gt_exemplar_matcher';
+                        // trigger = score passes threshold AND row is stable
+                        target.matcher_trigger     = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR && !_rowUnstable;
+                        target.matcher_rowUnstable = _rowUnstable;
+                        target.matcher_pack        = packName;
+                        target.matcher_row         = rowIdx;
+                        target.matcher_cx          = cx;
+                        target.matcher_cy          = cy;
+                        target.matcher_expectedCY  = expectedCY;
+                        target.matcher_prevRowCY   = prevRowCY;
+                        target.matcher_nextRowCY   = nextRowCY;
+                        target.matcher_crop        = bestCropRect;
+                        target.matcher_cropUrl     = cropUrl;
                         target.matcher_locHit      = false;
                         target.matcher_locConf     = null;
                         target.matcher_locInvalid  = false;
                         target.matcher_cropQuality = _cq;
                         target.matcher_geoPreset   = geo.preset;
 
-                        if (target.matcher_trigger) {
-                            target.class2       = best.class2;
-                            target.class2Source = 'gt_exemplar_matcher';
-                            const c3opts = resolveClass2ToClass3(best.class2);
-                            if (c3opts.length === 1) {
-                                target.profa       = c3opts[0];
-                                target.profaSource = 'gt_exemplar_matcher';
-                            }
-                        }
+                        // AUTO-WRITE SUSPENDED — row alignment validation in progress.
+                        // trigger calculates above but nothing is written to roster.
+                        // if (target.matcher_trigger) { ... }
                     }
                 }
             } catch(e) { console.warn('[icon-matcher]', e); }
@@ -8981,14 +9011,17 @@ ${playerList}
                 const _mbLocStr = p.matcher_geoPreset || (p.matcher_cx != null ? 'GEOMETRY' : '—');
                 const _mbCqStr = _mbCq ? `bri=${_mbCq.brightness} std=${_mbCq.contrast} sat=${_mbCq.saturation} (${_mbCq.reason})` : '';
                 const _mbDebug = (p.matcher_top1 || p.matcher_locInvalid) ? [
-                    `pack=${p.matcher_pack||'?'} row=${p.matcher_row??'?'}`,
-                    `loc=${_mbLocStr}`,
-                    `cx=${p.matcher_cx??'?'} cy=${p.matcher_cy??'?'}`,
+                    `name=${p.name} row=${p.matcher_row??'?'} pack=${p.matcher_pack||'?'}`,
+                    `geo=${_mbLocStr}`,
+                    `cx=${p.matcher_cx??'?'} cy=${p.matcher_cy??'?'} expCY=${p.matcher_expectedCY??'?'}`,
+                    p.matcher_prevRowCY != null ? `prevRow=${p.matcher_prevRowCY} nextRow=${p.matcher_nextRowCY}` : '',
+                    p.matcher_rowUnstable ? 'ROW_UNSTABLE' : '',
                     _mbCqStr ? `cropQ: ${_mbCqStr}` : '',
                     _mbCrop ? `crop sx=${_mbCrop.sx} sy=${_mbCrop.sy} sw=${_mbCrop.sw} sh=${_mbCrop.sh}` : '',
                     _mbCrop ? `sweep sz=${_mbCrop.sz} dx=${_mbCrop.dx} dy=${_mbCrop.dy}` : '',
                     p.matcher_sim != null ? `sim=${(p.matcher_sim*100).toFixed(1)}% Δ=${(p.matcher_margin*100).toFixed(1)}%` : '',
-                    p.matcher_top3 ? `top3=${p.matcher_top3.map(x=>x.name+' '+Math.round(x.sim*100)+'%').join(', ')}` : ''
+                    p.matcher_top3 ? `top3=${p.matcher_top3.map(x=>x.name+' '+Math.round(x.sim*100)+'%').join(', ')}` : '',
+                    `trigger=${p.matcher_trigger} rowUnstable=${p.matcher_rowUnstable??false}`
                 ].filter(Boolean).join(' | ') : '';
                 const _mbCropImg = p.matcher_cropUrl
                     ? `<img src="${p.matcher_cropUrl}" width="24" height="24" title="${_mbDebug}" style="image-rendering:pixelated;border:1px solid #334155;border-radius:2px;flex-shrink:0;vertical-align:middle">`
@@ -8998,11 +9031,13 @@ ${playerList}
                     ? (p.matcher_geoPreset === 'LOC_BAD_GEOMETRY'
                         ? `<span title="${_mbDebug}" style="font-size:9px;color:#ef4444;background:#1c0000;border-radius:3px;padding:1px 5px;flex-shrink:0">LOC BAD_GEOMETRY</span>`
                         : `<span title="${_mbDebug}" style="font-size:9px;color:#f97316;background:#1c0a00;border-radius:3px;padding:1px 5px;flex-shrink:0">LOC BAD_CROP ${_mbLocStr}</span>`)
-                    : (p.matcher_top1
-                        ? (p.matcher_trigger
-                            ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 5px;flex-shrink:0">${_mbIsGT?'GT_EX':''}✓ ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
-                            : `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#78716c;background:#0f172a;border-radius:3px;padding:1px 5px;flex-shrink:0">${_mbIsGT?'GT_EX ':''}${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}% Δ${(p.matcher_margin*100).toFixed(0)}%</span>`)
-                        : '');
+                    : (p.matcher_rowUnstable && p.matcher_top1
+                        ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#fb923c;background:#1a0800;border:1px solid #7c2d12;border-radius:3px;padding:1px 5px;flex-shrink:0">ROW_UNSTABLE ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
+                        : (p.matcher_top1
+                            ? (p.matcher_trigger
+                                ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 5px;flex-shrink:0">${_mbIsGT?'GT_EX':''}✓ ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
+                                : `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#78716c;background:#0f172a;border-radius:3px;padding:1px 5px;flex-shrink:0">${_mbIsGT?'GT_EX ':''}${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}% Δ${(p.matcher_margin*100).toFixed(0)}%</span>`)
+                            : ''));
                 return `<div style="background:#1a1f29;border-radius:8px;padding:8px 10px;border:1px solid #1e2530">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
                         <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
@@ -9196,9 +9231,10 @@ ${playerList}
                     }
                 }
 
-                // matcher guard: never write to roster if matcher didn't trigger
+                // matcher guard: never write to roster without confirmed trigger
+                const _matcherSources = ['bench_local_matcher', 'gt_exemplar_matcher'];
                 const pickedProfa = (p.profa && p.profa !== '—' &&
-                    !(p.profaSource === 'bench_local_matcher' && !p.matcher_trigger)) ? p.profa : null;
+                    !(_matcherSources.includes(p.profaSource) && !p.matcher_trigger)) ? p.profa : null;
                 if (!existing) {
                     roster.push({
                         id: Date.now() + Math.random(),
