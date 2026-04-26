@@ -8522,7 +8522,7 @@ function getClass2IconByClass3(c3) {
                         const cx = geo.x + Math.floor(geo.iconW/2);
                         const cy = ry   + Math.floor(geo.iconH/2);
 
-                        let best = null;
+                        let best = null, bestCropRect = null;
                         for (const sz of SWEEP_SZ) {
                             for (const dx of SWEEP_OFF) {
                                 for (const dy of SWEEP_OFF) {
@@ -8535,11 +8535,22 @@ function getClass2IconByClass3(c3) {
                                     if (!feat) continue;
                                     const res = _ccClassify(feat);
                                     if (!res) continue;
-                                    if (!best || res.similarity > best.similarity) best = res;
+                                    if (!best || res.similarity > best.similarity) {
+                                        best = res;
+                                        bestCropRect = {sx, sy, sw, sh, dx, dy, sz};
+                                    }
                                 }
                             }
                         }
                         if (!best) continue;
+
+                        // Generate 48×48 data URL of the winning crop for debug preview
+                        let cropUrl = '';
+                        if (bestCropRect) {
+                            const dc = document.createElement('canvas'); dc.width = 48; dc.height = 48;
+                            dc.getContext('2d').drawImage(sc, bestCropRect.sx, bestCropRect.sy, bestCropRect.sw, bestCropRect.sh, 0, 0, 48, 48);
+                            cropUrl = dc.toDataURL();
+                        }
 
                         target.matcher_top1    = best.class2;
                         target.matcher_sim     = best.similarity;
@@ -8547,6 +8558,12 @@ function getClass2IconByClass3(c3) {
                         target.matcher_top3    = best.top3;
                         target.matcher_source  = 'bench_local_matcher';
                         target.matcher_trigger = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
+                        target.matcher_pack    = packName;
+                        target.matcher_row     = rowIdx;
+                        target.matcher_cx      = cx;
+                        target.matcher_cy      = cy;
+                        target.matcher_crop    = bestCropRect;
+                        target.matcher_cropUrl = cropUrl;
 
                         if (target.matcher_trigger) {
                             target.class2       = best.class2;
@@ -8732,10 +8749,22 @@ function getClass2IconByClass3(c3) {
                     profaHtml = `<select onchange="dayLastParsed[${i}].profa=this.value;renderDayAnalyzedPlayers(dayLastParsed)" style="background:#0b0e14;border:1px solid #475569;border-radius:4px;color:#94a3b8;font-size:10px;padding:1px 4px;cursor:pointer;max-width:120px"><option value="">— профа не выбрана —</option>${allOpts}</select>`;
                 }
 
+                const _mbCrop = p.matcher_crop;
+                const _mbDebug = p.matcher_top1 ? [
+                    `pack=${p.matcher_pack||'?'} row=${p.matcher_row??'?'}`,
+                    `cx=${p.matcher_cx??'?'} cy=${p.matcher_cy??'?'}`,
+                    _mbCrop ? `crop sx=${_mbCrop.sx} sy=${_mbCrop.sy} sw=${_mbCrop.sw} sh=${_mbCrop.sh}` : '',
+                    _mbCrop ? `sweep sz=${_mbCrop.sz} dx=${_mbCrop.dx} dy=${_mbCrop.dy}` : '',
+                    `sim=${p.matcher_sim!=null?(p.matcher_sim*100).toFixed(1)+'%':'?'} Δ=${p.matcher_margin!=null?(p.matcher_margin*100).toFixed(1)+'%':'?'}`,
+                    `top3=${p.matcher_top3?p.matcher_top3.map(x=>x.name+' '+Math.round(x.sim*100)+'%').join(', '):''}`
+                ].filter(Boolean).join(' | ') : '';
+                const _mbCropImg = p.matcher_cropUrl
+                    ? `<img src="${p.matcher_cropUrl}" width="24" height="24" title="${_mbDebug}" style="image-rendering:pixelated;border:1px solid #334155;border-radius:2px;flex-shrink:0;vertical-align:middle">`
+                    : '';
                 const matcherBadge = p.matcher_top1
                     ? (p.matcher_trigger
-                        ? `<span title="AUTO: sim=${(p.matcher_sim*100).toFixed(0)}% margin=${(p.matcher_margin*100).toFixed(0)}%" style="font-size:9px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 5px;flex-shrink:0">✓ ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
-                        : `<span title="no trigger: top3=${p.matcher_top3?p.matcher_top3.map(x=>x.name+' '+Math.round(x.sim*100)+'%').join(', '):''}" style="font-size:9px;color:#94a3b8;background:#0f172a;border-radius:3px;padding:1px 5px;flex-shrink:0">${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}% Δ${(p.matcher_margin*100).toFixed(0)}%</span>`)
+                        ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 5px;flex-shrink:0">✓ ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
+                        : `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#94a3b8;background:#0f172a;border-radius:3px;padding:1px 5px;flex-shrink:0">${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}% Δ${(p.matcher_margin*100).toFixed(0)}%</span>`)
                     : '';
                 return `<div style="background:#1a1f29;border-radius:8px;padding:8px 10px;border:1px solid #1e2530">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
