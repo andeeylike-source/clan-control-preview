@@ -3729,7 +3729,11 @@
 
             <!-- Результаты анализа -->
             <div id="dayAnalyzeResults" style="display:none;margin-bottom:8px">
-                <div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:.05em;margin-bottom:6px">👥 Распознанные игроки</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                    <div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:.05em">👥 Распознанные игроки</div>
+                    <button id="dayListExpandBtn" onclick="window._dayListExpanded=!window._dayListExpanded;var l=document.getElementById('dayAnalyzedPlayersList');l.style.maxHeight=window._dayListExpanded?'none':'220px';this.textContent=window._dayListExpanded?'Свернуть':'Развернуть список'" style="font-size:10px;color:#6366f1;background:none;border:1px solid #2d3748;border-radius:6px;padding:2px 8px;cursor:pointer">Развернуть список</button>
+                </div>
+                <div id="dayMatcherSummary" style="font-size:10px;color:#64748b;margin-bottom:4px;line-height:1.6"></div>
                 <div id="dayAnalyzedPlayersList" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:4px"></div>
                 <div style="position:sticky;bottom:0;background:#12171f;padding:8px 0 2px;margin-top:8px">
                     <button onclick="applyDayParsedStats()" style="background:#22c55e;color:white;border:none;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;width:100%">✅ Применить в ростер</button>
@@ -8977,6 +8981,25 @@ ${playerList}
 
         function renderDayAnalyzedPlayers(players) {
             const list = document.getElementById('dayAnalyzedPlayersList');
+            // Sync expand/collapse state
+            if (typeof window._dayListExpanded === 'undefined') window._dayListExpanded = false;
+            list.style.maxHeight = window._dayListExpanded ? 'none' : '220px';
+            const _expandBtn = document.getElementById('dayListExpandBtn');
+            if (_expandBtn) _expandBtn.textContent = window._dayListExpanded ? 'Свернуть' : 'Развернуть список';
+            // Debug summary
+            const _nTotal = players.length;
+            const _nGTTrig   = players.filter(p => p.matcher_source === 'gt_exemplar_matcher' && p.matcher_trigger).length;
+            const _nGTDiag   = players.filter(p => p.matcher_source === 'gt_exemplar_matcher' && !p.matcher_trigger && p.matcher_top1).length;
+            const _nBadCrop  = players.filter(p => p.matcher_locInvalid).length;
+            const _nUnstable = players.filter(p => p.matcher_rowUnstable && !p.matcher_locInvalid).length;
+            const _nNoMatch  = players.filter(p => !p.matcher_top1 && !p.matcher_locInvalid).length;
+            const _sumEl = document.getElementById('dayMatcherSummary');
+            if (_sumEl && _nTotal) _sumEl.innerHTML =
+                `<span style="color:#86efac">GT_EX✓ ${_nGTTrig}</span> · ` +
+                `<span style="color:#78716c">GT_EX ${_nGTDiag}</span> · ` +
+                `<span style="color:#fb923c">ROW_UNSTABLE ${_nUnstable}</span> · ` +
+                `<span style="color:#f97316">BAD_CROP ${_nBadCrop}</span> · ` +
+                `<span style="color:#475569">нет данных ${_nNoMatch}</span> · всего ${_nTotal}`;
             list.innerHTML = players.map((p, i) => {
                 const inRoster = roster.find(r => normalizeNick(r.name) === normalizeNick(p.name));
                 const isNew = !inRoster;
