@@ -8423,6 +8423,9 @@ function getClass2IconByClass3(c3) {
         const _CC_FEAT_SIZE = 24;
         const _CC_ICON_DIR  = 'extracted_site_icons_v3/';
         let   _ccIconFeatures = null;
+        // GT exemplar catalog (real in-game party-window portrait sprites, 52 labeled crops)
+        const _CC_GT_CATALOG_URL = 'gt_exemplar_catalog.json';
+        let   _ccGTExemplars = null; // [{class2, vec}] loaded at runtime
 
         function _ccImgToFeature(img, size) {
             const c = document.createElement('canvas'); c.width = size; c.height = size;
@@ -8480,6 +8483,42 @@ function getClass2IconByClass3(c3) {
             })));
             const ok = items.filter(Boolean);
             _ccIconFeatures = { names: ok.map(x=>x.name), vectors: ok.map(x=>x.vec) };
+        }
+
+        // ── GT exemplar catalog: real in-game portrait sprites (52 labeled) ──
+        async function _ccEnsureGTFeatures() {
+            if (_ccGTExemplars !== null) return;
+            _ccGTExemplars = [];
+            try {
+                const r = await fetch(_CC_GT_CATALOG_URL);
+                if (!r.ok) { console.warn('[gt-exemplar] fetch failed', r.status); return; }
+                const entries = await r.json();
+                await Promise.all(entries.map(e => new Promise(res => {
+                    const img = new Image();
+                    img.onload = () => { _ccGTExemplars.push({ class2: e.class2, vec: _ccImgToFeature(img, _CC_FEAT_SIZE) }); res(); };
+                    img.onerror = () => res();
+                    img.src = e.b64;
+                })));
+                console.log('[gt-exemplar] loaded', _ccGTExemplars.length, 'exemplars,', new Set(_ccGTExemplars.map(e=>e.class2)).size, 'classes');
+            } catch(err) { console.warn('[gt-exemplar]', err); }
+        }
+
+        // Classify against GT exemplars: max-sim per class, then rank classes
+        function _ccClassifyGT(feat) {
+            if (!feat || !_ccGTExemplars || !_ccGTExemplars.length) return null;
+            const classBest = {};
+            for (const ex of _ccGTExemplars) {
+                const s = _ccCosineSim(feat, ex.vec);
+                if (!(ex.class2 in classBest) || s > classBest[ex.class2]) classBest[ex.class2] = s;
+            }
+            const sorted = Object.entries(classBest).sort((a,b) => b[1]-a[1]);
+            if (!sorted.length) return null;
+            return {
+                class2:    sorted[0][0],
+                similarity: sorted[0][1],
+                margin:    sorted[0][1] - (sorted[1] ? sorted[1][1] : 0),
+                top3:      sorted.slice(0,3).map(([name,sim]) => ({name, sim}))
+            };
         }
 
         function _ccBuildGeometryCandidates(W, H) {
@@ -8648,11 +8687,12 @@ ${playerList}
 
         async function runLocalIconMatcher(dateStr) {
             try {
-                await _ccEnsureFeatures();
-                if (!_ccIconFeatures || _ccIconFeatures.names.length === 0) return;
+                await _ccEnsureGTFeatures();
+                if (!_ccGTExemplars || _ccGTExemplars.length === 0) return;
                 const SWEEP_OFF = [-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6];
                 const SWEEP_SZ  = [16,18,20,22,24];
-                const TRIG_SIM  = 0.78, TRIG_MAR = 0.05;
+                // GT_EXEMPLAR diagnostic mode: thresholds kept, but trigger = false until calibrated
+                const TRIG_SIM  = 0.55, TRIG_MAR = 0.15;
 
                 for (const [packName, dataUrl] of Object.entries(dayScreenShotMap)) {
                     const packPlayers = dayScreenPlayersMap[packName];
@@ -8715,7 +8755,7 @@ ${playerList}
                                     if (sw<4||sh<4) continue;
                                     const feat = _ccCanvasRegionToFeature(sc,sx,sy,sw,sh,_CC_FEAT_SIZE);
                                     if (!feat) continue;
-                                    const res = _ccClassify(feat);
+                                    const res = _ccClassifyGT(feat);
                                     if (!res) continue;
                                     if (!best || res.similarity > best.similarity) {
                                         best = res;
@@ -8738,8 +8778,10 @@ ${playerList}
                         target.matcher_sim     = best.similarity;
                         target.matcher_margin  = best.margin;
                         target.matcher_top3    = best.top3;
-                        target.matcher_source  = 'bench_local_matcher';
-                        target.matcher_trigger = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
+                        target.matcher_source  = 'gt_exemplar_matcher';
+                        // Diagnostic mode: never auto-write until threshold calibrated on real data
+                        target.matcher_trigger = false;
+                        target.matcher_wouldTrigger = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
                         target.matcher_pack      = packName;
                         target.matcher_row       = rowIdx;
                         target.matcher_cx        = cx;
@@ -8953,14 +8995,20 @@ ${playerList}
                 const _mbCropImg = p.matcher_cropUrl
                     ? `<img src="${p.matcher_cropUrl}" width="24" height="24" title="${_mbDebug}" style="image-rendering:pixelated;border:1px solid #334155;border-radius:2px;flex-shrink:0;vertical-align:middle">`
                     : '';
+                const _mbIsGT = p.matcher_source === 'gt_exemplar_matcher';
+                const _mbWouldTrig = p.matcher_wouldTrigger;
                 const matcherBadge = p.matcher_locInvalid
                     ? (p.matcher_geoPreset === 'LOC_BAD_GEOMETRY'
                         ? `<span title="${_mbDebug}" style="font-size:9px;color:#ef4444;background:#1c0000;border-radius:3px;padding:1px 5px;flex-shrink:0">LOC BAD_GEOMETRY</span>`
                         : `<span title="${_mbDebug}" style="font-size:9px;color:#f97316;background:#1c0a00;border-radius:3px;padding:1px 5px;flex-shrink:0">LOC BAD_CROP ${_mbLocStr}</span>`)
                     : (p.matcher_top1
-                        ? (p.matcher_trigger
-                            ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 5px;flex-shrink:0">✓ ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
-                            : `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#94a3b8;background:#0f172a;border-radius:3px;padding:1px 5px;flex-shrink:0">${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}% Δ${(p.matcher_margin*100).toFixed(0)}%</span>`)
+                        ? (_mbIsGT
+                            ? (_mbWouldTrig
+                                ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#fde68a;background:#1c1500;border:1px solid #92400e;border-radius:3px;padding:1px 5px;flex-shrink:0">GT_EX~ ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
+                                : `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#78716c;background:#0f172a;border-radius:3px;padding:1px 5px;flex-shrink:0">GT_EX ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}% Δ${(p.matcher_margin*100).toFixed(0)}%</span>`)
+                            : (p.matcher_trigger
+                                ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 5px;flex-shrink:0">✓ ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
+                                : `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#94a3b8;background:#0f172a;border-radius:3px;padding:1px 5px;flex-shrink:0">${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}% Δ${(p.matcher_margin*100).toFixed(0)}%</span>`))
                         : '');
                 return `<div style="background:#1a1f29;border-radius:8px;padding:8px 10px;border:1px solid #1e2530">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
