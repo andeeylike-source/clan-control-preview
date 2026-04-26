@@ -7732,6 +7732,7 @@ function getClass2IconByClass3(c3) {
         let dayPackLeaders = {}; // { packName: leaderName }
         let dayScreenPlayersMap = {}; // { packName: [players] } — игроки каждого пака со скрина
         let dayScreenShotMap = {};   // { packName: dataUrl } — скрин каждого пака
+        let dayIconLocations = {};   // { packName: { normName: {icon_center_x,icon_center_y,icon_bbox,confidence} } }
 
         // ===== ПУЛ API КЛЮЧЕЙ GEMINI (из localStorage) =====
         function getGeminiKeys() {
@@ -8367,6 +8368,16 @@ function getClass2IconByClass3(c3) {
             });
             dayLastParsed = Object.values(merged);
 
+            // Gemini icon locator: get pixel coords per player, then feed to local cosine matcher
+            dayIconLocations = {};
+            setDayStatus('loading', '🔍 Локатор иконок (Gemini)...');
+            for (const [packName, dataUrl] of Object.entries(dayScreenShotMap)) {
+                const b64 = dataUrl.split(',')[1];
+                const mt  = dataUrl.split(';')[0].split(':')[1] || 'image/png';
+                await _ccLocateIcons(packName, b64, mt);
+                await new Promise(r => setTimeout(r, 800)); // rate-limit gap
+            }
+
             // AUTO icon recognition — local cosine matcher (read-only diagnostic, writes only on trigger)
             await runLocalIconMatcher(dateStr);
 
@@ -8489,6 +8500,59 @@ function getClass2IconByClass3(c3) {
             };
         }
 
+        // Gemini icon locator — returns pixel coords of class icon per player, does NOT classify
+        async function _ccLocateIcons(packName, base64, mediaType) {
+            const key = getNextApiKey();
+            if (!key) return;
+            const locPrompt = `This is a Lineage 2 screenshot showing a party window ("Окно группы").
+The party table has columns: player name | class icon | kills | deaths | pvp dmg | pve dmg.
+
+Your ONLY task: find the pixel position of the CLASS ICON (the small square class image) for each player row in the party table.
+Do NOT identify or name the class. Just locate the icon pixel center and bounding box in the ORIGINAL image resolution.
+
+Return ONLY valid JSON, no markdown:
+{"players":[{"name":"ExactNickAsWritten","row_index":0,"icon_center_x":123,"icon_center_y":456,"icon_bbox":{"x":112,"y":445,"w":22,"h":22},"confidence":0.95}]}
+
+Rules:
+- name = exact player name as it appears in the table
+- icon_center_x / icon_center_y = center of class icon in pixels of the original image
+- icon_bbox = bounding box of the class icon in original pixels
+- confidence = 0.0-1.0, how sure you are about the icon position (not the class)
+- If you cannot find the icon for a player, omit that player
+- Return only the party window rows, not command channel`;
+            try {
+                const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${key}`,
+                        'HTTP-Referer': 'https://andeeylike-source.github.io/clan-control/',
+                        'X-Title': 'Clan Control'
+                    },
+                    body: JSON.stringify({
+                        model: 'google/gemini-2.0-flash-lite-001',
+                        max_tokens: 800,
+                        messages: [{ role: 'user', content: [
+                            { type: 'image_url', image_url: { url: `data:${mediaType};base64,${base64}` } },
+                            { type: 'text', text: locPrompt }
+                        ]}]
+                    })
+                });
+                if (!resp.ok) { console.warn('[locator] HTTP', resp.status); return; }
+                const data = await resp.json();
+                const raw = (data.choices?.[0]?.message?.content || '').trim().replace(/```json|```/g,'').trim();
+                const parsed = JSON.parse(raw);
+                if (!parsed.players) return;
+                const byName = {};
+                parsed.players.forEach(p => {
+                    if (p.name && p.icon_center_x && p.icon_center_y)
+                        byName[normalizeNick(p.name)] = p;
+                });
+                dayIconLocations[packName] = byName;
+                console.log(`[locator] ${packName}: located ${Object.keys(byName).length} icons`);
+            } catch(e) { console.warn('[locator]', packName, e.message); }
+        }
+
         async function runLocalIconMatcher(dateStr) {
             try {
                 await _ccEnsureFeatures();
@@ -8517,10 +8581,19 @@ function getClass2IconByClass3(c3) {
                         const target = dayLastParsed.find(p => normalizeNick(p.name) === normName);
                         if (!target) continue;
 
-                        const ry = geo.y + rowIdx * geo.rowH;
-                        if (ry + geo.iconH > sc.height + 4) break;
-                        const cx = geo.x + Math.floor(geo.iconW/2);
-                        const cy = ry   + Math.floor(geo.iconH/2);
+                        // Prefer Gemini locator coords; fallback to calibrated geometry
+                        const _locEntry = dayIconLocations[packName] && dayIconLocations[packName][normName];
+                        let cx, cy, _locHit = false;
+                        if (_locEntry && _locEntry.icon_center_x && _locEntry.icon_center_y) {
+                            cx = _locEntry.icon_center_x;
+                            cy = _locEntry.icon_center_y;
+                            _locHit = true;
+                        } else {
+                            const ry = geo.y + rowIdx * geo.rowH;
+                            if (ry + geo.iconH > sc.height + 4) break;
+                            cx = geo.x + Math.floor(geo.iconW/2);
+                            cy = ry    + Math.floor(geo.iconH/2);
+                        }
 
                         let best = null, bestCropRect = null;
                         for (const sz of SWEEP_SZ) {
@@ -8558,12 +8631,14 @@ function getClass2IconByClass3(c3) {
                         target.matcher_top3    = best.top3;
                         target.matcher_source  = 'bench_local_matcher';
                         target.matcher_trigger = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
-                        target.matcher_pack    = packName;
-                        target.matcher_row     = rowIdx;
-                        target.matcher_cx      = cx;
-                        target.matcher_cy      = cy;
-                        target.matcher_crop    = bestCropRect;
-                        target.matcher_cropUrl = cropUrl;
+                        target.matcher_pack      = packName;
+                        target.matcher_row       = rowIdx;
+                        target.matcher_cx        = cx;
+                        target.matcher_cy        = cy;
+                        target.matcher_crop      = bestCropRect;
+                        target.matcher_cropUrl   = cropUrl;
+                        target.matcher_locHit    = _locHit;
+                        target.matcher_locConf   = _locEntry ? _locEntry.confidence : null;
 
                         if (target.matcher_trigger) {
                             target.class2       = best.class2;
@@ -8752,6 +8827,7 @@ function getClass2IconByClass3(c3) {
                 const _mbCrop = p.matcher_crop;
                 const _mbDebug = p.matcher_top1 ? [
                     `pack=${p.matcher_pack||'?'} row=${p.matcher_row??'?'}`,
+                    `loc=${p.matcher_locHit?'GEMINI(conf='+((p.matcher_locConf||0)*100).toFixed(0)+'%)':'GEOMETRY'}`,
                     `cx=${p.matcher_cx??'?'} cy=${p.matcher_cy??'?'}`,
                     _mbCrop ? `crop sx=${_mbCrop.sx} sy=${_mbCrop.sy} sw=${_mbCrop.sw} sh=${_mbCrop.sh}` : '',
                     _mbCrop ? `sweep sz=${_mbCrop.sz} dx=${_mbCrop.dx} dy=${_mbCrop.dy}` : '',
