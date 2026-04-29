@@ -14,7 +14,7 @@
 - PROJECT_STATE обновлять только при новом проверяемом факте, не после каждого edit
 
 ## Текущее состояние
-- current task: GT exemplar catalog matcher — авто-определение профы игроков по скриншоту КМ (scan preview); работа активна, последний коммит e3b7c10 (2026-04-26)
+- current task: GT exemplar catalog matcher — авто-определение профы игроков по скриншоту КМ (scan preview); работа активна, последний коммит 8fc52e6 (2026-04-29)
 - current layer: scan / KM recognition / auto-profa detection
 - active file: BASA (1).html
 - last tested file: BASA (1).html
@@ -45,6 +45,8 @@
 - Bucket km-screenshots в Supabase: создан, Storage RLS policies — на усмотрение
 
 ## Последние изменения (хронологически, новые сверху)
+- 2026-04-29 — 8fc52e6 fix gt matcher maxDy: use adjacent-row-centre criterion, restore recall — _maxDy = rowH − floor(sz/2) − 1; для rowH=17: sz=20→maxDy=6 (было 0), sz=22→5 (было 0), sz=24→4 (было 0); сохраняет bleed-guard, восстанавливает recall
+- 2026-04-29 — 6db483e fix gt matcher row bleed and ambiguous top3 flag — ВВЁЛ РЕГРЕССИЮ: _maxDy = max(0, floor(rowH/2 − sz/2) + 2) слишком агрессивен для rowH≈17; большинство иконок ушли в LOW_SIM; AMBIGUOUS_TOP3 margin 0.05 оставлен
 - 2026-04-26 — e3b7c10 add gt_ex debug strip to scan preview — диагностическая полоса GT exemplar в scan preview
 - 2026-04-26 — 3cd0414 enable safe auto profa with review queue — авто-проставление профы через очередь ревью (safe mode)
 - 2026-04-26 — 967f502 restore stable gt exemplar crop selection — стабилизация выбора кропа exemplar
@@ -84,7 +86,7 @@
 ## Preview deploy (подтверждено)
 - repo: andeeylike-source/clan-control-preview
 - remote: preview
-- последний commit на preview: d915042 (debug guard — только для диагностики Invalid Date)
+- последний commit на preview: 6db483e (fix gt matcher row bleed and ambiguous top3 flag)
 
 ## Что нельзя ломать
 - позиции CVE-блоков в режиме просмотра календаря (hero-meta layout)
