@@ -8786,6 +8786,11 @@ ${playerList}
                         for (const sz of SWEEP_SZ) {
                             for (const dx of SWEEP_OFF) {
                                 for (const dy of SWEEP_OFF) {
+                                    // Row boundary guard: limit dy so crop doesn't cross row midpoint.
+                                    // Allows headroom = rowH/2 - sz/2 + 2px tolerance (adaptive to screenshot res).
+                                    // For sz > rowH (tiny screenshots) only dy=0 is allowed.
+                                    const _maxDy = Math.max(0, Math.floor(geo.rowH / 2 - sz / 2) + 2);
+                                    if (Math.abs(dy) > _maxDy) continue;
                                     const sx = Math.max(0, cx+dx-Math.floor(sz/2));
                                     const sy = Math.max(0, cy+dy-Math.floor(sz/2));
                                     const sw = Math.min(sc.width-sx,  sz);
@@ -9161,8 +9166,9 @@ ${playerList}
                         if ((p.matcher_margin || 0) < _GT_MAR_TRIG) _reasons.push('LOW_MARGIN');
                     }
                     if (p.matcher_top3 && p.matcher_top3.length > 1) {
-                        const topNames = p.matcher_top3.map(x => x.name || x.class2);
-                        if (new Set(topNames.slice(0,3)).size > 1) _reasons.push('AMBIGUOUS_TOP3');
+                        const _t1sim = p.matcher_top3[0].sim ?? p.matcher_top3[0].similarity ?? 0;
+                        const _t2sim = p.matcher_top3[1].sim ?? p.matcher_top3[1].similarity ?? 0;
+                        if (_t1sim - _t2sim < 0.05) _reasons.push('AMBIGUOUS_TOP3');
                     }
                     const _reasonStr = _reasons.join(' · ') || '?';
                     const _simStr = p.matcher_sim != null ? `sim ${(p.matcher_sim*100).toFixed(0)}%` : '';
