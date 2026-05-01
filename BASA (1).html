@@ -3751,52 +3751,65 @@
     </div>
 
     <!-- KM PARTY REVIEW WIZARD -->
-    <div id="kmReviewWizard" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.85);align-items:center;justify-content:center;padding:14px;box-sizing:border-box">
-        <div style="background:#0f141d;border:1px solid #1e2530;border-radius:16px;width:100%;max-width:1100px;max-height:94vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.6)">
+    <div id="kmReviewWizard" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.82);align-items:center;justify-content:center;padding:10px;box-sizing:border-box">
+        <div style="background:#0f141d;border:1px solid #1e2530;border-radius:14px;width:100%;max-width:1340px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.55)">
             <!-- header -->
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid #1e2530;background:#12171f;gap:10px;flex-wrap:wrap">
-                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0">
-                    <div style="font-size:14px;font-weight:800;color:#e2e8f0">🧙 Сверка по пакам</div>
-                    <div id="kmRwIndicator" style="font-size:11px;color:#a5b4fc;background:#1a1f29;border:1px solid #2d3748;border-radius:6px;padding:3px 9px;font-weight:700">1/1</div>
-                    <div id="kmRwLeader" style="font-size:11px;color:#fbbf24;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid #1e2530;background:#12171f;gap:8px;flex-wrap:wrap">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0">
+                    <div style="font-size:13px;font-weight:800;color:#e2e8f0">🧙 Сверка по пакам</div>
+                    <div id="kmRwIndicator" style="font-size:11px;color:#a5b4fc;background:#1a1f29;border:1px solid #2d3748;border-radius:5px;padding:2px 8px;font-weight:700">1 / 1</div>
+                    <div id="kmRwLeader" style="font-size:11px;color:#fbbf24;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px"></div>
                 </div>
-                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-                    <button onclick="kmRwPrev()" id="kmRwPrevBtn" style="background:#1e2530;color:#94a3b8;border:1px solid #2d3748;border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700;cursor:pointer">◀ Prev party</button>
-                    <button onclick="kmRwNext()" id="kmRwNextBtn" style="background:#1e2530;color:#94a3b8;border:1px solid #2d3748;border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700;cursor:pointer">Next party ▶</button>
-                    <button onclick="kmRwClose()" title="Закрыть" style="background:none;border:none;color:#64748b;font-size:18px;cursor:pointer;padding:4px 8px;line-height:1">✕</button>
+                <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+                    <button onclick="kmRwPrev()" id="kmRwPrevBtn" style="background:#1e2530;color:#94a3b8;border:1px solid #2d3748;border-radius:7px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer">◀ Prev</button>
+                    <button onclick="kmRwNext()" id="kmRwNextBtn" style="background:#1e2530;color:#94a3b8;border:1px solid #2d3748;border-radius:7px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer">Next ▶</button>
+                    <button onclick="kmRwClose()" title="Закрыть" style="background:none;border:none;color:#64748b;font-size:17px;cursor:pointer;padding:3px 7px;line-height:1">✕</button>
                 </div>
             </div>
             <!-- body -->
             <div id="kmRwBody" style="display:flex;flex:1;overflow:hidden;min-height:0">
-                <!-- left: source screenshot -->
-                <div id="kmRwLeft" style="flex:1.05;background:#0a0d12;border-right:1px solid #1e2530;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0">
-                    <div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:.05em">📸 Исходный скрин «Члены группы»</div>
-                    <div id="kmRwShotWrap" style="background:#000;border:1px solid #1e2530;border-radius:8px;flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:240px">
-                        <img id="kmRwShot" src="" style="max-width:100%;max-height:62vh;object-fit:contain;display:none">
-                        <div id="kmRwShotEmpty" style="color:#475569;font-size:12px;text-align:center;padding:20px">Скриншот для этой пати не сохранён</div>
+                <!-- left: cropped «Член группы» -->
+                <div id="kmRwLeft" style="flex:0 0 40%;background:#0a0d12;border-right:1px solid #1e2530;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:0">
+                    <div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:.05em;display:flex;align-items:center;justify-content:space-between;gap:8px">
+                        <span>📸 Исходный «Член группы»</span>
+                        <span id="kmRwCropTag" style="font-size:9px;color:#475569;font-weight:600;text-transform:none"></span>
                     </div>
-                    <div style="font-size:10px;color:#64748b;line-height:1.5">Сверь визуально каждую строку с распознанными значениями справа.</div>
+                    <div id="kmRwShotWrap" style="background:#000;border:1px solid #1e2530;border-radius:8px;flex:1;display:flex;align-items:center;justify-content:center;overflow:auto;min-height:200px">
+                        <img id="kmRwShot" src="" style="max-width:100%;max-height:74vh;object-fit:contain;display:none;cursor:zoom-in" onclick="kmRwToggleZoom(this)">
+                        <div id="kmRwShotEmpty" style="color:#475569;font-size:12px;text-align:center;padding:18px">Кроп для этой пати недоступен</div>
+                    </div>
                 </div>
-                <!-- right: editable rows -->
-                <div id="kmRwRight" style="flex:1.15;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0">
+                <!-- right: compact editable list -->
+                <div id="kmRwRight" style="flex:1;overflow:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0">
                     <div id="kmRwPackHdr" style="font-size:11px;color:#94a3b8;font-weight:700"></div>
-                    <div id="kmRwRows" style="display:flex;flex-direction:column;gap:8px"></div>
+                    <div style="display:grid;grid-template-columns:1.55fr 56px 56px 78px 78px;gap:6px;padding:5px 6px;font-size:9px;color:#475569;text-transform:uppercase;font-weight:700;border-bottom:1px solid #1a1f29">
+                        <div>Игрок · Профа</div>
+                        <div style="text-align:center">⚔️ Kills</div>
+                        <div style="text-align:center">💀 Deaths</div>
+                        <div style="text-align:center">🗡️ PvP</div>
+                        <div style="text-align:center">🐉 PvE</div>
+                    </div>
+                    <div id="kmRwRows" style="display:flex;flex-direction:column"></div>
                 </div>
             </div>
             <!-- footer -->
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 18px;border-top:1px solid #1e2530;background:#12171f;gap:10px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-top:1px solid #1e2530;background:#12171f;gap:8px;flex-wrap:wrap">
                 <div id="kmRwSaveStatus" style="font-size:11px;color:#64748b">Правки записываются сразу при изменении полей.</div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap">
-                    <button onclick="kmRwSave()" style="background:#6366f1;color:white;border:none;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer">💾 Сохранить · далее</button>
-                    <button onclick="kmRwApply()" style="background:#22c55e;color:white;border:none;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer">✅ Применить в ростер</button>
+                <div style="display:flex;gap:7px;flex-wrap:wrap">
+                    <button onclick="kmRwSave()" style="background:#6366f1;color:white;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer">💾 Сохранить · далее</button>
+                    <button onclick="kmRwApply()" style="background:#22c55e;color:white;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer">✅ Применить в ростер</button>
                 </div>
             </div>
         </div>
     </div>
     <style>
-        @media (max-width: 760px) {
+        #kmReviewWizard input.kmrw-num::-webkit-inner-spin-button,
+        #kmReviewWizard input.kmrw-num::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+        #kmReviewWizard input.kmrw-num { -moz-appearance:textfield; }
+        #kmReviewWizard .kmrw-row:hover { background:#12171f; }
+        @media (max-width: 900px) {
             #kmRwBody { flex-direction: column; }
-            #kmRwLeft { border-right:none !important; border-bottom:1px solid #1e2530; max-height:38vh; flex:0 0 auto !important; }
+            #kmRwLeft { border-right:none !important; border-bottom:1px solid #1e2530; max-height:36vh; flex:0 0 auto !important; }
             #kmRwRight { flex:1 !important; }
         }
     </style>
@@ -7794,6 +7807,7 @@ function getClass2IconByClass3(c3) {
         let dayScreenPlayersMap = {}; // { packName: [players] } — игроки каждого пака со скрина
         let dayScreenShotMap = {};   // { packName: dataUrl } — скрин каждого пака
         let dayIconLocations = {};   // { packName: { normName: {icon_center_x,icon_center_y,icon_bbox,confidence} } }
+        let dayPackGeometry = {};    // { packName: {x,y,rowH,iconW,iconH,packLen,imgW,imgH,preset} } — для кропа таблицы «Член группы» в wizard
 
         // ===== ПУЛ API КЛЮЧЕЙ GEMINI (из localStorage) =====
         function getGeminiKeys() {
@@ -8801,6 +8815,11 @@ ${playerList}
                         }
                         continue;
                     }
+                    // Persist geometry so KM review wizard can crop just the «Член группы» table
+                    dayPackGeometry[packName] = {
+                        x: geo.x, y: geo.y, rowH: geo.rowH, iconW: geo.iconW, iconH: geo.iconH,
+                        packLen: packPlayers.length, imgW: sc.width, imgH: sc.height, preset: geo.preset
+                    };
 
                     for (let rowIdx = 0; rowIdx < packPlayers.length; rowIdx++) {
                         const pp = packPlayers[rowIdx];
@@ -9631,6 +9650,8 @@ ${playerList}
             _kmRw.parties = parties;
             _kmRw.idx = 0;
             _kmRw.open = true;
+            _kmRw.cropCache = {};
+            _kmRw.shotReq = 0;
             const ov = document.getElementById('kmReviewWizard');
             if (ov) ov.style.display = 'flex';
             kmRwRender();
@@ -9654,6 +9675,82 @@ ${playerList}
             return (dayLastParsed || []).find(p => normalizeNick(p.name) === nk) || null;
         }
 
+        async function _kmRwGetCropUrl(packName) {
+            const fullUrl = (dayScreenShotMap || {})[packName] || '';
+            if (!fullUrl) return { url:'', cropped:false };
+            const g = (dayPackGeometry || {})[packName];
+            if (!_kmRw.cropCache) _kmRw.cropCache = {};
+            if (_kmRw.cropCache[packName]) return _kmRw.cropCache[packName];
+            if (!g) {
+                const fallback = { url: fullUrl, cropped: false };
+                _kmRw.cropCache[packName] = fallback;
+                return fallback;
+            }
+            try {
+                const img = await new Promise((res, rej) => {
+                    const im = new Image();
+                    im.onload = () => res(im);
+                    im.onerror = rej;
+                    im.src = fullUrl;
+                });
+                // Heuristics: nick column ≈ 6.5 × iconW left of icon; stats columns ≈ 13 × iconW right
+                const padL = Math.max(80,  Math.round(6.5 * g.iconW));
+                const padR = Math.max(180, Math.round(13  * g.iconW));
+                const padTop = Math.max(24, Math.round(2 * g.rowH));
+                const padBot = Math.max(18, Math.round(1.5 * g.rowH));
+                const W = img.naturalWidth, H = img.naturalHeight;
+                const cx = Math.max(0, Math.round(g.x - padL));
+                const cy = Math.max(0, Math.round(g.y - padTop));
+                const cw = Math.min(W - cx, Math.round((g.x + g.iconW + padR) - cx));
+                const ch = Math.min(H - cy, Math.round((g.y + g.packLen * g.rowH + padBot) - cy));
+                if (cw < 60 || ch < 60) {
+                    const fb = { url: fullUrl, cropped: false };
+                    _kmRw.cropCache[packName] = fb;
+                    return fb;
+                }
+                const c = document.createElement('canvas');
+                c.width = cw; c.height = ch;
+                c.getContext('2d').drawImage(img, cx, cy, cw, ch, 0, 0, cw, ch);
+                const url = c.toDataURL('image/png');
+                const out = { url, cropped: true, w: cw, h: ch };
+                _kmRw.cropCache[packName] = out;
+                return out;
+            } catch(e) {
+                console.warn('[kmRw crop]', e);
+                return { url: fullUrl, cropped: false };
+            }
+        }
+
+        function _kmRwBadge(parsed) {
+            const profaSrc = parsed.profaSource || '';
+            const isAuto = parsed.matcher_source === 'gt_exemplar_matcher' && parsed.matcher_trigger && !parsed.matcher_rowUnstable && !parsed.matcher_locInvalid;
+            const isManual = profaSrc === 'manual_review';
+            const top3Title = parsed.matcher_top3 && parsed.matcher_top3.length
+                ? 'top3: ' + parsed.matcher_top3.slice(0,3).map(x => (x.name||x.class2||'?') + ' ' + Math.round((x.sim||x.similarity||0)*100) + '%').join(', ')
+                : '';
+            if (isManual) {
+                return '<span title="Ручная правка" style="font-size:8.5px;color:#a5b4fc;background:#1e1b4b;border:1px solid #4338ca;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">MANUAL</span>';
+            }
+            if (isAuto) {
+                const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
+                return '<span title="Авто · ' + _kmRwEsc(top3Title) + '" style="font-size:8.5px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">AUTO ' + sim + '</span>';
+            }
+            if (parsed.matcher_locInvalid) {
+                return '<span title="Плохой кроп иконки — выбери профу вручную" style="font-size:8.5px;color:#f97316;background:#1c0a00;border:1px solid #7c2d12;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">BAD CROP</span>';
+            }
+            if (parsed.matcher_rowUnstable && parsed.matcher_top1) {
+                return '<span title="Строка съехала — проверь вручную · ' + _kmRwEsc(top3Title) + '" style="font-size:8.5px;color:#fb923c;background:#1a0800;border:1px solid #7c2d12;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">ROW?</span>';
+            }
+            if (parsed.matcher_top1 && !parsed.matcher_trigger) {
+                const reasons = [];
+                if ((parsed.matcher_sim||0)    < 0.60) reasons.push('LOW_SIM');
+                if ((parsed.matcher_margin||0) < 0.08) reasons.push('AMBIG');
+                const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
+                return '<span title="' + _kmRwEsc((parsed.matcher_top1||'') + ' ' + sim + ' · ' + top3Title) + '" style="font-size:8.5px;color:#fbbf24;background:#1c1300;border:1px solid #92400e;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">' + (reasons.join('·') || 'CHECK') + '</span>';
+            }
+            return '';
+        }
+
         function kmRwRender() {
             if (!_kmRw.open) return;
             const total = _kmRw.parties.length;
@@ -9674,10 +9771,20 @@ ${playerList}
 
             const shotImg = document.getElementById('kmRwShot');
             const shotEmpty = document.getElementById('kmRwShotEmpty');
+            const cropTag = document.getElementById('kmRwCropTag');
+            if (cropTag) cropTag.textContent = '';
             if (party.shotUrl) {
-                shotImg.src = party.shotUrl;
-                shotImg.style.display = '';
                 shotEmpty.style.display = 'none';
+                shotImg.style.display = '';
+                // Show full screenshot immediately to avoid an empty flash
+                shotImg.src = party.shotUrl;
+                if (cropTag) cropTag.textContent = '⏳ кадрирую…';
+                const myReq = (_kmRw.shotReq = (_kmRw.shotReq||0) + 1);
+                _kmRwGetCropUrl(party.packName).then(out => {
+                    if (myReq !== _kmRw.shotReq || _kmRw.idx !== idx) return; // user navigated away
+                    if (out && out.url) shotImg.src = out.url;
+                    if (cropTag) cropTag.textContent = out && out.cropped ? '🎯 кроп таблицы' : '⚠️ нет геометрии — полный скрин';
+                });
             } else {
                 shotImg.removeAttribute('src');
                 shotImg.style.display = 'none';
@@ -9686,83 +9793,65 @@ ${playerList}
 
             document.getElementById('kmRwPackHdr').innerHTML =
                 '<span style="color:#64748b">Пак:</span> <span style="color:#e2e8f0;font-weight:800">' + _kmRwEsc(party.packName) +
-                '</span> <span style="color:#64748b">·</span> <span style="color:#64748b">игроков:</span> <span style="color:#e2e8f0;font-weight:800">' + party.players.length + '</span>';
+                '</span> <span style="color:#475569">·</span> <span style="color:#64748b">игроков:</span> <span style="color:#e2e8f0;font-weight:800">' + party.players.length + '</span>';
 
             const rowsHtml = party.players.map((pp, i) => {
                 const parsed = _kmRwFindParsed(pp.name) || {};
                 const profa = (parsed.profa && parsed.profa !== '—') ? parsed.profa : '';
-                const profaSrc = parsed.profaSource || '';
-                const isAuto = parsed.matcher_source === 'gt_exemplar_matcher' && parsed.matcher_trigger && !parsed.matcher_rowUnstable && !parsed.matcher_locInvalid;
-                const isManual = profaSrc === 'manual_review';
-                let badgeHtml = '';
-                if (isManual) {
-                    badgeHtml = '<span title="Ручная правка" style="font-size:9px;color:#a5b4fc;background:#1e1b4b;border:1px solid #4338ca;border-radius:3px;padding:1px 5px;font-weight:700">MANUAL</span>';
-                } else if (isAuto) {
-                    const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
-                    badgeHtml = '<span title="Авто-сопоставление с высокой уверенностью" style="font-size:9px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 5px;font-weight:700">AUTO ' + sim + '</span>';
-                } else if (parsed.matcher_locInvalid) {
-                    badgeHtml = '<span title="Плохой кроп иконки — нужна ручная правка" style="font-size:9px;color:#f97316;background:#1c0a00;border:1px solid #7c2d12;border-radius:3px;padding:1px 5px;font-weight:700">BAD CROP</span>';
-                } else if (parsed.matcher_rowUnstable && parsed.matcher_top1) {
-                    badgeHtml = '<span title="Строка съехала — проверь вручную" style="font-size:9px;color:#fb923c;background:#1a0800;border:1px solid #7c2d12;border-radius:3px;padding:1px 5px;font-weight:700">ROW UNSTABLE</span>';
-                } else if (parsed.matcher_top1 && !parsed.matcher_trigger) {
-                    const reasons = [];
-                    if ((parsed.matcher_sim||0) < 0.60) reasons.push('LOW_SIM');
-                    if ((parsed.matcher_margin||0) < 0.08) reasons.push('AMBIGUOUS');
-                    badgeHtml = '<span title="Низкая уверенность авто-распознавания" style="font-size:9px;color:#fbbf24;background:#1c1300;border:1px solid #92400e;border-radius:3px;padding:1px 5px;font-weight:700">' + (reasons.join(' · ') || 'CHECK') + '</span>';
-                }
-
-                const top3Html = parsed.matcher_top3 && parsed.matcher_top3.length > 0
-                    ? '<div style="font-size:9px;color:#64748b;margin-top:3px">top3: ' +
-                        parsed.matcher_top3.slice(0,3).map(x => _kmRwEsc(x.name||x.class2||'?') + ' ' + Math.round((x.sim||x.similarity||0)*100) + '%').join(', ') +
-                      '</div>'
-                    : '';
-
-                const cropHtml = parsed.matcher_cropUrl
-                    ? '<img src="' + parsed.matcher_cropUrl + '" width="28" height="28" style="image-rendering:pixelated;border:1px solid #334155;border-radius:3px;flex-shrink:0">'
-                    : '';
-
-                const profaCurrentHtml = profa && typeof profaIconHtml === 'function'
-                    ? '<span style="display:inline-flex;align-items:center;gap:4px">' + profaIconHtml(profa, 18) + '</span>'
-                    : '';
-
+                const profaIconSmall = profa && typeof profaIconHtml === 'function'
+                    ? profaIconHtml(profa, 16)
+                    : '<span style="display:inline-block;width:16px;height:16px;border:1px dashed #334155;border-radius:3px"></span>';
                 const profaOpts = Object.keys(PROFA_NAMES || {}).map(pf =>
-                    '<option value="' + _kmRwEsc(pf) + '"' + (pf===profa?' selected':'') + '>' + _kmRwEsc(pf) + ' (' + _kmRwEsc(PROFA_NAMES[pf]) + ')</option>'
+                    '<option value="' + _kmRwEsc(pf) + '"' + (pf===profa?' selected':'') + '>' + _kmRwEsc(pf) + (PROFA_NAMES[pf] ? ' · ' + _kmRwEsc(PROFA_NAMES[pf]) : '') + '</option>'
                 ).join('');
-                const profaSelectHtml = '<select onchange="kmRwSetProfa(' + idx + ',' + i + ',this.value)" style="background:#0b0e14;border:1px solid #2d3748;border-radius:6px;color:#e2e8f0;font-size:11px;padding:3px 6px;cursor:pointer;max-width:170px">' +
-                    '<option value="">— профа —</option>' + profaOpts +
-                '</select>';
+                const profaSelect = '<select onchange="kmRwSetProfa(' + idx + ',' + i + ',this.value)" style="background:#0b0e14;border:1px solid #2d3748;border-radius:5px;color:#e2e8f0;font-size:10.5px;padding:2px 4px;cursor:pointer;max-width:108px;flex:0 1 108px">' +
+                    '<option value="">— профа —</option>' + profaOpts + '</select>';
 
                 const isLeader = party.leader && pp.name && pp.name.toLowerCase() === String(party.leader).toLowerCase();
-                const leaderTag = isLeader ? '<span title="Лидер пати" style="font-size:9px;color:#fbbf24;background:#1a1206;border:1px solid #a16207;border-radius:3px;padding:1px 5px;font-weight:700">★ ЛИДЕР</span>' : '';
+                const leaderMark = isLeader
+                    ? '<span title="Лидер" style="color:#fbbf24;font-size:11px;line-height:1;flex-shrink:0">★</span>'
+                    : '<span style="display:inline-block;width:7px;flex-shrink:0"></span>';
 
-                const numFields = [
-                    ['kills','⚔️ Убийства'],
-                    ['deaths','💀 Смерти'],
-                    ['pvp_dmg','🗡️ PvP урон'],
-                    ['pve_dmg','🐉 PvE урон']
-                ];
-                const numsHtml = numFields.map(([k,label]) =>
-                    '<div>' +
-                        '<div style="font-size:9px;color:#64748b;margin-bottom:2px">' + label + '</div>' +
-                        '<input type="number" min="0" value="' + (pp[k]||0) + '" onchange="kmRwSetNum(' + idx + ',' + i + ',\'' + k + '\',this.value)" style="background:#0b0e14;border:1px solid #2d3748;border-radius:6px;padding:4px 6px;color:#e2e8f0;font-size:12px;width:100%;box-sizing:border-box">' +
-                    '</div>'
-                ).join('');
+                const badgeHtml = _kmRwBadge(parsed);
 
-                return '<div style="background:#1a1f29;border:1px solid #1e2530;border-radius:9px;padding:9px 11px">' +
-                    '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:6px">' +
-                        cropHtml +
-                        leaderTag +
-                        '<input value="' + _kmRwEsc(pp.name||'') + '" oninput="kmRwSetName(' + idx + ',' + i + ',this.value)" style="background:#0b0e14;border:1px solid #2d3748;border-radius:6px;padding:4px 8px;color:#fff;font-weight:700;font-size:12px;width:140px">' +
-                        profaCurrentHtml +
-                        profaSelectHtml +
+                const numCellStyle = 'background:#0b0e14;border:1px solid #1e2530;border-radius:5px;padding:3px 4px;font-size:11px;text-align:center;width:100%;box-sizing:border-box;outline:none';
+                const num = (k, color) =>
+                    '<input type="number" min="0" class="kmrw-num" value="' + (pp[k]||0) +
+                    '" onchange="kmRwSetNum(' + idx + ',' + i + ',\'' + k + '\',this.value)" ' +
+                    'style="' + numCellStyle + ';color:' + color + '">';
+
+                return '<div class="kmrw-row" style="display:grid;grid-template-columns:1.55fr 56px 56px 78px 78px;gap:6px;align-items:center;padding:4px 6px;border-bottom:1px solid #11151c;transition:background .12s">' +
+                    '<div style="display:flex;align-items:center;gap:5px;min-width:0">' +
+                        leaderMark +
+                        '<input value="' + _kmRwEsc(pp.name||'') + '" oninput="kmRwSetName(' + idx + ',' + i + ',this.value)" ' +
+                        'style="flex:1 1 110px;min-width:80px;background:transparent;border:1px solid #1e2530;border-radius:5px;padding:3px 6px;color:#e2e8f0;font-weight:700;font-size:12px;outline:none">' +
+                        profaIconSmall +
+                        profaSelect +
                         badgeHtml +
                     '</div>' +
-                    top3Html +
-                    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px">' + numsHtml + '</div>' +
+                    num('kills','#f59e0b') +
+                    num('deaths','#ef4444') +
+                    num('pvp_dmg','#a5b4fc') +
+                    num('pve_dmg','#86efac') +
                 '</div>';
             }).join('');
 
             document.getElementById('kmRwRows').innerHTML = rowsHtml;
+        }
+
+        function kmRwToggleZoom(img) {
+            if (!img) return;
+            if (img.dataset.zoomed === '1') {
+                img.style.maxWidth = '100%';
+                img.style.maxHeight = '74vh';
+                img.style.cursor = 'zoom-in';
+                img.dataset.zoomed = '0';
+            } else {
+                img.style.maxWidth = 'none';
+                img.style.maxHeight = 'none';
+                img.style.cursor = 'zoom-out';
+                img.dataset.zoomed = '1';
+            }
         }
 
         function kmRwSetName(partyIdx, rowIdx, val) {
