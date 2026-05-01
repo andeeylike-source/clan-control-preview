@@ -16217,6 +16217,160 @@ window._archRender = function() {
     }
     .cc-tab-bg-toast.show { opacity: 1; transform: translateY(0); }
 
+    /* ══ v20 polish: calendar premium glass ════════════════ */
+    body:not(.light) .calendar-grid-card,
+    body:not(.light) .calendar-side-card,
+    body:not(.light) .calendar-summary-card {
+      background: linear-gradient(180deg, rgba(10,13,20,0.62), rgba(6,8,14,0.44)) !important;
+      border: 1px solid rgba(255,255,255,0.09) !important;
+      border-top-color: rgba(255,255,255,0.16) !important;
+      box-shadow: 0 14px 44px rgba(0,0,0,0.32), inset 0 1px rgba(255,255,255,0.05) !important;
+    }
+    body:not(.light) .calendar-grid-card:hover,
+    body:not(.light) .calendar-side-card:hover,
+    body:not(.light) .calendar-summary-card:hover {
+      border-color: rgba(232,190,88,0.26) !important;
+      box-shadow: 0 22px 64px rgba(0,0,0,0.42), 0 0 28px rgba(232,190,88,0.06) !important;
+    }
+    body:not(.light) .calendar-grid {
+      background: rgba(255,255,255,0.03) !important;
+      border: 1px solid rgba(255,255,255,0.08) !important;
+    }
+    body:not(.light) .calendar-header-cell {
+      background: rgba(8,10,16,0.46) !important;
+      color: rgba(232,190,88,0.55) !important;
+      letter-spacing: 0.10em !important;
+      border-bottom: 1px solid rgba(232,190,88,0.10) !important;
+    }
+    body:not(.light) .calendar-day {
+      background: rgba(6,8,14,0.42) !important;
+      transition: background 0.18s, box-shadow 0.20s !important;
+    }
+    body:not(.light) .calendar-day:hover {
+      background: rgba(232,190,88,0.045) !important;
+      box-shadow: inset 0 0 0 1px rgba(232,190,88,0.16) !important;
+    }
+    body:not(.light) .calendar-day.today {
+      background: rgba(232,190,88,0.08) !important;
+      outline: 1px solid rgba(232,190,88,0.45) !important;
+      box-shadow: inset 0 0 24px rgba(232,190,88,0.07) !important;
+    }
+    body:not(.light) .calendar-hero-meta {
+      background: linear-gradient(180deg, rgba(8,10,14,0.56), rgba(5,6,10,0.46)) !important;
+      border: 1px solid rgba(255,255,255,0.08) !important;
+    }
+    body:not(.light) .calendar-hero-eyebrow {
+      background: rgba(8,10,14,0.55) !important;
+      border: 1px solid rgba(232,190,88,0.32) !important;
+      color: #f5d98a !important;
+    }
+    body:not(.light) .calendar-nav-btn {
+      background: rgba(255,255,255,0.04) !important;
+      border: 1px solid rgba(255,255,255,0.10) !important;
+      color: rgba(245,230,200,0.78) !important;
+      transition: all 0.17s !important;
+    }
+    body:not(.light) .calendar-nav-btn:hover {
+      border-color: rgba(232,190,88,0.42) !important;
+      color: #f5d98a !important;
+      box-shadow: 0 0 14px rgba(232,190,88,0.10) !important;
+    }
+    body:not(.light) .calendar-side-link {
+      color: rgba(232,190,88,0.78) !important;
+    }
+    body:not(.light) .calendar-side-link:hover {
+      color: #f5d98a !important;
+    }
+
+    /* ══ v20 polish: modals premium glass ═════════════════ */
+    body:not(.light) .modal-overlay {
+      background: rgba(0,0,0,0.62) !important;
+      backdrop-filter: blur(6px) !important;
+      -webkit-backdrop-filter: blur(6px) !important;
+    }
+    body:not(.light) .event-modal-card,
+    body:not(.light) .day-modal-card,
+    body:not(.light) .info-modal-box {
+      background: linear-gradient(180deg, rgba(10,13,20,0.94), rgba(6,8,14,0.90)) !important;
+      border: 1px solid rgba(255,255,255,0.12) !important;
+      border-top-color: rgba(255,255,255,0.20) !important;
+      box-shadow: 0 32px 110px rgba(0,0,0,0.62), inset 0 1px rgba(255,255,255,0.07) !important;
+    }
+    body:not(.light) .event-item-row,
+    body:not(.light) .member-list-item {
+      background: rgba(8,10,16,0.46) !important;
+      border: 1px solid rgba(255,255,255,0.08) !important;
+      transition: border-color 0.18s, background 0.18s !important;
+    }
+    body:not(.light) .event-item-row:hover,
+    body:not(.light) .member-list-item:hover {
+      border-color: rgba(232,190,88,0.28) !important;
+      background: rgba(232,190,88,0.04) !important;
+    }
+
+    /* ══ v20 polish: secondary buttons & topbar ═══════════ */
+    body:not(.light) .topbar-icon-btn {
+      background: rgba(255,255,255,0.04) !important;
+      border: 1px solid rgba(255,255,255,0.10) !important;
+      color: rgba(245,230,200,0.72) !important;
+      transition: all 0.17s !important;
+    }
+    body:not(.light) .btn-secondary,
+    body:not(.light) button.btn-secondary {
+      background: rgba(255,255,255,0.05) !important;
+      border: 1px solid rgba(255,255,255,0.11) !important;
+      color: rgba(245,230,200,0.82) !important;
+      transition: all 0.17s !important;
+    }
+    body:not(.light) .btn-secondary:hover,
+    body:not(.light) button.btn-secondary:hover {
+      border-color: rgba(232,190,88,0.42) !important;
+      color: #f5d98a !important;
+      background: rgba(232,190,88,0.06) !important;
+      box-shadow: 0 0 16px rgba(232,190,88,0.09) !important;
+    }
+
+    /* ══ v20 polish: scrollbar gold tint ══════════════════ */
+    body:not(.light) ::-webkit-scrollbar { width: 6px; height: 6px; }
+    body:not(.light) ::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, rgba(232,190,88,0.28), rgba(160,120,40,0.18)) !important;
+      border-radius: 10px !important;
+    }
+    body:not(.light) ::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg, rgba(232,190,88,0.44), rgba(180,140,60,0.28)) !important;
+    }
+
+    /* ══ v20 polish: badges & event chips ═════════════════ */
+    body:not(.light) .badge {
+      border-radius: 7px !important;
+      letter-spacing: 0.04em !important;
+    }
+    body:not(.light) .event-chip {
+      border-radius: 7px !important;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.35) !important;
+    }
+
+    /* ══ v20 polish: autocomplete popover ═════════════════ */
+    body:not(.light) .autocomplete-suggestions,
+    body:not(.light) .dp-popup {
+      background: linear-gradient(180deg, rgba(10,13,20,0.95), rgba(6,8,14,0.92)) !important;
+      border: 1px solid rgba(232,190,88,0.30) !important;
+      box-shadow: 0 22px 70px rgba(0,0,0,0.55), inset 0 1px rgba(255,255,255,0.06) !important;
+    }
+    body:not(.light) .suggestion-item:hover {
+      background: rgba(232,190,88,0.10) !important;
+      color: #f5d98a !important;
+    }
+
+    /* ══ v20 polish: dash alerts hover glow ═══════════════ */
+    body:not(.light) .dash-alert {
+      transition: background 0.18s, box-shadow 0.20s !important;
+    }
+    body:not(.light) .dash-alert:hover {
+      background: rgba(232,190,88,0.05) !important;
+      box-shadow: inset 0 0 0 1px rgba(232,190,88,0.18) !important;
+    }
+
     </style>
 </body>
 </html>
