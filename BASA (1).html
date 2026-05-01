@@ -16121,15 +16121,23 @@ window._archRender = function() {
     var applyAll = document.getElementById('ccTabApplyAll');
     var isAll    = applyAll && applyAll.checked;
 
-    // Find last uploaded
+    // Find last uploaded image from pending (any tab)
     var lastImg = null;
     TABS.forEach(function(t){ if (_pending[t.id]) lastImg = _pending[t.id]; });
 
-    if (isAll && lastImg) {
-      try { localStorage.setItem(KEY_GLOBAL, lastImg); } catch(e){}
-      localStorage.setItem(KEY_USE_GLOB, '1');
-      TABS.forEach(function(t){ localStorage.removeItem(KEY_TAB + t.id); });
+    if (isAll) {
+      // Global mode: if a new image was uploaded, update cc-bg-global; otherwise keep existing
+      if (lastImg) {
+        try { localStorage.setItem(KEY_GLOBAL, lastImg); } catch(e){}
+      }
+      // Always activate global flag when checkbox is ON and Save is clicked
+      if (localStorage.getItem(KEY_GLOBAL)) {
+        localStorage.setItem(KEY_USE_GLOB, '1');
+        // Clear per-tab keys — global takes over
+        TABS.forEach(function(t){ localStorage.removeItem(KEY_TAB + t.id); });
+      }
     } else {
+      // Per-tab mode: deactivate global, save individual tab images
       localStorage.removeItem(KEY_USE_GLOB);
       TABS.forEach(function(t){
         if (_pending[t.id]) {
@@ -16151,9 +16159,12 @@ window._archRender = function() {
     localStorage.removeItem(KEY_GLOBAL);
     localStorage.removeItem(KEY_USE_GLOB);
     _pending = {};
-    // Remove custom bg style
+    // Clear this engine's style element
     var el = document.getElementById('cceGlobalBgStyle');
     if (el) el.textContent = '';
+    // Also clear the CVE preload style so the default CSS bg shows again
+    var cve = document.getElementById('cveGlobalBgStyle');
+    if (cve) cve.textContent = '';
     showToast('Фоны сброшены');
     renderRows();
   }
