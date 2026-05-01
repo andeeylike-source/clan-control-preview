@@ -9659,6 +9659,7 @@ ${playerList}
 
         function kmRwClose() {
             _kmRw.open = false;
+            if (typeof kmRwCloseProfaPicker === 'function') kmRwCloseProfaPicker();
             const ov = document.getElementById('kmReviewWizard');
             if (ov) ov.style.display = 'none';
             if (typeof renderDayAnalyzedPlayers === 'function' && Array.isArray(dayLastParsed)) {
@@ -9666,8 +9667,8 @@ ${playerList}
             }
         }
 
-        function kmRwPrev() { if (_kmRw.idx > 0) { _kmRw.idx--; kmRwRender(); } }
-        function kmRwNext() { if (_kmRw.idx < _kmRw.parties.length - 1) { _kmRw.idx++; kmRwRender(); } }
+        function kmRwPrev() { if (_kmRw.idx > 0) { if (typeof kmRwCloseProfaPicker === 'function') kmRwCloseProfaPicker(); _kmRw.idx--; kmRwRender(); } }
+        function kmRwNext() { if (_kmRw.idx < _kmRw.parties.length - 1) { if (typeof kmRwCloseProfaPicker === 'function') kmRwCloseProfaPicker(); _kmRw.idx++; kmRwRender(); } }
 
         function _kmRwFindParsed(name) {
             if (!name) return null;
@@ -9801,11 +9802,17 @@ ${playerList}
                 const profaIconSmall = profa && typeof profaIconHtml === 'function'
                     ? profaIconHtml(profa, 16)
                     : '<span style="display:inline-block;width:16px;height:16px;border:1px dashed #334155;border-radius:3px"></span>';
-                const profaOpts = Object.keys(PROFA_NAMES || {}).map(pf =>
-                    '<option value="' + _kmRwEsc(pf) + '"' + (pf===profa?' selected':'') + '>' + _kmRwEsc(pf) + (PROFA_NAMES[pf] ? ' · ' + _kmRwEsc(PROFA_NAMES[pf]) : '') + '</option>'
-                ).join('');
-                const profaSelect = '<select onchange="kmRwSetProfa(' + idx + ',' + i + ',this.value)" style="background:#0b0e14;border:1px solid #2d3748;border-radius:5px;color:#e2e8f0;font-size:10.5px;padding:2px 4px;cursor:pointer;max-width:108px;flex:0 1 108px">' +
-                    '<option value="">— профа —</option>' + profaOpts + '</select>';
+                const profaInfo = (typeof PROFA_INFO !== 'undefined' && PROFA_INFO[profa]) || null;
+                const profaShortLabel = profa
+                    ? _kmRwEsc(profaInfo && profaInfo.short ? profaInfo.short : (PROFA_NAMES[profa] || profa))
+                    : '<span style="color:#64748b">— профа —</span>';
+                const profaSelect =
+                    '<button type="button" onclick="kmRwOpenProfaPicker(' + idx + ',' + i + ',this)" ' +
+                    'title="' + _kmRwEsc(profa || 'Выбрать профу — поиск по названию, сокращению или классу') + '" ' +
+                    'style="display:inline-flex;align-items:center;justify-content:space-between;gap:4px;background:#0b0e14;border:1px solid #2d3748;border-radius:5px;color:#e2e8f0;font-size:10.5px;padding:2px 6px;cursor:pointer;flex:0 1 110px;max-width:110px;height:22px;font-weight:600;text-align:left;font-family:inherit">' +
+                        '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + profaShortLabel + '</span>' +
+                        '<span style="color:#475569;font-size:9px;flex-shrink:0">▾</span>' +
+                    '</button>';
 
                 const isLeader = party.leader && pp.name && pp.name.toLowerCase() === String(party.leader).toLowerCase();
                 const leaderMark = isLeader
@@ -9853,6 +9860,201 @@ ${playerList}
                 img.dataset.zoomed = '1';
             }
         }
+
+        // ===== KM REVIEW: searchable profa picker (reuses PROFA_INFO + switchKeyboardLayout) =====
+        // Extra Latin-form abbreviations not covered by PROFA_INFO (short is in cyrillic, en2 is full word).
+        const _KMRW_LATIN_ALIASES = {
+            'Doomcryer': 'wc warcryer',
+            "Eva's Templar": 'tk temple knight',
+            'Shillien Templar': 'sk shk shillien knight',
+            'Phoenix Knight': 'pk paladin',
+            'Hell Knight': 'hk dark avenger da',
+            'Hierophant': 'pp prophet',
+            'Sword Muse': 'svs ss swordsinger',
+            'Spectral Dancer': 'bd bladedancer',
+            'Sagittarius': 'sag hawkeye hk-arch',
+            'Adventurer': 'th treasure hunter',
+            'Wind Rider': 'pw plains walker',
+            'Ghost Hunter': 'aw abyss walker av',
+            'Doombringer': 'bers berserker',
+            'Soulhound': 'sb soul breaker'
+        };
+
+        function kmRwOpenProfaPicker(partyIdx, rowIdx, anchor) {
+            kmRwCloseProfaPicker();
+            let picker = document.getElementById('kmRwProfaPicker');
+            if (!picker) {
+                picker = document.createElement('div');
+                picker.id = 'kmRwProfaPicker';
+                picker.style.cssText = 'position:fixed;z-index:400;background:#0f141d;border:1px solid #2d3748;border-radius:8px;box-shadow:0 14px 40px rgba(0,0,0,0.65);width:300px;max-height:360px;display:flex;flex-direction:column;overflow:hidden';
+                document.body.appendChild(picker);
+            }
+            _kmRw.profaTarget = { partyIdx: partyIdx, rowIdx: rowIdx };
+            const party = _kmRw.parties[partyIdx];
+            const row = party && party.players[rowIdx];
+            const parsed = row ? (_kmRwFindParsed(row.name) || {}) : {};
+            const currentProfa = parsed.profa && parsed.profa !== '—' ? parsed.profa : '';
+            picker.innerHTML =
+                '<div style="padding:7px 8px;border-bottom:1px solid #1e2530;display:flex;gap:6px;align-items:center">' +
+                    '<input id="kmRwProfaSearch" type="text" autocomplete="off" placeholder="Поиск: биш, варк, tk, sorc..." ' +
+                    'oninput="_kmRwRenderProfaList(this.value)" onkeydown="_kmRwProfaKey(event)" ' +
+                    'style="flex:1;background:#0b0e14;border:1px solid #2d3748;border-radius:5px;padding:5px 8px;color:#e2e8f0;font-size:11.5px;outline:none">' +
+                    (currentProfa
+                        ? '<button onclick="_kmRwClearProfa()" title="Очистить профу" style="background:#2d3748;color:#94a3b8;border:none;border-radius:5px;padding:4px 7px;cursor:pointer;font-size:10px;font-weight:700">✕</button>'
+                        : '') +
+                '</div>' +
+                '<div id="kmRwProfaList" style="overflow:auto;flex:1"></div>';
+            const rect = anchor.getBoundingClientRect();
+            const W = 300, H = 360;
+            let left = rect.left;
+            let top = rect.bottom + 4;
+            if (left + W > window.innerWidth - 8) left = window.innerWidth - W - 8;
+            if (left < 8) left = 8;
+            if (top + H > window.innerHeight - 8) top = Math.max(8, rect.top - H - 4);
+            picker.style.left = left + 'px';
+            picker.style.top  = top + 'px';
+            picker.style.display = 'flex';
+            _kmRwRenderProfaList('');
+            setTimeout(() => { const inp = document.getElementById('kmRwProfaSearch'); if (inp) inp.focus(); }, 30);
+            // Outside-click close handler — registered after current click bubbles up
+            setTimeout(() => {
+                const close = (e) => {
+                    const p = document.getElementById('kmRwProfaPicker');
+                    if (!p) return;
+                    if (!p.contains(e.target) && e.target !== anchor && !anchor.contains(e.target)) {
+                        kmRwCloseProfaPicker();
+                    }
+                };
+                _kmRw.profaCloseHandler = close;
+                document.addEventListener('mousedown', close, true);
+            }, 0);
+        }
+
+        function kmRwCloseProfaPicker() {
+            const picker = document.getElementById('kmRwProfaPicker');
+            if (picker) picker.style.display = 'none';
+            if (_kmRw.profaCloseHandler) {
+                document.removeEventListener('mousedown', _kmRw.profaCloseHandler, true);
+                _kmRw.profaCloseHandler = null;
+            }
+            _kmRw.profaTarget = null;
+            _kmRw.profaList = null;
+        }
+
+        function _kmRwClearProfa() {
+            const t = _kmRw.profaTarget;
+            if (!t) return;
+            kmRwSetProfa(t.partyIdx, t.rowIdx, '');
+            kmRwCloseProfaPicker();
+        }
+
+        function _kmRwRenderProfaList(query) {
+            const listEl = document.getElementById('kmRwProfaList');
+            if (!listEl) return;
+            const q = (query || '').toLowerCase().trim();
+            const qAlt = (typeof switchKeyboardLayout === 'function') ? (switchKeyboardLayout(q) || '').toLowerCase() : '';
+            const t = _kmRw.profaTarget;
+            const party = t ? _kmRw.parties[t.partyIdx] : null;
+            const row = party ? party.players[t.rowIdx] : null;
+            const parsed = row ? (_kmRwFindParsed(row.name) || {}) : {};
+            const currentProfa = parsed.profa && parsed.profa !== '—' ? parsed.profa : '';
+            const allKeys = Object.keys(PROFA_NAMES || {});
+            const items = allKeys.filter(pf => {
+                if (!q) return true;
+                const info = (typeof PROFA_INFO !== 'undefined' && PROFA_INFO[pf]) || {};
+                const searchable = [
+                    pf, info.ru || '', info.short || '', info.ru2 || '', info.en2 || '', info.role || '',
+                    PROFA_NAMES[pf] || '', _KMRW_LATIN_ALIASES[pf] || ''
+                ].join(' ').toLowerCase();
+                return searchable.includes(q) || (qAlt && searchable.includes(qAlt));
+            });
+            if (!items.length) {
+                listEl.innerHTML = '<div style="padding:14px;text-align:center;color:#475569;font-size:11px">Ничего не найдено</div>';
+                _kmRw.profaList = [];
+                _kmRw.profaActiveIdx = -1;
+                return;
+            }
+            _kmRw.profaList = items;
+            const curIdx = items.indexOf(currentProfa);
+            _kmRw.profaActiveIdx = curIdx >= 0 ? curIdx : 0;
+            listEl.innerHTML = items.map((pf, i) => {
+                const info = (typeof PROFA_INFO !== 'undefined' && PROFA_INFO[pf]) || {};
+                const short = info.short || (PROFA_NAMES[pf] || '');
+                const ru = info.ru || '';
+                const en2 = info.en2 || '';
+                const role = info.role || '';
+                const isActive = i === _kmRw.profaActiveIdx;
+                const isCurrent = pf === currentProfa;
+                const icon = (typeof profaIconHtml === 'function') ? profaIconHtml(pf, 18) : '';
+                const subParts = [];
+                if (ru) subParts.push(ru);
+                if (en2) subParts.push(en2);
+                if (role) subParts.push(role);
+                const escPf = pf.replace(/'/g, "\\'");
+                return '<div class="kmrw-profa-item" data-i="' + i + '" data-pf="' + _kmRwEsc(pf) + '" ' +
+                    'onclick="_kmRwPickProfa(\'' + escPf + '\')" onmouseover="_kmRwProfaHover(' + i + ')" ' +
+                    'style="display:flex;align-items:center;gap:7px;padding:5px 9px;cursor:pointer;border-bottom:1px solid #11151c;background:' + (isActive ? '#1e2530' : 'transparent') + '">' +
+                        icon +
+                        '<div style="flex:1;min-width:0;overflow:hidden">' +
+                            '<div style="font-size:11.5px;font-weight:700;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
+                                _kmRwEsc(pf) + ' <span style="color:#f59e0b;font-weight:600">· ' + _kmRwEsc(short) + '</span>' +
+                            '</div>' +
+                            (subParts.length
+                                ? '<div style="font-size:9.5px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _kmRwEsc(subParts.join(' · ')) + '</div>'
+                                : '') +
+                        '</div>' +
+                        (isCurrent ? '<span style="color:#86efac;font-size:10px;font-weight:700;flex-shrink:0">✓</span>' : '') +
+                    '</div>';
+            }).join('');
+            const activeEl = listEl.querySelector('.kmrw-profa-item[data-i="' + _kmRw.profaActiveIdx + '"]');
+            if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
+        }
+
+        function _kmRwProfaHover(i) {
+            _kmRw.profaActiveIdx = i;
+            const listEl = document.getElementById('kmRwProfaList');
+            if (!listEl) return;
+            listEl.querySelectorAll('.kmrw-profa-item').forEach(el => {
+                el.style.background = el.dataset.i === String(i) ? '#1e2530' : 'transparent';
+            });
+        }
+
+        function _kmRwPickProfa(pf) {
+            const t = _kmRw.profaTarget;
+            if (!t) return;
+            kmRwSetProfa(t.partyIdx, t.rowIdx, pf);
+            kmRwCloseProfaPicker();
+        }
+
+        function _kmRwProfaKey(e) {
+            const list = _kmRw.profaList || [];
+            if (e.key === 'Escape') { e.preventDefault(); kmRwCloseProfaPicker(); return; }
+            if (!list.length) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                _kmRw.profaActiveIdx = Math.min(list.length - 1, (_kmRw.profaActiveIdx == null ? -1 : _kmRw.profaActiveIdx) + 1);
+                _kmRwProfaSyncActive();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                _kmRw.profaActiveIdx = Math.max(0, (_kmRw.profaActiveIdx || 0) - 1);
+                _kmRwProfaSyncActive();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                const pf = list[_kmRw.profaActiveIdx || 0];
+                if (pf) _kmRwPickProfa(pf);
+            }
+        }
+
+        function _kmRwProfaSyncActive() {
+            const listEl = document.getElementById('kmRwProfaList');
+            if (!listEl) return;
+            listEl.querySelectorAll('.kmrw-profa-item').forEach(el => {
+                const isActive = el.dataset.i === String(_kmRw.profaActiveIdx);
+                el.style.background = isActive ? '#1e2530' : 'transparent';
+                if (isActive) el.scrollIntoView({ block: 'nearest' });
+            });
+        }
+        // ===== END searchable profa picker =====
 
         function kmRwSetName(partyIdx, rowIdx, val) {
             const party = _kmRw.parties[partyIdx]; if (!party) return;
