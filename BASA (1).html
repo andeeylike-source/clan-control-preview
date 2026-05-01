@@ -3740,7 +3740,8 @@
                     <div style="font-size:10px;color:#f97316;text-transform:uppercase;font-weight:700;letter-spacing:.05em;margin-bottom:4px">⚠️ Проверить профы</div>
                     <div id="dayReviewQueueList" style="display:flex;flex-direction:column;gap:4px"></div>
                 </div>
-                <div style="position:sticky;bottom:0;background:#12171f;padding:8px 0 2px;margin-top:8px">
+                <div style="position:sticky;bottom:0;background:#12171f;padding:8px 0 2px;margin-top:8px;display:flex;flex-direction:column;gap:6px">
+                    <button onclick="openKMReviewWizard()" id="kmRwOpenBtn" style="background:#6366f1;color:white;border:none;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;width:100%">🧙 Сверить по пакам (wizard)</button>
                     <button onclick="applyDayParsedStats()" style="background:#22c55e;color:white;border:none;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;width:100%">✅ Применить в ростер</button>
                 </div>
             </div>
@@ -3748,6 +3749,57 @@
             <button onclick="saveDayModal()" class="btn-primary w-full mt-1" style="font-size:14px;padding:12px;font-weight:700">💾 Сохранить</button>
         </div>
     </div>
+
+    <!-- KM PARTY REVIEW WIZARD -->
+    <div id="kmReviewWizard" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.85);align-items:center;justify-content:center;padding:14px;box-sizing:border-box">
+        <div style="background:#0f141d;border:1px solid #1e2530;border-radius:16px;width:100%;max-width:1100px;max-height:94vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.6)">
+            <!-- header -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid #1e2530;background:#12171f;gap:10px;flex-wrap:wrap">
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0">
+                    <div style="font-size:14px;font-weight:800;color:#e2e8f0">🧙 Сверка по пакам</div>
+                    <div id="kmRwIndicator" style="font-size:11px;color:#a5b4fc;background:#1a1f29;border:1px solid #2d3748;border-radius:6px;padding:3px 9px;font-weight:700">1/1</div>
+                    <div id="kmRwLeader" style="font-size:11px;color:#fbbf24;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px"></div>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                    <button onclick="kmRwPrev()" id="kmRwPrevBtn" style="background:#1e2530;color:#94a3b8;border:1px solid #2d3748;border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700;cursor:pointer">◀ Prev party</button>
+                    <button onclick="kmRwNext()" id="kmRwNextBtn" style="background:#1e2530;color:#94a3b8;border:1px solid #2d3748;border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700;cursor:pointer">Next party ▶</button>
+                    <button onclick="kmRwClose()" title="Закрыть" style="background:none;border:none;color:#64748b;font-size:18px;cursor:pointer;padding:4px 8px;line-height:1">✕</button>
+                </div>
+            </div>
+            <!-- body -->
+            <div id="kmRwBody" style="display:flex;flex:1;overflow:hidden;min-height:0">
+                <!-- left: source screenshot -->
+                <div id="kmRwLeft" style="flex:1.05;background:#0a0d12;border-right:1px solid #1e2530;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0">
+                    <div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:.05em">📸 Исходный скрин «Члены группы»</div>
+                    <div id="kmRwShotWrap" style="background:#000;border:1px solid #1e2530;border-radius:8px;flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:240px">
+                        <img id="kmRwShot" src="" style="max-width:100%;max-height:62vh;object-fit:contain;display:none">
+                        <div id="kmRwShotEmpty" style="color:#475569;font-size:12px;text-align:center;padding:20px">Скриншот для этой пати не сохранён</div>
+                    </div>
+                    <div style="font-size:10px;color:#64748b;line-height:1.5">Сверь визуально каждую строку с распознанными значениями справа.</div>
+                </div>
+                <!-- right: editable rows -->
+                <div id="kmRwRight" style="flex:1.15;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0">
+                    <div id="kmRwPackHdr" style="font-size:11px;color:#94a3b8;font-weight:700"></div>
+                    <div id="kmRwRows" style="display:flex;flex-direction:column;gap:8px"></div>
+                </div>
+            </div>
+            <!-- footer -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 18px;border-top:1px solid #1e2530;background:#12171f;gap:10px;flex-wrap:wrap">
+                <div id="kmRwSaveStatus" style="font-size:11px;color:#64748b">Правки записываются сразу при изменении полей.</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button onclick="kmRwSave()" style="background:#6366f1;color:white;border:none;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer">💾 Сохранить · далее</button>
+                    <button onclick="kmRwApply()" style="background:#22c55e;color:white;border:none;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer">✅ Применить в ростер</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <style>
+        @media (max-width: 760px) {
+            #kmRwBody { flex-direction: column; }
+            #kmRwLeft { border-right:none !important; border-bottom:1px solid #1e2530; max-height:38vh; flex:0 0 auto !important; }
+            #kmRwRight { flex:1 !important; }
+        }
+    </style>
 
     <!-- МОДАЛКА РЕДАКТИРОВАНИЯ СОБЫТИЯ -->
     <div id="editEventModal" class="modal-overlay" style="z-index:200">
@@ -8409,6 +8461,11 @@ function getClass2IconByClass3(c3) {
 
                 // Уведомление о завершении
                 notifyAnalysisComplete(dayLastParsed.length);
+
+                // Авто-открытие wizard, если есть пакеты на сверку
+                if (typeof openKMReviewWizard === 'function' && dayScreenPlayersMap && Object.keys(dayScreenPlayersMap).length > 0) {
+                    setTimeout(() => openKMReviewWizard(), 300);
+                }
             });
         }
 
@@ -9534,6 +9591,247 @@ ${playerList}
             // Проверяем ростер на похожие ники — показываем если нашли
             setTimeout(() => checkRosterSimilarNicks(), 300);
         }
+
+        // ===== KM PARTY REVIEW WIZARD =====
+        let _kmRw = { parties: [], idx: 0, open: false };
+
+        function _kmRwEsc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
+
+        function _kmRwBuildParties() {
+            const parties = [];
+            const packNames = Object.keys(dayScreenPlayersMap || {});
+            packNames.forEach(pn => {
+                const players = (dayScreenPlayersMap || {})[pn] || [];
+                if (!players.length) return;
+                const leader = (dayPackLeaders && dayPackLeaders[pn]) || (players[0] && players[0].name) || pn;
+                parties.push({
+                    packName: pn,
+                    leader: leader,
+                    shotUrl: (dayScreenShotMap && dayScreenShotMap[pn]) || '',
+                    players: players
+                });
+            });
+            return parties;
+        }
+
+        function openKMReviewWizard() {
+            const parties = _kmRwBuildParties();
+            if (parties.length === 0) {
+                if (Array.isArray(dayLastParsed) && dayLastParsed.length > 0) {
+                    parties.push({ packName: '(нет данных по пакам)', leader: '—', shotUrl: '', players: dayLastParsed });
+                } else {
+                    setDayStatus('warning', '⚠️ Нет распознанных паков — сначала запусти анализ скриншотов.');
+                    return;
+                }
+            }
+            _kmRw.parties = parties;
+            _kmRw.idx = 0;
+            _kmRw.open = true;
+            const ov = document.getElementById('kmReviewWizard');
+            if (ov) ov.style.display = 'flex';
+            kmRwRender();
+        }
+
+        function kmRwClose() {
+            _kmRw.open = false;
+            const ov = document.getElementById('kmReviewWizard');
+            if (ov) ov.style.display = 'none';
+            if (typeof renderDayAnalyzedPlayers === 'function' && Array.isArray(dayLastParsed)) {
+                renderDayAnalyzedPlayers(dayLastParsed);
+            }
+        }
+
+        function kmRwPrev() { if (_kmRw.idx > 0) { _kmRw.idx--; kmRwRender(); } }
+        function kmRwNext() { if (_kmRw.idx < _kmRw.parties.length - 1) { _kmRw.idx++; kmRwRender(); } }
+
+        function _kmRwFindParsed(name) {
+            if (!name) return null;
+            const nk = normalizeNick(name);
+            return (dayLastParsed || []).find(p => normalizeNick(p.name) === nk) || null;
+        }
+
+        function kmRwRender() {
+            if (!_kmRw.open) return;
+            const total = _kmRw.parties.length;
+            const idx = _kmRw.idx;
+            const party = _kmRw.parties[idx];
+            if (!party) return;
+
+            document.getElementById('kmRwIndicator').textContent = (idx+1) + ' / ' + total;
+            document.getElementById('kmRwLeader').textContent = party.leader && party.leader !== '—' ? ('👑 Лидер: ' + party.leader) : '';
+            const prevBtn = document.getElementById('kmRwPrevBtn');
+            const nextBtn = document.getElementById('kmRwNextBtn');
+            prevBtn.disabled = idx === 0;
+            nextBtn.disabled = idx === total - 1;
+            prevBtn.style.opacity = idx === 0 ? '0.4' : '1';
+            nextBtn.style.opacity = idx === total - 1 ? '0.4' : '1';
+            prevBtn.style.cursor = idx === 0 ? 'not-allowed' : 'pointer';
+            nextBtn.style.cursor = idx === total - 1 ? 'not-allowed' : 'pointer';
+
+            const shotImg = document.getElementById('kmRwShot');
+            const shotEmpty = document.getElementById('kmRwShotEmpty');
+            if (party.shotUrl) {
+                shotImg.src = party.shotUrl;
+                shotImg.style.display = '';
+                shotEmpty.style.display = 'none';
+            } else {
+                shotImg.removeAttribute('src');
+                shotImg.style.display = 'none';
+                shotEmpty.style.display = '';
+            }
+
+            document.getElementById('kmRwPackHdr').innerHTML =
+                '<span style="color:#64748b">Пак:</span> <span style="color:#e2e8f0;font-weight:800">' + _kmRwEsc(party.packName) +
+                '</span> <span style="color:#64748b">·</span> <span style="color:#64748b">игроков:</span> <span style="color:#e2e8f0;font-weight:800">' + party.players.length + '</span>';
+
+            const rowsHtml = party.players.map((pp, i) => {
+                const parsed = _kmRwFindParsed(pp.name) || {};
+                const profa = (parsed.profa && parsed.profa !== '—') ? parsed.profa : '';
+                const profaSrc = parsed.profaSource || '';
+                const isAuto = parsed.matcher_source === 'gt_exemplar_matcher' && parsed.matcher_trigger && !parsed.matcher_rowUnstable && !parsed.matcher_locInvalid;
+                const isManual = profaSrc === 'manual_review';
+                let badgeHtml = '';
+                if (isManual) {
+                    badgeHtml = '<span title="Ручная правка" style="font-size:9px;color:#a5b4fc;background:#1e1b4b;border:1px solid #4338ca;border-radius:3px;padding:1px 5px;font-weight:700">MANUAL</span>';
+                } else if (isAuto) {
+                    const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
+                    badgeHtml = '<span title="Авто-сопоставление с высокой уверенностью" style="font-size:9px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 5px;font-weight:700">AUTO ' + sim + '</span>';
+                } else if (parsed.matcher_locInvalid) {
+                    badgeHtml = '<span title="Плохой кроп иконки — нужна ручная правка" style="font-size:9px;color:#f97316;background:#1c0a00;border:1px solid #7c2d12;border-radius:3px;padding:1px 5px;font-weight:700">BAD CROP</span>';
+                } else if (parsed.matcher_rowUnstable && parsed.matcher_top1) {
+                    badgeHtml = '<span title="Строка съехала — проверь вручную" style="font-size:9px;color:#fb923c;background:#1a0800;border:1px solid #7c2d12;border-radius:3px;padding:1px 5px;font-weight:700">ROW UNSTABLE</span>';
+                } else if (parsed.matcher_top1 && !parsed.matcher_trigger) {
+                    const reasons = [];
+                    if ((parsed.matcher_sim||0) < 0.60) reasons.push('LOW_SIM');
+                    if ((parsed.matcher_margin||0) < 0.08) reasons.push('AMBIGUOUS');
+                    badgeHtml = '<span title="Низкая уверенность авто-распознавания" style="font-size:9px;color:#fbbf24;background:#1c1300;border:1px solid #92400e;border-radius:3px;padding:1px 5px;font-weight:700">' + (reasons.join(' · ') || 'CHECK') + '</span>';
+                }
+
+                const top3Html = parsed.matcher_top3 && parsed.matcher_top3.length > 0
+                    ? '<div style="font-size:9px;color:#64748b;margin-top:3px">top3: ' +
+                        parsed.matcher_top3.slice(0,3).map(x => _kmRwEsc(x.name||x.class2||'?') + ' ' + Math.round((x.sim||x.similarity||0)*100) + '%').join(', ') +
+                      '</div>'
+                    : '';
+
+                const cropHtml = parsed.matcher_cropUrl
+                    ? '<img src="' + parsed.matcher_cropUrl + '" width="28" height="28" style="image-rendering:pixelated;border:1px solid #334155;border-radius:3px;flex-shrink:0">'
+                    : '';
+
+                const profaCurrentHtml = profa && typeof profaIconHtml === 'function'
+                    ? '<span style="display:inline-flex;align-items:center;gap:4px">' + profaIconHtml(profa, 18) + '</span>'
+                    : '';
+
+                const profaOpts = Object.keys(PROFA_NAMES || {}).map(pf =>
+                    '<option value="' + _kmRwEsc(pf) + '"' + (pf===profa?' selected':'') + '>' + _kmRwEsc(pf) + ' (' + _kmRwEsc(PROFA_NAMES[pf]) + ')</option>'
+                ).join('');
+                const profaSelectHtml = '<select onchange="kmRwSetProfa(' + idx + ',' + i + ',this.value)" style="background:#0b0e14;border:1px solid #2d3748;border-radius:6px;color:#e2e8f0;font-size:11px;padding:3px 6px;cursor:pointer;max-width:170px">' +
+                    '<option value="">— профа —</option>' + profaOpts +
+                '</select>';
+
+                const isLeader = party.leader && pp.name && pp.name.toLowerCase() === String(party.leader).toLowerCase();
+                const leaderTag = isLeader ? '<span title="Лидер пати" style="font-size:9px;color:#fbbf24;background:#1a1206;border:1px solid #a16207;border-radius:3px;padding:1px 5px;font-weight:700">★ ЛИДЕР</span>' : '';
+
+                const numFields = [
+                    ['kills','⚔️ Убийства'],
+                    ['deaths','💀 Смерти'],
+                    ['pvp_dmg','🗡️ PvP урон'],
+                    ['pve_dmg','🐉 PvE урон']
+                ];
+                const numsHtml = numFields.map(([k,label]) =>
+                    '<div>' +
+                        '<div style="font-size:9px;color:#64748b;margin-bottom:2px">' + label + '</div>' +
+                        '<input type="number" min="0" value="' + (pp[k]||0) + '" onchange="kmRwSetNum(' + idx + ',' + i + ',\'' + k + '\',this.value)" style="background:#0b0e14;border:1px solid #2d3748;border-radius:6px;padding:4px 6px;color:#e2e8f0;font-size:12px;width:100%;box-sizing:border-box">' +
+                    '</div>'
+                ).join('');
+
+                return '<div style="background:#1a1f29;border:1px solid #1e2530;border-radius:9px;padding:9px 11px">' +
+                    '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:6px">' +
+                        cropHtml +
+                        leaderTag +
+                        '<input value="' + _kmRwEsc(pp.name||'') + '" oninput="kmRwSetName(' + idx + ',' + i + ',this.value)" style="background:#0b0e14;border:1px solid #2d3748;border-radius:6px;padding:4px 8px;color:#fff;font-weight:700;font-size:12px;width:140px">' +
+                        profaCurrentHtml +
+                        profaSelectHtml +
+                        badgeHtml +
+                    '</div>' +
+                    top3Html +
+                    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px">' + numsHtml + '</div>' +
+                '</div>';
+            }).join('');
+
+            document.getElementById('kmRwRows').innerHTML = rowsHtml;
+        }
+
+        function kmRwSetName(partyIdx, rowIdx, val) {
+            const party = _kmRw.parties[partyIdx]; if (!party) return;
+            const row = party.players[rowIdx]; if (!row) return;
+            const oldName = row.name;
+            row.name = val;
+            const parsed = _kmRwFindParsed(oldName);
+            if (parsed) parsed.name = val;
+            if (party.leader && oldName && String(party.leader).toLowerCase() === String(oldName).toLowerCase()) {
+                party.leader = val;
+                if (dayPackLeaders && dayPackLeaders[party.packName]) dayPackLeaders[party.packName] = val;
+                document.getElementById('kmRwLeader').textContent = val ? ('👑 Лидер: ' + val) : '';
+            }
+        }
+
+        function kmRwSetNum(partyIdx, rowIdx, key, val) {
+            const party = _kmRw.parties[partyIdx]; if (!party) return;
+            const row = party.players[rowIdx]; if (!row) return;
+            const n = Math.max(0, parseInt(val) || 0);
+            row[key] = n;
+            const parsed = _kmRwFindParsed(row.name);
+            if (parsed) parsed[key] = n;
+            _kmRwToast('правки записаны');
+        }
+
+        function kmRwSetProfa(partyIdx, rowIdx, val) {
+            const party = _kmRw.parties[partyIdx]; if (!party) return;
+            const row = party.players[rowIdx]; if (!row) return;
+            let parsed = _kmRwFindParsed(row.name);
+            if (!parsed) {
+                parsed = Object.assign({}, row);
+                if (Array.isArray(dayLastParsed)) dayLastParsed.push(parsed);
+            }
+            if (val) {
+                parsed.profa = val;
+                parsed.profaSource = 'manual_review';
+            } else {
+                parsed.profa = '—';
+                parsed.profaSource = null;
+            }
+            kmRwRender();
+        }
+
+        function kmRwSave() {
+            _kmRwToast('пак сохранён в текущем результате анализа');
+            if (_kmRw.idx < _kmRw.parties.length - 1) {
+                _kmRw.idx++;
+                kmRwRender();
+            }
+        }
+
+        function kmRwApply() {
+            kmRwClose();
+            if (typeof applyDayParsedStats === 'function') applyDayParsedStats();
+        }
+
+        function _kmRwToast(text) {
+            const el = document.getElementById('kmRwSaveStatus');
+            if (!el) return;
+            el.textContent = '✅ ' + text;
+            el.style.color = '#86efac';
+            clearTimeout(window.__kmRwToastTm);
+            window.__kmRwToastTm = setTimeout(() => {
+                el.textContent = 'Правки записываются сразу при изменении полей.';
+                el.style.color = '#64748b';
+            }, 1800);
+        }
+        // ===== END KM PARTY REVIEW WIZARD =====
 
         function checkRosterSimilarNicks() {
             const pairs = [];
