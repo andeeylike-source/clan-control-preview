@@ -3146,12 +3146,13 @@
 <!-- =============================================
      TOPBAR
 ============================================= -->
-<div id="topbar" class="hidden" translate="no">
-    <div class="topbar-logo">⚔️ Clan<span>Control</span></div>
-    <div class="topbar-right">
-        <div class="topbar-clan" id="topbarClan" style="display:none"></div>
+<!-- v20 TOP BAR — compact glass strip with brand + tools chips -->
+<div id="topbar" class="top hidden" translate="no">
+    <div class="brand">⚔️ Clan<b>Control</b></div>
+    <div class="tools">
+        <span class="chip dark" id="topbarClan" style="display:none"></span>
         <span id="roleBadge" style="display:none"></span>
-        <button id="adminModeToggle" onclick="window._toggleAdminMode&&window._toggleAdminMode()" style="display:none;font-size:9px;font-weight:800;padding:2px 7px;border-radius:5px;border:1px solid rgba(201,168,76,0.35);background:rgba(201,168,76,0.06);color:#e8c97a;cursor:pointer;white-space:nowrap;flex-shrink:0;letter-spacing:.04em;line-height:18px" title="Тест-режим для admin">▸ TEST</button>
+        <button id="adminModeToggle" class="chip" onclick="window._toggleAdminMode&&window._toggleAdminMode()" style="display:none" title="Тест-режим для admin">▸ TEST</button>
         <button class="flip-toggle" id="themeToggle" type="button" onclick="toggleTheme()" aria-label="Theme" data-state="left">
             <span class="flip-toggle-track"></span>
             <span class="flip-toggle-thumb"></span>
@@ -3164,81 +3165,125 @@
             <span class="flip-toggle-option">RU</span>
             <span class="flip-toggle-option">EN</span>
         </button>
-        <div class="topbar-divider"></div>
-        <div class="topbar-icon-btn" onclick="if(typeof showPage==='function')showPage('settings')" title="Настройки">⚙️</div>
-        <div class="topbar-user">
-            <div class="topbar-avatar" id="topbarAvatar">?</div>
-            <span class="topbar-user-email" id="topbarEmail">—</span>
-        </div>
-        <button id="ccAdminBtn" onclick="window._ccTabBg&&window._ccTabBg.open()" title="Фоны вкладок" style="display:none;width:34px;height:34px;border-radius:9px;border:1px solid rgba(201,168,76,0.35);background:rgba(201,168,76,0.08);color:#e8c97a;font-size:15px;cursor:pointer;transition:all .2s;flex-shrink:0">✏️</button>
-        <button id="shellToggleBtn" onclick="shellToggle()" title="Убрать оболочку" style="display:none;padding:0 10px;height:34px;border-radius:9px;border:1px solid rgba(120,160,255,0.35);background:rgba(120,160,255,0.08);color:rgba(140,185,255,0.85);font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;flex-shrink:0;white-space:nowrap">Оболочка</button>
-        <div class="topbar-icon-btn" onclick="loginLogout()" title="Выйти" style="color:#475569">🚪</div>
+        <button class="chip icon-chip" onclick="if(typeof showPage==='function')showPage('settings')" title="Настройки">⚙</button>
+        <span class="chip dark" style="display:inline-flex;align-items:center;gap:8px;padding:4px 10px 4px 4px">
+            <span class="topbar-avatar" id="topbarAvatar" style="width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e8be58,#1db954);color:#080e0c;font-size:10px;font-weight:900;text-transform:uppercase">?</span>
+            <span id="topbarEmail" style="font-size:11px;color:rgba(247,242,232,.78);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+        </span>
+        <button id="ccAdminBtn" class="chip icon-chip" onclick="window._ccTabBg&&window._ccTabBg.open()" title="Фоны вкладок" style="display:none;color:#e8c97a">✏️</button>
+        <button id="shellToggleBtn" class="chip" onclick="shellToggle()" title="Убрать оболочку" style="display:none">Оболочка</button>
+        <button class="chip icon-chip danger" onclick="loginLogout()" title="Выйти">🚪</button>
     </div>
 </div>
 
 <!-- =============================================
      APP LAYOUT
 ============================================= -->
-<div id="appLayout" class="hidden">
+<div id="appLayout" class="app hidden">
 
 
-    <aside class="sidebar" translate="no">
-        <nav>
-            <div style="font-size:9px;font-weight:800;color:#334155;text-transform:uppercase;letter-spacing:.1em;padding:6px 16px 4px;margin-top:4px">Аналитика</div>
-            <div onclick="showPage('dashboard')" id="nav-dashboard" class="nav-item">🏠 Дашборд</div>
-            <div onclick="showPage('stats')" id="nav-stats" class="nav-item">📊 Статистика</div>
-            <div onclick="showPage('calendar')" id="nav-calendar" class="nav-item">📅 Календарь КМ</div>
-            <div onclick="showPage('screenshots')" id="nav-screenshots" class="nav-item">📋 История КМ</div>
-            <div style="font-size:9px;font-weight:800;color:#334155;text-transform:uppercase;letter-spacing:.1em;padding:6px 16px 4px;margin-top:8px">Управление</div>
-            <div onclick="showPage('roster')" id="nav-roster" class="nav-item">👥 Клан</div>
-            <div onclick="showPage('profile')" id="nav-profile" class="nav-item" style="display:none">👤 Профиль</div>
-            <div onclick="showPage('packs')" id="nav-packs" class="nav-item">⚔️ Рейд Паки</div>
-            <div onclick="showPage('archive')" id="nav-archive" class="nav-item">🗄️ Архив</div>
+    <!-- v20 SIDE — premium glass panel with logo, nav, tier card -->
+    <aside class="sidebar side" translate="no">
+        <div class="logo">
+            <div class="mark"><span>♜</span></div>
+            <h2>CLAN<br>CONTROL</h2>
+            <small>war room admin</small>
+        </div>
+        <nav class="nav">
+            <p>Аналитика</p>
+            <button class="nav-item" id="nav-dashboard" onclick="showPage('dashboard')"><span class="ico">⌂</span>Дашборд</button>
+            <button class="nav-item" id="nav-stats" onclick="showPage('stats')"><span class="ico">▥</span>Статистика</button>
+            <button class="nav-item" id="nav-calendar" onclick="showPage('calendar')"><span class="ico">▣</span>Календарь КМ</button>
+            <button class="nav-item" id="nav-screenshots" onclick="showPage('screenshots')"><span class="ico">▤</span>История КМ</button>
+            <p>Управление</p>
+            <button class="nav-item" id="nav-roster" onclick="showPage('roster')"><span class="ico">⚇</span>Клан</button>
+            <button class="nav-item" id="nav-profile" onclick="showPage('profile')" style="display:none"><span class="ico">☻</span>Профиль</button>
+            <button class="nav-item" id="nav-packs" onclick="showPage('packs')"><span class="ico">⚔</span>Рейд Паки</button>
+            <button class="nav-item" id="nav-archive" onclick="showPage('archive')"><span class="ico">⌸</span>Архив</button>
+            <p>Система</p>
+            <button class="nav-item" id="nav-settings" onclick="showPage('settings')"><span class="ico">⚙</span>Настройки</button>
+            <button class="nav-item" id="nav-users" onclick="showPage('users')" style="display:none"><span class="ico">☻</span>Пользователи</button>
+            <button class="nav-item" id="nav-backup" onclick="exportData()" title="Скачать резервную копию всех данных"><span class="ico">⤓</span>Бэкап данных</button>
         </nav>
-        <div style="margin-top:auto;padding-top:12px;border-top:1px solid #1e2530;display:flex;flex-direction:column;gap:2px">
-            <div style="font-size:9px;font-weight:800;color:#334155;text-transform:uppercase;letter-spacing:.1em;padding:4px 16px 4px">Система</div>
-            <div onclick="showPage('settings')" id="nav-settings" class="nav-item">⚙️ Настройки</div>
-            <div onclick="showPage('users')" id="nav-users" class="nav-item" style="display:none">👤 Пользователи</div>
-            <button onclick="exportData()" title="Скачать резервную копию всех данных" style="display:flex;align-items:center;gap:8px;background:none;border:none;color:#475569;border-radius:8px;padding:10px 16px;font-size:13px;cursor:pointer;transition:all .2s;width:100%;text-align:left;font-family:inherit" onmouseover="this.style.background='#1a1f29';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='#475569'">💾 Бэкап данных</button>
-            <!-- Индикатор автосохранения -->
-            <div id="autoSaveIndicator" style="font-size:10px;color:#475569;padding:4px 16px;display:flex;align-items:center;gap:5px;opacity:0;transition:opacity .4s">
-                <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;display:inline-block"></span>
-                <span id="autoSaveText">Сохранено</span>
-            </div>
+        <div class="tier" id="autoSaveTier">
+            <small>Автосохранение</small>
+            <b>Synced</b>
+            <span id="autoSaveText">Сохранено</span>
+            <hr>
+            <small id="autoSaveIndicator" style="opacity:.0;transition:opacity .4s">●  cloud ok</small>
         </div>
     </aside>
 
-    <main class="main-content">
+    <main class="main-content surface">
         
         
-        <!-- ДАШБОРД -->
-        <section id="page-dashboard" class="page-section">
-            <div class="flex justify-between items-center mb-6" style="flex-wrap:wrap;gap:10px">
+        <!-- ДАШБОРД — v20 command-center layout -->
+        <section id="page-dashboard" class="page-section screen">
+            <div class="head">
                 <div>
-                    <h1 class="text-3xl font-bold">Дашборд</h1>
-                    <div id="dashSubtitle" class="text-slate-500 text-sm mt-1"></div>
+                    <span class="eyebrow">⚜ command center</span>
+                    <h1>Дашборд</h1>
+                    <p class="sub" id="dashSubtitle"></p>
                 </div>
-                <div id="dashNextEvent" style="background:#6366f122;border:1px solid #6366f144;border-radius:10px;padding:10px 16px;font-size:12px;color:#a5b4fc;font-weight:600;cursor:pointer" onclick="showPage('calendar')"></div>
-            </div>
-            <!-- Навигация -->
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px" id="dashNavCards"></div>
-            <!-- Алерты + Обратить внимание -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
-                <div>
-                    <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#475569;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:6px">🔔 Предупреждения <span id="dashAlertCount" style="background:#ef4444;color:white;border-radius:10px;padding:1px 7px;font-size:9px"></span></div>
-                    <div id="dashAlerts" style="max-height:340px;overflow-y:auto"></div>
-                </div>
-                <div>
-                    <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#475569;letter-spacing:.08em;margin-bottom:10px">👁 Обратить внимание</div>
-                    <div id="dashAttention" style="max-height:340px;overflow-y:auto"></div>
+                <div class="actions">
+                    <div id="dashNextEvent" class="btn gold" style="cursor:pointer" onclick="showPage('calendar')"></div>
                 </div>
             </div>
-            <!-- Рейтинги -->
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
-                <div class="dash-card"><div class="dash-card-title">🏆 Топ-5 ценных</div><div id="dashTopValue"></div></div>
-                <div class="dash-card"><div class="dash-card-title">📈 Растут</div><div id="dashTopGrowing"></div></div>
-                <div class="dash-card"><div class="dash-card-title">📉 Падают</div><div id="dashTopFalling"></div></div>
-                <div class="dash-card"><div class="dash-card-title">💎 Редкие таланты</div><div style="font-size:10px;color:#475569;margin-bottom:6px">Ходят редко, но когда приходят — играют лучше многих</div><div id="dashRareGems"></div></div>
+
+            <!-- 4 stat cards — v20 .stats ribbon, populated by renderDashboard via #dashNavCards -->
+            <div class="card stats" id="dashNavCards"></div>
+
+            <!-- Двойная сетка: alerts + attention -->
+            <div class="grid cols2" style="margin-top:14px">
+                <article class="card">
+                    <div class="ph">
+                        <div>
+                            <h3>Alerts &amp; warnings</h3>
+                            <p>Критичные сигналы без визуального шума <span id="dashAlertCount" style="display:inline-block;margin-left:6px;background:rgba(255,85,85,.18);color:#ff9f9f;border-radius:99px;padding:1px 8px;font-size:10px;font-weight:900"></span></p>
+                        </div>
+                    </div>
+                    <div class="body" id="dashAlerts" style="max-height:340px;overflow-y:auto"></div>
+                </article>
+                <article class="card">
+                    <div class="ph">
+                        <div>
+                            <h3>Обратить внимание</h3>
+                            <p>Тихие сигналы для оперативного контроля</p>
+                        </div>
+                    </div>
+                    <div class="body" id="dashAttention" style="max-height:340px;overflow-y:auto"></div>
+                </article>
+            </div>
+
+            <!-- Рейтинги — v20 cards с реальными данными -->
+            <div class="grid cols2" style="margin-top:14px">
+                <article class="card">
+                    <div class="ph">
+                        <div><h3>Топ-5 ценных</h3><p>Текущие лидеры по ценности</p></div>
+                        <a class="link" onclick="showPage('roster')" style="cursor:pointer">Roster →</a>
+                    </div>
+                    <div class="body" id="dashTopValue"></div>
+                </article>
+                <article class="card">
+                    <div class="ph">
+                        <div><h3>Растут</h3><p>Ускоряют темп за последние КМ</p></div>
+                    </div>
+                    <div class="body" id="dashTopGrowing"></div>
+                </article>
+            </div>
+            <div class="grid cols2" style="margin-top:14px">
+                <article class="card">
+                    <div class="ph">
+                        <div><h3>Падают</h3><p>Сбавили темп — зона внимания</p></div>
+                    </div>
+                    <div class="body" id="dashTopFalling"></div>
+                </article>
+                <article class="card">
+                    <div class="ph">
+                        <div><h3>Редкие таланты</h3><p>Ходят редко, но когда приходят — играют лучше многих</p></div>
+                    </div>
+                    <div class="body" id="dashRareGems"></div>
+                </article>
             </div>
         </section>
 
@@ -16905,5 +16950,733 @@ window._archRender = function() {
     }
 
     </style>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         v20 BASE — direct port of clan_control_v20 shell + dashboard.
+         New v20 markup uses these classes: .top, .side, .surface, .nav,
+         .head, .eyebrow, .actions, .stats, .stat, .orb, .card, .ph,
+         .alert, .rank, .rare, .scan, .ring, .mline, .bar, .chart, .cline,
+         .cal, .week, .day, .time, .tico, .dist, .pill, .empty, .btn, .chip,
+         .search, .label, .big, .note, .up, .down, .warn.
+         Sits last so it overrides all previous shell CSS.
+    ════════════════════════════════════════════════════════════════ -->
+    <style id="v20-base">
+
+    body:not(.light) {
+      --gold: #e8be58;
+      --gold2: #ffd671;
+      --blue: #5f8cff;
+      --violet: #9b66ff;
+      --green: #30db76;
+      --red: #ff5555;
+      --ink: #f7f2e8;
+      --muted: rgba(247,242,232,.62);
+      --faint: rgba(247,242,232,.38);
+      --line: rgba(255,255,255,.12);
+    }
+
+    /* ── BODY: kill old flex column shell, let .top + .app stack ─ */
+    body:not(.light) {
+      background: #050505 !important;
+      color: var(--ink) !important;
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;
+      display: block !important;
+      flex-direction: initial !important;
+      height: auto !important;
+      min-height: 100vh !important;
+      overflow: auto !important;
+    }
+
+    /* ── TOP BAR (replaces #topbar layout) ─────────────────────── */
+    body:not(.light) #topbar.top {
+      position: fixed !important;
+      top: 0; left: 0; right: 0;
+      height: 46px !important;
+      padding: 0 16px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 12px !important;
+      background: linear-gradient(180deg, rgba(9,9,10,.62), rgba(9,9,10,.18)) !important;
+      border-bottom: 1px solid rgba(255,255,255,.07) !important;
+      backdrop-filter: blur(18px) !important;
+      -webkit-backdrop-filter: blur(18px) !important;
+      z-index: 120 !important;
+    }
+    body:not(.light) #topbar.top .brand {
+      font-size: 13px !important;
+      font-weight: 900 !important;
+      color: var(--muted) !important;
+      letter-spacing: 0.02em !important;
+    }
+    body:not(.light) #topbar.top .brand b { color: var(--gold) !important; }
+    body:not(.light) #topbar.top .tools {
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+    }
+    body:not(.light) .chip {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 6px !important;
+      min-height: 32px !important;
+      padding: 7px 11px !important;
+      border-radius: 10px !important;
+      border: 1px solid rgba(255,255,255,.10) !important;
+      background: rgba(255,255,255,.07) !important;
+      color: var(--muted) !important;
+      font-size: 12px !important;
+      font-weight: 800 !important;
+      cursor: pointer !important;
+      transition: filter .17s, transform .17s, box-shadow .17s, border-color .17s !important;
+      white-space: nowrap !important;
+      font-family: inherit !important;
+    }
+    body:not(.light) .chip:hover { filter: brightness(1.10); border-color: rgba(255,216,113,.32) !important; color: var(--ink) !important; }
+    body:not(.light) .chip:active { transform: translateY(1px) scale(.985); }
+    body:not(.light) .chip.icon-chip {
+      width: 34px !important;
+      min-width: 34px !important;
+      padding: 0 !important;
+      font-size: 14px !important;
+    }
+    body:not(.light) .chip.gold {
+      background: linear-gradient(135deg, #ffe08b, #b47b2c) !important;
+      color: #201507 !important;
+      border-color: rgba(255,216,113,.28) !important;
+    }
+    body:not(.light) .chip.dark {
+      background: rgba(0,0,0,.34) !important;
+      color: var(--ink) !important;
+    }
+    body:not(.light) .chip.danger {
+      color: #ffb5a8 !important;
+      border-color: rgba(255,80,60,.28) !important;
+    }
+
+    /* ── APP grid layout ───────────────────────────────────────── */
+    body:not(.light) #appLayout.app {
+      display: grid !important;
+      grid-template-columns: 220px 1fr !important;
+      gap: 22px !important;
+      padding: 70px clamp(20px, 3.5vw, 56px) 32px !important;
+      min-height: 100vh !important;
+      overflow: visible !important;
+      flex: none !important;
+    }
+
+    /* ── SIDE (sidebar) — premium glass panel ───────────────────── */
+    body:not(.light) .sidebar.side {
+      width: 220px !important;
+      flex-shrink: 0 !important;
+      height: calc(100vh - 96px) !important;
+      min-height: 600px !important;
+      position: sticky !important;
+      top: 60px !important;
+      border: 1px solid var(--line) !important;
+      border-radius: 24px !important;
+      background: linear-gradient(180deg, rgba(11,11,12,.44), rgba(6,6,7,.62)) !important;
+      box-shadow: 0 22px 80px rgba(0,0,0,.45), inset 0 1px rgba(255,255,255,.08) !important;
+      backdrop-filter: blur(20px) saturate(1.18) !important;
+      -webkit-backdrop-filter: blur(20px) saturate(1.18) !important;
+      display: flex !important;
+      flex-direction: column !important;
+      overflow: hidden !important;
+      padding: 0 !important;
+      transition: none !important;
+    }
+    body:not(.light) .sidebar.side .logo {
+      text-align: center !important;
+      padding: 22px 18px 14px !important;
+      border-bottom: 1px solid rgba(255,255,255,.07) !important;
+    }
+    body:not(.light) .sidebar.side .logo .mark {
+      width: 64px; height: 64px;
+      margin: 0 auto 12px;
+      border-radius: 22px;
+      display: grid; place-items: center;
+      transform: rotate(45deg);
+      border: 1px solid rgba(255,216,113,.42);
+      background: radial-gradient(circle, rgba(255,225,140,.22), transparent 58%), rgba(255,255,255,.04);
+      box-shadow: 0 0 32px rgba(232,190,88,.18);
+    }
+    body:not(.light) .sidebar.side .logo .mark span { transform: rotate(-45deg); font-size: 28px; }
+    body:not(.light) .sidebar.side .logo h2 {
+      margin: 0;
+      color: #f2cb73;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 22px;
+      line-height: .86;
+      letter-spacing: 0.13em;
+    }
+    body:not(.light) .sidebar.side .logo small {
+      display: block;
+      margin-top: 9px;
+      color: rgba(247,242,232,.42);
+      font-size: 9px;
+      letter-spacing: 0.20em;
+      text-transform: uppercase;
+    }
+    body:not(.light) .sidebar.side .nav {
+      padding: 14px 12px !important;
+      overflow-y: auto !important;
+      flex: 1 !important;
+    }
+    body:not(.light) .sidebar.side .nav p {
+      margin: 14px 10px 6px !important;
+      color: rgba(247,242,232,.36) !important;
+      font-size: 9px !important;
+      font-weight: 900 !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.12em !important;
+    }
+    body:not(.light) .sidebar.side .nav button.nav-item {
+      width: 100% !important;
+      border: 0 !important;
+      background: transparent !important;
+      color: rgba(247,242,232,.72) !important;
+      display: flex !important;
+      gap: 10px !important;
+      align-items: center !important;
+      padding: 10px 12px !important;
+      border-radius: 12px !important;
+      margin: 2px 0 !important;
+      text-align: left !important;
+      font: inherit !important;
+      font-size: 13px !important;
+      letter-spacing: 0 !important;
+      cursor: pointer !important;
+      transition: background .18s, color .18s, transform .18s, box-shadow .18s !important;
+      border-left: 0 !important;
+    }
+    body:not(.light) .sidebar.side .nav button.nav-item:hover {
+      background: rgba(255,255,255,.06) !important;
+      color: var(--ink) !important;
+      transform: translateX(3px) !important;
+    }
+    body:not(.light) .sidebar.side .nav button.nav-item.active {
+      background: linear-gradient(90deg, rgba(218,166,61,.42), rgba(255,255,255,.055)) !important;
+      color: #fff4cf !important;
+      border-left: 0 !important;
+      padding-left: 12px !important;
+      box-shadow: inset 0 0 0 1px rgba(255,216,113,.34), 0 0 28px rgba(232,190,88,.13) !important;
+      font-weight: 700 !important;
+    }
+    body:not(.light) .sidebar.side .nav .ico {
+      width: 18px; text-align: center; color: var(--gold);
+    }
+    body:not(.light) .sidebar.side .tier {
+      margin: auto 14px 14px !important;
+      padding: 16px 12px !important;
+      border-radius: 18px !important;
+      text-align: center !important;
+      border: 1px solid rgba(255,255,255,.10) !important;
+      background: radial-gradient(circle at 50% 0, rgba(232,190,88,.12), transparent 54%), rgba(0,0,0,.24) !important;
+    }
+    body:not(.light) .sidebar.side .tier small {
+      display: block !important;
+      color: rgba(247,242,232,.44) !important;
+      font-size: 9px !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.14em !important;
+      font-weight: 900 !important;
+    }
+    body:not(.light) .sidebar.side .tier b {
+      display: block !important;
+      margin: 5px 0 !important;
+      color: #f2cb73 !important;
+      font-family: Georgia, serif !important;
+      font-size: 16px !important;
+    }
+    body:not(.light) .sidebar.side .tier hr {
+      border: 0 !important;
+      border-top: 1px solid rgba(255,255,255,.08) !important;
+      margin: 10px 0 !important;
+    }
+
+    /* ── SURFACE (main content) ─────────────────────────────────── */
+    body:not(.light) .main-content.surface {
+      min-height: calc(100vh - 96px) !important;
+      position: relative !important;
+      overflow: hidden auto !important;
+      border-radius: 26px !important;
+      border: 1px solid rgba(255,255,255,.12) !important;
+      background: linear-gradient(180deg, rgba(255,255,255,.060), rgba(255,255,255,.024)) !important;
+      box-shadow: 0 22px 80px rgba(0,0,0,.45), inset 0 1px rgba(255,255,255,.10) !important;
+      backdrop-filter: blur(18px) saturate(1.16) !important;
+      -webkit-backdrop-filter: blur(18px) saturate(1.16) !important;
+      padding: 26px clamp(22px, 2.8vw, 36px) !important;
+      visibility: visible !important;
+      flex: none !important;
+      margin: 0 !important;
+    }
+    body:not(.light) .main-content.surface::before {
+      content: "" !important;
+      position: absolute !important;
+      inset: 0 !important;
+      pointer-events: none !important;
+      border-radius: inherit !important;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(255,216,113,.10), transparent 38%),
+        linear-gradient(90deg, transparent, rgba(255,255,255,.04), transparent) !important;
+      z-index: 0 !important;
+    }
+    body:not(.light) .main-content.surface > * {
+      position: relative !important;
+      z-index: 1 !important;
+    }
+
+    /* ── HEADINGS / EYEBROW / SUB ────────────────────────────────── */
+    body:not(.light) .surface .head {
+      display: flex !important;
+      justify-content: space-between !important;
+      gap: 18px !important;
+      margin-bottom: 22px !important;
+      align-items: flex-start !important;
+      flex-wrap: wrap !important;
+    }
+    body:not(.light) .surface .head h1 {
+      margin: 0 !important;
+      font-size: clamp(28px, 3vw, 44px) !important;
+      line-height: .96 !important;
+      letter-spacing: -0.045em !important;
+      color: #fffdf5 !important;
+      text-shadow: 0 2px 18px rgba(0,0,0,.40) !important;
+    }
+    body:not(.light) .surface .eyebrow {
+      display: inline-flex !important;
+      padding: 7px 12px !important;
+      margin-bottom: 10px !important;
+      border-radius: 99px !important;
+      border: 1px solid rgba(255,216,113,.18) !important;
+      background: rgba(255,207,107,.09) !important;
+      color: #f2d18a !important;
+      font-size: 11px !important;
+      font-weight: 900 !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.12em !important;
+    }
+    body:not(.light) .surface .sub {
+      margin: 8px 0 0 !important;
+      color: var(--muted) !important;
+      font-size: 14px !important;
+      max-width: 760px !important;
+    }
+    body:not(.light) .surface .actions {
+      display: flex !important;
+      gap: 10px !important;
+      flex-wrap: wrap !important;
+      justify-content: flex-end !important;
+    }
+    body:not(.light) .surface .actions .btn,
+    body:not(.light) .surface .actions .btn.gold,
+    body:not(.light) #dashNextEvent.btn.gold {
+      height: 40px !important;
+      padding: 0 14px !important;
+      border: 1px solid rgba(255,255,255,.10) !important;
+      background: linear-gradient(135deg, #ffd978, #b9822e) !important;
+      color: #241807 !important;
+      border-radius: 13px !important;
+      font: inherit !important;
+      font-size: 13px !important;
+      font-weight: 900 !important;
+      transition: transform .17s, box-shadow .17s, filter .17s !important;
+      cursor: pointer !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+    }
+    body:not(.light) .surface .btn:hover { transform: translateY(-2px); filter: brightness(1.08); }
+
+    /* ── GRID helpers ─────────────────────────────────────────── */
+    body:not(.light) .surface .grid { display: grid !important; gap: 14px !important; }
+    body:not(.light) .surface .grid.cols2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    body:not(.light) .surface .grid.cols3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+    body:not(.light) .surface .grid.cols4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+    body:not(.light) .surface .grid.dash { grid-template-columns: 1.1fr 1fr .78fr !important; align-items: start !important; }
+
+    /* ── CARD / PH (panel) ───────────────────────────────────── */
+    body:not(.light) .surface .card {
+      position: relative !important;
+      overflow: hidden !important;
+      border: 1px solid rgba(255,255,255,.115) !important;
+      border-radius: 22px !important;
+      background: linear-gradient(180deg, rgba(8,11,15,.58), rgba(8,9,11,.37)) !important;
+      box-shadow: 0 12px 42px rgba(0,0,0,.30), inset 0 1px rgba(255,255,255,.075) !important;
+      backdrop-filter: blur(14px) saturate(1.15) !important;
+      -webkit-backdrop-filter: blur(14px) saturate(1.15) !important;
+      transition: transform .20s, border-color .20s, box-shadow .20s !important;
+      padding: 0 !important;
+    }
+    body:not(.light) .surface .card::before {
+      content: '' !important;
+      position: absolute !important;
+      inset: 0 !important;
+      pointer-events: none !important;
+      background:
+        radial-gradient(circle at 0 0, rgba(255,216,113,.085), transparent 38%),
+        radial-gradient(circle at 100% 0, rgba(155,102,255,.07), transparent 38%) !important;
+      opacity: .55 !important;
+      border-radius: inherit !important;
+    }
+    body:not(.light) .surface .card > * { position: relative !important; z-index: 1 !important; }
+    body:not(.light) .surface .card:hover {
+      border-color: rgba(255,216,113,.28) !important;
+      box-shadow: 0 24px 65px rgba(0,0,0,.42), 0 0 38px rgba(232,190,88,.07) !important;
+    }
+    body:not(.light) .surface .card .ph {
+      display: flex !important;
+      justify-content: space-between !important;
+      gap: 10px !important;
+      padding: 16px 18px 12px !important;
+      border-bottom: 1px solid rgba(255,255,255,.07) !important;
+    }
+    body:not(.light) .surface .card .ph h3 {
+      margin: 0 !important;
+      color: #f5e3b7 !important;
+      font-family: Georgia, serif !important;
+      text-transform: uppercase !important;
+      font-size: 15px !important;
+      letter-spacing: 0.035em !important;
+    }
+    body:not(.light) .surface .card .ph p {
+      margin: 4px 0 0 !important;
+      color: var(--faint) !important;
+      font-size: 12px !important;
+    }
+    body:not(.light) .surface .card .body {
+      padding: 14px 18px 18px !important;
+    }
+    body:not(.light) .surface .card .link {
+      color: #e7c873 !important;
+      text-decoration: none !important;
+      font-size: 12px !important;
+      font-weight: 850 !important;
+      cursor: pointer !important;
+    }
+
+    /* ── STATS ribbon ─────────────────────────────────────────── */
+    body:not(.light) .surface .card.stats {
+      display: grid !important;
+      grid-template-columns: repeat(4, 1fr) !important;
+      overflow: hidden !important;
+      margin-bottom: 14px !important;
+      padding: 0 !important;
+    }
+    body:not(.light) .surface .stat {
+      min-height: 100px !important;
+      padding: 18px !important;
+      display: grid !important;
+      grid-template-columns: 44px 1fr !important;
+      gap: 14px !important;
+      align-items: center !important;
+      border-right: 1px solid rgba(255,255,255,.08) !important;
+      cursor: pointer !important;
+      transition: background .18s !important;
+    }
+    body:not(.light) .surface .stat:last-child { border-right: 0 !important; }
+    body:not(.light) .surface .stat:hover { background: rgba(255,255,255,.04) !important; }
+    body:not(.light) .surface .orb {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,216,113,.32);
+      background:
+        radial-gradient(circle at 34% 28%, rgba(255,245,210,.34), transparent 18%),
+        radial-gradient(circle, rgba(255,203,94,.16), rgba(0,0,0,.44) 66%);
+      box-shadow: inset 0 0 18px rgba(0,0,0,.85), 0 0 22px rgba(232,190,88,.14);
+      display: grid; place-items: center;
+      font-size: 16px;
+    }
+    body:not(.light) .surface .orb.green {
+      background: conic-gradient(var(--green) 0 82%, rgba(255,255,255,.08) 0);
+      font-weight: 950;
+      color: #08120a;
+    }
+    body:not(.light) .surface .label {
+      color: rgba(247,242,232,.55) !important;
+      font-size: 11px !important;
+      font-weight: 900 !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.09em !important;
+    }
+    body:not(.light) .surface .big {
+      margin-top: 4px !important;
+      color: #fffdf5 !important;
+      font-size: 28px !important;
+      line-height: .94 !important;
+      font-weight: 950 !important;
+      letter-spacing: -0.05em !important;
+    }
+    body:not(.light) .surface .note {
+      margin-top: 5px !important;
+      color: var(--muted) !important;
+      font-size: 12px !important;
+    }
+    body:not(.light) .surface .up { color: var(--green) !important; font-weight: 900 !important; }
+    body:not(.light) .surface .down { color: var(--red) !important; font-weight: 900 !important; }
+    body:not(.light) .surface .warn { color: #ffb13d !important; font-weight: 900 !important; }
+
+    /* ── ALERTS / RANK / RARE / TIME ──────────────────────────── */
+    body:not(.light) .surface .alert {
+      display: grid !important;
+      grid-template-columns: 34px 1fr auto !important;
+      gap: 10px !important;
+      align-items: center !important;
+      margin-bottom: 8px !important;
+      padding: 11px !important;
+      border-radius: 13px !important;
+      background: rgba(255,255,255,.045) !important;
+      border: 1px solid rgba(255,255,255,.08) !important;
+      transition: transform .18s, background .18s !important;
+    }
+    body:not(.light) .surface .alert:hover {
+      transform: translateX(4px) !important;
+      background: rgba(255,255,255,.07) !important;
+    }
+    body:not(.light) .surface .alert.red    { border-color: rgba(255,85,85,.25) !important; background: rgba(255,85,85,.08) !important; }
+    body:not(.light) .surface .alert.gold   { border-color: rgba(255,207,107,.22) !important; background: rgba(255,207,107,.075) !important; }
+    body:not(.light) .surface .alert.violet { border-color: rgba(155,102,255,.27) !important; background: rgba(155,102,255,.09) !important; }
+    body:not(.light) .surface .ai {
+      width: 34px; height: 34px;
+      border-radius: 11px;
+      display: grid; place-items: center;
+      background: rgba(0,0,0,.28);
+      color: var(--gold);
+      font-weight: 950;
+    }
+    body:not(.light) .surface .alert h4 { margin: 0 0 2px !important; font-size: 13px !important; color: var(--ink) !important; }
+    body:not(.light) .surface .alert p  { margin: 0 !important; color: var(--muted) !important; font-size: 12px !important; }
+    body:not(.light) .surface .badge {
+      min-width: 28px; height: 28px;
+      border-radius: 99px;
+      display: grid; place-items: center;
+      background: rgba(0,0,0,.32);
+      border: 1px solid rgba(255,255,255,.10);
+      font-size: 12px; font-weight: 950;
+      color: var(--ink);
+    }
+    body:not(.light) .surface .rank {
+      display: grid !important;
+      grid-template-columns: 31px 34px 1fr auto !important;
+      gap: 10px !important;
+      align-items: center !important;
+      padding: 10px 0 !important;
+      border-bottom: 1px solid rgba(255,255,255,.065) !important;
+    }
+    body:not(.light) .surface .rank:last-child { border-bottom: 0 !important; }
+    body:not(.light) .surface .num {
+      width: 27px; height: 27px;
+      border-radius: 9px;
+      display: grid; place-items: center;
+      background: rgba(255,207,107,.10);
+      border: 1px solid rgba(255,207,107,.23);
+      color: #f4d686;
+      font-weight: 950;
+    }
+    body:not(.light) .surface .ava {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,207,107,.34);
+      background:
+        radial-gradient(circle at 50% 28%, rgba(255,231,166,.30), transparent 18%),
+        linear-gradient(135deg, #4a2b16, #14181d 58%, #241318);
+    }
+    body:not(.light) .surface .rank b { font-size: 13px !important; color: var(--ink) !important; }
+    body:not(.light) .surface .rank small { display: block !important; color: var(--muted) !important; font-size: 11px !important; }
+    body:not(.light) .surface .score { text-align: right !important; font-weight: 950 !important; color: var(--ink) !important; }
+    body:not(.light) .surface .rare {
+      display: grid !important;
+      grid-template-columns: 32px 1fr auto !important;
+      align-items: center !important;
+      gap: 10px !important;
+      padding: 12px 0 !important;
+      border-bottom: 1px solid rgba(255,255,255,.065) !important;
+      font-size: 13px !important;
+    }
+    body:not(.light) .surface .rare:last-child { border-bottom: 0 !important; }
+    body:not(.light) .surface .rico {
+      width: 30px; height: 30px;
+      border-radius: 10px;
+      display: grid; place-items: center;
+      color: var(--gold);
+      background: rgba(255,207,107,.09);
+      border: 1px solid rgba(255,207,107,.18);
+    }
+
+    /* ── SCREEN fade-in (replaces page-section toggling visuals) ─ */
+    body:not(.light) .main-content.surface .page-section { display: none; }
+    body:not(.light) .main-content.surface .page-section.active {
+      display: block !important;
+      animation: v20ScreenIn .42s cubic-bezier(.22,.85,.18,1) both;
+    }
+    @keyframes v20ScreenIn {
+      from { opacity: 0; transform: translateY(12px) scale(.992); filter: blur(5px); }
+      to   { opacity: 1; transform: none; filter: none; }
+    }
+
+    /* ── Hide login/topbar artifacts that don't apply to v20 shell ─ */
+    body:not(.light) #topbar.top.hidden { display: none !important; }
+    body:not(.light) #appLayout.app.hidden { display: none !important; }
+
+    /* ── Mobile fallback ────────────────────────────────────── */
+    @media (max-width: 920px) {
+      body:not(.light) #appLayout.app {
+        grid-template-columns: 1fr !important;
+        padding: 60px 12px 18px !important;
+        gap: 12px !important;
+      }
+      body:not(.light) .sidebar.side {
+        position: relative !important;
+        top: auto !important;
+        height: auto !important;
+        min-height: 0 !important;
+        flex-direction: column !important;
+      }
+      body:not(.light) .sidebar.side .nav { padding: 8px !important; }
+      body:not(.light) .sidebar.side .logo { padding: 14px 12px 10px !important; }
+      body:not(.light) .sidebar.side .tier { display: none !important; }
+      body:not(.light) .surface .grid.cols2,
+      body:not(.light) .surface .grid.cols3,
+      body:not(.light) .surface .grid.cols4 { grid-template-columns: 1fr !important; }
+      body:not(.light) .surface .card.stats { grid-template-columns: 1fr 1fr !important; }
+    }
+
+    </style>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         v20 dashboard adapter — converts existing renderDashboard output
+         into v20 .stat / .rank / .rare DOM. Hooks via DOM observation;
+         existing render functions still target #dash* IDs unchanged.
+    ════════════════════════════════════════════════════════════════ -->
+    <script id="v20-dashboard-adapter">
+    (function(){
+      'use strict';
+      const ICONS = { roster:'⚇', calendar:'▣', packs:'⚔', stats:'▥' };
+
+      function adaptStats() {
+        const root = document.getElementById('dashNavCards');
+        if (!root || root.dataset.v20Adapted === '1') {
+          // re-skin children every render
+        }
+        // Find old layout cards rendered by renderDashboard and convert.
+        const cards = root.querySelectorAll('.dash-card');
+        if (!cards.length) return;
+        const stats = Array.from(cards).map(card => {
+          const text = card.textContent.replace(/\s+/g, ' ').trim();
+          const numEl = card.querySelector('div[style*="font-weight:900"], div[style*="font-weight: 900"]');
+          const num = numEl ? numEl.textContent.trim() : '';
+          const subEl = card.querySelector('div[style*="color:#64748b"], div[style*="color: #64748b"]');
+          const sub = subEl ? subEl.textContent.trim() : '';
+          const icon = card.querySelector('span') ? card.querySelector('span').textContent : '';
+          const onclick = card.getAttribute('onclick') || '';
+          return { num, sub, icon, onclick };
+        });
+        const html = stats.map(s => {
+          const safe = (s.onclick || '').replace(/"/g, '&quot;');
+          return '<div class="stat" onclick="'+safe+'">'
+               + '<div class="orb">' + (s.icon||'') + '</div>'
+               + '<div>'
+               + '<div class="label">' + (s.sub.split('·')[0]||'').trim() + '</div>'
+               + '<div class="big">' + s.num + '</div>'
+               + '<div class="note">' + (s.sub.split('·').slice(1).join('·').trim() || s.sub) + '</div>'
+               + '</div></div>';
+        }).join('');
+        root.innerHTML = html;
+      }
+
+      function adaptRankList(id) {
+        const root = document.getElementById(id);
+        if (!root) return;
+        // BASA renders inline divs with player names + stats. Wrap as v20 .rank.
+        // Lightweight: parse children into rank rows.
+        const rows = Array.from(root.children);
+        if (!rows.length || rows[0].classList.contains('rank')) return;
+        let i = 0;
+        const newHtml = rows.slice(0, 5).map(row => {
+          i++;
+          const txt = row.textContent.replace(/\s+/g, ' ').trim();
+          const parts = txt.split(/\s{2,}| |·/).filter(Boolean);
+          const name = parts[0] || txt;
+          const sub  = parts.slice(1, -1).join(' · ');
+          const score = parts[parts.length - 1] || '';
+          return '<div class="rank">'
+               + '<span class="num">' + i + '</span>'
+               + '<span class="ava"></span>'
+               + '<span><b>' + name + '</b><small>' + sub + '</small></span>'
+               + '<span class="score">' + score + '</span>'
+               + '</div>';
+        }).join('');
+        root.innerHTML = newHtml;
+      }
+
+      function adaptRareGems() {
+        const root = document.getElementById('dashRareGems');
+        if (!root) return;
+        const rows = Array.from(root.children);
+        if (!rows.length || rows[0].classList.contains('rare')) return;
+        const newHtml = rows.slice(0, 8).map(row => {
+          const txt = row.textContent.replace(/\s+/g, ' ').trim();
+          const parts = txt.split(/\s{2,}|·/).filter(Boolean);
+          const name = parts[0] || txt;
+          const meta = parts.slice(1).join(' · ');
+          return '<div class="rare">'
+               + '<span class="rico">✦</span>'
+               + '<span><b>' + name + '</b>' + (meta ? '<br><small style="color:rgba(247,242,232,.62);font-size:11px">'+meta+'</small>' : '') + '</span>'
+               + '</div>';
+        }).join('');
+        root.innerHTML = newHtml;
+      }
+
+      function runAdapter() {
+        try { adaptStats(); } catch(e){}
+        try { adaptRankList('dashTopValue'); } catch(e){}
+        try { adaptRankList('dashTopGrowing'); } catch(e){}
+        try { adaptRankList('dashTopFalling'); } catch(e){}
+        try { adaptRareGems(); } catch(e){}
+      }
+
+      // Re-run after every renderDashboard call.
+      function patch() {
+        if (typeof window.renderDashboard !== 'function') return false;
+        if (window._renderDashboardOrig) return true;
+        window._renderDashboardOrig = window.renderDashboard;
+        window.renderDashboard = function() {
+          window._renderDashboardOrig.apply(this, arguments);
+          setTimeout(runAdapter, 0);
+        };
+        return true;
+      }
+      document.addEventListener('DOMContentLoaded', function(){
+        if (!patch()) setTimeout(patch, 250);
+        // Also adapt on first show.
+        setTimeout(runAdapter, 600);
+      });
+
+      // Sidebar nav active sync — mirror BASA's id-based highlighting onto v20 buttons.
+      const _origShowPage = window.showPage;
+      function syncActive(id) {
+        document.querySelectorAll('.sidebar.side .nav .nav-item').forEach(b => b.classList.remove('active'));
+        const b = document.getElementById('nav-' + id);
+        if (b) b.classList.add('active');
+      }
+      function patchShow() {
+        if (typeof window.showPage !== 'function') return false;
+        if (window._v20ShowPagePatched) return true;
+        window._v20ShowPagePatched = true;
+        const orig = window.showPage;
+        window.showPage = function(pid) {
+          orig.apply(this, arguments);
+          syncActive(pid);
+          // Re-run dashboard adapter when dashboard is shown.
+          if (pid === 'dashboard') setTimeout(runAdapter, 80);
+        };
+        return true;
+      }
+      document.addEventListener('DOMContentLoaded', function(){
+        if (!patchShow()) setTimeout(patchShow, 220);
+      });
+    })();
+    </script>
 </body>
 </html>
