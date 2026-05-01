@@ -3057,6 +3057,376 @@
     #archSystemMap .arch-chain-item:hover { border-color: #1e2d3d; color: #475569; }
     #archSystemMap .arch-chain-item.sel   { border-color: #3b82f6; color: #93c5fd; background: #0c1a30; }
     </style>
+
+    <!-- ═══ DARK GLASS FANTASY v20 — visual layer over shell-override + readability-layer ═══ -->
+    <style id="dark-glass-v20">
+
+    /* ── Cinematic body overlay ──────────────────────────── */
+    body:not(.light)::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse at 28% 0%, rgba(232,190,88,0.07) 0%, transparent 44%),
+        radial-gradient(ellipse at 72% 4%, rgba(155,102,255,0.05) 0%, transparent 38%),
+        radial-gradient(circle at 50% 100%, rgba(0,0,0,0.55) 0%, transparent 58%),
+        linear-gradient(180deg, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.46) 100%);
+    }
+    body:not(.light) > * { position: relative; z-index: 1; }
+
+    /* ── Topbar ──────────────────────────────────────────── */
+    body:not(.light) #topbar {
+      background: rgba(5,6,10,0.28) !important;
+      border-bottom: 1px solid rgba(232,190,88,0.09) !important;
+      backdrop-filter: blur(22px) saturate(1.15) !important;
+      -webkit-backdrop-filter: blur(22px) saturate(1.15) !important;
+    }
+    body:not(.light) .topbar-logo { color: rgba(245,230,200,0.90) !important; }
+    body:not(.light) .topbar-logo span { color: #e8be58 !important; }
+
+    /* ── Sidebar ─────────────────────────────────────────── */
+    body:not(.light) .sidebar {
+      background: linear-gradient(180deg, rgba(8,10,15,0.62), rgba(4,5,9,0.52)) !important;
+      border-right: 1px solid rgba(255,255,255,0.08) !important;
+      backdrop-filter: blur(20px) saturate(1.2) !important;
+      -webkit-backdrop-filter: blur(20px) saturate(1.2) !important;
+    }
+    body:not(.light) .sidebar [style*="color:#334155"],
+    body:not(.light) .sidebar [style*="color:#475569"],
+    body:not(.light) .sidebar-section-label {
+      color: rgba(232,190,88,0.38) !important;
+      letter-spacing: 0.12em !important;
+    }
+    body:not(.light) .sidebar > div[style*="border-top"] {
+      border-top-color: rgba(255,255,255,0.07) !important;
+    }
+
+    /* ── Nav items ───────────────────────────────────────── */
+    body:not(.light) .nav-item {
+      color: rgba(235,228,210,0.58) !important;
+      border-radius: 10px !important;
+      transition: all 0.18s !important;
+    }
+    body:not(.light) .nav-item:hover {
+      background: rgba(255,255,255,0.055) !important;
+      color: rgba(250,244,228,0.92) !important;
+      transform: translateX(2px) !important;
+    }
+    body:not(.light) .nav-item.active {
+      background: linear-gradient(90deg, rgba(232,190,88,0.16), rgba(255,255,255,0.03)) !important;
+      border-left: 2px solid rgba(232,190,88,0.75) !important;
+      color: #f5d98a !important;
+      font-weight: 600 !important;
+      box-shadow: 0 0 22px rgba(232,190,88,0.09) !important;
+      padding-left: 8px !important;
+    }
+
+    /* ── Main content ────────────────────────────────────── */
+    body:not(.light) .main-content {
+      background: rgba(6,8,14,0.40) !important;
+      backdrop-filter: blur(10px) !important;
+      -webkit-backdrop-filter: blur(10px) !important;
+    }
+
+    /* ── Cards ───────────────────────────────────────────── */
+    body:not(.light) .card,
+    body:not(.light) .dash-card {
+      background: linear-gradient(180deg, rgba(10,13,20,0.66), rgba(6,8,14,0.48)) !important;
+      border: 1px solid rgba(255,255,255,0.09) !important;
+      border-top-color: rgba(255,255,255,0.14) !important;
+      box-shadow: 0 12px 42px rgba(0,0,0,0.30), inset 0 1px rgba(255,255,255,0.06) !important;
+      transition: border-color 0.2s, box-shadow 0.22s !important;
+    }
+    body:not(.light) .card:hover,
+    body:not(.light) .dash-card:hover {
+      border-color: rgba(232,190,88,0.26) !important;
+      box-shadow: 0 20px 62px rgba(0,0,0,0.40), 0 0 30px rgba(232,190,88,0.055) !important;
+    }
+    body:not(.light) .pack-card {
+      background: linear-gradient(180deg, rgba(10,13,20,0.62), rgba(6,8,14,0.44)) !important;
+      border: 1px solid rgba(255,255,255,0.09) !important;
+    }
+    body:not(.light) .pack-card:hover {
+      border-color: rgba(232,190,88,0.22) !important;
+      transform: translateY(-2px) !important;
+    }
+    body:not(.light) .pack-card::after {
+      background: linear-gradient(90deg, transparent, rgba(232,190,88,0.18), transparent) !important;
+    }
+    body:not(.light) .member-list-item {
+      background: rgba(8,10,16,0.48) !important;
+      border-color: rgba(255,255,255,0.08) !important;
+    }
+
+    /* ── Tables ──────────────────────────────────────────── */
+    body:not(.light) td { color: rgba(240,236,220,0.82) !important; }
+    body:not(.light) th {
+      color: rgba(232,190,88,0.52) !important;
+      letter-spacing: 0.10em !important;
+    }
+    body:not(.light) tr:hover td {
+      background: rgba(232,190,88,0.035) !important;
+    }
+    body:not(.light) td, body:not(.light) th {
+      border-bottom-color: rgba(255,255,255,0.06) !important;
+    }
+
+    /* ── Typography ──────────────────────────────────────── */
+    body:not(.light) h1 {
+      text-shadow: 0 2px 18px rgba(0,0,0,0.72), 0 0 42px rgba(232,190,88,0.07) !important;
+    }
+    body:not(.light) h2,
+    body:not(.light) h3 {
+      text-shadow: 0 1px 8px rgba(0,0,0,0.58) !important;
+    }
+
+    /* ── Inputs ──────────────────────────────────────────── */
+    body:not(.light) .input-dark {
+      background: rgba(0,0,0,0.38) !important;
+      border-color: rgba(255,255,255,0.10) !important;
+    }
+    body:not(.light) .input-dark:focus {
+      border-color: rgba(232,190,88,0.52) !important;
+      box-shadow: 0 0 0 3px rgba(232,190,88,0.09) !important;
+    }
+
+    /* ── Topbar buttons ──────────────────────────────────── */
+    body:not(.light) .topbar-icon-btn:hover {
+      border-color: rgba(232,190,88,0.38) !important;
+      color: #f5d98a !important;
+      box-shadow: 0 0 14px rgba(232,190,88,0.09) !important;
+    }
+    body:not(.light) .btn-primary {
+      background: linear-gradient(135deg, #d4a93e, #b98228) !important;
+      box-shadow: 0 4px 20px rgba(201,168,76,0.20) !important;
+    }
+
+    /* ══ Pencil button ════════════════════════════════════ */
+    #ccTabBgBtn {
+      width: 34px; height: 34px;
+      border-radius: 9px;
+      border: 1px solid rgba(232,190,88,0.30);
+      background: rgba(232,190,88,0.07);
+      color: #e8c97a;
+      font-size: 15px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    #ccTabBgBtn:hover {
+      border-color: rgba(232,190,88,0.55);
+      background: rgba(232,190,88,0.12);
+      box-shadow: 0 0 16px rgba(232,190,88,0.13);
+    }
+
+    /* ══ Per-tab background modal ═════════════════════════ */
+    .cc-tab-bg-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 400;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+      background: rgba(0,0,0,0.54);
+      backdrop-filter: blur(5px);
+    }
+    .cc-tab-bg-modal.open {
+      display: flex;
+      animation: ccTabFade .18s ease both;
+    }
+    @keyframes ccTabFade { from { opacity:0 } to { opacity:1 } }
+
+    .cc-tab-bg-dialog {
+      width: min(740px, 94vw);
+      max-height: min(720px, 88vh);
+      overflow-y: auto;
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-top-color: rgba(255,255,255,0.22);
+      background: linear-gradient(180deg, rgba(8,10,16,0.94), rgba(5,6,10,0.90));
+      box-shadow: 0 36px 140px rgba(0,0,0,0.66), inset 0 1px rgba(255,255,255,0.08);
+      color: #f0ede4;
+      padding: 22px 26px 26px;
+    }
+    .cc-tab-bg-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.09);
+      margin-bottom: 14px;
+    }
+    .cc-tab-bg-head h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 800;
+      color: #f5e3b7;
+      letter-spacing: -0.3px;
+      text-shadow: none !important;
+    }
+    .cc-tab-bg-head p {
+      margin: 5px 0 0;
+      color: rgba(240,236,220,0.52);
+      font-size: 13px;
+    }
+    .cc-tab-bg-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 10px 0 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      margin-bottom: 12px;
+    }
+    .cc-tab-check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: rgba(240,236,220,0.75);
+      font-size: 13px;
+      font-weight: 600;
+      flex: 1;
+      cursor: pointer;
+    }
+    .cc-tab-check input[type="checkbox"] {
+      accent-color: #e8be58;
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+    .cc-tab-bg-list { display: grid; gap: 8px; }
+    .cc-tab-bg-row {
+      display: grid;
+      grid-template-columns: 1fr 82px auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.09);
+      background: rgba(255,255,255,0.04);
+      transition: border-color 0.18s, background 0.18s;
+    }
+    .cc-tab-bg-row:hover {
+      background: rgba(255,255,255,0.06);
+      border-color: rgba(255,255,255,0.14);
+    }
+    .cc-tab-bg-row.is-current {
+      border-color: rgba(232,190,88,0.42);
+      box-shadow: 0 0 0 1px rgba(232,190,88,0.12), 0 0 22px rgba(232,190,88,0.07);
+    }
+    .cc-tab-bg-row strong { display:block; font-size:13px; font-weight:700; color:#f0ede4; }
+    .cc-tab-bg-row span { display:block; margin-top:3px; color:rgba(240,236,220,0.44); font-size:11px; }
+    .cc-tab-bg-preview {
+      width: 82px; height: 48px;
+      border-radius: 9px;
+      background-size: cover;
+      background-position: center;
+      background-color: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.13);
+    }
+    .cc-tab-upload-btn {
+      height: 32px;
+      padding: 0 12px;
+      border-radius: 9px;
+      border: 1px solid rgba(255,255,255,0.13);
+      background: rgba(255,255,255,0.07);
+      color: rgba(240,236,220,0.80);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.17s;
+      font-family: inherit;
+    }
+    .cc-tab-upload-btn:hover {
+      border-color: rgba(232,190,88,0.42);
+      color: #f5d98a;
+      background: rgba(232,190,88,0.08);
+    }
+    .cc-tab-bg-save-btn {
+      height: 36px;
+      padding: 0 18px;
+      border-radius: 10px;
+      border: none;
+      background: linear-gradient(135deg, #d4a93e, #b98228);
+      color: #201407;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.17s;
+      font-family: inherit;
+    }
+    .cc-tab-bg-save-btn:hover {
+      filter: brightness(1.10);
+      box-shadow: 0 4px 20px rgba(201,168,76,0.28);
+    }
+    .cc-tab-bg-reset-btn {
+      height: 36px;
+      padding: 0 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.11);
+      background: rgba(255,255,255,0.055);
+      color: rgba(240,236,220,0.68);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.17s;
+      font-family: inherit;
+    }
+    .cc-tab-bg-reset-btn:hover {
+      border-color: rgba(255,75,55,0.30);
+      color: #ffa898;
+      background: rgba(255,75,55,0.07);
+    }
+    .cc-tab-bg-close-btn {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.11);
+      background: rgba(255,255,255,0.055);
+      color: rgba(240,236,220,0.62);
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.17s;
+      font-family: inherit;
+      flex-shrink: 0;
+    }
+    .cc-tab-bg-close-btn:hover {
+      background: rgba(255,255,255,0.10);
+      color: #f0ede4;
+    }
+    .cc-tab-bg-toast {
+      position: fixed;
+      bottom: 26px;
+      right: 22px;
+      z-index: 450;
+      padding: 9px 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(232,190,88,0.24);
+      background: rgba(5,6,10,0.90);
+      color: #ffe9b0;
+      font-size: 13px;
+      font-weight: 800;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.36);
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .cc-tab-bg-toast.show { opacity: 1; transform: translateY(0); }
+
+    </style>
+
     <!-- defer: ~950 KB UMD bundle downloads in parallel, executes after HTML parsed, not blocking first paint -->
     <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" id="supabase-sdk"></script>
     <script>
@@ -3169,6 +3539,7 @@
         </div>
         <button id="ccAdminBtn" onclick="cveToggle()" title="Редактировать календарь" style="display:none;width:34px;height:34px;border-radius:9px;border:1px solid rgba(201,168,76,0.35);background:rgba(201,168,76,0.08);color:#e8c97a;font-size:15px;cursor:pointer;transition:all .2s;flex-shrink:0">✏️</button>
         <button id="shellToggleBtn" onclick="shellToggle()" title="Убрать оболочку" style="display:none;padding:0 10px;height:34px;border-radius:9px;border:1px solid rgba(120,160,255,0.35);background:rgba(120,160,255,0.08);color:rgba(140,185,255,0.85);font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;flex-shrink:0;white-space:nowrap">Оболочка</button>
+        <button id="ccTabBgBtn" title="Фоны вкладок">🖼</button>
         <div class="topbar-icon-btn" onclick="loginLogout()" title="Выйти" style="color:#475569">🚪</div>
     </div>
 </div>
@@ -15559,6 +15930,277 @@ window._archRender = function() {
   // ── авто-восстановление только для admin ──
   if (isActive() && typeof _isAdm === 'function' && _isAdm()) startInspect();
 
+})();
+</script>
+
+<!-- ═══ PER-TAB BACKGROUND MODAL ═══ -->
+<div class="cc-tab-bg-modal" id="ccTabBgModal" aria-hidden="true">
+  <div class="cc-tab-bg-dialog" role="dialog" aria-labelledby="ccTabBgTitle">
+    <div class="cc-tab-bg-head">
+      <div>
+        <h2 id="ccTabBgTitle">Фоны вкладок</h2>
+        <p>Загрузи отдельную обложку для каждого раздела или одну картинку сразу для всех.</p>
+      </div>
+      <button class="cc-tab-bg-close-btn" id="ccTabBgClose" type="button" aria-label="Закрыть">×</button>
+    </div>
+    <div class="cc-tab-bg-toolbar">
+      <label class="cc-tab-check">
+        <input type="checkbox" id="ccTabApplyAll">
+        <span>Применить выбранную картинку ко всем</span>
+      </label>
+      <button class="cc-tab-bg-reset-btn" id="ccTabBgReset" type="button">Сбросить фоны</button>
+      <button class="cc-tab-bg-save-btn" id="ccTabBgSave" type="button">Сохранить</button>
+    </div>
+    <div class="cc-tab-bg-list" id="ccTabBgList"></div>
+    <input type="file" id="ccTabBgFile" accept="image/*" hidden>
+  </div>
+</div>
+<div class="cc-tab-bg-toast" id="ccTabBgToast">Сохранено</div>
+
+<!-- ═══ PER-TAB BACKGROUND ENGINE ═══ -->
+<script>
+(function(){
+  'use strict';
+
+  var TABS = [
+    { id:'dashboard',   label:'Дашборд' },
+    { id:'stats',       label:'Статистика' },
+    { id:'calendar',    label:'Календарь КМ' },
+    { id:'screenshots', label:'История КМ / Screenshot Scan' },
+    { id:'roster',      label:'Клан' },
+    { id:'packs',       label:'Рейд Паки' },
+    { id:'archive',     label:'Архив' },
+    { id:'settings',    label:'Настройки' }
+  ];
+
+  var KEY_TAB      = 'cc-bg-tab-';
+  var KEY_GLOBAL   = 'cc-bg-global';
+  var KEY_USE_GLOB = 'cc-bg-use-global';
+
+  var _currentTab   = 'dashboard';
+  var _pending      = {};
+  var _uploadTarget = null;
+
+  // ── Apply background for a tab ──────────────────────────
+  function getBgUrl(tabId) {
+    if (localStorage.getItem(KEY_USE_GLOB) === '1') {
+      return localStorage.getItem(KEY_GLOBAL) || null;
+    }
+    return localStorage.getItem(KEY_TAB + tabId) || null;
+  }
+
+  function applyBg(tabId) {
+    var url = getBgUrl(tabId);
+    var el  = document.getElementById('cceGlobalBgStyle');
+    if (!el) {
+      el = document.createElement('style');
+      el.id = 'cceGlobalBgStyle';
+      document.head.appendChild(el);
+    }
+    if (url) {
+      el.textContent = 'body{background-image:url("'+url+'") !important;background-size:cover !important;background-position:center center !important;background-attachment:fixed !important;}';
+      var sup = document.getElementById('cvePreloadBgSuppress');
+      if (sup) sup.remove();
+    } else {
+      el.textContent = '';
+    }
+  }
+
+  // ── Patch showPage ──────────────────────────────────────
+  function patchShowPage() {
+    if (typeof window.showPage !== 'function') return false;
+    var orig = window.showPage;
+    window.showPage = function(pid) {
+      orig.apply(this, arguments);
+      _currentTab = pid || 'dashboard';
+      applyBg(_currentTab);
+    };
+    return true;
+  }
+  if (!patchShowPage()) {
+    document.addEventListener('DOMContentLoaded', function(){ setTimeout(patchShowPage, 120); });
+  }
+
+  // Apply bg on initial load
+  document.addEventListener('DOMContentLoaded', function(){
+    setTimeout(function(){
+      var hash = (location.hash || '').replace('#','') || 'dashboard';
+      _currentTab = hash;
+      applyBg(_currentTab);
+    }, 150);
+  });
+
+  // ── Toast ───────────────────────────────────────────────
+  function showToast(text) {
+    var t = document.getElementById('ccTabBgToast');
+    if (!t) return;
+    t.textContent = text;
+    t.classList.add('show');
+    clearTimeout(window._ccTabToastT);
+    window._ccTabToastT = setTimeout(function(){ t.classList.remove('show'); }, 1600);
+  }
+
+  // ── Modal open/close ────────────────────────────────────
+  function openModal() {
+    renderRows();
+    var m = document.getElementById('ccTabBgModal');
+    if (m) { m.classList.add('open'); m.setAttribute('aria-hidden','false'); }
+  }
+  function closeModal() {
+    var m = document.getElementById('ccTabBgModal');
+    if (m) { m.classList.remove('open'); m.setAttribute('aria-hidden','true'); }
+  }
+
+  // ── Render rows ─────────────────────────────────────────
+  function metaFor(tabId) {
+    if (_pending[tabId]) return 'Не сохранено';
+    if (localStorage.getItem(KEY_USE_GLOB) === '1' && localStorage.getItem(KEY_GLOBAL)) return 'Общий фон';
+    return localStorage.getItem(KEY_TAB + tabId) ? 'Загружено' : 'По умолчанию';
+  }
+  function previewFor(tabId) {
+    if (_pending[tabId]) return _pending[tabId];
+    if (localStorage.getItem(KEY_USE_GLOB) === '1') return localStorage.getItem(KEY_GLOBAL) || '';
+    return localStorage.getItem(KEY_TAB + tabId) || '';
+  }
+
+  function renderRows() {
+    var box = document.getElementById('ccTabBgList');
+    if (!box) return;
+    box.innerHTML = TABS.map(function(tab){
+      var cur     = tab.id === _currentTab;
+      var preview = previewFor(tab.id);
+      var bgStyle = preview ? 'background-image:url("'+preview+'")' : '';
+      return '<div class="cc-tab-bg-row'+(cur?' is-current':'')+'">'
+        + '<div><strong>'+tab.label+'</strong><span>'+metaFor(tab.id)+'</span></div>'
+        + '<div class="cc-tab-bg-preview" style="'+bgStyle+'"></div>'
+        + '<button class="cc-tab-upload-btn" type="button" data-upload-tab="'+tab.id+'">Загрузить обложку</button>'
+        + '</div>';
+    }).join('');
+  }
+
+  // ── Image compression ───────────────────────────────────
+  function compressImage(file) {
+    return new Promise(function(resolve){
+      var reader = new FileReader();
+      reader.onload = function(){
+        var img = new Image();
+        img.onload = function(){
+          var max = 1800, w = img.naturalWidth, h = img.naturalHeight;
+          if (w > max) { h = Math.round(h * max / w); w = max; }
+          var c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          c.getContext('2d').drawImage(img, 0, 0, w, h);
+          try { resolve(c.toDataURL('image/webp', 0.80)); }
+          catch(e) { resolve(reader.result); }
+        };
+        img.onerror = function(){ resolve(reader.result); };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // ── Upload ──────────────────────────────────────────────
+  function uploadFor(tabId, file) {
+    return compressImage(file).then(function(data){
+      _pending[tabId] = data;
+      // Live preview for current tab
+      if (tabId === _currentTab) {
+        var el = document.getElementById('cceGlobalBgStyle');
+        if (!el){ el = document.createElement('style'); el.id='cceGlobalBgStyle'; document.head.appendChild(el); }
+        el.textContent = 'body{background-image:url("'+data+'") !important;background-size:cover !important;background-position:center center !important;background-attachment:fixed !important;}';
+        var sup = document.getElementById('cvePreloadBgSuppress');
+        if (sup) sup.remove();
+      }
+      renderRows();
+    });
+  }
+
+  // ── Save ────────────────────────────────────────────────
+  function saveAll() {
+    var applyAll = document.getElementById('ccTabApplyAll');
+    var isAll    = applyAll && applyAll.checked;
+
+    // Find last uploaded
+    var lastImg = null;
+    TABS.forEach(function(t){ if (_pending[t.id]) lastImg = _pending[t.id]; });
+
+    if (isAll && lastImg) {
+      try { localStorage.setItem(KEY_GLOBAL, lastImg); } catch(e){}
+      localStorage.setItem(KEY_USE_GLOB, '1');
+      TABS.forEach(function(t){ localStorage.removeItem(KEY_TAB + t.id); });
+    } else {
+      localStorage.removeItem(KEY_USE_GLOB);
+      TABS.forEach(function(t){
+        if (_pending[t.id]) {
+          try { localStorage.setItem(KEY_TAB + t.id, _pending[t.id]); } catch(e){}
+        }
+      });
+    }
+
+    _pending = {};
+    applyBg(_currentTab);
+    renderRows();
+    closeModal();
+    showToast('Сохранено');
+  }
+
+  // ── Reset ────────────────────────────────────────────────
+  function resetAll() {
+    TABS.forEach(function(t){ localStorage.removeItem(KEY_TAB + t.id); });
+    localStorage.removeItem(KEY_GLOBAL);
+    localStorage.removeItem(KEY_USE_GLOB);
+    _pending = {};
+    // Remove custom bg style
+    var el = document.getElementById('cceGlobalBgStyle');
+    if (el) el.textContent = '';
+    showToast('Фоны сброшены');
+    renderRows();
+  }
+
+  // ── Wire events ─────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function(){
+
+    var pencilBtn = document.getElementById('ccTabBgBtn');
+    if (pencilBtn) pencilBtn.addEventListener('click', function(e){
+      e.preventDefault();
+      openModal();
+    });
+
+    var closeBtn = document.getElementById('ccTabBgClose');
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+
+    var modal = document.getElementById('ccTabBgModal');
+    if (modal) modal.addEventListener('click', function(e){ if (e.target === modal) closeModal(); });
+
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeModal(); });
+
+    var saveBtn = document.getElementById('ccTabBgSave');
+    if (saveBtn) saveBtn.addEventListener('click', saveAll);
+
+    var resetBtn = document.getElementById('ccTabBgReset');
+    if (resetBtn) resetBtn.addEventListener('click', resetAll);
+
+    var fileInput = document.getElementById('ccTabBgFile');
+    if (fileInput) {
+      fileInput.addEventListener('change', function(){
+        var file = fileInput.files && fileInput.files[0];
+        if (!file || !_uploadTarget) return;
+        uploadFor(_uploadTarget, file).then(function(){ fileInput.value = ''; });
+      });
+    }
+
+    document.addEventListener('click', function(e){
+      var btn = e.target.closest('[data-upload-tab]');
+      if (!btn) return;
+      e.preventDefault();
+      _uploadTarget = btn.dataset.uploadTab;
+      var fi = document.getElementById('ccTabBgFile');
+      if (fi) { fi.value = ''; fi.click(); }
+    });
+  });
+
+  window._ccTabBg = { open:openModal, close:closeModal };
 })();
 </script>
 </body>
