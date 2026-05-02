@@ -3232,78 +3232,72 @@
             <!-- 4 stat cards — v20 .stats ribbon, populated by renderDashboard via #dashNavCards -->
             <div class="card stats" id="dashNavCards"></div>
 
-            <!-- Двойная сетка: alerts + attention -->
-            <div class="grid cols2" style="margin-top:14px">
-                <article class="card">
-                    <div class="ph">
-                        <div>
-                            <h3>Alerts &amp; warnings</h3>
-                            <p>Критичные сигналы без визуального шума <span id="dashAlertCount" style="display:inline-block;margin-left:6px;background:rgba(255,85,85,.18);color:#ff9f9f;border-radius:99px;padding:1px 8px;font-size:10px;font-weight:900"></span></p>
+            <div class="grid dash" id="dashV20Grid" style="margin-top:14px">
+                <div class="grid">
+                    <article class="card">
+                        <div class="ph">
+                            <div>
+                                <h3>Alerts &amp; warnings</h3>
+                                <p>Критичные сигналы без визуального шума</p>
+                            </div>
+                            <a class="link" id="dashAlertCount">View all (0)</a>
                         </div>
-                    </div>
-                    <div class="body" id="dashAlerts" style="max-height:340px;overflow-y:auto"></div>
-                </article>
-                <article class="card">
-                    <div class="ph">
-                        <div>
-                            <h3>Обратить внимание</h3>
-                            <p>Тихие сигналы для оперативного контроля</p>
+                        <div class="body" id="dashAlerts"></div>
+                    </article>
+                    <article class="card">
+                        <div class="ph">
+                            <div><h3>Screenshot Analysis</h3><p>AI OCR queue and scan confidence</p></div>
+                            <a class="link" onclick="showPage('calendar')" style="cursor:pointer">Scan logs</a>
                         </div>
-                    </div>
-                    <div class="body" id="dashAttention" style="max-height:340px;overflow-y:auto"></div>
-                </article>
-            </div>
-
-            <!-- Рейтинги — v20 cards с реальными данными -->
-            <div class="grid cols2" style="margin-top:14px">
-                <article class="card">
-                    <div class="ph">
-                        <div><h3>Топ-5 ценных</h3><p>Текущие лидеры по ценности</p></div>
-                        <a class="link" onclick="showPage('roster')" style="cursor:pointer">Roster →</a>
-                    </div>
-                    <div class="body" id="dashTopValue"></div>
-                </article>
-                <article class="card">
-                    <div class="ph">
-                        <div><h3>Растут</h3><p>Ускоряют темп за последние КМ</p></div>
-                    </div>
-                    <div class="body" id="dashTopGrowing"></div>
-                </article>
-            </div>
-            <div class="grid cols2" style="margin-top:14px">
-                <article class="card">
-                    <div class="ph">
-                        <div><h3>Падают</h3><p>Сбавили темп — зона внимания</p></div>
-                    </div>
-                    <div class="body" id="dashTopFalling"></div>
-                </article>
-                <article class="card">
-                    <div class="ph">
-                        <div><h3>Редкие таланты</h3><p>Ходят редко, но когда приходят — играют лучше многих</p></div>
-                    </div>
-                    <div class="body" id="dashRareGems"></div>
-                </article>
-            </div>
-            <div class="grid cols3 v20-ops-grid" style="margin-top:14px">
-                <article class="card">
-                    <div class="ph">
-                        <div><h3>Screenshot analysis</h3><p>Сводка по последним загруженным КМ</p></div>
-                    </div>
-                    <div class="body" id="dashScanAnalysis"></div>
-                </article>
-                <article class="card">
-                    <div class="ph">
-                        <div><h3>Calendar</h3><p>Ближайшие события war table</p></div>
-                        <a class="link" onclick="showPage('calendar')" style="cursor:pointer">Open →</a>
-                    </div>
-                    <div class="body" id="dashMiniCalendar"></div>
-                </article>
-                <article class="card">
-                    <div class="ph">
-                        <div><h3>Activity timeline</h3><p>Последние изменения по КМ</p></div>
-                    </div>
-                    <div class="body" id="dashActivityTimeline"></div>
-                </article>
+                        <div class="body scan" id="dashScanAnalysis"></div>
+                    </article>
+                </div>
+                <div class="grid">
+                    <article class="card">
+                        <div class="ph">
+                            <div><h3>Top 5 performers</h3><p>Current KM % leaders</p></div>
+                            <a class="link" onclick="showPage('roster')" style="cursor:pointer">Roster</a>
+                        </div>
+                        <div class="body" id="dashTopValue"></div>
+                    </article>
+                    <article class="card">
+                        <div class="ph">
+                            <div><h3>Growth / Decline</h3><p>Average KM trend · Last wars</p></div>
+                            <a class="link" onclick="showPage('stats')" style="cursor:pointer">Last wars↗</a>
+                        </div>
+                        <div class="body" id="dashGrowthDecline">
+                            <div id="dashTrendSummary"></div>
+                            <div class="chart" id="dashTrendChart"></div>
+                            <div class="mini">
+                                <div><b>Top growth</b><div id="dashTopGrowing"></div></div>
+                                <div><b>Top decline</b><div id="dashTopFalling"></div></div>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+                <div class="grid">
+                    <article class="card">
+                        <div class="ph">
+                            <div><h3>Rare talents</h3><p>Roster-wide unique build value</p></div>
+                            <a class="link" onclick="showPage('roster')" style="cursor:pointer">View all</a>
+                        </div>
+                        <div class="body" id="dashRareGems"></div>
+                    </article>
+                    <article class="card">
+                        <div class="ph">
+                            <div><h3>War table calendar</h3><p>Upcoming command board</p></div>
+                            <a class="link" onclick="showPage('calendar')" style="cursor:pointer">Full calendar</a>
+                        </div>
+                        <div class="body" id="dashMiniCalendar"></div>
+                    </article>
+                    <article class="card">
+                        <div class="ph">
+                            <div><h3>Activity timeline</h3><p>Live operational feed</p></div>
+                            <a class="link" onclick="showPage('screenshots')" style="cursor:pointer">View all</a>
+                        </div>
+                        <div class="body" id="dashActivityTimeline"></div>
+                    </article>
+                </div>
             </div>
         </section>
 
@@ -17971,6 +17965,155 @@ window._archRender = function() {
       background: rgba(255,207,107,.09);
       border: 1px solid rgba(255,207,107,.18);
     }
+    body:not(.light) .surface .scan {
+      display: grid !important;
+      grid-template-columns: 116px 1fr !important;
+      gap: 20px !important;
+      align-items: center !important;
+    }
+    body:not(.light) .surface .ring {
+      width: 104px !important;
+      height: 104px !important;
+      border-radius: 50% !important;
+      display: grid !important;
+      place-items: center !important;
+      background: conic-gradient(#9b66ff 0 var(--scan,0%), rgba(255,255,255,.06) 0) !important;
+      box-shadow: 0 0 34px rgba(155,102,255,.18) !important;
+      position: relative !important;
+    }
+    body:not(.light) .surface .ring::before {
+      content: "" !important;
+      position: absolute !important;
+      inset: 14px !important;
+      border-radius: inherit !important;
+      background: rgba(0,0,0,.72) !important;
+      box-shadow: inset 0 0 18px rgba(0,0,0,.86) !important;
+    }
+    body:not(.light) .surface .ring > div { position: relative !important; text-align: center !important; z-index: 1 !important; }
+    body:not(.light) .surface .ring b { display:block !important; font-size: 24px !important; color: var(--ink) !important; }
+    body:not(.light) .surface .ring small { display:block !important; color: var(--muted) !important; font-size: 9px !important; text-transform: uppercase !important; }
+    body:not(.light) .surface .mline,
+    body:not(.light) .surface .ml {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 10px !important;
+      margin: 8px 0 !important;
+      color: var(--muted) !important;
+      font-size: 12px !important;
+    }
+    body:not(.light) .surface .mline b,
+    body:not(.light) .surface .ml b { color: var(--ink) !important; }
+    body:not(.light) .surface .bar {
+      height: 6px !important;
+      margin-top: 12px !important;
+      overflow: hidden !important;
+      border-radius: 99px !important;
+      background: rgba(255,255,255,.08) !important;
+    }
+    body:not(.light) .surface .bar span {
+      display: block !important;
+      width: var(--w,0%) !important;
+      height: 100% !important;
+      border-radius: inherit !important;
+      background: linear-gradient(90deg,#9b66ff,#ffd671,#68ff92) !important;
+    }
+    body:not(.light) .surface .chart {
+      height: 168px !important;
+      margin: 10px 0 12px !important;
+      overflow: hidden !important;
+    }
+    body:not(.light) .surface .chart svg { width: 100% !important; height: 100% !important; display:block !important; }
+    body:not(.light) .surface .mini {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr !important;
+      gap: 12px !important;
+      margin-top: 10px !important;
+    }
+    body:not(.light) .surface .mini b {
+      display: block !important;
+      margin-bottom: 6px !important;
+      color: var(--ink) !important;
+      font-size: 13px !important;
+    }
+    body:not(.light) .surface .cal-head {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 10px !important;
+      margin-bottom: 12px !important;
+    }
+    body:not(.light) .surface .cal-head h3 {
+      margin: 0 !important;
+      color: #f5e3b7 !important;
+      font-family: Georgia, serif !important;
+      font-size: 17px !important;
+    }
+    body:not(.light) .surface .week,
+    body:not(.light) .surface .cal {
+      display: grid !important;
+      grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+      gap: 5px !important;
+    }
+    body:not(.light) .surface .week {
+      margin-bottom: 6px !important;
+      color: rgba(247,242,232,.48) !important;
+      font-size: 9px !important;
+      font-weight: 900 !important;
+      text-align: center !important;
+      text-transform: uppercase !important;
+    }
+    body:not(.light) .surface .day {
+      aspect-ratio: 1 / 1 !important;
+      min-width: 0 !important;
+      border: 1px solid rgba(255,255,255,.08) !important;
+      border-radius: 10px !important;
+      background: rgba(255,255,255,.035) !important;
+      color: var(--ink) !important;
+      font: inherit !important;
+      font-size: 11px !important;
+      font-weight: 850 !important;
+      cursor: pointer !important;
+      position: relative !important;
+      display: grid !important;
+      place-items: center !important;
+      padding: 0 !important;
+    }
+    body:not(.light) .surface .day.muted { opacity: .25 !important; cursor: default !important; }
+    body:not(.light) .surface .day.today { border-color: rgba(255,216,113,.45) !important; background: rgba(255,207,107,.12) !important; color: #ffe7a8 !important; }
+    body:not(.light) .surface .day.has { border-color: rgba(255,207,107,.26) !important; }
+    body:not(.light) .surface .day i {
+      position: absolute !important;
+      bottom: 5px !important;
+      width: 4px !important;
+      height: 4px !important;
+      border-radius: 50% !important;
+      background: var(--gold) !important;
+    }
+    body:not(.light) .surface .time {
+      display: grid !important;
+      grid-template-columns: 34px 1fr auto !important;
+      gap: 10px !important;
+      align-items: center !important;
+      padding: 10px 0 !important;
+      border-bottom: 1px solid rgba(255,255,255,.065) !important;
+      color: var(--muted) !important;
+    }
+    body:not(.light) .surface .time:last-child { border-bottom: 0 !important; }
+    body:not(.light) .surface .time strong { display:block !important; color: var(--ink) !important; font-size: 13px !important; }
+    body:not(.light) .surface .time em { color: var(--muted) !important; font-size: 11px !important; font-style: normal !important; }
+    body:not(.light) .surface .tico {
+      width: 30px !important;
+      height: 30px !important;
+      border-radius: 10px !important;
+      display: grid !important;
+      place-items: center !important;
+      background: rgba(255,207,107,.09) !important;
+      border: 1px solid rgba(255,207,107,.18) !important;
+      color: var(--gold) !important;
+      font-weight: 950 !important;
+      font-size: 11px !important;
+    }
 
     /* ── SCREEN fade-in (replaces page-section toggling visuals) ─ */
     body:not(.light) .main-content.surface .page-section { display: none; }
@@ -18056,6 +18199,7 @@ window._archRender = function() {
       function adaptRankList(id) {
         const root = document.getElementById(id);
         if (!root) return;
+        if (root.dataset.v20Direct === '1') return;
         // BASA renders inline divs with player names + stats. Wrap as v20 .rank.
         // Lightweight: parse children into rank rows.
         const rows = Array.from(root.children);
@@ -18081,6 +18225,7 @@ window._archRender = function() {
       function adaptRareGems() {
         const root = document.getElementById('dashRareGems');
         if (!root) return;
+        if (root.dataset.v20Direct === '1') return;
         const rows = Array.from(root.children);
         if (!rows.length || rows[0].classList.contains('rare')) return;
         const newHtml = rows.slice(0, 8).map(row => {
@@ -18407,20 +18552,20 @@ window._archRender = function() {
           dashTitle:'Дашборд',
           alertsTitle:'Alerts & warnings',
           alertsSub:'Критичные сигналы без визуального шума',
-          attentionTitle:'Обратить внимание',
+          attentionTitle:'Needs attention',
           attentionSub:'Тихие сигналы для оперативного контроля',
-          topValue:'Топ-5 ценных',
-          topValueSub:'Текущие лидеры по ценности',
-          growing:'Растут',
-          growingSub:'Ускоряют темп за последние КМ',
-          falling:'Падают',
-          fallingSub:'Сбавили темп — зона внимания',
-          rare:'Редкие таланты',
-          rareSub:'Ходят редко, но когда приходят — играют лучше многих',
-          scan:'Screenshot analysis',
-          scanSub:'Сводка по последним загруженным КМ',
-          cal:'Calendar',
-          calSub:'Ближайшие события war table',
+          topValue:'Top 5 performers',
+          topValueSub:'Current KM % leaders',
+          growing:'Growth',
+          growingSub:'Average KM trend',
+          falling:'Decline',
+          fallingSub:'Last wars',
+          rare:'Rare talents',
+          rareSub:'Roster-wide unique build value',
+          scan:'Screenshot Analysis',
+          scanSub:'AI OCR queue and scan confidence',
+          cal:'War table calendar',
+          calSub:'Upcoming command board',
           timeline:'Activity timeline',
           timelineSub:'Последние изменения по КМ',
           shell:'Оболочка',
@@ -18572,12 +18717,10 @@ window._archRender = function() {
         var ph = document.querySelectorAll('#page-dashboard .ph');
         [
           [st.alertsTitle, st.alertsSub],
-          [st.attentionTitle, st.attentionSub],
-          [st.topValue, st.topValueSub],
-          [st.growing, st.growingSub],
-          [st.falling, st.fallingSub],
-          [st.rare, st.rareSub],
           [st.scan, st.scanSub],
+          [st.topValue, st.topValueSub],
+          [st.growing + ' / ' + st.falling, st.growingSub + ' · ' + st.fallingSub],
+          [st.rare, st.rareSub],
           [st.cal, st.calSub],
           [st.timeline, st.timelineSub]
         ].forEach(function(pair, i){
@@ -19031,6 +19174,277 @@ window._archRender = function() {
       else init();
       setTimeout(init, 300);
       setTimeout(init, 1000);
+    })();
+    </script>
+    <script id="v20-dashboard-renderer">
+    (function(){
+      'use strict';
+      function esc(v){ return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+      function jsq(v){ return String(v == null ? '' : v).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+      function data(){
+        return {
+          roster: (typeof roster !== 'undefined' && Array.isArray(roster)) ? roster : [],
+          packs: (typeof packs !== 'undefined' && Array.isArray(packs)) ? packs : [],
+          stats: (typeof appliedStatsByDate !== 'undefined' && appliedStatsByDate) ? appliedStatsByDate : {}
+        };
+      }
+      function dates(){ return Object.keys(data().stats).sort(); }
+      function nk(name){ return typeof normalizeNick === 'function' ? normalizeNick(name || '') : String(name || '').toLowerCase().trim(); }
+      function alias(name){ return typeof resolveAlias === 'function' ? resolveAlias(name || '') : (name || ''); }
+      function lds(d){ return typeof localDateStr === 'function' ? localDateStr(d) : d.toISOString().slice(0,10); }
+      function today(){ return typeof todayStr === 'function' ? todayStr() : lds(new Date()); }
+      function statMap(){ return typeof calcStatsForPeriod === 'function' ? (calcStatsForPeriod('', '') || {}) : {}; }
+      function valuesMap(){ return typeof calcAllPlayerValues === 'function' ? (calcAllPlayerValues() || {}) : {}; }
+      function seenInSnap(snap, playerNk){
+        return !!(snap && snap.players && snap.players.some(function(sp){
+          return nk(alias(sp.name)) === playerNk || nk(sp.name) === playerNk;
+        }));
+      }
+      function isSupport(profa){
+        var tanks = ['Phoenix Knight','Hell Knight','Eva\'s Templar','Shillien Templar'];
+        var healers = ['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'];
+        return !!(profa && profa !== '—' && tanks.concat(healers).some(function(x){ return profa.indexOf(x.split(' ')[0]) >= 0; }));
+      }
+      function openAttr(name){ return ' onclick="openPlayerProfile(\'' + jsq(name) + '\')"'; }
+
+      function renderHead(allDates, totalPlayers, totalKm){
+        var nextEvent = null;
+        for (var i = 0; i < 14; i++) {
+          var d = new Date(); d.setDate(d.getDate() + i);
+          var ds = lds(d);
+          var evs = (typeof getAllEventsForDate === 'function' ? getAllEventsForDate(ds) : []).filter(function(e){
+            return typeof getEventStatus !== 'function' || getEventStatus(ds, e.key) !== 'done';
+          });
+          if (evs.length) {
+            nextEvent = { offset:i, date:ds, event:evs[0], label:i === 0 ? 'Сегодня' : (i === 1 ? 'Завтра' : d.toLocaleDateString('ru-RU', { weekday:'short', day:'numeric', month:'short' })) };
+            break;
+          }
+        }
+        var nextEl = document.getElementById('dashNextEvent');
+        if (nextEl) nextEl.innerHTML = nextEvent ? '⚡ ' + esc(nextEvent.label) + ': <b>' + esc(nextEvent.event.title || 'KM') + '</b>' + (nextEvent.event.time ? ' в ' + esc(nextEvent.event.time) : '') : '⚡ Нет событий';
+        var subtitle = document.getElementById('dashSubtitle');
+        if (subtitle) subtitle.textContent = totalPlayers + ' игроков · ' + totalKm + ' КМ · v20 command surface';
+        return nextEvent;
+      }
+
+      function renderStats(allDates){
+        var d = data();
+        var totalKm = allDates.length;
+        var totalPlayers = d.roster.length;
+        var newPlayers = d.roster.filter(function(p){ return p.isNew; }).length;
+        var lastN = allDates.slice(-Math.min(3, totalKm));
+        var activeCount = 0;
+        d.roster.forEach(function(p){
+          var pn = nk(p.name);
+          if (lastN.some(function(ds){ return seenInSnap(d.stats[ds], pn); })) activeCount++;
+        });
+        var lastDate = totalKm ? allDates[totalKm - 1].split('-').slice(1).reverse().join('.') : '—';
+        var rows = [
+          { label:'Игроки', big:totalPlayers, note:'активных в клане' + (newPlayers ? ' · +' + newPlayers + ' new' : ''), orb:'', page:'roster' },
+          { label:'Календарь · КМ', big:lastDate, note:'снимков КМ: ' + totalKm, orb:'', page:'calendar' },
+          { label:'Рейд паки', big:d.packs.length, note:'командных групп', orb:'', page:'packs' },
+          { label:'Активность ' + lastN.length + ' КМ', big:activeCount + '/' + totalPlayers, note:activeCount < totalPlayers * 0.5 ? 'нужен контроль' : 'готовность высокая', orb: totalPlayers ? Math.round(activeCount / Math.max(totalPlayers, 1) * 100) : '0', page:'stats', green: activeCount >= totalPlayers * 0.5 }
+        ];
+        var el = document.getElementById('dashNavCards');
+        if (el) el.innerHTML = rows.map(function(s){
+          return '<div class="stat" onclick="showPage(\'' + s.page + '\')" style="cursor:pointer">'
+            + '<div class="orb' + (s.green ? ' green' : '') + '">' + esc(s.orb) + '</div>'
+            + '<div><div class="label">' + esc(s.label) + '</div><div class="big">' + esc(s.big) + '</div><div class="note">' + esc(s.note) + '</div></div></div>';
+        }).join('');
+        return { totalPlayers:totalPlayers, totalKm:totalKm, activeCount:activeCount };
+      }
+
+      function buildAlerts(allDates){
+        var d = data(), sm = statMap(), out = [];
+        if (!allDates.length) out.push({ cls:'violet', icon:'AI', title:'Нет данных КМ', text:'Загрузи скриншоты КМ через Календарь чтобы начать анализ.', badge:'›' });
+        if (allDates.length >= 3) {
+          var last5 = allDates.slice(-5);
+          d.roster.forEach(function(p){
+            var playerNk = nk(p.name), streak = 0;
+            for (var i = last5.length - 1; i >= 0; i--) {
+              if (!seenInSnap(d.stats[last5[i]], playerNk)) streak++; else break;
+            }
+            if (streak >= 3) out.push({ cls:'red', icon:'!', title:p.name + ' — ' + streak + ' пропусков подряд', text:'Отсутствует на последних КМ. Нужно связаться.', badge:streak, player:p.name });
+          });
+        }
+        var noProfa = d.roster.filter(function(p){ return !p.profa || p.profa === '—' || p.profa === ''; });
+        if (noProfa.length) out.push({ cls:'gold', icon:'!', title:noProfa.length + ' игроков без профы', text:noProfa.slice(0,5).map(function(p){ return p.name; }).join(', ') + (noProfa.length > 5 ? ' +' + (noProfa.length - 5) : ''), badge:noProfa.length });
+        d.packs.forEach(function(pack){
+          var members = d.roster.filter(function(p){ return p.pac === pack.name; });
+          if (members.length < 3) return;
+          var hasTank = members.some(function(m){ return m.profa && ['Phoenix Knight','Hell Knight','Eva\'s Templar','Shillien Templar'].some(function(t){ return m.profa.indexOf(t.split(' ')[0]) >= 0; }); });
+          var hasHeal = members.some(function(m){ return m.profa && ['Cardinal','Eva\'s Saint','Shillien Saint','Hierophant'].some(function(h){ return m.profa.indexOf(h.split(' ')[0]) >= 0; }); });
+          if (!hasTank) out.push({ cls:'gold', icon:'✦', title:'Пак ' + pack.name + ' без танка', text:'Нет игрока с профой танка в составе.', badge:'!' });
+          if (!hasHeal) out.push({ cls:'gold', icon:'✦', title:'Пак ' + pack.name + ' без хилера', text:'Нет кардинала/бишопа в составе пака.', badge:'!' });
+        });
+        if (allDates.length) {
+          var allPS = d.roster.map(function(p){
+            var pn = nk(p.name), ps = sm[pn];
+            if (!ps) return null;
+            var present = allDates.filter(function(ds){ return seenInSnap(d.stats[ds], pn); }).length;
+            return { name:p.name, kills:ps.kills || 0, deaths:ps.deaths || 0, att:Math.round(present / allDates.length * 100), profa:p.profa, pac:p.pac };
+          }).filter(Boolean);
+          var dead = allPS.filter(function(p){ return p.kills === 0 && p.att > 30 && !isSupport(p.profa); });
+          if (dead.length) out.push({ cls:'gold', icon:'!', title:dead.length + ' ДД с 0 убийств', text:dead.slice(0,4).map(function(p){ return p.name; }).join(', ') + (dead.length > 4 ? ' +' + (dead.length - 4) : ''), badge:dead.length, listType:'deadweight' });
+          var relSup = allPS.filter(function(p){ return isSupport(p.profa) && p.att >= 80; });
+          if (relSup.length) out.push({ cls:'violet', icon:'✦', title:relSup.length + ' надежных саппортов', text:relSup.slice(0,4).map(function(p){ return p.name; }).join(', ') + '. Явка 80%+', badge:'›', listType:'supports' });
+          var solo = allPS.filter(function(p){ return p.pac === 'СОЛО' && p.kills > 8 && p.att >= 50; });
+          if (solo.length) out.push({ cls:'violet', icon:'AI', title:solo.length + ' сильных СОЛО', text:solo.slice(0,3).map(function(p){ return p.name + ' (' + p.kills + ' kills)'; }).join(', '), badge:'›', listType:'solostrong' });
+        }
+        return out;
+      }
+
+      function renderAlerts(allDates){
+        var alerts = buildAlerts(allDates);
+        var count = document.getElementById('dashAlertCount');
+        if (count) count.textContent = 'View all (' + alerts.length + ')';
+        var el = document.getElementById('dashAlerts');
+        if (!el) return;
+        if (!alerts.length) {
+          el.innerHTML = '<div class="alert violet"><div class="ai">✓</div><div><h4>Все спокойно</h4><p>Критичных сигналов нет.</p></div><b class="badge">OK</b></div>';
+          return;
+        }
+        el.innerHTML = alerts.slice(0, 6).map(function(a){
+          var click = a.player ? openAttr(a.player) : (a.listType ? ' onclick="showAttentionList(\'' + a.listType + '\')"' : '');
+          return '<div class="alert ' + a.cls + '"' + click + (click ? ' style="cursor:pointer"' : '') + '><div class="ai">' + esc(a.icon) + '</div><div><h4>' + esc(a.title) + '</h4><p>' + esc(a.text) + '</p></div><b class="badge">' + esc(a.badge) + '</b></div>';
+        }).join('');
+      }
+
+      function renderTopAndRare(allDates){
+        var d = data(), vals = valuesMap(), sm = statMap();
+        var players = d.roster.map(function(p){
+          var v = vals[nk(p.name)];
+          return v && v.value > 0 ? { name:p.name, value:v.value, profa:p.profa } : null;
+        }).filter(Boolean).sort(function(a,b){ return b.value - a.value; });
+        var top = document.getElementById('dashTopValue');
+        if (top) top.innerHTML = players.length ? players.slice(0,5).map(function(p, i){
+          var sub = p.profa && p.profa !== '—' ? p.profa : 'Roster member';
+          return '<div class="rank"' + openAttr(p.name) + ' style="cursor:pointer"><span class="num">' + (i+1) + '</span><span class="ava"></span><span><b>' + esc(p.name) + '</b><small>' + esc(sub) + '</small></span><span class="score">' + esc(p.value) + '%<br><small class="up">value</small></span></div>';
+        }).join('') : '<div class="time"><span class="tico">AI</span><span><strong>Нет рейтинга</strong><em>Нужны данные КМ</em></span><em>—</em></div>';
+
+        var gems = d.roster.map(function(p){
+          var v = vals[nk(p.name)];
+          if (!v || !v.kmCount || v.attendance >= 50 || v.avgKmScore <= 60) return null;
+          var ps = sm[nk(p.name)] || {};
+          var desc = Math.round(v.avgKmScore) + ' score · ' + v.attendance + '% KM · ' + (ps.kills || 0) + ' kills';
+          return { name:p.name, desc:desc, score:Math.round(v.avgKmScore) };
+        }).filter(Boolean).sort(function(a,b){ return b.score - a.score; });
+        var rare = document.getElementById('dashRareGems');
+        if (rare) rare.innerHTML = gems.length ? gems.slice(0,5).map(function(g){
+          return '<div class="rare"' + openAttr(g.name) + ' style="cursor:pointer"><span class="rico">✦</span><span><b>' + esc(g.name) + '</b><br><small style="color:rgba(247,242,232,.62);font-size:11px">' + esc(g.desc) + '</small></span><b>' + esc(g.score) + '</b></div>';
+        }).join('') : '<div class="rare"><span class="rico">✦</span><span>Редкие таланты пока не выявлены</span><b>—</b></div>';
+      }
+
+      function renderTrend(allDates){
+        var d = data();
+        var pcts = allDates.slice(-7).map(function(ds){
+          var total = d.roster.length || 1;
+          var cnt = d.stats[ds] && d.stats[ds].players ? d.stats[ds].players.length : 0;
+          return Math.round(cnt / total * 100);
+        });
+        if (!pcts.length) pcts = [0,0,0,0,0,0,0];
+        var lastPct = pcts[pcts.length - 1] || 0;
+        var prevPct = pcts.length > 1 ? pcts[pcts.length - 2] : lastPct;
+        var diff = lastPct - prevPct;
+        var sum = document.getElementById('dashTrendSummary');
+        if (sum) sum.innerHTML = '<div class="big">' + lastPct + '% <span style="font-size:14px" class="' + (diff >= 0 ? 'up' : 'down') + '">' + (diff >= 0 ? '▲ ' : '▼ ') + Math.abs(diff) + '%</span></div>';
+        var pts = pcts.map(function(v, i){
+          var x = pcts.length === 1 ? 0 : Math.round(i * 600 / (pcts.length - 1));
+          var y = Math.round(190 - (v / 100) * 140);
+          return [x,y];
+        });
+        var line = pts.map(function(p,i){ return (i ? 'L' : 'M') + p[0] + ' ' + p[1]; }).join(' ');
+        var area = line + ' L600 210 L0 210 Z';
+        var chart = document.getElementById('dashTrendChart');
+        if (chart) chart.innerHTML = '<svg viewBox="0 0 600 210" preserveAspectRatio="none"><defs><linearGradient id="dashF" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#9b66ff" stop-opacity=".45"/><stop offset="1" stop-color="#9b66ff" stop-opacity="0"/></linearGradient><linearGradient id="dashL" x1="0" x2="1"><stop stop-color="#9b66ff"/><stop offset=".55" stop-color="#ffd671"/><stop offset="1" stop-color="#68ff92"/></linearGradient></defs><path d="' + area + '" fill="url(#dashF)"/><path class="cline" d="' + line + '" fill="none" stroke="url(#dashL)" stroke-width="4" stroke-linecap="round"/></svg>';
+
+        var growEl = document.getElementById('dashTopGrowing');
+        var fallEl = document.getElementById('dashTopFalling');
+        if (allDates.length < 2) {
+          if (growEl) growEl.innerHTML = '<p class="ml"><span>Нужно 2+ КМ</span><span>—</span></p>';
+          if (fallEl) fallEl.innerHTML = '<p class="ml"><span>Нужно 2+ КМ</span><span>—</span></p>';
+          return;
+        }
+        var last = allDates[allDates.length - 1], prev = allDates[allDates.length - 2];
+        var ls = d.stats[last] && d.stats[last].players ? d.stats[last].players : [];
+        var ps = d.stats[prev] && d.stats[prev].players ? d.stats[prev].players : [];
+        function isDps(name){
+          var r = d.roster.find(function(x){ return nk(x.name) === nk(name); });
+          var profa = r && r.profa;
+          return !profa || profa === '—' || !isSupport(profa);
+        }
+        var diffs = ls.filter(function(lp){ return isDps(lp.name); }).map(function(lp){
+          var pp = ps.find(function(p){ return nk(p.name) === nk(lp.name); });
+          return { name:lp.name, diff:(lp.kills || 0) - (pp ? (pp.kills || 0) : 0) };
+        });
+        function trendRows(el, list, up){
+          if (!el) return;
+          el.innerHTML = list.slice(0,2).map(function(g){
+            return '<p class="ml"' + openAttr(g.name) + ' style="cursor:pointer"><span>' + esc(g.name) + '</span><span class="' + (up ? 'up' : 'down') + '">' + (up ? '▲ +' : '▼ ') + esc(g.diff) + '</span></p>';
+          }).join('') || '<p class="ml"><span>—</span><span>—</span></p>';
+        }
+        trendRows(growEl, diffs.filter(function(g){ return g.diff > 0; }).sort(function(a,b){ return b.diff-a.diff; }), true);
+        trendRows(fallEl, diffs.filter(function(g){ return g.diff < 0; }).sort(function(a,b){ return a.diff-b.diff; }), false);
+      }
+
+      function renderScanAndCalendar(allDates){
+        var d = data(), last = allDates[allDates.length - 1];
+        var lastPlayers = last && d.stats[last] && d.stats[last].players ? d.stats[last].players.length : 0;
+        var pct = d.roster.length ? Math.min(100, Math.round(lastPlayers / d.roster.length * 100)) : 0;
+        var scan = document.getElementById('dashScanAnalysis');
+        if (scan) scan.innerHTML = '<div class="ring" style="--scan:' + pct + '%"><div><b>' + lastPlayers + '</b><small>rows</small></div></div><div><div class="mline"><span><span class="up">●</span> Matched roster</span><b>' + lastPlayers + ' / ' + (d.roster.length || '—') + '</b></div><div class="mline"><span><span class="warn">●</span> KM snapshots</span><b>' + allDates.length + '</b></div><div class="mline"><span><span class="down">●</span> Last scan</span><b>' + esc(last || '—') + '</b></div><div class="bar"><span style="--w:' + pct + '%"></span></div><div class="actions" style="justify-content:flex-start;margin-top:14px"><button class="btn violet" onclick="showPage(\'calendar\')">✦ Open scan</button><button class="btn" onclick="showPage(\'screenshots\')">Open queue</button></div></div>';
+
+        var cal = document.getElementById('dashMiniCalendar');
+        if (cal) {
+          var now = new Date(), y = now.getFullYear(), m = now.getMonth();
+          var first = new Date(y, m, 1), start = (first.getDay() + 6) % 7, daysInMonth = new Date(y, m + 1, 0).getDate();
+          var cells = [];
+          for (var i = 0; i < start; i++) cells.push('<button class="day muted" type="button"></button>');
+          for (var day = 1; day <= daysInMonth; day++) {
+            var dd = new Date(y, m, day), ds = lds(dd);
+            var evs = typeof getAllEventsForDate === 'function' ? (getAllEventsForDate(ds) || []) : [];
+            cells.push('<button class="day' + (ds === today() ? ' today' : '') + (evs.length ? ' has' : '') + '" type="button" onclick="showPage(\'calendar\')"><b>' + day + '</b>' + (evs.length ? '<i></i>' : '') + '</button>');
+          }
+          cal.innerHTML = '<div class="cal-head"><button class="btn" type="button">‹</button><h3>' + esc(now.toLocaleDateString('ru-RU', { month:'long', year:'numeric' })) + '</h3><button class="btn" type="button">›</button></div><div class="week"><span>ПН</span><span>ВТ</span><span>СР</span><span>ЧТ</span><span>ПТ</span><span>СБ</span><span>ВС</span></div><div class="cal">' + cells.slice(0, 42).join('') + '</div>';
+        }
+      }
+
+      function renderTimeline(allDates){
+        var d = data();
+        var rows = allDates.slice(-5).reverse().map(function(ds, i){
+          var cnt = d.stats[ds] && d.stats[ds].players ? d.stats[ds].players.length : 0;
+          return { icon:i ? '↗' : 'AI', title:'KM snapshot saved', sub:ds + ' · ' + cnt + ' players processed', tail:i ? '' : 'latest' };
+        });
+        if (!rows.length) rows.push({ icon:'AI', title:'Нет данных КМ', sub:'Загрузи скриншоты для таймлайна', tail:'—' });
+        var el = document.getElementById('dashActivityTimeline');
+        if (el) el.innerHTML = rows.map(function(r){
+          return '<div class="time"><span class="tico">' + esc(r.icon) + '</span><span><strong>' + esc(r.title) + '</strong><em>' + esc(r.sub) + '</em></span><em>' + esc(r.tail) + '</em></div>';
+        }).join('');
+      }
+
+      function renderDashboardV20(){
+        var allDates = dates();
+        ['dashTopValue','dashTopGrowing','dashTopFalling','dashRareGems'].forEach(function(id){
+          var el = document.getElementById(id);
+          if (el) el.dataset.v20Direct = '1';
+        });
+        var totals = renderStats(allDates);
+        renderHead(allDates, totals.totalPlayers, totals.totalKm);
+        renderAlerts(allDates);
+        renderTopAndRare(allDates);
+        renderTrend(allDates);
+        renderScanAndCalendar(allDates);
+        renderTimeline(allDates);
+        if (typeof ccApplyTabBackground === 'function') ccApplyTabBackground('dashboard');
+      }
+
+      window.renderDashboard = renderDashboardV20;
+      window.renderExtraDashboard = function(){ renderDashboardV20(); };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function(){ setTimeout(renderDashboardV20, 120); });
+      } else {
+        setTimeout(renderDashboardV20, 120);
+      }
     })();
     </script>
 </body>
