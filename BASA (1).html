@@ -3076,22 +3076,6 @@
 </head>
 <body>
 
-<!-- Glass shell cursor glow -->
-<div id="cc-cursor-glow"></div>
-<script>
-(function(){
-  var g=document.getElementById('cc-cursor-glow');
-  if(!g)return;
-  var mx=-500,my=-500;
-  document.addEventListener('mousemove',function(e){mx=e.clientX;my=e.clientY;});
-  function tick(){
-    g.style.left=mx+'px';g.style.top=my+'px';
-    requestAnimationFrame(tick);
-  }
-  tick();
-})();
-</script>
-
 <!-- =============================================
      LOGIN SCREEN
 ============================================= -->
@@ -3149,6 +3133,9 @@
 <!-- v20 TOP BAR — compact glass strip with brand + tools chips -->
 <div id="topbar" class="top hidden" translate="no">
     <div class="tools">
+        <span class="chip gold v20-shell-chip" aria-hidden="true">DOOM</span>
+        <span class="chip gold v20-shell-chip" aria-hidden="true">ADMIN</span>
+        <span class="chip gold v20-shell-chip" aria-hidden="true">TEST</span>
         <span class="chip dark" id="topbarClan" style="display:none"></span>
         <span id="roleBadge" style="display:none"></span>
         <button id="adminModeToggle" class="chip" onclick="window._toggleAdminMode&&window._toggleAdminMode()" style="display:none" title="Тест-режим для admin">▸ TEST</button>
@@ -3171,6 +3158,8 @@
         </span>
         <button id="ccAdminBtn" class="chip icon-chip" onclick="window._ccTabBg&&window._ccTabBg.open()" title="Фоны вкладок" style="display:none;color:#e8c97a">✏️</button>
         <button id="shellToggleBtn" class="chip" onclick="shellToggle()" title="Убрать оболочку" style="display:none">Оболочка</button>
+        <button id="dfToggle" type="button" class="chip v20-shell-chip" aria-pressed="false">DF</button>
+        <button id="fxToggle" type="button" class="chip v20-shell-chip" aria-pressed="false">✦ FX</button>
         <button class="chip icon-chip danger" onclick="loginLogout()" title="Выйти">🚪</button>
     </div>
 </div>
@@ -17002,7 +16991,7 @@ window._archRender = function() {
 
     /* ── Sidebar — v20 .side premium glass ──────────────────── */
     body:not(.light) .sidebar {
-      width: 182px !important;
+      width: 210px !important;
       flex-shrink: 0 !important;
       padding: 16px 10px !important;
       border-radius: 24px !important;
@@ -17024,7 +17013,7 @@ window._archRender = function() {
       padding: 14px 10px 6px !important;
     }
     body:not(.light) .nav-item {
-      gap: 8px !important;
+      gap: 10px !important;
       padding: 8px 10px !important;
       border-radius: 11px !important;
       margin-bottom: 2px !important;
@@ -17459,7 +17448,7 @@ window._archRender = function() {
       align-items: center !important;
       justify-content: space-between !important;
       gap: 12px !important;
-      background: linear-gradient(180deg, rgba(9,9,10,.62), rgba(9,9,10,.18)) !important;
+      background: linear-gradient(180deg, rgba(9,9,10,.68), rgba(9,9,10,.18)) !important;
       border-bottom: 1px solid rgba(255,255,255,.07) !important;
       backdrop-filter: blur(18px) !important;
       -webkit-backdrop-filter: blur(18px) !important;
@@ -17520,9 +17509,9 @@ window._archRender = function() {
     /* ── APP grid layout ───────────────────────────────────────── */
     body:not(.light) #appLayout.app {
       display: grid !important;
-      grid-template-columns: 182px 1fr !important;
-      gap: 20px !important;
-      padding: 70px clamp(52px, 5.5vw, 74px) 32px !important;
+      grid-template-columns: 210px 1fr !important;
+      gap: 24px !important;
+      padding: 82px clamp(22px, 4vw, 86px) 34px !important;
       min-height: 100vh !important;
       overflow: visible !important;
       flex: none !important;
@@ -17530,18 +17519,18 @@ window._archRender = function() {
 
     /* ── SIDE (sidebar) — premium glass panel ───────────────────── */
     body:not(.light) .sidebar.side {
-      width: 182px !important;
+      width: 210px !important;
       flex-shrink: 0 !important;
-      height: calc(100vh - 94px) !important;
-      min-height: 580px !important;
+      height: calc(100vh - 112px) !important;
+      min-height: 650px !important;
       position: sticky !important;
-      top: 58px !important;
+      top: 72px !important;
       border: 1px solid var(--line) !important;
-      border-radius: 22px !important;
-      background: linear-gradient(180deg, rgba(11,11,12,.44), rgba(6,6,7,.62)) !important;
+      border-radius: 26px !important;
+      background: linear-gradient(180deg, rgba(11,11,12,.44), rgba(6,6,7,.64)) !important;
       box-shadow: 0 22px 80px rgba(0,0,0,.45), inset 0 1px rgba(255,255,255,.08) !important;
-      backdrop-filter: blur(20px) saturate(1.18) !important;
-      -webkit-backdrop-filter: blur(20px) saturate(1.18) !important;
+      backdrop-filter: blur(22px) !important;
+      -webkit-backdrop-filter: blur(22px) !important;
       display: flex !important;
       flex-direction: column !important;
       overflow: hidden !important;
@@ -17550,45 +17539,45 @@ window._archRender = function() {
     }
     body:not(.light) .sidebar.side .logo {
       text-align: center !important;
-      padding: 18px 14px 12px !important;
+      padding: 25px 18px 16px !important;
       border-bottom: 1px solid rgba(255,255,255,.07) !important;
     }
     body:not(.light) .sidebar.side .logo .mark {
-      width: 56px; height: 56px;
-      margin: 0 auto 10px;
-      border-radius: 20px;
+      width: 72px; height: 72px;
+      margin: 0 auto 14px;
+      border-radius: 26px;
       display: grid; place-items: center;
       transform: rotate(45deg);
       border: 1px solid rgba(255,216,113,.42);
       background: radial-gradient(circle, rgba(255,225,140,.22), transparent 58%), rgba(255,255,255,.04);
       box-shadow: 0 0 32px rgba(232,190,88,.18);
     }
-    body:not(.light) .sidebar.side .logo .mark span { transform: rotate(-45deg); font-size: 24px; }
+    body:not(.light) .sidebar.side .logo .mark span { transform: rotate(-45deg); font-size: 32px; }
     body:not(.light) .sidebar.side .logo h2 {
       margin: 0;
       color: #f2cb73;
       font-family: Georgia, "Times New Roman", serif;
-      font-size: 19px;
+      font-size: 26px;
       line-height: .86;
       letter-spacing: 0.13em;
     }
     body:not(.light) .sidebar.side .logo small {
       display: block;
-      margin-top: 8px;
+      margin-top: 10px;
       color: rgba(247,242,232,.42);
-      font-size: 9px;
+      font-size: 10px;
       letter-spacing: 0.20em;
       text-transform: uppercase;
     }
     body:not(.light) .sidebar.side .nav {
-      padding: 10px 10px !important;
+      padding: 16px 14px !important;
       overflow-y: auto !important;
       flex: 1 !important;
     }
     body:not(.light) .sidebar.side .nav p {
-      margin: 12px 8px 4px !important;
+      margin: 16px 10px 8px !important;
       color: rgba(247,242,232,.36) !important;
-      font-size: 9px !important;
+      font-size: 10px !important;
       font-weight: 900 !important;
       text-transform: uppercase !important;
       letter-spacing: 0.12em !important;
@@ -17599,14 +17588,14 @@ window._archRender = function() {
       background: transparent !important;
       color: rgba(247,242,232,.72) !important;
       display: flex !important;
-      gap: 8px !important;
+      gap: 10px !important;
       align-items: center !important;
-      padding: 8px 10px !important;
-      border-radius: 11px !important;
-      margin: 1px 0 !important;
+      padding: 12px !important;
+      border-radius: 13px !important;
+      margin: 3px 0 !important;
       text-align: left !important;
       font: inherit !important;
-      font-size: 12px !important;
+      font-size: 14px !important;
       letter-spacing: 0 !important;
       cursor: pointer !important;
       transition: background .18s, color .18s, transform .18s, box-shadow .18s !important;
@@ -17630,8 +17619,8 @@ window._archRender = function() {
     }
     body:not(.light) .sidebar.side .tier {
       margin: auto 14px 14px !important;
-      padding: 16px 12px !important;
-      border-radius: 18px !important;
+      padding: 18px 12px !important;
+      border-radius: 20px !important;
       text-align: center !important;
       border: 1px solid rgba(255,255,255,.10) !important;
       background: radial-gradient(circle at 50% 0, rgba(232,190,88,.12), transparent 54%), rgba(0,0,0,.24) !important;
@@ -17639,36 +17628,36 @@ window._archRender = function() {
     body:not(.light) .sidebar.side .tier small {
       display: block !important;
       color: rgba(247,242,232,.44) !important;
-      font-size: 9px !important;
+      font-size: 10px !important;
       text-transform: uppercase !important;
       letter-spacing: 0.14em !important;
       font-weight: 900 !important;
     }
     body:not(.light) .sidebar.side .tier b {
       display: block !important;
-      margin: 5px 0 !important;
+      margin: 6px 0 !important;
       color: #f2cb73 !important;
       font-family: Georgia, serif !important;
-      font-size: 16px !important;
+      font-size: 18px !important;
     }
     body:not(.light) .sidebar.side .tier hr {
       border: 0 !important;
       border-top: 1px solid rgba(255,255,255,.08) !important;
-      margin: 10px 0 !important;
+      margin: 14px 0 !important;
     }
 
     /* ── SURFACE (main content) ─────────────────────────────────── */
     body:not(.light) .main-content.surface {
-      min-height: calc(100vh - 94px) !important;
+      min-height: calc(100vh - 116px) !important;
       position: relative !important;
       overflow: hidden auto !important;
       border-radius: 28px !important;
       border: 1px solid rgba(255,255,255,.12) !important;
-      background: linear-gradient(180deg, rgba(255,255,255,.060), rgba(255,255,255,.024)) !important;
+      background: linear-gradient(180deg, rgba(255,255,255,.078), rgba(255,255,255,.035)) !important;
       box-shadow: 0 22px 80px rgba(0,0,0,.45), inset 0 1px rgba(255,255,255,.10) !important;
-      backdrop-filter: blur(18px) saturate(1.16) !important;
-      -webkit-backdrop-filter: blur(18px) saturate(1.16) !important;
-      padding: 26px clamp(22px, 2.8vw, 36px) !important;
+      backdrop-filter: blur(22px) saturate(116%) !important;
+      -webkit-backdrop-filter: blur(22px) saturate(116%) !important;
+      padding: 26px !important;
       visibility: visible !important;
       flex: none !important;
       margin: 0 !important;
@@ -17694,13 +17683,13 @@ window._archRender = function() {
       display: flex !important;
       justify-content: space-between !important;
       gap: 18px !important;
-      margin-bottom: 22px !important;
+      margin-bottom: 18px !important;
       align-items: flex-start !important;
       flex-wrap: wrap !important;
     }
     body:not(.light) .surface .head h1 {
       margin: 0 !important;
-      font-size: clamp(28px, 3vw, 44px) !important;
+      font-size: clamp(32px, 3vw, 48px) !important;
       line-height: .96 !important;
       letter-spacing: -0.045em !important;
       color: #fffdf5 !important;
@@ -17762,10 +17751,10 @@ window._archRender = function() {
     body:not(.light) .surface .card {
       position: relative !important;
       overflow: hidden !important;
-      border: 1px solid rgba(255,255,255,.115) !important;
+      border: 1px solid rgba(255,255,255,.10) !important;
       border-radius: 22px !important;
       background: linear-gradient(180deg, rgba(8,11,15,.58), rgba(8,9,11,.37)) !important;
-      box-shadow: 0 12px 42px rgba(0,0,0,.30), inset 0 1px rgba(255,255,255,.075) !important;
+      box-shadow: 0 10px 36px rgba(0,0,0,.32), inset 0 1px rgba(255,255,255,.075) !important;
       backdrop-filter: blur(14px) saturate(1.15) !important;
       -webkit-backdrop-filter: blur(14px) saturate(1.15) !important;
       transition: transform .20s, border-color .20s, box-shadow .20s !important;
@@ -17777,9 +17766,8 @@ window._archRender = function() {
       inset: 0 !important;
       pointer-events: none !important;
       background:
-        radial-gradient(circle at 0 0, rgba(255,216,113,.085), transparent 38%),
-        radial-gradient(circle at 100% 0, rgba(155,102,255,.07), transparent 38%) !important;
-      opacity: .55 !important;
+        radial-gradient(circle at 0 0, rgba(255,216,113,.09), transparent 35%),
+        radial-gradient(circle at 100% 0, rgba(155,102,255,.08), transparent 36%) !important;
       border-radius: inherit !important;
     }
     body:not(.light) .surface .card > * { position: relative !important; z-index: 1 !important; }
@@ -17791,7 +17779,7 @@ window._archRender = function() {
       display: flex !important;
       justify-content: space-between !important;
       gap: 10px !important;
-      padding: 16px 18px 12px !important;
+      padding: 16px 16px 10px !important;
       border-bottom: 1px solid rgba(255,255,255,.07) !important;
     }
     body:not(.light) .surface .card .ph h3 {
@@ -17799,16 +17787,16 @@ window._archRender = function() {
       color: #f5e3b7 !important;
       font-family: Georgia, serif !important;
       text-transform: uppercase !important;
-      font-size: 15px !important;
+      font-size: 16px !important;
       letter-spacing: 0.035em !important;
     }
     body:not(.light) .surface .card .ph p {
-      margin: 4px 0 0 !important;
+      margin: 3px 0 0 !important;
       color: var(--faint) !important;
       font-size: 12px !important;
     }
     body:not(.light) .surface .card .body {
-      padding: 14px 18px 18px !important;
+      padding: 14px 16px 16px !important;
     }
     body:not(.light) .surface .card .link {
       color: #e7c873 !important;
@@ -17827,8 +17815,8 @@ window._archRender = function() {
       padding: 0 !important;
     }
     body:not(.light) .surface .stat {
-      min-height: 100px !important;
-      padding: 18px !important;
+      min-height: 106px !important;
+      padding: 20px !important;
       display: grid !important;
       grid-template-columns: 44px 1fr !important;
       gap: 14px !important;
@@ -17863,15 +17851,15 @@ window._archRender = function() {
       letter-spacing: 0.09em !important;
     }
     body:not(.light) .surface .big {
-      margin-top: 4px !important;
+      margin-top: 5px !important;
       color: #fffdf5 !important;
-      font-size: 28px !important;
+      font-size: 30px !important;
       line-height: .94 !important;
       font-weight: 950 !important;
       letter-spacing: -0.05em !important;
     }
     body:not(.light) .surface .note {
-      margin-top: 5px !important;
+      margin-top: 6px !important;
       color: var(--muted) !important;
       font-size: 12px !important;
     }
@@ -18000,7 +17988,7 @@ window._archRender = function() {
       gap: 10px !important;
       margin: 8px 0 !important;
       color: var(--muted) !important;
-      font-size: 12px !important;
+      font-size: 14px !important;
     }
     body:not(.light) .surface .mline b,
     body:not(.light) .surface .ml b { color: var(--ink) !important; }
@@ -18058,7 +18046,7 @@ window._archRender = function() {
     body:not(.light) .surface .week {
       margin-bottom: 6px !important;
       color: rgba(247,242,232,.48) !important;
-      font-size: 9px !important;
+      font-size: 10px !important;
       font-weight: 900 !important;
       text-align: center !important;
       text-transform: uppercase !important;
@@ -18342,32 +18330,34 @@ window._archRender = function() {
       }
       body:not(.light) #appLayout.app {
         grid-template-columns: 210px minmax(0,1fr) !important;
-        padding: 70px clamp(22px,4vw,86px) 32px !important;
+        padding: 82px clamp(22px,4vw,86px) 34px !important;
         gap: 24px !important;
       }
       body:not(.light) .sidebar.side {
         width: 210px !important;
+        height: calc(100vh - 112px) !important;
+        top: 72px !important;
         min-height: 650px !important;
         border-radius: 26px !important;
       }
       body:not(.light) .sidebar.side .logo {
-        padding: 24px 18px 16px !important;
+        padding: 25px 18px 16px !important;
       }
       body:not(.light) .sidebar.side .logo .mark {
-        width: 68px !important;
-        height: 68px !important;
-        border-radius: 24px !important;
+        width: 72px !important;
+        height: 72px !important;
+        border-radius: 26px !important;
       }
       body:not(.light) .sidebar.side .logo h2 {
-        font-size: 24px !important;
+        font-size: 26px !important;
       }
       body:not(.light) .sidebar.side .nav button.nav-item {
         font-size: 14px !important;
-        padding: 11px 12px !important;
+        padding: 12px !important;
         border-radius: 13px !important;
       }
       body:not(.light) .main-content.surface {
-        min-height: calc(100vh - 104px) !important;
+        min-height: calc(100vh - 116px) !important;
       }
       body:not(.light) .v20-ops-grid {
         grid-template-columns: 1fr 1fr 1fr !important;
