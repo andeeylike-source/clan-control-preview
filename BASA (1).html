@@ -18475,10 +18475,14 @@ window._archRender = function() {
         if (boolGlobal()) return localStorage.getItem(KEY_GLOBAL) || '';
         return localStorage.getItem(KEY_TAB + tabId) || '';
       }
+      function cssUrl(url) {
+        return String(url || '').replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,'');
+      }
       function escapeAttr(s) {
         return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
       }
-      function applyStoredBackground(pid) {
+      function ccApplyTabBackground(pid) {
+        pid = pid || currentPage();
         var url = selectedBg(pid || currentPage());
         var tag = document.getElementById('cceGlobalBgStyle');
         if (!tag) {
@@ -18486,9 +18490,25 @@ window._archRender = function() {
           tag.id = 'cceGlobalBgStyle';
           document.head.appendChild(tag);
         }
-        tag.textContent = url
-          ? 'body,body:not(.light){background-image:url("' + String(url).replace(/"/g,'\\"') + '") !important;background-size:cover !important;background-position:center center !important;background-attachment:fixed !important;}'
-          : '';
+        if (url) {
+          var safe = cssUrl(url);
+          tag.textContent =
+            'body,body:not(.light){background-image:url("' + safe + '") !important;background-size:cover !important;background-position:center center !important;background-attachment:fixed !important;}'
+            + 'body:not(.light) .cc-v20-bg-layer{background:'
+            + 'linear-gradient(90deg,rgba(0,0,0,.34),rgba(0,0,0,.04),rgba(0,0,0,.46)),'
+            + 'radial-gradient(circle at 48% 12%,rgba(232,190,88,.18),transparent 30%),'
+            + 'radial-gradient(circle at 78% 8%,rgba(95,140,255,.12),transparent 28%),'
+            + 'radial-gradient(circle at 30% 78%,rgba(155,102,255,.10),transparent 34%),'
+            + 'url("' + safe + '") center center/cover no-repeat,'
+            + 'linear-gradient(120deg,#17130e,#07080b 43%,#151114) !important;}';
+        } else {
+          tag.textContent = '';
+        }
+        return url;
+      }
+      window.ccApplyTabBackground = ccApplyTabBackground;
+      function applyStoredBackground(pid) {
+        return ccApplyTabBackground(pid);
       }
       function renderExtraDashboard() {
         var dates = Object.keys(window.appliedStatsByDate || {}).sort();
@@ -18604,7 +18624,8 @@ window._archRender = function() {
           var cur = currentPage();
           var mt = modalText[lang()];
           var applyAll = document.getElementById('ccTabApplyAll');
-          if (applyAll) applyAll.checked = boolGlobal();
+          var hasPending = Object.keys(pending).some(function(id){ return !!pending[id]; });
+          if (applyAll && !hasPending) applyAll.checked = boolGlobal();
           box.innerHTML = tabs().map(function(tab){
             var preview = pending[tab.id] || selectedBg(tab.id);
             var bgStyle = preview ? 'background-image:url(&quot;'+escapeAttr(preview)+'&quot;)' : '';
@@ -18671,7 +18692,7 @@ window._archRender = function() {
             if (last) localStorage.setItem(KEY_GLOBAL, last);
             if (localStorage.getItem(KEY_GLOBAL)) localStorage.setItem(KEY_USE_GLOBAL, 'true');
           } else {
-            localStorage.setItem(KEY_USE_GLOBAL, 'false');
+            localStorage.removeItem(KEY_USE_GLOBAL);
             Object.keys(pending).forEach(function(k){ localStorage.setItem(KEY_TAB + k, pending[k]); });
           }
           pending = {};
@@ -18712,10 +18733,23 @@ window._archRender = function() {
             if (!file || !uploadTarget) return;
             compress(file).then(function(data){
               pending[uploadTarget] = data;
-              if (uploadTarget === currentPage()) applyStoredBackground(uploadTarget);
-              var tag = document.getElementById('cceGlobalBgStyle');
-              if (uploadTarget === currentPage() && tag) {
-                tag.textContent = 'body,body:not(.light){background-image:url("'+String(data).replace(/"/g,'\\"')+'") !important;background-size:cover !important;background-position:center center !important;background-attachment:fixed !important;}';
+              if (uploadTarget === currentPage()) {
+                var tag = document.getElementById('cceGlobalBgStyle');
+                if (!tag) {
+                  tag = document.createElement('style');
+                  tag.id = 'cceGlobalBgStyle';
+                  document.head.appendChild(tag);
+                }
+                var safe = cssUrl(data);
+                tag.textContent =
+                  'body,body:not(.light){background-image:url("' + safe + '") !important;background-size:cover !important;background-position:center center !important;background-attachment:fixed !important;}'
+                  + 'body:not(.light) .cc-v20-bg-layer{background:'
+                  + 'linear-gradient(90deg,rgba(0,0,0,.34),rgba(0,0,0,.04),rgba(0,0,0,.46)),'
+                  + 'radial-gradient(circle at 48% 12%,rgba(232,190,88,.18),transparent 30%),'
+                  + 'radial-gradient(circle at 78% 8%,rgba(95,140,255,.12),transparent 28%),'
+                  + 'radial-gradient(circle at 30% 78%,rgba(155,102,255,.10),transparent 34%),'
+                  + 'url("' + safe + '") center center/cover no-repeat,'
+                  + 'linear-gradient(120deg,#17130e,#07080b 43%,#151114) !important;}';
               }
               fileInput.value = '';
               renderRows();
