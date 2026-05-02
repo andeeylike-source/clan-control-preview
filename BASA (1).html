@@ -3148,7 +3148,6 @@
 ============================================= -->
 <!-- v20 TOP BAR — compact glass strip with brand + tools chips -->
 <div id="topbar" class="top hidden" translate="no">
-    <div class="brand">⚔️ Clan<b>Control</b></div>
     <div class="tools">
         <span class="chip dark" id="topbarClan" style="display:none"></span>
         <span id="roleBadge" style="display:none"></span>
@@ -3562,6 +3561,30 @@
                 <div id="apiKeyStatus" style="display:none;margin-top:12px;font-size:13px;padding:10px;border-radius:8px"></div>
             </div>
             <div class="card mb-6">
+                <h2 class="text-lg font-bold mb-2">Провайдер анализа</h2>
+                <p class="text-slate-500 text-sm mb-4">Gemini/OpenRouter остаётся основным потоком. OCR.space использует локальный proxy.</p>
+                <div style="display:grid;gap:12px">
+                    <label style="display:block">
+                        <div style="font-size:11px;color:#64748b;margin-bottom:6px;text-transform:uppercase;font-weight:700">Провайдер</div>
+                        <select id="analysisProviderSelect" class="input-dark" style="width:100%">
+                            <option value="gemini">Gemini/OpenRouter</option>
+                            <option value="ocrspace">OCR.space proxy</option>
+                        </select>
+                    </label>
+                    <label style="display:block">
+                        <div style="font-size:11px;color:#64748b;margin-bottom:6px;text-transform:uppercase;font-weight:700">OCR.space proxy URL</div>
+                        <input id="ocrSpaceProxyUrlInput" type="url" class="input-dark" placeholder="http://localhost:8787/ocr-read">
+                    </label>
+                    <label style="display:block">
+                        <div style="font-size:11px;color:#64748b;margin-bottom:6px;text-transform:uppercase;font-weight:700">OCR.space API key</div>
+                        <input id="ocrSpaceKeyInput" type="password" class="input-dark" placeholder="reserved/direct mode, сейчас используется proxy">
+                        <div style="font-size:10px;color:#475569;margin-top:5px">reserved/direct mode, сейчас используется proxy</div>
+                    </label>
+                    <button onclick="saveAnalysisProviderSettings()" class="btn-primary" style="width:max-content">Сохранить провайдер</button>
+                    <div id="analysisProviderStatus" style="display:none;font-size:13px;padding:10px;border-radius:8px"></div>
+                </div>
+            </div>
+            <div class="card mb-6">
                 <div onclick="(function(el){var b=document.getElementById('aliasesBody');var open=b.style.display!=='none';b.style.display=open?'none':'block';el.querySelector('.aliases-arr').textContent=open?'▼':'▲'})(this)" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none">
                     <h2 class="text-lg font-bold">🔗 Алиасы ников</h2>
                     <span class="aliases-arr" style="color:#475569;font-size:12px;padding:2px 6px">▼</span>
@@ -3770,6 +3793,7 @@
             <div id="dayAnalyzeBlock" style="display:none;margin-bottom:8px">
                 <button onclick="analyzeDayScreenshots()" id="analyzeBtn" style="background:#6366f1;color:white;border:none;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;width:100%">🔍 Анализировать скриншоты (AI)</button>
                 <div id="apiKeyIndicator" style="font-size:10px;color:#475569;margin-top:4px;text-align:center">🔑 Используется пул из 6 ключей</div>
+                <div id="analysisProviderIndicator" style="font-size:10px;color:#64748b;margin-top:2px;text-align:center">Провайдер: Gemini/OpenRouter</div>
             </div>
 
             <!-- Статус обработки -->
@@ -5175,7 +5199,7 @@
             if(pageId === 'archive') renderArchive();
             if(pageId === 'stats') renderStats();
             if(pageId === 'screenshots') renderScreenshotArchive();
-            if(pageId === 'settings') { renderApiKeys(); renderAliases(); renderValueWeightsUI(); }
+            if(pageId === 'settings') { renderApiKeys(); renderAnalysisProviderSettings(); renderAliases(); renderValueWeightsUI(); }
             if(pageId === 'users') renderUsersPage();
             // Обновляем hash в URL (кроме профиля — у него свой hash)
             if (pageId !== 'profile') {
@@ -7869,6 +7893,31 @@ function getClass2IconByClass3(c3) {
             localStorage.setItem('clanControl_geminiKeys', JSON.stringify(keys));
         }
 
+        function getAnalysisProvider() {
+            const provider = localStorage.getItem('clanControl_analysisProvider') || 'gemini';
+            return provider === 'ocrspace' ? 'ocrspace' : 'gemini';
+        }
+
+        function saveAnalysisProvider(provider) {
+            localStorage.setItem('clanControl_analysisProvider', provider === 'ocrspace' ? 'ocrspace' : 'gemini');
+        }
+
+        function getOcrSpaceKey() {
+            return localStorage.getItem('clanControl_ocrSpaceKey') || '';
+        }
+
+        function saveOcrSpaceKey(key) {
+            localStorage.setItem('clanControl_ocrSpaceKey', key || '');
+        }
+
+        function getOcrSpaceProxyUrl() {
+            return localStorage.getItem('clanControl_ocrSpaceProxyUrl') || 'http://localhost:8787/ocr-read';
+        }
+
+        function saveOcrSpaceProxyUrl(url) {
+            localStorage.setItem('clanControl_ocrSpaceProxyUrl', url || 'http://localhost:8787/ocr-read');
+        }
+
         // Храним исчерпанные ключи с датой (сбрасываются на следующий день)
         let exhaustedKeys = {}; // { keyIndex: dateStr }
 
@@ -7909,6 +7958,12 @@ function getClass2IconByClass3(c3) {
         function updateApiKeyIndicator() {
             const el = document.getElementById('apiKeyIndicator');
             if (!el) return;
+            updateAnalysisProviderIndicator();
+            if (getAnalysisProvider() === 'ocrspace') {
+                el.innerHTML = `OCR.space proxy: ${getOcrSpaceProxyUrl()}`;
+                el.style.color = '#475569';
+                return;
+            }
             const GEMINI_KEYS = getGeminiKeys();
             if (GEMINI_KEYS.length === 0) {
                 el.innerHTML = `⚠️ API ключи не настроены — <span onclick="showPage('settings')" style="color:#6366f1;cursor:pointer;text-decoration:underline">добавить</span>`;
@@ -7922,6 +7977,14 @@ function getClass2IconByClass3(c3) {
                 ? `🔑 Ключ ${idx+1} из ${GEMINI_KEYS.length} · Доступно: ${available}`
                 : `⚠️ Все ключи исчерпаны — попробуй завтра`;
             el.style.color = available > 0 ? '#475569' : '#ef4444';
+        }
+
+        function updateAnalysisProviderIndicator() {
+            const el = document.getElementById('analysisProviderIndicator');
+            if (!el) return;
+            el.innerText = getAnalysisProvider() === 'ocrspace'
+                ? 'Провайдер: OCR.space proxy'
+                : 'Провайдер: Gemini/OpenRouter';
         }
 
         // ===== СИСТЕМА АЛИАСОВ =====
@@ -8083,6 +8146,333 @@ function getClass2IconByClass3(c3) {
             overlay.querySelector('#simNo').onclick  = () => { overlay.remove(); callback(false); };
         }
 
+        function _ccOcrClamp(value, min, max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        function toOcrNum(v) {
+            if (v === 0 || v === '0') return 0;
+            if (v === null || v === undefined || v === '') return 0;
+            const cleaned = String(v).replace(/[\s,]+/g, '');
+            const parsed = Number.parseInt(cleaned, 10);
+            return Number.isFinite(parsed) ? parsed : 0;
+        }
+
+        function _ccOcrReadNumbersFallback(row) {
+            const raw = Array.isArray(row?.numbers)
+                ? row.numbers
+                : (Array.isArray(row?.numbersFound) ? row.numbersFound : null);
+            if (!raw || raw.length < 4) return null;
+            return [0, 1, 2, 3].map(i => toOcrNum(raw[i]));
+        }
+
+        function _ccOcrLoadImage(dataUrl) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = dataUrl;
+            });
+        }
+
+        function _ccOcrSharpen(imageData, width, height) {
+            const src = imageData.data;
+            const out = new Uint8ClampedArray(src.length);
+            const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const idx = (y * width + x) * 4;
+                    if (x === 0 || y === 0 || x === width - 1 || y === height - 1) {
+                        out[idx] = src[idx]; out[idx + 1] = src[idx + 1]; out[idx + 2] = src[idx + 2]; out[idx + 3] = src[idx + 3];
+                        continue;
+                    }
+                    let r = 0, g = 0, b = 0, k = 0;
+                    for (let yy = -1; yy <= 1; yy++) {
+                        for (let xx = -1; xx <= 1; xx++) {
+                            const srcIdx = ((y + yy) * width + x + xx) * 4;
+                            const weight = kernel[k++];
+                            r += src[srcIdx] * weight;
+                            g += src[srcIdx + 1] * weight;
+                            b += src[srcIdx + 2] * weight;
+                        }
+                    }
+                    out[idx] = _ccOcrClamp(r, 0, 255);
+                    out[idx + 1] = _ccOcrClamp(g, 0, 255);
+                    out[idx + 2] = _ccOcrClamp(b, 0, 255);
+                    out[idx + 3] = src[idx + 3];
+                }
+            }
+            return new ImageData(out, width, height);
+        }
+
+        function _ccOcrPreprocessCrop(img) {
+            const cropX = _ccOcrClamp(398, 0, Math.max(0, img.naturalWidth - 1));
+            const cropY = _ccOcrClamp(90, 0, Math.max(0, img.naturalHeight - 1));
+            const cropW = _ccOcrClamp(375, 1, Math.max(1, img.naturalWidth - cropX));
+            const cropH = _ccOcrClamp(205, 1, Math.max(1, img.naturalHeight - cropY));
+            const scale = 3;
+
+            const cropCanvas = document.createElement('canvas');
+            cropCanvas.width = cropW;
+            cropCanvas.height = cropH;
+            cropCanvas.getContext('2d', { willReadFrequently: true }).drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+            const processedCanvas = document.createElement('canvas');
+            processedCanvas.width = Math.round(cropW * scale);
+            processedCanvas.height = Math.round(cropH * scale);
+            const ctx = processedCanvas.getContext('2d', { willReadFrequently: true });
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(cropCanvas, 0, 0, processedCanvas.width, processedCanvas.height);
+
+            let imageData = ctx.getImageData(0, 0, processedCanvas.width, processedCanvas.height);
+            const data = imageData.data;
+            const contrast = 140 / 100;
+            const factor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
+            for (let i = 0; i < data.length; i += 4) {
+                const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                data[i] = gray;
+                data[i + 1] = gray;
+                data[i + 2] = gray;
+                data[i] = _ccOcrClamp(factor * (data[i] - 128) + 128, 0, 255);
+                data[i + 1] = _ccOcrClamp(factor * (data[i + 1] - 128) + 128, 0, 255);
+                data[i + 2] = _ccOcrClamp(factor * (data[i + 2] - 128) + 128, 0, 255);
+            }
+            imageData = _ccOcrSharpen(imageData, processedCanvas.width, processedCanvas.height);
+            ctx.putImageData(imageData, 0, 0);
+
+            const maskX = _ccOcrClamp(Math.round(152 * scale), 0, Math.max(0, processedCanvas.width - 1));
+            const maskW = _ccOcrClamp(Math.round(32 * scale), 1, Math.max(1, processedCanvas.width - maskX));
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(maskX, 0, maskW, processedCanvas.height);
+            return {
+                processedCanvas,
+                cropCanvas,
+                geometry: {
+                    x: cropX,
+                    y: cropY,
+                    w: cropW,
+                    h: cropH,
+                    source: 'ocrspace_preset_right_group_table'
+                }
+            };
+        }
+
+        function _ccOcrCanvasToBlob(canvas) {
+            return new Promise((resolve, reject) => {
+                canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not create PNG blob from processed crop.')), 'image/png');
+            });
+        }
+
+        function _ccOcrNormalizeRow(row) {
+            const name = String(row?.nick || row?.name || '').trim();
+            if (!name) return null;
+            const fallbackNums = _ccOcrReadNumbersFallback(row);
+            const missing = Array.isArray(row?.missingColumnsFilledAsZero) ? row.missingColumnsFilledAsZero : [];
+            const useFallbackRow = fallbackNums && fallbackNums.length >= 4 && missing.length > 0;
+            const normalized = {
+                name,
+                nick: name,
+                kills: useFallbackRow ? fallbackNums[0] : toOcrNum(row.kills),
+                deaths: useFallbackRow ? fallbackNums[1] : toOcrNum(row.deaths),
+                pvp_dmg: useFallbackRow ? fallbackNums[2] : toOcrNum(row.pvp ?? row.pvp_dmg),
+                pve_dmg: useFallbackRow ? fallbackNums[3] : toOcrNum(row.pve ?? row.pve_dmg),
+                class2: null
+            };
+            console.debug('[ocrspace] provider row', row);
+            console.debug('[ocrspace] normalized row', normalized);
+            return normalized;
+        }
+
+        function _ccOcrValidateProxyUrl() {
+            try {
+                const url = new URL(getOcrSpaceProxyUrl(), window.location.href);
+                if (!/^https?:$/.test(url.protocol)) throw new Error('proxy URL must be http(s)');
+                if (!url.pathname.endsWith('/ocr-read')) throw new Error('proxy URL should end with /ocr-read');
+                return url.href;
+            } catch(e) {
+                throw new Error('Invalid OCR.space proxy URL: ' + (e.message || e));
+            }
+        }
+
+        async function analyzeWithOcrSpaceProvider({ dateStr, shots }) {
+            const btn = document.getElementById('analyzeBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = 'OCR.space...';
+            }
+            document.getElementById('dayAnalyzeResults').style.display = 'none';
+            setDayStatus('loading', `OCR.space: обрабатываю ${shots.length} скриншотов...`);
+            let progBar = document.getElementById('analyzeProgressWrap');
+            if (!progBar && btn) {
+                progBar = document.createElement('div');
+                progBar.id = 'analyzeProgressWrap';
+                progBar.style.cssText = 'margin-top:10px;background:#1e2530;border-radius:6px;overflow:hidden;height:6px';
+                progBar.innerHTML = '<div id="analyzeProgressBar" style="height:100%;background:#6366f1;border-radius:6px;width:0%;transition:width .4s"></div>';
+                btn.parentNode.insertBefore(progBar, btn.nextSibling);
+            }
+            const pb = document.getElementById('analyzeProgressBar');
+            if (pb) pb.style.width = '0%';
+            if (progBar) progBar.style.display = 'block';
+            const minibarText = document.getElementById('minibarText');
+            const minibarSub = document.getElementById('minibarSub');
+            if (minibarText) minibarText.innerText = `OCR.space: 0 из ${shots.length}...`;
+            if (minibarSub) minibarSub.innerText = 'Нажми чтобы развернуть';
+
+            const allPlayers = {};
+            const screenPlayersMap = {};
+            const screenShotDataMap = {};
+            const geometryMap = {};
+            const skippedScreenshots = [];
+            let firstError = null;
+
+            try {
+                const apiUrl = _ccOcrValidateProxyUrl();
+                for (let i = 0; i < shots.length; i++) {
+                    const shot = shots[i];
+                    try {
+                        setDayStatus('loading', `OCR.space: скриншот ${i + 1} из ${shots.length}...`);
+                        if (minibarText) minibarText.innerText = `OCR.space: ${i + 1} из ${shots.length}...`;
+                        if (pb) pb.style.width = Math.round(((i + 1) / shots.length) * 100) + '%';
+
+                        const img = await _ccOcrLoadImage(shot.dataUrl);
+                        const crop = _ccOcrPreprocessCrop(img);
+                        console.debug('[ocrspace] crop geometry', crop.geometry);
+                        const blob = await _ccOcrCanvasToBlob(crop.processedCanvas);
+                        const form = new FormData();
+                        form.append('file', blob, 'clan_control_crop_processed.png');
+
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 60000);
+                        let response, json;
+                        try {
+                            response = await fetch(apiUrl, { method: 'POST', body: form, signal: controller.signal });
+                            const responseText = await response.text();
+                            try {
+                                json = JSON.parse(responseText);
+                            } catch(e) {
+                                throw new Error(`OCR.space proxy returned non-JSON response: HTTP ${response.status}`);
+                            }
+                        } finally {
+                            clearTimeout(timeoutId);
+                        }
+                        if (!response.ok || json.error || json.ok === false) throw new Error(json.error || `HTTP ${response.status}`);
+
+                        const rows = json.finalParsed || json.parsed || [];
+                        const players = [];
+                        rows.forEach(row => {
+                            const normalized = _ccOcrNormalizeRow(row);
+                            if (normalized) players.push(normalized);
+                        });
+                        if (!players.length) {
+                            skippedScreenshots.push({ num: i + 1, reason: 'OCR.space не вернул игроков' });
+                            continue;
+                        }
+
+                        const packName = shot.packName || shot.name || 'OCR ' + (i + 1);
+                        screenPlayersMap[packName] = players.map(p => ({...p}));
+                        screenShotDataMap[packName] = shot.dataUrl;
+                        geometryMap[packName] = {
+                            ...crop.geometry,
+                            cropUrl: crop.cropCanvas.toDataURL('image/png')
+                        };
+                        console.debug('[ocrspace] screenshot map entry', { packName, hasShot: Boolean(screenShotDataMap[packName]), geometry: geometryMap[packName] });
+                        players.forEach(p => {
+                            const key = normalizeNick(p.name);
+                            if (!key) return;
+                            if (allPlayers[key]) {
+                                allPlayers[key].kills = Math.max(allPlayers[key].kills || 0, p.kills || 0);
+                                allPlayers[key].deaths = Math.max(allPlayers[key].deaths || 0, p.deaths || 0);
+                                allPlayers[key].pvp_dmg = Math.max(allPlayers[key].pvp_dmg || 0, p.pvp_dmg || 0);
+                                allPlayers[key].pve_dmg = Math.max(allPlayers[key].pve_dmg || 0, p.pve_dmg || 0);
+                            } else {
+                                allPlayers[key] = {...p};
+                            }
+                        });
+                    } catch(e) {
+                        const msg = e?.name === 'AbortError' ? 'timeout after 60 seconds' : (e.message || String(e));
+                        console.warn(`OCR.space скриншот ${i + 1}:`, msg);
+                        skippedScreenshots.push({ num: i + 1, reason: msg });
+                        if (!firstError) firstError = msg;
+                    }
+                }
+
+                dayLastParsed = Object.values(allPlayers);
+                dayExpectedTotal = null;
+                dayCommandChannel = [];
+                dayPackLeaders = {};
+                dayScreenPlayersMap = screenPlayersMap;
+                dayScreenShotMap = screenShotDataMap;
+                Object.assign(dayPackGeometry, geometryMap);
+
+                if (firstError && dayLastParsed.length === 0) {
+                    setDayStatus('error', `OCR.space error: ${firstError}`);
+                    return;
+                }
+                if (dayLastParsed.length === 0) {
+                    setDayStatus('error', 'OCR.space не распознал игроков. Проверь proxy и качество скриншотов.');
+                    return;
+                }
+
+                dayLastParsed = dayLastParsed.map(p => ({ ...p, _rawName: p.name, name: resolveAlias(p.name) }));
+                dayLastParsed = dayLastParsed.map(p => {
+                    const normP = normalizeNick(p.name);
+                    const rosterMatch = roster.find(r => normalizeNick(r.name) === normP && r.name !== p.name);
+                    if (rosterMatch) {
+                        if (p._rawName) nickAliases[p._rawName.toLowerCase()] = rosterMatch.name;
+                        nickAliases[p.name.toLowerCase()] = rosterMatch.name;
+                        return { ...p, name: rosterMatch.name };
+                    }
+                    return p;
+                });
+                const merged = {};
+                dayLastParsed.forEach(p => {
+                    const k = normalizeNick(p.name);
+                    if (merged[k]) {
+                        merged[k].kills += p.kills;
+                        merged[k].deaths += p.deaths;
+                        merged[k].pvp_dmg += p.pvp_dmg;
+                        merged[k].pve_dmg += p.pve_dmg;
+                    } else {
+                        merged[k] = {...p};
+                    }
+                });
+                dayLastParsed = Object.values(merged);
+
+                await runLocalIconMatcher(dateStr);
+                Object.assign(dayPackGeometry, geometryMap);
+
+                setDayStatus('loading', `OCR.space: распознано ${dayLastParsed.length} игроков. Проверяю похожие ники...`);
+                checkSimilarNicks(dayLastParsed, () => {
+                    renderDayAnalyzedPlayers(dayLastParsed);
+                    document.getElementById('dayAnalyzeResults').style.display = '';
+                    let statusMsg = `OCR.space готово: ${dayLastParsed.length} уникальных игроков из ${shots.length} скриншотов`;
+                    if (skippedScreenshots.length > 0) {
+                        statusMsg += ` | Пропущено скриншотов: ${skippedScreenshots.length} - №${skippedScreenshots.map(s => s.num + ' (' + s.reason + ')').join(', №')}`;
+                    }
+                    setDayStatus(skippedScreenshots.length > 0 ? 'warning' : 'success', statusMsg);
+                    expandDayModal();
+                    if (minibarText) minibarText.innerText = `OCR.space: ${dayLastParsed.length} игроков`;
+                    notifyAnalysisComplete(dayLastParsed.length);
+                    if (typeof openKMReviewWizard === 'function' && dayScreenPlayersMap && Object.keys(dayScreenPlayersMap).length > 0) {
+                        setTimeout(() => openKMReviewWizard(), 300);
+                    }
+                });
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = '🔍 Анализировать';
+                }
+                const pbWrap = document.getElementById('analyzeProgressWrap');
+                if (pbWrap) {
+                    const pbEl = document.getElementById('analyzeProgressBar');
+                    if (pbEl) pbEl.style.width = '100%';
+                    setTimeout(() => { pbWrap.style.display = 'none'; }, 600);
+                }
+                updateApiKeyIndicator();
+            }
+        }
+
         async function analyzeDayScreenshots() {
             if (typeof window._cc === 'function' && !window._cc().canAutoAnalyze) {
                 setDayStatus('error', '❌ AI-анализ доступен только на плане Pro.');
@@ -8093,6 +8483,9 @@ function getClass2IconByClass3(c3) {
             const dateStr = activeDayDate;
             const shots = dayScreenshots[dateStr] || [];
             if (!shots.length) return;
+
+            const provider = getAnalysisProvider();
+            if (provider === 'ocrspace') return analyzeWithOcrSpaceProvider({ dateStr, shots });
 
             const apiKey = getNextApiKey();
             if (!apiKey) {
@@ -9734,6 +10127,11 @@ ${playerList}
                 const fallback = { url: fullUrl, cropped: false };
                 _kmRw.cropCache[packName] = fallback;
                 return fallback;
+            }
+            if (g.cropUrl) {
+                const out = { url: g.cropUrl, cropped: true, w: g.w || null, h: g.h || null, source: g.source || 'geometry_crop_url' };
+                _kmRw.cropCache[packName] = out;
+                return out;
             }
             try {
                 const img = await new Promise((res, rej) => {
@@ -12021,6 +12419,33 @@ ${playerList}
             `).join('');
         }
 
+        function renderAnalysisProviderSettings() {
+            const providerEl = document.getElementById('analysisProviderSelect');
+            const proxyEl = document.getElementById('ocrSpaceProxyUrlInput');
+            const keyEl = document.getElementById('ocrSpaceKeyInput');
+            if (providerEl) providerEl.value = getAnalysisProvider();
+            if (proxyEl) proxyEl.value = getOcrSpaceProxyUrl();
+            if (keyEl) keyEl.value = getOcrSpaceKey();
+            updateAnalysisProviderIndicator();
+        }
+
+        function saveAnalysisProviderSettings() {
+            const providerEl = document.getElementById('analysisProviderSelect');
+            const proxyEl = document.getElementById('ocrSpaceProxyUrlInput');
+            const keyEl = document.getElementById('ocrSpaceKeyInput');
+            saveAnalysisProvider(providerEl ? providerEl.value : 'gemini');
+            saveOcrSpaceProxyUrl(proxyEl ? proxyEl.value.trim() : '');
+            saveOcrSpaceKey(keyEl ? keyEl.value.trim() : '');
+            renderAnalysisProviderSettings();
+            updateApiKeyIndicator();
+            const st = document.getElementById('analysisProviderStatus');
+            if (st) {
+                st.style.cssText = 'display:block;background:#14532d22;border:1px solid #22c55e44;color:#4ade80;font-size:13px;padding:10px;border-radius:8px';
+                st.innerText = 'Сохранено';
+                setTimeout(() => st.style.display = 'none', 2500);
+            }
+        }
+
         function resetExhaustedKeys() {
             exhaustedKeys = {};
             saveToStorage();
@@ -13579,10 +14004,22 @@ ${playerList}
 
     function _applyLangLabels(lang) {
         var map = _UI_LABELS[lang] || {};
-        var navItems = document.querySelectorAll('.nav-item, .sidebar-section-label');
+        var navItems = document.querySelectorAll('.nav-item, .sidebar-section-label, .nav p');
         navItems.forEach(function(el) {
-            var cur = el.textContent.trim();
-            if (map[cur]) el.textContent = map[cur];
+            var icoSpan = el.querySelector('.ico');
+            if (icoSpan) {
+                // nav-item with icon: replace only the bare text node (skip .ico content)
+                for (var i = 0; i < el.childNodes.length; i++) {
+                    var node = el.childNodes[i];
+                    if (node.nodeType === 3) {
+                        var txt = node.textContent.trim();
+                        if (txt && map[txt]) node.textContent = map[txt];
+                    }
+                }
+            } else {
+                var cur = el.textContent.trim();
+                if (map[cur]) el.textContent = map[cur];
+            }
         });
         // Update login subtitle
         var sub = document.getElementById('loginSubtitle');
@@ -13617,6 +14054,7 @@ ${playerList}
             document.body.classList.toggle('light', theme === 'light');
             syncFlipToggle(['themeToggle', 'loginThemeToggle'], theme === 'light');
             syncFlipToggle(['langToggle',  'loginLangToggle'],  lang === 'en');
+            _applyLangLabels(lang);
         }
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', _initToggles);
@@ -16063,9 +16501,9 @@ window._archRender = function() {
 
     /* ══ Per-tab background modal ═════════════════════════ */
     .cc-tab-bg-modal {
-      position: fixed;
-      inset: 0;
-      z-index: 400;
+      position: fixed !important;
+      inset: 0 !important;
+      z-index: 9999 !important;
       display: none;
       align-items: center;
       justify-content: center;
@@ -16074,7 +16512,7 @@ window._archRender = function() {
       backdrop-filter: blur(5px);
     }
     .cc-tab-bg-modal.open {
-      display: flex;
+      display: flex !important;
       animation: ccTabFade .18s ease both;
     }
     @keyframes ccTabFade { from { opacity:0 } to { opacity:1 } }
@@ -16541,9 +16979,9 @@ window._archRender = function() {
 
     /* ── Sidebar — v20 .side premium glass ──────────────────── */
     body:not(.light) .sidebar {
-      width: 228px !important;
+      width: 182px !important;
       flex-shrink: 0 !important;
-      padding: 20px 14px !important;
+      padding: 16px 10px !important;
       border-radius: 24px !important;
       border: 1px solid rgba(255,255,255,0.12) !important;
       border-right: 1px solid rgba(255,255,255,0.12) !important;
@@ -16563,11 +17001,11 @@ window._archRender = function() {
       padding: 14px 10px 6px !important;
     }
     body:not(.light) .nav-item {
-      gap: 10px !important;
-      padding: 11px 12px !important;
-      border-radius: 13px !important;
-      margin-bottom: 3px !important;
-      font-size: 13px !important;
+      gap: 8px !important;
+      padding: 8px 10px !important;
+      border-radius: 11px !important;
+      margin-bottom: 2px !important;
+      font-size: 12px !important;
       color: rgba(247,242,232,0.72) !important;
       border-left: none !important;
       transition: background 0.18s, color 0.18s, transform 0.18s, box-shadow 0.18s !important;
@@ -16583,7 +17021,7 @@ window._archRender = function() {
       color: #fff4cf !important;
       font-weight: 700 !important;
       border-left: none !important;
-      padding-left: 12px !important;
+      padding-left: 10px !important;
       box-shadow:
         inset 0 0 0 1px rgba(255,216,113,0.32),
         0 0 28px rgba(232,190,88,0.13) !important;
@@ -16592,8 +17030,9 @@ window._archRender = function() {
 
     /* ── Main content — v20 .surface with backdrop-filter ───── */
     body:not(.light) .main-content {
-      padding: 28px clamp(22px, 2.8vw, 36px) !important;
-      border-radius: 26px !important;
+      padding: 24px clamp(18px, 2.4vw, 32px) !important;
+      border-radius: 28px !important;
+      min-height: 0 !important;
       border: 1px solid rgba(255,255,255,0.12) !important;
       background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018)) !important;
       box-shadow:
@@ -17058,9 +17497,9 @@ window._archRender = function() {
     /* ── APP grid layout ───────────────────────────────────────── */
     body:not(.light) #appLayout.app {
       display: grid !important;
-      grid-template-columns: 220px 1fr !important;
-      gap: 22px !important;
-      padding: 70px clamp(20px, 3.5vw, 56px) 32px !important;
+      grid-template-columns: 182px 1fr !important;
+      gap: 20px !important;
+      padding: 70px clamp(52px, 5.5vw, 74px) 32px !important;
       min-height: 100vh !important;
       overflow: visible !important;
       flex: none !important;
@@ -17068,14 +17507,14 @@ window._archRender = function() {
 
     /* ── SIDE (sidebar) — premium glass panel ───────────────────── */
     body:not(.light) .sidebar.side {
-      width: 220px !important;
+      width: 182px !important;
       flex-shrink: 0 !important;
-      height: calc(100vh - 96px) !important;
-      min-height: 600px !important;
+      height: calc(100vh - 94px) !important;
+      min-height: 580px !important;
       position: sticky !important;
-      top: 60px !important;
+      top: 58px !important;
       border: 1px solid var(--line) !important;
-      border-radius: 24px !important;
+      border-radius: 22px !important;
       background: linear-gradient(180deg, rgba(11,11,12,.44), rgba(6,6,7,.62)) !important;
       box-shadow: 0 22px 80px rgba(0,0,0,.45), inset 0 1px rgba(255,255,255,.08) !important;
       backdrop-filter: blur(20px) saturate(1.18) !important;
@@ -17088,43 +17527,43 @@ window._archRender = function() {
     }
     body:not(.light) .sidebar.side .logo {
       text-align: center !important;
-      padding: 22px 18px 14px !important;
+      padding: 18px 14px 12px !important;
       border-bottom: 1px solid rgba(255,255,255,.07) !important;
     }
     body:not(.light) .sidebar.side .logo .mark {
-      width: 64px; height: 64px;
-      margin: 0 auto 12px;
-      border-radius: 22px;
+      width: 56px; height: 56px;
+      margin: 0 auto 10px;
+      border-radius: 20px;
       display: grid; place-items: center;
       transform: rotate(45deg);
       border: 1px solid rgba(255,216,113,.42);
       background: radial-gradient(circle, rgba(255,225,140,.22), transparent 58%), rgba(255,255,255,.04);
       box-shadow: 0 0 32px rgba(232,190,88,.18);
     }
-    body:not(.light) .sidebar.side .logo .mark span { transform: rotate(-45deg); font-size: 28px; }
+    body:not(.light) .sidebar.side .logo .mark span { transform: rotate(-45deg); font-size: 24px; }
     body:not(.light) .sidebar.side .logo h2 {
       margin: 0;
       color: #f2cb73;
       font-family: Georgia, "Times New Roman", serif;
-      font-size: 22px;
+      font-size: 19px;
       line-height: .86;
       letter-spacing: 0.13em;
     }
     body:not(.light) .sidebar.side .logo small {
       display: block;
-      margin-top: 9px;
+      margin-top: 8px;
       color: rgba(247,242,232,.42);
       font-size: 9px;
       letter-spacing: 0.20em;
       text-transform: uppercase;
     }
     body:not(.light) .sidebar.side .nav {
-      padding: 14px 12px !important;
+      padding: 10px 10px !important;
       overflow-y: auto !important;
       flex: 1 !important;
     }
     body:not(.light) .sidebar.side .nav p {
-      margin: 14px 10px 6px !important;
+      margin: 12px 8px 4px !important;
       color: rgba(247,242,232,.36) !important;
       font-size: 9px !important;
       font-weight: 900 !important;
@@ -17137,14 +17576,14 @@ window._archRender = function() {
       background: transparent !important;
       color: rgba(247,242,232,.72) !important;
       display: flex !important;
-      gap: 10px !important;
+      gap: 8px !important;
       align-items: center !important;
-      padding: 10px 12px !important;
-      border-radius: 12px !important;
-      margin: 2px 0 !important;
+      padding: 8px 10px !important;
+      border-radius: 11px !important;
+      margin: 1px 0 !important;
       text-align: left !important;
       font: inherit !important;
-      font-size: 13px !important;
+      font-size: 12px !important;
       letter-spacing: 0 !important;
       cursor: pointer !important;
       transition: background .18s, color .18s, transform .18s, box-shadow .18s !important;
@@ -17197,10 +17636,10 @@ window._archRender = function() {
 
     /* ── SURFACE (main content) ─────────────────────────────────── */
     body:not(.light) .main-content.surface {
-      min-height: calc(100vh - 96px) !important;
+      min-height: calc(100vh - 94px) !important;
       position: relative !important;
       overflow: hidden auto !important;
-      border-radius: 26px !important;
+      border-radius: 28px !important;
       border: 1px solid rgba(255,255,255,.12) !important;
       background: linear-gradient(180deg, rgba(255,255,255,.060), rgba(255,255,255,.024)) !important;
       box-shadow: 0 22px 80px rgba(0,0,0,.45), inset 0 1px rgba(255,255,255,.10) !important;
