@@ -18682,7 +18682,7 @@ window._archRender = function() {
         function reset() {
           tabs().forEach(function(t){ localStorage.removeItem(KEY_TAB + t.id); });
           localStorage.removeItem(KEY_GLOBAL);
-          localStorage.setItem(KEY_USE_GLOBAL, 'false');
+          localStorage.removeItem(KEY_USE_GLOBAL);
           pending = {};
           applyStoredBackground(currentPage());
           renderRows();
@@ -18792,6 +18792,211 @@ window._archRender = function() {
         setTimeout(init, 80);
       }
       setTimeout(init, 500);
+    })();
+    </script>
+    <style id="v20-shell-completion">
+      body:not(.light) #cc-cursor-glow {
+        display: none !important;
+      }
+      body:not(.light) .cc-v20-bg-layer {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        overflow: hidden;
+        background:
+          linear-gradient(90deg, rgba(0,0,0,.34), rgba(0,0,0,.04), rgba(0,0,0,.46)),
+          radial-gradient(circle at 48% 12%, rgba(232,190,88,.18), transparent 30%),
+          radial-gradient(circle at 78% 8%, rgba(95,140,255,.12), transparent 28%),
+          radial-gradient(circle at 30% 78%, rgba(155,102,255,.10), transparent 34%),
+          linear-gradient(120deg, #17130e, #07080b 43%, #151114);
+      }
+      body:not(.light) .cc-v20-bg-layer::before {
+        content: "";
+        position: absolute;
+        inset: -8%;
+        background:
+          linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px),
+          linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px);
+        background-size: 86px 86px;
+        opacity: .18;
+        mask-image: radial-gradient(circle at 50% 42%, #000, transparent 72%);
+      }
+      body:not(.light) .cc-v20-bg-layer::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at 50% 30%, transparent, rgba(0,0,0,.48) 48%, rgba(0,0,0,.86)),
+          linear-gradient(180deg, rgba(0,0,0,.03), rgba(0,0,0,.62));
+      }
+      body:not(.light) .cc-v20-noise {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        opacity: .10;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='.75'/%3E%3C/svg%3E");
+      }
+      body:not(.light) #topbar,
+      body:not(.light) #appLayout,
+      body:not(.light) #loginScreen,
+      body:not(.light) .modal,
+      body:not(.light) .cc-tab-bg-modal {
+        position: relative;
+        z-index: 5;
+      }
+      body:not(.light) #topbar {
+        position: fixed !important;
+        z-index: 120 !important;
+      }
+      body:not(.light) .cc-tab-bg-modal {
+        position: fixed !important;
+        z-index: 20000 !important;
+      }
+      body:not(.light) .page-section.v20-grafted {
+        min-height: 100%;
+      }
+      body:not(.light) .page-section.v20-grafted .v20-page-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 22px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+      body:not(.light) .page-section.v20-grafted .v20-page-head h1 {
+        margin: 0;
+        font-size: clamp(28px, 3vw, 44px);
+        line-height: .96;
+        letter-spacing: -0.045em;
+        color: #fffdf5;
+        text-shadow: 0 2px 18px rgba(0,0,0,.40);
+      }
+      body:not(.light) .page-section.v20-grafted .v20-page-body {
+        display: grid;
+        gap: 16px;
+      }
+      body:not(.light) .page-section.v20-grafted .v20-page-body > h1:first-child,
+      body:not(.light) .page-section.v20-grafted .v20-page-body > .flex.justify-between.items-center:first-child > h1,
+      body:not(.light) .page-section.v20-grafted .v20-page-body > .flex.justify-between.items-center:first-child > div > h1,
+      body:not(.light) .page-section.v20-grafted .v20-page-body > div[style*="justify-content:space-between"]:first-child > h1 {
+        display: none !important;
+      }
+      body:not(.light) .surface input,
+      body:not(.light) .surface textarea,
+      body:not(.light) .surface select,
+      body:not(.light) .surface .input-dark,
+      body:not(.light) .surface .dp-btn {
+        background: rgba(0,0,0,.28) !important;
+        border: 1px solid rgba(255,255,255,.10) !important;
+        color: var(--ink) !important;
+        border-radius: 13px !important;
+        box-shadow: inset 0 1px rgba(255,255,255,.04) !important;
+      }
+      body:not(.light) .surface .btn-primary,
+      body:not(.light) .surface button:not(.nav-item):not(.chip):not(.flip-toggle):not(.cc-tab-bg-close-btn) {
+        border-radius: 13px !important;
+        border: 1px solid rgba(255,255,255,.10) !important;
+        box-shadow: inset 0 1px rgba(255,255,255,.045) !important;
+      }
+      body:not(.light) .surface table {
+        overflow: hidden;
+        border-radius: 16px;
+      }
+      body:not(.light) .surface th {
+        color: rgba(247,242,232,.45) !important;
+        background: rgba(0,0,0,.16) !important;
+      }
+      body:not(.light) .surface td {
+        color: rgba(247,242,232,.78) !important;
+      }
+      body:not(.light) .surface tr:hover {
+        background: rgba(255,255,255,.045) !important;
+      }
+      body:not(.light) #themeToggle {
+        display: none !important;
+      }
+    </style>
+    <script id="v20-shell-completion">
+    (function(){
+      'use strict';
+      var labels = {
+        stats: { ru:['Статистика КМ','аналитика'], en:['War Statistics','analytics'] },
+        calendar: { ru:['Календарь КМ','war calendar'], en:['War Calendar','war calendar'] },
+        screenshots: { ru:['История КМ','screenshot review'], en:['War History','screenshot review'] },
+        roster: { ru:['Клан','roster control'], en:['Clan','roster control'] },
+        profile: { ru:['Профиль','player dossier'], en:['Profile','player dossier'] },
+        packs: { ru:['Рейд Паки','raid groups'], en:['Raid Packs','raid groups'] },
+        archive: { ru:['Архив','cold storage'], en:['Archive','cold storage'] },
+        settings: { ru:['Настройки','system'], en:['Settings','system'] },
+        users: { ru:['Пользователи','admin'], en:['Users','admin'] },
+        'pack-detail': { ru:['Группа','raid pack'], en:['Group','raid pack'] }
+      };
+      function lang(){ return localStorage.getItem('cc_lang') === 'en' ? 'en' : 'ru'; }
+      function ensureBgLayer(){
+        if (!document.querySelector('.cc-v20-bg-layer')) {
+          var bg = document.createElement('div');
+          bg.className = 'cc-v20-bg-layer';
+          document.body.insertBefore(bg, document.body.firstChild);
+        }
+        if (!document.querySelector('.cc-v20-noise')) {
+          var noise = document.createElement('div');
+          noise.className = 'cc-v20-noise';
+          document.body.insertBefore(noise, document.body.firstChild.nextSibling);
+        }
+        var cursor = document.getElementById('cc-cursor-glow');
+        if (cursor) cursor.remove();
+      }
+      function graftSection(id){
+        var sec = document.getElementById('page-' + id);
+        if (!sec || sec.dataset.v20Grafted === '1' || id === 'dashboard') return;
+        sec.dataset.v20Grafted = '1';
+        sec.classList.add('screen', 'v20-grafted');
+        if (id !== 'calendar') {
+          var head = document.createElement('div');
+          head.className = 'v20-page-head head';
+          head.innerHTML = '<div><span class="eyebrow" data-v20-eyebrow></span><h1 data-v20-title></h1><p class="sub" data-v20-sub></p></div>';
+          var body = document.createElement('div');
+          body.className = 'v20-page-body';
+          while (sec.firstChild) body.appendChild(sec.firstChild);
+          sec.appendChild(head);
+          sec.appendChild(body);
+        } else {
+          sec.classList.add('v20-calendar-shell');
+        }
+      }
+      function applyText(){
+        Object.keys(labels).forEach(function(id){
+          var sec = document.getElementById('page-' + id);
+          if (!sec) return;
+          var l = labels[id][lang()] || labels[id].ru;
+          var title = sec.querySelector('[data-v20-title]');
+          var eyebrow = sec.querySelector('[data-v20-eyebrow]');
+          var sub = sec.querySelector('[data-v20-sub]');
+          if (title) title.textContent = l[0];
+          if (eyebrow) eyebrow.textContent = '⚜ ' + l[1];
+          if (sub) sub.textContent = lang() === 'en'
+            ? 'Operational tools preserved from BASA, presented inside the v20 command shell.'
+            : 'Рабочие инструменты BASA сохранены внутри командной оболочки v20.';
+        });
+      }
+      function init(){
+        document.body.classList.remove('light', 'cursor-on');
+        localStorage.setItem('cc_theme', 'dark');
+        ensureBgLayer();
+        Object.keys(labels).forEach(graftSection);
+        applyText();
+      }
+      var oldSetLang = window.setLang;
+      window.setLang = function(l){
+        if (typeof oldSetLang === 'function') oldSetLang(l);
+        applyText();
+      };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+      else init();
+      setTimeout(init, 300);
+      setTimeout(init, 1000);
     })();
     </script>
 </body>
