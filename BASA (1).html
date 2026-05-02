@@ -3135,7 +3135,6 @@
     <div class="tools">
         <span id="roleBadge" style="display:none"></span>
         <span class="chip dark" id="topbarClan" style="display:none"></span>
-        <span class="chip gold v20-shell-chip" aria-hidden="true">TEST</span>
         <button id="adminModeToggle" class="chip" onclick="window._toggleAdminMode&&window._toggleAdminMode()" style="display:none" title="Тест-режим для admin">▸ TEST</button>
         <button class="flip-toggle" id="themeToggle" type="button" onclick="toggleTheme()" aria-label="Theme" data-state="left">
             <span class="flip-toggle-track"></span>
@@ -16410,18 +16409,18 @@ window._archRender = function() {
 
     /* ── Main content ────────────────────────────────────── */
     body:not(.light) .main-content {
-      background: rgba(6,8,14,0.40) !important;
-      backdrop-filter: blur(10px) !important;
-      -webkit-backdrop-filter: blur(10px) !important;
+      background: rgba(8,10,14,0.28) !important;
+      backdrop-filter: blur(3px) saturate(1.05) !important;
+      -webkit-backdrop-filter: blur(3px) saturate(1.05) !important;
     }
 
     /* ── Cards ───────────────────────────────────────────── */
     body:not(.light) .card,
     body:not(.light) .dash-card {
-      background: linear-gradient(180deg, rgba(10,13,20,0.66), rgba(6,8,14,0.48)) !important;
-      border: 1px solid rgba(255,255,255,0.09) !important;
-      border-top-color: rgba(255,255,255,0.14) !important;
-      box-shadow: 0 12px 42px rgba(0,0,0,0.30), inset 0 1px rgba(255,255,255,0.06) !important;
+      background: rgba(8,10,14,0.34) !important;
+      border: 1px solid rgba(255,255,255,0.12) !important;
+      border-top-color: rgba(255,255,255,0.16) !important;
+      box-shadow: 0 10px 34px rgba(0,0,0,0.26), inset 0 1px rgba(255,255,255,0.05) !important;
       transition: border-color 0.2s, box-shadow 0.22s !important;
     }
     body:not(.light) .card:hover,
@@ -16430,8 +16429,8 @@ window._archRender = function() {
       box-shadow: 0 20px 62px rgba(0,0,0,0.40), 0 0 30px rgba(232,190,88,0.055) !important;
     }
     body:not(.light) .pack-card {
-      background: linear-gradient(180deg, rgba(10,13,20,0.62), rgba(6,8,14,0.44)) !important;
-      border: 1px solid rgba(255,255,255,0.09) !important;
+      background: rgba(8,10,14,0.32) !important;
+      border: 1px solid rgba(255,255,255,0.12) !important;
     }
     body:not(.light) .pack-card:hover {
       border-color: rgba(232,190,88,0.22) !important;
@@ -17069,13 +17068,13 @@ window._archRender = function() {
     body:not(.light) .dash-card,
     body:not(.light) .pack-card {
       border-radius: 22px !important;
-      border: 1px solid rgba(255,255,255,0.115) !important;
-      background: linear-gradient(180deg, rgba(8,11,15,0.58), rgba(8,9,11,0.37)) !important;
+      border: 1px solid rgba(255,255,255,0.12) !important;
+      background: rgba(8,10,14,0.34) !important;
       box-shadow:
-        0 12px 42px rgba(0,0,0,0.30),
-        inset 0 1px rgba(255,255,255,0.075) !important;
-      backdrop-filter: blur(14px) saturate(1.15) !important;
-      -webkit-backdrop-filter: blur(14px) saturate(1.15) !important;
+        0 10px 34px rgba(0,0,0,0.27),
+        inset 0 1px rgba(255,255,255,0.055) !important;
+      backdrop-filter: blur(3px) saturate(1.05) !important;
+      -webkit-backdrop-filter: blur(3px) saturate(1.05) !important;
       transition: transform 0.20s, border-color 0.20s, box-shadow 0.20s !important;
       position: relative !important;
       overflow: hidden !important;
@@ -17088,9 +17087,9 @@ window._archRender = function() {
       inset: 0 !important;
       pointer-events: none !important;
       background:
-        radial-gradient(circle at 0% 0%, rgba(255,216,113,0.085), transparent 38%),
-        radial-gradient(circle at 100% 0%, rgba(155,102,255,0.07), transparent 38%) !important;
-      opacity: 0.55 !important;
+        radial-gradient(circle at 0% 0%, rgba(255,216,113,0.045), transparent 38%),
+        radial-gradient(circle at 100% 0%, rgba(155,102,255,0.035), transparent 38%) !important;
+      opacity: 0.42 !important;
       border-radius: inherit !important;
     }
     body:not(.light) .card > *,
@@ -17651,10 +17650,10 @@ window._archRender = function() {
       overflow: hidden auto !important;
       border-radius: 28px !important;
       border: 1px solid rgba(255,255,255,.12) !important;
-      background: linear-gradient(180deg, rgba(255,255,255,.078), rgba(255,255,255,.035)) !important;
-      box-shadow: 0 22px 80px rgba(0,0,0,.45), inset 0 1px rgba(255,255,255,.10) !important;
-      backdrop-filter: blur(22px) saturate(116%) !important;
-      -webkit-backdrop-filter: blur(22px) saturate(116%) !important;
+      background: rgba(8,10,14,.28) !important;
+      box-shadow: 0 18px 64px rgba(0,0,0,.36), inset 0 1px rgba(255,255,255,.07) !important;
+      backdrop-filter: blur(3px) saturate(1.05) !important;
+      -webkit-backdrop-filter: blur(3px) saturate(1.05) !important;
       padding: 26px !important;
       visibility: visible !important;
       flex: none !important;
@@ -17667,8 +17666,8 @@ window._archRender = function() {
       pointer-events: none !important;
       border-radius: inherit !important;
       background:
-        radial-gradient(circle at 50% 0%, rgba(255,216,113,.10), transparent 38%),
-        linear-gradient(90deg, transparent, rgba(255,255,255,.04), transparent) !important;
+        radial-gradient(circle at 50% 0%, rgba(255,216,113,.055), transparent 38%),
+        linear-gradient(90deg, transparent, rgba(255,255,255,.018), transparent) !important;
       z-index: 0 !important;
     }
     body:not(.light) .main-content.surface > * {
@@ -17749,12 +17748,12 @@ window._archRender = function() {
     body:not(.light) .surface .card {
       position: relative !important;
       overflow: hidden !important;
-      border: 1px solid rgba(255,255,255,.10) !important;
+      border: 1px solid rgba(255,255,255,.12) !important;
       border-radius: 22px !important;
-      background: linear-gradient(180deg, rgba(8,11,15,.58), rgba(8,9,11,.37)) !important;
-      box-shadow: 0 10px 36px rgba(0,0,0,.32), inset 0 1px rgba(255,255,255,.075) !important;
-      backdrop-filter: blur(14px) saturate(1.15) !important;
-      -webkit-backdrop-filter: blur(14px) saturate(1.15) !important;
+      background: rgba(8,10,14,.34) !important;
+      box-shadow: 0 10px 34px rgba(0,0,0,.27), inset 0 1px rgba(255,255,255,.055) !important;
+      backdrop-filter: blur(3px) saturate(1.05) !important;
+      -webkit-backdrop-filter: blur(3px) saturate(1.05) !important;
       transition: transform .20s, border-color .20s, box-shadow .20s !important;
       padding: 0 !important;
     }
@@ -17764,8 +17763,8 @@ window._archRender = function() {
       inset: 0 !important;
       pointer-events: none !important;
       background:
-        radial-gradient(circle at 0 0, rgba(255,216,113,.09), transparent 35%),
-        radial-gradient(circle at 100% 0, rgba(155,102,255,.08), transparent 36%) !important;
+        radial-gradient(circle at 0 0, rgba(255,216,113,.045), transparent 35%),
+        radial-gradient(circle at 100% 0, rgba(155,102,255,.035), transparent 36%) !important;
       border-radius: inherit !important;
     }
     body:not(.light) .surface .card > * { position: relative !important; z-index: 1 !important; }
