@@ -3284,6 +3284,27 @@
                     <div class="body" id="dashRareGems"></div>
                 </article>
             </div>
+            <div class="grid cols3 v20-ops-grid" style="margin-top:14px">
+                <article class="card">
+                    <div class="ph">
+                        <div><h3>Screenshot analysis</h3><p>Сводка по последним загруженным КМ</p></div>
+                    </div>
+                    <div class="body" id="dashScanAnalysis"></div>
+                </article>
+                <article class="card">
+                    <div class="ph">
+                        <div><h3>Calendar</h3><p>Ближайшие события war table</p></div>
+                        <a class="link" onclick="showPage('calendar')" style="cursor:pointer">Open →</a>
+                    </div>
+                    <div class="body" id="dashMiniCalendar"></div>
+                </article>
+                <article class="card">
+                    <div class="ph">
+                        <div><h3>Activity timeline</h3><p>Последние изменения по КМ</p></div>
+                    </div>
+                    <div class="body" id="dashActivityTimeline"></div>
+                </article>
+            </div>
         </section>
 
 <!-- КАЛЕНДАРЬ -->
@@ -8267,19 +8288,27 @@ function getClass2IconByClass3(c3) {
         function _ccOcrNormalizeRow(row) {
             const name = String(row?.nick || row?.name || '').trim();
             if (!name) return null;
-            const fallbackNums = _ccOcrReadNumbersFallback(row);
-            const missing = Array.isArray(row?.missingColumnsFilledAsZero) ? row.missingColumnsFilledAsZero : [];
-            const useFallbackRow = fallbackNums && fallbackNums.length >= 4 && missing.length > 0;
+            console.debug('[ocrspace] provider row', row);
+            // rawLine scan recovers numbers fused with the nick by OCR (proxy tokenizer skips mixed tokens).
+            const rawLine = typeof row?.rawLine === 'string' ? row.rawLine : null;
+            if (rawLine) {
+                const nums = (rawLine.match(/\d+/g) || []).map(Number);
+                if (nums.length >= 4) {
+                    const s = nums.slice(-4);
+                    const normalized = { name, nick: name, kills: s[0], deaths: s[1], pvp_dmg: s[2], pve_dmg: s[3], class2: null };
+                    console.debug('[ocrspace] normalized row', normalized);
+                    return normalized;
+                }
+            }
             const normalized = {
                 name,
                 nick: name,
-                kills: useFallbackRow ? fallbackNums[0] : toOcrNum(row.kills),
-                deaths: useFallbackRow ? fallbackNums[1] : toOcrNum(row.deaths),
-                pvp_dmg: useFallbackRow ? fallbackNums[2] : toOcrNum(row.pvp ?? row.pvp_dmg),
-                pve_dmg: useFallbackRow ? fallbackNums[3] : toOcrNum(row.pve ?? row.pve_dmg),
+                kills: toOcrNum(row.kills),
+                deaths: toOcrNum(row.deaths),
+                pvp_dmg: toOcrNum(row.pvp ?? row.pvp_dmg),
+                pve_dmg: toOcrNum(row.pve ?? row.pve_dmg),
                 class2: null
             };
-            console.debug('[ocrspace] provider row', row);
             console.debug('[ocrspace] normalized row', normalized);
             return normalized;
         }
@@ -8357,7 +8386,7 @@ function getClass2IconByClass3(c3) {
                             clearTimeout(timeoutId);
                         }
                         if (!response.ok || json.error || json.ok === false) throw new Error(json.error || `HTTP ${response.status}`);
-
+                        console.debug('[ocrspace] raw response', json);
                         const rows = json.finalParsed || json.parsed || [];
                         const players = [];
                         rows.forEach(row => {
@@ -18115,6 +18144,654 @@ window._archRender = function() {
       document.addEventListener('DOMContentLoaded', function(){
         if (!patchShow()) setTimeout(patchShow, 220);
       });
+    })();
+    </script>
+    <style id="v20-final-war-room-lock">
+      /* Final visual lock: v20 dark-only shell, no light mode, no cursor add-ons. */
+      #themeToggle,
+      #loginThemeToggle,
+      #cc-cursor-glow {
+        display: none !important;
+      }
+      #topbar [style*="display:none"],
+      #topbar [style*="display: none"],
+      .sidebar [style*="display:none"],
+      .sidebar [style*="display: none"] {
+        display: none !important;
+      }
+      body.light {
+        --bg: #050505 !important;
+        --bg2: rgba(10,12,16,.58) !important;
+        --bg3: rgba(255,255,255,.07) !important;
+        --bg4: rgba(255,255,255,.10) !important;
+        --border: rgba(255,255,255,.12) !important;
+        --border2: rgba(255,255,255,.18) !important;
+        --text: #f7f2e8 !important;
+        --text2: rgba(247,242,232,.78) !important;
+        --text3: rgba(247,242,232,.62) !important;
+        --text4: rgba(247,242,232,.38) !important;
+        --input-bg: rgba(0,0,0,.32) !important;
+        background-color: #050505 !important;
+        color: #f7f2e8 !important;
+      }
+      body.light #appLayout,
+      body.light #topbar,
+      body.light .sidebar,
+      body.light .main-content,
+      body.light .card,
+      body.light .dash-card,
+      body.light .pack-card,
+      body.light .calendar-grid-card,
+      body.light .calendar-side-card,
+      body.light .calendar-summary-card {
+        color: #f7f2e8 !important;
+      }
+      body:not(.light) #topbar.top .tools,
+      #topbar.top .tools {
+        width: 100%;
+        justify-content: flex-end;
+        min-width: 0;
+      }
+      #topbar.top #topbarClan {
+        margin-right: auto;
+      }
+      body:not(.light) #appLayout.app {
+        grid-template-columns: 210px minmax(0,1fr) !important;
+        padding: 70px clamp(22px,4vw,86px) 32px !important;
+        gap: 24px !important;
+      }
+      body:not(.light) .sidebar.side {
+        width: 210px !important;
+        min-height: 650px !important;
+        border-radius: 26px !important;
+      }
+      body:not(.light) .sidebar.side .logo {
+        padding: 24px 18px 16px !important;
+      }
+      body:not(.light) .sidebar.side .logo .mark {
+        width: 68px !important;
+        height: 68px !important;
+        border-radius: 24px !important;
+      }
+      body:not(.light) .sidebar.side .logo h2 {
+        font-size: 24px !important;
+      }
+      body:not(.light) .sidebar.side .nav button.nav-item {
+        font-size: 14px !important;
+        padding: 11px 12px !important;
+        border-radius: 13px !important;
+      }
+      body:not(.light) .main-content.surface {
+        min-height: calc(100vh - 104px) !important;
+      }
+      body:not(.light) .v20-ops-grid {
+        grid-template-columns: 1fr 1fr 1fr !important;
+      }
+      .scan {
+        display: grid;
+        grid-template-columns: 106px 1fr;
+        gap: 18px;
+        align-items: center;
+      }
+      .ring {
+        --scan: 0%;
+        width: 104px;
+        height: 104px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background:
+          conic-gradient(var(--violet,#9b66ff) 0 var(--scan), rgba(255,255,255,.08) 0),
+          radial-gradient(circle,#0b0b0d 0 58%,transparent 59%);
+        box-shadow: 0 0 34px rgba(155,102,255,.28);
+        position: relative;
+      }
+      .ring:after {
+        content: "";
+        position: absolute;
+        inset: 13px;
+        border-radius: 50%;
+        background: rgba(5,5,6,.86);
+        border: 1px solid rgba(255,255,255,.08);
+      }
+      .ring div { position: relative; z-index: 1; text-align: center; }
+      .ring b { display:block; font-size:25px; color:#fffdf5; }
+      .ring small { font-size:9px; color:rgba(247,242,232,.62); text-transform:uppercase; }
+      .mline {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        margin: 9px 0;
+        color: rgba(247,242,232,.62);
+        font-size: 12px;
+      }
+      .bar {
+        height: 6px;
+        border-radius: 99px;
+        overflow: hidden;
+        background: rgba(255,255,255,.08);
+        grid-column: 1 / -1;
+      }
+      .bar span {
+        display: block;
+        width: var(--w,50%);
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg,var(--gold,#e8be58),var(--violet,#9b66ff),#6ca5ff);
+        box-shadow: 0 0 20px rgba(155,102,255,.25);
+      }
+      body:not(.light) .time {
+        display: grid;
+        grid-template-columns: 32px 1fr auto;
+        gap: 10px;
+        align-items: center;
+        padding: 11px 0;
+        border-bottom: 1px solid rgba(255,255,255,.065);
+        font-size: 12px;
+      }
+      body:not(.light) .time:last-child { border-bottom: 0; }
+      body:not(.light) .tico {
+        width: 30px;
+        height: 30px;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        background: rgba(255,255,255,.06);
+        color: var(--gold,#e8be58);
+      }
+      body:not(.light) .time strong { display:block; color:#f7f2e8; }
+      body:not(.light) .time em,
+      body:not(.light) .time span span {
+        display:block;
+        color:rgba(247,242,232,.62);
+        font-style:normal;
+      }
+      body:not(.light) .cc-tab-bg-modal {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 100000 !important;
+        display: none !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 28px !important;
+        background: rgba(0,0,0,.68) !important;
+        backdrop-filter: blur(10px) saturate(1.08) !important;
+        -webkit-backdrop-filter: blur(10px) saturate(1.08) !important;
+      }
+      body:not(.light) .cc-tab-bg-modal.open {
+        display: flex !important;
+      }
+      body:not(.light) .cc-tab-bg-dialog {
+        width: min(780px,94vw) !important;
+        max-height: min(760px,88vh) !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+        border-radius: 24px !important;
+        border: 1px solid rgba(255,255,255,.16) !important;
+        background: linear-gradient(180deg,rgba(8,10,14,.94),rgba(5,6,8,.88)) !important;
+        box-shadow: 0 34px 140px rgba(0,0,0,.68), inset 0 1px rgba(255,255,255,.10) !important;
+      }
+      body:not(.light) .cc-tab-bg-list {
+        overflow-y: auto !important;
+        padding-right: 4px !important;
+      }
+      @media (max-width: 1100px) {
+        body:not(.light) .v20-ops-grid { grid-template-columns: 1fr !important; }
+        body:not(.light) #appLayout.app { padding-left: 18px !important; padding-right: 18px !important; }
+      }
+      @media (max-width: 920px) {
+        body:not(.light) #appLayout.app { grid-template-columns: 1fr !important; padding: 60px 12px 18px !important; }
+        body:not(.light) .sidebar.side { width: 100% !important; min-height: 0 !important; }
+      }
+    </style>
+    <script id="v20-final-behavior-lock">
+    (function(){
+      'use strict';
+
+      var KEY_TAB = 'cc-bg-tab-';
+      var KEY_GLOBAL = 'cc-bg-global';
+      var KEY_USE_GLOBAL = 'cc-bg-use-global';
+      var pageLabels = {
+        dashboard: { ru:'Дашборд', en:'Dashboard' },
+        stats: { ru:'Статистика', en:'Statistics' },
+        calendar: { ru:'Календарь КМ', en:'War Calendar' },
+        screenshots: { ru:'История КМ', en:'War History' },
+        roster: { ru:'Клан', en:'Clan' },
+        profile: { ru:'Профиль', en:'Profile' },
+        packs: { ru:'Рейд Паки', en:'Raid Packs' },
+        archive: { ru:'Архив', en:'Archive' },
+        settings: { ru:'Настройки', en:'Settings' },
+        users: { ru:'Пользователи', en:'Users' },
+        backup: { ru:'Бэкап данных', en:'Data Backup' }
+      };
+      var sectionLabels = {
+        ru: ['Аналитика','Управление','Система'],
+        en: ['Analytics','Management','System']
+      };
+      var modalText = {
+        ru: {
+          title:'Фоны вкладок',
+          note:'Загрузи отдельную обложку для каждого раздела или одну картинку сразу для всех.',
+          all:'Применить выбранную картинку ко всем',
+          reset:'Сбросить фоны',
+          save:'Сохранить',
+          upload:'Загрузить обложку',
+          current:'Текущая вкладка',
+          global:'Общий фон',
+          loaded:'Загружено',
+          pending:'Не сохранено',
+          empty:'По умолчанию',
+          toastSaved:'Сохранено',
+          toastReset:'Фоны сброшены'
+        },
+        en: {
+          title:'Tab Backgrounds',
+          note:'Upload a separate cover for each section or apply one image to every tab.',
+          all:'Apply selected image to all',
+          reset:'Reset backgrounds',
+          save:'Save',
+          upload:'Upload cover',
+          current:'Current tab',
+          global:'Global background',
+          loaded:'Uploaded',
+          pending:'Unsaved',
+          empty:'Default',
+          toastSaved:'Saved',
+          toastReset:'Backgrounds reset'
+        }
+      };
+      var staticText = {
+        ru: {
+          dashEyebrow:'⚜ command center',
+          dashTitle:'Дашборд',
+          alertsTitle:'Alerts & warnings',
+          alertsSub:'Критичные сигналы без визуального шума',
+          attentionTitle:'Обратить внимание',
+          attentionSub:'Тихие сигналы для оперативного контроля',
+          topValue:'Топ-5 ценных',
+          topValueSub:'Текущие лидеры по ценности',
+          growing:'Растут',
+          growingSub:'Ускоряют темп за последние КМ',
+          falling:'Падают',
+          fallingSub:'Сбавили темп — зона внимания',
+          rare:'Редкие таланты',
+          rareSub:'Ходят редко, но когда приходят — играют лучше многих',
+          scan:'Screenshot analysis',
+          scanSub:'Сводка по последним загруженным КМ',
+          cal:'Calendar',
+          calSub:'Ближайшие события war table',
+          timeline:'Activity timeline',
+          timelineSub:'Последние изменения по КМ',
+          shell:'Оболочка',
+          test:'▸ TEST'
+        },
+        en: {
+          dashEyebrow:'⚜ command center',
+          dashTitle:'Dashboard',
+          alertsTitle:'Alerts & warnings',
+          alertsSub:'Critical signals without visual noise',
+          attentionTitle:'Needs attention',
+          attentionSub:'Quiet signals for operational control',
+          topValue:'Top-5 valuable',
+          topValueSub:'Current value leaders',
+          growing:'Growing',
+          growingSub:'Accelerating over recent wars',
+          falling:'Declining',
+          fallingSub:'Slowing down, needs attention',
+          rare:'Rare talents',
+          rareSub:'Low attendance, high impact when present',
+          scan:'Screenshot analysis',
+          scanSub:'Summary of latest uploaded wars',
+          cal:'Calendar',
+          calSub:'Upcoming war table events',
+          timeline:'Activity timeline',
+          timelineSub:'Latest war activity',
+          shell:'Shell',
+          test:'▸ TEST'
+        }
+      };
+
+      function lang() {
+        return localStorage.getItem('cc_lang') === 'en' ? 'en' : 'ru';
+      }
+      function boolGlobal() {
+        return localStorage.getItem(KEY_USE_GLOBAL) === 'true' || localStorage.getItem(KEY_USE_GLOBAL) === '1';
+      }
+      function setText(el, text) {
+        if (el && text !== undefined) el.textContent = text;
+      }
+      function setNavButton(btn, text) {
+        if (!btn) return;
+        var textNode = Array.from(btn.childNodes).find(function(n){ return n.nodeType === 3; });
+        if (textNode) textNode.nodeValue = text;
+        else btn.appendChild(document.createTextNode(text));
+      }
+      function currentPage() {
+        var active = document.querySelector('.page-section.active');
+        return active ? active.id.replace(/^page-/,'') : ((location.hash || '#dashboard').slice(1) || 'dashboard');
+      }
+      function selectedBg(tabId) {
+        if (boolGlobal()) return localStorage.getItem(KEY_GLOBAL) || '';
+        return localStorage.getItem(KEY_TAB + tabId) || '';
+      }
+      function escapeAttr(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+      }
+      function applyStoredBackground(pid) {
+        var url = selectedBg(pid || currentPage());
+        var tag = document.getElementById('cceGlobalBgStyle');
+        if (!tag) {
+          tag = document.createElement('style');
+          tag.id = 'cceGlobalBgStyle';
+          document.head.appendChild(tag);
+        }
+        tag.textContent = url
+          ? 'body,body:not(.light){background-image:url("' + String(url).replace(/"/g,'\\"') + '") !important;background-size:cover !important;background-position:center center !important;background-attachment:fixed !important;}'
+          : '';
+      }
+      function renderExtraDashboard() {
+        var dates = Object.keys(window.appliedStatsByDate || {}).sort();
+        var last = dates[dates.length - 1];
+        var lastPlayers = last && window.appliedStatsByDate[last] && window.appliedStatsByDate[last].players ? window.appliedStatsByDate[last].players.length : 0;
+        var rosterCount = (window.roster || []).length;
+        var scanPct = rosterCount ? Math.min(100, Math.round((lastPlayers / rosterCount) * 100)) : 0;
+        var scan = document.getElementById('dashScanAnalysis');
+        if (scan) {
+          scan.innerHTML =
+            '<div class="scan"><div class="ring" style="--scan:'+scanPct+'%"><div><b>'+scanPct+'%</b><small>coverage</small></div></div>'
+            + '<div>'
+            + '<div class="mline"><span>Last scan</span><b>'+(last || '—')+'</b><div class="bar"><span style="--w:'+scanPct+'%"></span></div></div>'
+            + '<div class="mline"><span>Rows matched</span><b>'+lastPlayers+'/'+(rosterCount || '—')+'</b><div class="bar"><span style="--w:'+Math.min(100,lastPlayers*3)+'%"></span></div></div>'
+            + '<div class="mline"><span>KM snapshots</span><b>'+dates.length+'</b><div class="bar"><span style="--w:'+Math.min(100,dates.length*8)+'%"></span></div></div>'
+            + '</div></div>';
+        }
+        var cal = document.getElementById('dashMiniCalendar');
+        if (cal) {
+          var rows = [];
+          if (typeof window.getAllEventsForDate === 'function' && typeof window.localDateStr === 'function') {
+            for (var i=0; i<10 && rows.length<4; i++) {
+              var d = new Date(); d.setDate(d.getDate()+i);
+              var ds = window.localDateStr(d);
+              var evs = window.getAllEventsForDate(ds) || [];
+              evs.slice(0,2).forEach(function(ev){
+                rows.push({ icon:'▣', title: ev.title || 'Event', sub: ds + (ev.time ? ' · ' + ev.time : ''), tail: i === 0 ? 'today' : '+' + i + 'd' });
+              });
+            }
+          }
+          if (!rows.length) rows.push({ icon:'▣', title: lang()==='en'?'No events':'Нет событий', sub: lang()==='en'?'Calendar is empty':'Календарь пуст', tail:'—' });
+          cal.innerHTML = rows.map(function(r){
+            return '<div class="time"><span class="tico">'+r.icon+'</span><span><strong>'+r.title+'</strong><em>'+r.sub+'</em></span><em>'+r.tail+'</em></div>';
+          }).join('');
+        }
+        var timeline = document.getElementById('dashActivityTimeline');
+        if (timeline) {
+          var rows2 = dates.slice(-5).reverse().map(function(ds, idx){
+            var snap = window.appliedStatsByDate[ds] || {};
+            var cnt = snap.players ? snap.players.length : 0;
+            return { icon: idx === 0 ? '✦' : '•', title: ds, sub: cnt + ' players in snapshot', tail: idx === 0 ? 'latest' : '' };
+          });
+          if (!rows2.length) rows2.push({ icon:'•', title: lang()==='en'?'No KM data':'Нет данных КМ', sub: lang()==='en'?'Upload screenshots to start timeline':'Загрузи скриншоты для таймлайна', tail:'—' });
+          timeline.innerHTML = rows2.map(function(r){
+            return '<div class="time"><span class="tico">'+r.icon+'</span><span><strong>'+r.title+'</strong><em>'+r.sub+'</em></span><em>'+r.tail+'</em></div>';
+          }).join('');
+        }
+      }
+      function applyLang() {
+        var l = lang();
+        document.documentElement.lang = l;
+        Object.keys(pageLabels).forEach(function(id){
+          setNavButton(document.getElementById('nav-' + id), pageLabels[id][l]);
+        });
+        document.querySelectorAll('.sidebar.side .nav p').forEach(function(p, i){
+          setText(p, sectionLabels[l][i] || p.textContent);
+        });
+        var st = staticText[l];
+        setText(document.querySelector('#page-dashboard .eyebrow'), st.dashEyebrow);
+        setText(document.querySelector('#page-dashboard .head h1'), st.dashTitle);
+        var ph = document.querySelectorAll('#page-dashboard .ph');
+        [
+          [st.alertsTitle, st.alertsSub],
+          [st.attentionTitle, st.attentionSub],
+          [st.topValue, st.topValueSub],
+          [st.growing, st.growingSub],
+          [st.falling, st.fallingSub],
+          [st.rare, st.rareSub],
+          [st.scan, st.scanSub],
+          [st.cal, st.calSub],
+          [st.timeline, st.timelineSub]
+        ].forEach(function(pair, i){
+          var h = ph[i] && ph[i].querySelector('h3');
+          var p = ph[i] && ph[i].querySelector('p');
+          setText(h, pair[0]);
+          setText(p, pair[1]);
+        });
+        setText(document.getElementById('shellToggleBtn'), st.shell);
+        setText(document.getElementById('adminModeToggle'), st.test);
+        var modal = modalText[l];
+        setText(document.getElementById('ccTabBgTitle'), modal.title);
+        setText(document.querySelector('.cc-tab-bg-head p'), modal.note);
+        setText(document.querySelector('.cc-tab-check span'), modal.all);
+        setText(document.getElementById('ccTabBgReset'), modal.reset);
+        setText(document.getElementById('ccTabBgSave'), modal.save);
+        document.querySelectorAll('.cc-tab-upload-btn').forEach(function(b){ setText(b, modal.upload); });
+        var settingsBtn = document.querySelector('#topbar button[onclick*="settings"]');
+        if (settingsBtn) settingsBtn.title = l === 'en' ? 'Settings' : 'Настройки';
+        var pencil = document.getElementById('ccAdminBtn');
+        if (pencil) pencil.title = l === 'en' ? 'Tab backgrounds' : 'Фоны вкладок';
+        var logout = document.querySelector('#topbar button[onclick*="loginLogout"]');
+        if (logout) logout.title = l === 'en' ? 'Sign out' : 'Выйти';
+      }
+
+      function replaceModalApi() {
+        var fileInput = document.getElementById('ccTabBgFile');
+        var uploadTarget = null;
+        var pending = {};
+        function tabs() {
+          return Object.keys(pageLabels).filter(function(id){ return id !== 'backup'; }).map(function(id){
+            return { id:id, label:pageLabels[id][lang()] };
+          });
+        }
+        function status(tabId) {
+          var mt = modalText[lang()];
+          if (pending[tabId]) return mt.pending;
+          if (boolGlobal() && localStorage.getItem(KEY_GLOBAL)) return mt.global;
+          return localStorage.getItem(KEY_TAB + tabId) ? mt.loaded : mt.empty;
+        }
+        function renderRows() {
+          var box = document.getElementById('ccTabBgList');
+          if (!box) return;
+          var cur = currentPage();
+          var mt = modalText[lang()];
+          var applyAll = document.getElementById('ccTabApplyAll');
+          if (applyAll) applyAll.checked = boolGlobal();
+          box.innerHTML = tabs().map(function(tab){
+            var preview = pending[tab.id] || selectedBg(tab.id);
+            var bgStyle = preview ? 'background-image:url(&quot;'+escapeAttr(preview)+'&quot;)' : '';
+            var mark = tab.id === cur ? '<span>'+mt.current+'</span>' : '<span>'+status(tab.id)+'</span>';
+            return '<div class="cc-tab-bg-row'+(tab.id===cur?' is-current':'')+'">'
+              + '<div><strong>'+tab.label+'</strong>'+mark+'</div>'
+              + '<div class="cc-tab-bg-preview" style="'+bgStyle+'"></div>'
+              + '<button class="cc-tab-upload-btn" type="button" data-upload-tab="'+tab.id+'">'+mt.upload+'</button>'
+              + '</div>';
+          }).join('');
+        }
+        function toast(text) {
+          var t = document.getElementById('ccTabBgToast');
+          if (!t) return;
+          t.textContent = text;
+          t.classList.add('show');
+          clearTimeout(window._ccFinalToastTimer);
+          window._ccFinalToastTimer = setTimeout(function(){ t.classList.remove('show'); }, 1600);
+        }
+        function open() {
+          document.body.classList.remove('light');
+          localStorage.setItem('cc_theme','dark');
+          applyLang();
+          renderRows();
+          var m = document.getElementById('ccTabBgModal');
+          if (m) {
+            m.classList.add('open');
+            m.setAttribute('aria-hidden','false');
+          }
+        }
+        function close() {
+          var m = document.getElementById('ccTabBgModal');
+          if (m) {
+            m.classList.remove('open');
+            m.setAttribute('aria-hidden','true');
+          }
+        }
+        function compress(file) {
+          return new Promise(function(resolve){
+            var reader = new FileReader();
+            reader.onload = function(){
+              var img = new Image();
+              img.onload = function(){
+                var max = 1800, w = img.naturalWidth, h = img.naturalHeight;
+                if (w > max) { h = Math.round(h * max / w); w = max; }
+                var c = document.createElement('canvas');
+                c.width = w; c.height = h;
+                c.getContext('2d').drawImage(img, 0, 0, w, h);
+                try { resolve(c.toDataURL('image/webp', 0.82)); }
+                catch(e) { resolve(reader.result); }
+              };
+              img.onerror = function(){ resolve(reader.result); };
+              img.src = reader.result;
+            };
+            reader.readAsDataURL(file);
+          });
+        }
+        function save() {
+          var applyAll = document.getElementById('ccTabApplyAll');
+          var useAll = !!(applyAll && applyAll.checked);
+          var last = null;
+          Object.keys(pending).forEach(function(k){ if (pending[k]) last = pending[k]; });
+          if (useAll) {
+            if (last) localStorage.setItem(KEY_GLOBAL, last);
+            if (localStorage.getItem(KEY_GLOBAL)) localStorage.setItem(KEY_USE_GLOBAL, 'true');
+          } else {
+            localStorage.setItem(KEY_USE_GLOBAL, 'false');
+            Object.keys(pending).forEach(function(k){ localStorage.setItem(KEY_TAB + k, pending[k]); });
+          }
+          pending = {};
+          applyStoredBackground(currentPage());
+          close();
+          toast(modalText[lang()].toastSaved);
+        }
+        function reset() {
+          tabs().forEach(function(t){ localStorage.removeItem(KEY_TAB + t.id); });
+          localStorage.removeItem(KEY_GLOBAL);
+          localStorage.setItem(KEY_USE_GLOBAL, 'false');
+          pending = {};
+          applyStoredBackground(currentPage());
+          renderRows();
+          toast(modalText[lang()].toastReset);
+        }
+        window._ccTabBg = { open:open, close:close, render:renderRows, apply:applyStoredBackground };
+        window.cveToggle = open;
+        var closeBtn = document.getElementById('ccTabBgClose');
+        if (closeBtn && !closeBtn.dataset.finalLock) {
+          closeBtn.dataset.finalLock = '1';
+          closeBtn.addEventListener('click', close);
+        }
+        var saveBtn = document.getElementById('ccTabBgSave');
+        if (saveBtn && !saveBtn.dataset.finalLock) {
+          saveBtn.dataset.finalLock = '1';
+          saveBtn.addEventListener('click', function(e){ e.preventDefault(); e.stopImmediatePropagation(); save(); }, true);
+        }
+        var resetBtn = document.getElementById('ccTabBgReset');
+        if (resetBtn && !resetBtn.dataset.finalLock) {
+          resetBtn.dataset.finalLock = '1';
+          resetBtn.addEventListener('click', function(e){ e.preventDefault(); e.stopImmediatePropagation(); reset(); }, true);
+        }
+        if (fileInput && !fileInput.dataset.finalLock) {
+          fileInput.dataset.finalLock = '1';
+          fileInput.addEventListener('change', function(){
+            var file = fileInput.files && fileInput.files[0];
+            if (!file || !uploadTarget) return;
+            compress(file).then(function(data){
+              pending[uploadTarget] = data;
+              if (uploadTarget === currentPage()) applyStoredBackground(uploadTarget);
+              var tag = document.getElementById('cceGlobalBgStyle');
+              if (uploadTarget === currentPage() && tag) {
+                tag.textContent = 'body,body:not(.light){background-image:url("'+String(data).replace(/"/g,'\\"')+'") !important;background-size:cover !important;background-position:center center !important;background-attachment:fixed !important;}';
+              }
+              fileInput.value = '';
+              renderRows();
+            });
+          }, true);
+        }
+        document.addEventListener('click', function(e){
+          var btn = e.target.closest('[data-upload-tab]');
+          if (!btn) return;
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          uploadTarget = btn.dataset.uploadTab;
+          if (fileInput) {
+            fileInput.value = '';
+            fileInput.click();
+          }
+        }, true);
+        var modal = document.getElementById('ccTabBgModal');
+        if (modal && !modal.dataset.finalLock) {
+          modal.dataset.finalLock = '1';
+          modal.addEventListener('click', function(e){ if (e.target === modal) close(); });
+        }
+      }
+
+      function patchFunctions() {
+        document.body.classList.remove('light');
+        localStorage.setItem('cc_theme','dark');
+        window.setTheme = function(){ document.body.classList.remove('light'); localStorage.setItem('cc_theme','dark'); };
+        window.toggleTheme = window.setTheme;
+        var theme = document.getElementById('themeToggle');
+        if (theme) theme.setAttribute('aria-hidden','true');
+
+        if (typeof window.showPage === 'function' && !window._v20FinalShowPage) {
+          var origShow = window.showPage;
+          window._v20FinalShowPage = origShow;
+          window.showPage = function(pid) {
+            var ret = origShow.apply(this, arguments);
+            document.body.classList.remove('light');
+            applyStoredBackground(pid || currentPage());
+            setTimeout(function(){ renderExtraDashboard(); applyLang(); }, 40);
+            return ret;
+          };
+        }
+        var oldSetLang = window.setLang;
+        window.setLang = function(l) {
+          l = l === 'en' ? 'en' : 'ru';
+          localStorage.setItem('cc_lang', l);
+          if (typeof oldSetLang === 'function') {
+            try { oldSetLang(l); } catch(e) {}
+          }
+          localStorage.setItem('cc_lang', l);
+          if (typeof window.syncFlipToggle === 'function') {
+            try { window.syncFlipToggle(['langToggle','loginLangToggle'], l === 'en'); } catch(e) {}
+          }
+          applyLang();
+          renderExtraDashboard();
+          if (window._ccTabBg && typeof window._ccTabBg.render === 'function') window._ccTabBg.render();
+        };
+        window.toggleLang = function() {
+          window.setLang(lang() === 'ru' ? 'en' : 'ru');
+        };
+      }
+
+      function init() {
+        patchFunctions();
+        replaceModalApi();
+        applyStoredBackground(currentPage());
+        applyLang();
+        renderExtraDashboard();
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function(){ setTimeout(init, 80); });
+      } else {
+        setTimeout(init, 80);
+      }
+      setTimeout(init, 500);
     })();
     </script>
 </body>
