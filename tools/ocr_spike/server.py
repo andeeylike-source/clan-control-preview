@@ -25,7 +25,8 @@ TMP_DIR.mkdir(exist_ok=True)
 _CORS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+    "Access-Control-Max-Age": "86400",
 }
 
 
@@ -166,6 +167,7 @@ class _Handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):  # noqa: N802
         self.send_response(204)
         self._cors()
+        self.send_header("Content-Length", "0")
         self.end_headers()
 
     def do_GET(self):  # noqa: N802
