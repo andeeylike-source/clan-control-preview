@@ -19842,25 +19842,15 @@ window._archRender = function() {
         z-index: 0;
         pointer-events: none;
         overflow: hidden;
-        transform: none;
+        transform: none !important;
         transform-origin: 50% 50%;
-        animation: ccBgCinematicMotion 32s ease-in-out infinite alternate;
-        will-change: transform;
+        animation: none !important;
+        will-change: auto;
         background: transparent;
         background-size: cover;
         background-position: center center;
         filter: none;
         opacity: 1;
-      }
-      @keyframes ccBgCinematicMotion {
-        from { transform: scale(1.02) translate3d(-1%, -.6%, 0); }
-        to { transform: scale(1.055) translate3d(1%, .8%, 0); }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        body:not(.light) .cc-v20-bg-layer {
-          animation: none !important;
-          transform: none !important;
-        }
       }
       body:not(.light) .cc-v20-bg-layer::before {
         content: "";
@@ -19882,6 +19872,61 @@ window._archRender = function() {
         display: block;
         background:
           linear-gradient(180deg, rgba(32,18,7,.08), rgba(0,0,0,.14)) !important;
+      }
+      body:not(.light) .cc-v20-fireflies {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        mix-blend-mode: screen;
+        opacity: .58;
+        background:
+          radial-gradient(circle at 12% 18%, rgba(255,216,130,.42) 0 1px, rgba(255,216,130,.18) 2px, transparent 9px),
+          radial-gradient(circle at 22% 72%, rgba(255,205,116,.30) 0 1px, rgba(255,205,116,.12) 2px, transparent 8px),
+          radial-gradient(circle at 34% 34%, rgba(185,205,255,.22) 0 1px, rgba(185,205,255,.08) 2px, transparent 7px),
+          radial-gradient(circle at 48% 16%, rgba(255,230,160,.28) 0 1px, rgba(255,230,160,.10) 2px, transparent 8px),
+          radial-gradient(circle at 58% 58%, rgba(255,216,130,.32) 0 1px, rgba(255,216,130,.12) 2px, transparent 9px),
+          radial-gradient(circle at 72% 28%, rgba(255,205,116,.36) 0 1px, rgba(255,205,116,.12) 2px, transparent 10px),
+          radial-gradient(circle at 82% 78%, rgba(185,205,255,.18) 0 1px, rgba(185,205,255,.07) 2px, transparent 7px),
+          radial-gradient(circle at 92% 42%, rgba(255,226,150,.28) 0 1px, rgba(255,226,150,.10) 2px, transparent 8px);
+        filter: drop-shadow(0 0 7px rgba(255,206,112,.26));
+        animation: ccFireflyFlicker 8s ease-in-out infinite alternate;
+      }
+      body:not(.light) .cc-v20-fireflies::before,
+      body:not(.light) .cc-v20-fireflies::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(circle at 18% 46%, rgba(255,216,130,.22) 0 1px, transparent 7px),
+          radial-gradient(circle at 39% 82%, rgba(255,238,176,.24) 0 1px, transparent 8px),
+          radial-gradient(circle at 66% 12%, rgba(255,216,130,.20) 0 1px, transparent 7px),
+          radial-gradient(circle at 76% 64%, rgba(190,205,255,.14) 0 1px, transparent 6px),
+          radial-gradient(circle at 88% 20%, rgba(255,226,150,.20) 0 1px, transparent 7px);
+        opacity: .62;
+        animation: ccFireflyFlicker 11s ease-in-out infinite alternate-reverse;
+      }
+      body:not(.light) .cc-v20-fireflies::after {
+        background:
+          radial-gradient(circle at 8% 88%, rgba(255,216,130,.18) 0 1px, transparent 6px),
+          radial-gradient(circle at 28% 12%, rgba(190,205,255,.13) 0 1px, transparent 6px),
+          radial-gradient(circle at 52% 74%, rgba(255,238,176,.20) 0 1px, transparent 7px),
+          radial-gradient(circle at 69% 48%, rgba(255,216,130,.18) 0 1px, transparent 7px),
+          radial-gradient(circle at 96% 86%, rgba(255,226,150,.18) 0 1px, transparent 6px);
+        opacity: .48;
+        animation-duration: 13s;
+      }
+      @keyframes ccFireflyFlicker {
+        from { opacity: .42; }
+        to { opacity: .66; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        body:not(.light) .cc-v20-fireflies,
+        body:not(.light) .cc-v20-fireflies::before,
+        body:not(.light) .cc-v20-fireflies::after {
+          animation: none !important;
+        }
       }
       body:not(.light) .cc-v20-noise {
         position: fixed;
@@ -20067,6 +20112,11 @@ window._archRender = function() {
           var bg = document.createElement('div');
           bg.className = 'cc-v20-bg-layer';
           document.body.insertBefore(bg, document.body.firstChild);
+        }
+        if (!document.querySelector('.cc-v20-fireflies')) {
+          var fireflies = document.createElement('div');
+          fireflies.className = 'cc-v20-fireflies';
+          document.body.insertBefore(fireflies, document.body.firstChild.nextSibling);
         }
         if (!document.querySelector('.cc-v20-noise')) {
           var noise = document.createElement('div');
