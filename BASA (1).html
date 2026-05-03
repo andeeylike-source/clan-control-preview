@@ -3566,7 +3566,48 @@
         <!-- НАСТРОЙКИ -->
         <section id="page-settings" class="page-section">
             <h1 class="text-3xl font-bold mb-8">⚙️ Настройки</h1>
-            <div class="card mb-6">
+            <div class="cc-settings-v20-top">
+                <div class="card cc-settings-overview-card">
+                    <div class="ph">
+                        <div>
+                            <h3>Интеграции</h3>
+                            <p>API / webhooks</p>
+                        </div>
+                    </div>
+                    <div class="body">
+                        <p class="ml"><span>Discord Bot</span><span class="pill green">Connected</span></p>
+                        <p class="ml"><span>Google Drive</span><span class="pill gold">Connect</span></p>
+                        <p class="ml"><span>Slack</span><span class="pill gold">Connect</span></p>
+                    </div>
+                </div>
+                <div class="card cc-settings-overview-card">
+                    <div class="ph">
+                        <div>
+                            <h3>Интерфейс</h3>
+                            <p>Фон и motion</p>
+                        </div>
+                    </div>
+                    <div class="body">
+                        <p class="ml"><span>Compact mode</span><span class="pill green">ON</span></p>
+                        <p class="ml"><span>Glass strength</span><span class="pill blue">Medium</span></p>
+                        <p class="ml"><span>Animated transitions</span><span class="pill green">ON</span></p>
+                    </div>
+                </div>
+                <div class="card cc-settings-overview-card">
+                    <div class="ph">
+                        <div>
+                            <h3>Бэкапы</h3>
+                            <p>Data safety</p>
+                        </div>
+                    </div>
+                    <div class="body">
+                        <p class="ml"><span>Last backup</span><b class="up">Success</b></p>
+                        <p class="ml"><span>Frequency</span><span class="pill">Daily</span></p>
+                        <button onclick="exportData()" class="btn gold" style="width:100%">Backup Now</button>
+                    </div>
+                </div>
+            </div>
+            <div class="card mb-6 cc-settings-api">
                 <h2 class="text-lg font-bold mb-2">🔑 API ключи</h2>
                 <p class="text-slate-500 text-sm mb-6">Ключи хранятся только в твоём браузере — не в коде и не на GitHub. Получить ключ: <a href="https://openrouter.ai/keys" target="_blank" style="color:#6366f1">openrouter.ai/keys</a> (бесплатно, модель gemini-2.0-flash-lite)</p>
                 <div id="apiKeysList" class="space-y-3 mb-4"></div>
@@ -3578,7 +3619,7 @@
                 </div>
                 <div id="apiKeyStatus" style="display:none;margin-top:12px;font-size:13px;padding:10px;border-radius:8px"></div>
             </div>
-            <div class="card mb-6">
+            <div class="card mb-6 cc-settings-provider">
                 <h2 class="text-lg font-bold mb-2">Провайдер анализа</h2>
                 <p class="text-slate-500 text-sm mb-4">Gemini/OpenRouter остаётся основным потоком. OCR.space использует локальный proxy.</p>
                 <div style="display:grid;gap:12px">
@@ -3602,7 +3643,7 @@
                     <div id="analysisProviderStatus" style="display:none;font-size:13px;padding:10px;border-radius:8px"></div>
                 </div>
             </div>
-            <div class="card mb-6">
+            <div class="card mb-6 cc-settings-aliases">
                 <div onclick="(function(el){var b=document.getElementById('aliasesBody');var open=b.style.display!=='none';b.style.display=open?'none':'block';el.querySelector('.aliases-arr').textContent=open?'▼':'▲'})(this)" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none">
                     <h2 class="text-lg font-bold">🔗 Алиасы ников</h2>
                     <span class="aliases-arr" style="color:#475569;font-size:12px;padding:2px 6px">▼</span>
@@ -3613,12 +3654,12 @@
                     <button onclick="addAliasRow()" style="background:none;border:1px dashed #2d3748;color:#64748b;border-radius:10px;padding:10px;width:100%;cursor:pointer;font-size:13px;transition:all .2s" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#64748b'">+ Добавить алиас</button>
                 </div>
             </div>
-                        <div class="card mb-6">
+                        <div class="card mb-6 cc-settings-weights">
                 <h2 class="text-lg font-bold mb-2">⚖️ Веса ценности</h2>
                 <p class="text-slate-500 text-sm mb-4">Настрой формулу расчёта "ценности" для каждой роли. Сумма весов должна быть 100%.</p>
                 <div id="valueWeightsConfig"></div>
             </div>
-            <div class="card mb-6">
+            <div class="card mb-6 cc-settings-notify">
                 <h2 class="text-lg font-bold mb-2">🔔 Уведомления</h2>
                 <p class="text-slate-500 text-sm mb-4">Настройки уведомления при завершении анализа скриншотов.</p>
                 <div class="flex flex-col gap-3">
@@ -3632,7 +3673,7 @@
                     </label>
                 </div>
             </div>
-            <div class="card">
+            <div class="card cc-settings-export">
                 <h2 class="text-lg font-bold mb-2">💾 Экспорт / Импорт данных</h2>
                 <p class="text-slate-500 text-sm mb-4">Сохраняй данные в файл и загружай обратно. Удобно для резервного копирования и переноса.</p>
                 <div class="flex gap-3 flex-wrap">
@@ -3644,7 +3685,7 @@
                 </div>
                 <div id="importStatus" style="display:none;margin-top:12px;font-size:13px;padding:10px;border-radius:8px"></div>
             </div>
-            <div class="card">
+            <div class="card cc-settings-data">
                 <h2 class="text-lg font-bold mb-2">🗑️ Данные</h2>
                 <p class="text-slate-500 text-sm mb-4">Сбросить все данные приложения (ростер, статистика, события). Ключи сохранятся.</p>
                 <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -18635,7 +18676,6 @@ window._archRender = function() {
         color: rgba(247,242,232,.78) !important;
         border-top-color: rgba(255,255,255,.07) !important;
       }
-      body:not(.light) #page-settings > div,
       body:not(.light) #page-settings .card,
       body:not(.light) #page-settings [style*="background:#12171f"],
       body:not(.light) #page-settings [style*="background: #12171f"],
@@ -18662,41 +18702,126 @@ window._archRender = function() {
         border-radius: 12px !important;
         border-color: rgba(255,255,255,.12) !important;
       }
-      body:not(.light) #page-settings .v20-page-body,
-      body:not(.light) #page-settings:not(.v20-grafted) {
-        width: min(1120px, 100%) !important;
-        margin: 0 auto !important;
-      }
       body:not(.light) #page-settings .v20-page-body {
         display: grid !important;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-        gap: 18px !important;
+        grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+        gap: 14px !important;
         align-items: start !important;
-      }
-      body:not(.light) #page-settings .v20-page-body > .card,
-      body:not(.light) #page-settings:not(.v20-grafted) > .card {
+        width: 100% !important;
         margin: 0 !important;
-        padding: 22px !important;
-        min-width: 0 !important;
       }
-      body:not(.light) #page-settings .v20-page-body > .card:nth-of-type(1),
-      body:not(.light) #page-settings .v20-page-body > .card:nth-of-type(4),
-      body:not(.light) #page-settings .v20-page-body > .card:nth-of-type(n+5),
-      body:not(.light) #page-settings:not(.v20-grafted) > .card:nth-of-type(1),
-      body:not(.light) #page-settings:not(.v20-grafted) > .card:nth-of-type(4),
-      body:not(.light) #page-settings:not(.v20-grafted) > .card:nth-of-type(n+5) {
+      body:not(.light) #page-settings .cc-settings-head-save {
+        height: 40px !important;
+        min-width: 104px !important;
+        border: 1px solid rgba(255,216,113,.28) !important;
+        border-radius: 13px !important;
+        background: linear-gradient(135deg, #ffd978, #b9822e) !important;
+        color: #241807 !important;
+        font-size: 13px !important;
+        font-weight: 850 !important;
+      }
+      body:not(.light) #page-settings .cc-settings-v20-top {
         grid-column: 1 / -1 !important;
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 14px !important;
+        width: 100% !important;
+      }
+      body:not(.light) #page-settings .v20-page-body > .card {
+        margin: 0 !important;
+        padding: 20px !important;
+        min-width: 0 !important;
+        grid-column: span 4 !important;
+      }
+      body:not(.light) #page-settings .cc-settings-api,
+      body:not(.light) #page-settings .cc-settings-weights {
+        grid-column: 1 / -1 !important;
+      }
+      body:not(.light) #page-settings .cc-settings-provider,
+      body:not(.light) #page-settings .cc-settings-aliases {
+        grid-column: span 6 !important;
+      }
+      body:not(.light) #page-settings .cc-settings-overview-card {
+        padding: 0 !important;
+        min-height: 164px !important;
+      }
+      body:not(.light) #page-settings .ph {
+        display: flex !important;
+        justify-content: space-between !important;
+        gap: 10px !important;
+        padding: 16px 16px 10px !important;
+        border-bottom: 1px solid rgba(255,255,255,.07) !important;
+      }
+      body:not(.light) #page-settings .ph h3 {
+        margin: 0 !important;
+        color: #f5e3b7 !important;
+        font-family: Georgia, "Times New Roman", serif !important;
+        text-transform: uppercase !important;
+        font-size: 16px !important;
+        line-height: 1.1 !important;
+        letter-spacing: .035em !important;
+      }
+      body:not(.light) #page-settings .ph p {
+        margin: 3px 0 0 !important;
+        color: rgba(247,242,232,.50) !important;
+        font-size: 12px !important;
+        line-height: 1.3 !important;
+      }
+      body:not(.light) #page-settings .body {
+        padding: 14px 16px 16px !important;
+      }
+      body:not(.light) #page-settings .ml {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        gap: 10px !important;
+        margin: 0 !important;
+        padding: 4px 0 !important;
+        color: rgba(247,242,232,.62) !important;
+        font-size: 13px !important;
+        line-height: 1.35 !important;
+      }
+      body:not(.light) #page-settings .pill {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-width: 48px !important;
+        padding: 5px 9px !important;
+        border-radius: 999px !important;
+        background: rgba(255,255,255,.07) !important;
+        border: 1px solid rgba(255,255,255,.10) !important;
+        color: rgba(247,242,232,.78) !important;
+        font-size: 10px !important;
+        font-weight: 950 !important;
+        text-transform: uppercase !important;
+        line-height: 1 !important;
+      }
+      body:not(.light) #page-settings .pill.gold {
+        color: #ffd978 !important;
+        border-color: rgba(255,207,107,.25) !important;
+        background: rgba(255,207,107,.09) !important;
+      }
+      body:not(.light) #page-settings .pill.green {
+        color: #9dffbd !important;
+        border-color: rgba(48,219,118,.22) !important;
+        background: rgba(48,219,118,.09) !important;
+      }
+      body:not(.light) #page-settings .pill.blue {
+        color: #bdd0ff !important;
+        border-color: rgba(95,140,255,.26) !important;
+        background: rgba(95,140,255,.10) !important;
       }
       body:not(.light) #page-settings h2 {
         margin: 0 0 8px !important;
-        color: #fff8e8 !important;
-        font-size: 15px !important;
-        line-height: 1.2 !important;
+        color: #f5e3b7 !important;
+        font-family: Georgia, "Times New Roman", serif !important;
+        text-transform: uppercase !important;
+        font-size: 16px !important;
+        line-height: 1.12 !important;
         font-weight: 850 !important;
-        letter-spacing: .01em !important;
+        letter-spacing: .035em !important;
       }
       body:not(.light) #page-settings p {
-        max-width: 760px !important;
         color: rgba(226,232,240,.62) !important;
         line-height: 1.55 !important;
       }
@@ -18746,12 +18871,17 @@ window._archRender = function() {
         background: rgba(255,255,255,.055) !important;
         color: rgba(247,242,232,.82) !important;
       }
+      body:not(.light) #page-settings .btn {
+        height: 40px !important;
+        border-radius: 13px !important;
+      }
+      body:not(.light) #page-settings .btn.gold,
       body:not(.light) #page-settings .btn-primary,
       body:not(.light) #page-settings button[onclick*="save"],
       body:not(.light) #page-settings button[onclick*="add"] {
         border-color: rgba(232,190,88,.34) !important;
-        background: linear-gradient(180deg, rgba(232,190,88,.24), rgba(147,97,29,.24)) !important;
-        color: #ffe6a7 !important;
+        background: linear-gradient(135deg, #ffd978, #b9822e) !important;
+        color: #241807 !important;
         box-shadow: inset 0 1px rgba(255,255,255,.12), 0 8px 22px rgba(0,0,0,.18) !important;
       }
       body:not(.light) #page-settings button[onclick*="clearStorage"],
@@ -18867,18 +18997,22 @@ window._archRender = function() {
         line-height: 1.45 !important;
       }
       @media (max-width: 980px) {
-        body:not(.light) #page-settings .v20-page-body {
+        body:not(.light) #page-settings .v20-page-body,
+        body:not(.light) #page-settings .cc-settings-v20-top {
           grid-template-columns: 1fr !important;
         }
         body:not(.light) #page-settings .v20-page-body > .card,
-        body:not(.light) #page-settings:not(.v20-grafted) > .card {
+        body:not(.light) #page-settings .cc-settings-provider,
+        body:not(.light) #page-settings .cc-settings-aliases {
           grid-column: 1 / -1 !important;
         }
       }
       @media (max-width: 640px) {
-        body:not(.light) #page-settings .v20-page-body > .card,
-        body:not(.light) #page-settings:not(.v20-grafted) > .card {
+        body:not(.light) #page-settings .v20-page-body > .card {
           padding: 16px !important;
+        }
+        body:not(.light) #page-settings .cc-settings-overview-card {
+          padding: 0 !important;
         }
         body:not(.light) #aliasesList > div {
           grid-template-columns: minmax(0, 1fr) auto !important;
@@ -19950,7 +20084,7 @@ window._archRender = function() {
         if (id !== 'calendar') {
           var head = document.createElement('div');
           head.className = 'v20-page-head head';
-          head.innerHTML = '<div><span class="eyebrow" data-v20-eyebrow></span><h1 data-v20-title></h1><p class="sub" data-v20-sub></p></div>';
+          head.innerHTML = '<div><span class="eyebrow" data-v20-eyebrow></span><h1 data-v20-title></h1><p class="sub" data-v20-sub></p></div>' + (id === 'settings' ? '<button class="btn gold cc-settings-head-save" type="button" data-v20-settings-save onclick="if(window.saveApiKeys)saveApiKeys();if(window.saveAnalysisProviderSettings)saveAnalysisProviderSettings();if(window.saveNotifySettings)saveNotifySettings();">Сохранить</button>' : '');
           var body = document.createElement('div');
           body.className = 'v20-page-body';
           while (sec.firstChild) body.appendChild(sec.firstChild);
@@ -19973,6 +20107,8 @@ window._archRender = function() {
           if (sub) sub.textContent = lang() === 'en'
             ? 'Operational tools preserved from BASA, presented inside the v20 command shell.'
             : 'Рабочие инструменты BASA сохранены внутри командной оболочки v20.';
+          var save = sec.querySelector('[data-v20-settings-save]');
+          if (save) save.textContent = lang() === 'en' ? 'Save' : 'Сохранить';
         });
       }
       function init(){
