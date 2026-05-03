@@ -8417,6 +8417,33 @@ function getClass2IconByClass3(c3) {
             }
         }
 
+        async function _tryLocalPaddleOcr(cropBase64, filename) {
+            try {
+                const hc = await fetch('http://localhost:5050/health', { signal: AbortSignal.timeout(2000) });
+                if (!hc.ok) { console.warn('[local-ocr] /health not ok'); return null; }
+            } catch {
+                console.warn('[local-ocr] server unavailable');
+                return null;
+            }
+            try {
+                const known_names = roster.map(r => r.name);
+                const aliases = Object.assign({}, nickAliases);
+                const resp = await fetch('http://localhost:5050/ocr', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                    body: JSON.stringify({ base64: cropBase64, filename, known_names, aliases }),
+                    signal: AbortSignal.timeout(90000),
+                });
+                const json = await resp.json();
+                if (!json.ok || !Array.isArray(json.parsed)) return null;
+                console.info('[local-ocr] rows:', json.parsed.length, '| timing_ms:', json.timing_ms, '| cached:', json.cached);
+                return json.parsed;
+            } catch(e) {
+                console.warn('[local-ocr] OCR request failed:', e.message || e);
+                return null;
+            }
+        }
+
         async function analyzeWithOcrSpaceProvider({ dateStr, shots }) {
             const btn = document.getElementById('analyzeBtn');
             if (btn) {
@@ -8449,7 +8476,6 @@ function getClass2IconByClass3(c3) {
             let firstError = null;
 
             try {
-                const apiUrl = _ccOcrValidateProxyUrl();
                 for (let i = 0; i < shots.length; i++) {
                     const shot = shots[i];
                     try {
@@ -8460,32 +8486,46 @@ function getClass2IconByClass3(c3) {
                         const img = await _ccOcrLoadImage(shot.dataUrl);
                         const crop = _ccOcrPreprocessCrop(img);
                         console.debug('[ocrspace] crop geometry', crop.geometry);
-                        const blob = await _ccOcrCanvasToBlob(crop.processedCanvas);
-                        const form = new FormData();
-                        form.append('file', blob, 'clan_control_crop_processed.png');
 
-                        const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 60000);
-                        let response, json;
-                        try {
-                            response = await fetch(apiUrl, { method: 'POST', body: form, signal: controller.signal });
-                            const responseText = await response.text();
-                            try {
-                                json = JSON.parse(responseText);
-                            } catch(e) {
-                                throw new Error(`OCR.space proxy returned non-JSON response: HTTP ${response.status}`);
-                            }
-                        } finally {
-                            clearTimeout(timeoutId);
+                        // local PaddleOCR — first provider
+                        let players = [];
+                        const _localResult = await _tryLocalPaddleOcr(
+                            crop.processedCanvas.toDataURL('image/png'),
+                            (shot.name || ('shot_' + (i + 1))) + '.png'
+                        );
+                        if (_localResult && _localResult.length > 0) {
+                            console.info('[local-ocr] using local result for shot', i + 1, '—', _localResult.length, 'rows');
+                            _localResult.forEach(row => { const n = _ccOcrNormalizeRow(row); if (n) players.push(n); });
                         }
-                        if (!response.ok || json.error || json.ok === false) throw new Error(json.error || `HTTP ${response.status}`);
-                        console.debug('[ocrspace] raw response', json);
-                        const rows = json.finalParsed || json.parsed || [];
-                        const players = [];
-                        rows.forEach(row => {
-                            const normalized = _ccOcrNormalizeRow(row);
-                            if (normalized) players.push(normalized);
-                        });
+
+                        if (!players.length) {
+                            // fallback: OCR.space proxy
+                            console.warn('[local-ocr] fallback -> OCR.space proxy for shot', i + 1);
+                            const apiUrl = _ccOcrValidateProxyUrl();
+                            const blob = await _ccOcrCanvasToBlob(crop.processedCanvas);
+                            const form = new FormData();
+                            form.append('file', blob, 'clan_control_crop_processed.png');
+
+                            const controller = new AbortController();
+                            const timeoutId = setTimeout(() => controller.abort(), 60000);
+                            let response, json;
+                            try {
+                                response = await fetch(apiUrl, { method: 'POST', body: form, signal: controller.signal });
+                                const responseText = await response.text();
+                                try {
+                                    json = JSON.parse(responseText);
+                                } catch(e) {
+                                    throw new Error(`OCR.space proxy returned non-JSON response: HTTP ${response.status}`);
+                                }
+                            } finally {
+                                clearTimeout(timeoutId);
+                            }
+                            if (!response.ok || json.error || json.ok === false) throw new Error(json.error || `HTTP ${response.status}`);
+                            console.debug('[ocrspace] raw response', json);
+                            const rows = json.finalParsed || json.parsed || [];
+                            rows.forEach(row => { const n = _ccOcrNormalizeRow(row); if (n) players.push(n); });
+                        }
+
                         if (!players.length) {
                             skippedScreenshots.push({ num: i + 1, reason: 'OCR.space не вернул игроков' });
                             continue;
