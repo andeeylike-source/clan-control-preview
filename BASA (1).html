@@ -3161,10 +3161,15 @@
         <button class="chip icon-chip danger" onclick="loginLogout()" title="Выйти">⏻</button>
     </div>
     <div class="cc-glass-popover" id="glassDimPopover" aria-hidden="true">
-        <label for="glassDimRange">Стекло — матовость и тонировка</label>
+        <label for="glassBlurRange">Матовость</label>
         <div class="cc-glass-row">
-            <input id="glassDimRange" type="range" min="0" max="100" step="1" value="40" aria-label="Матовость и тонировка стекла">
-            <span id="glassDimValue">40%</span>
+            <input id="glassBlurRange" type="range" min="0" max="20" step="1" value="4" aria-label="Матовость стекла">
+            <span id="glassBlurValue">4px</span>
+        </div>
+        <label for="glassTintRange">Тонировка</label>
+        <div class="cc-glass-row">
+            <input id="glassTintRange" type="range" min="0" max="80" step="1" value="34" aria-label="Тонировка стекла">
+            <span id="glassTintValue">34%</span>
         </div>
         <button id="glassDimReset" type="button">Сброс</button>
     </div>
@@ -17487,7 +17492,7 @@ window._archRender = function() {
       align-items: center !important;
       justify-content: space-between !important;
       gap: 12px !important;
-      background: linear-gradient(180deg, rgba(9,9,10,var(--cc-topbar-dim)), rgba(9,9,10,var(--cc-glass-dim))) !important;
+      background: linear-gradient(180deg, rgba(9,9,10,var(--cc-topbar-dim)), rgba(9,9,10,var(--cc-glass-tint))) !important;
       border-bottom: 1px solid rgba(255,255,255,.07) !important;
       backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
       -webkit-backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
@@ -18530,18 +18535,21 @@ window._archRender = function() {
     <style id="v20-targeted-ui-fixes">
       /* Targeted v20 visual fixes only: shell transparency, stats/settings panels, roster role badges. */
       :root {
-        --cc-glass-dim: .25;
-        --cc-card-dim: .31;
-        --cc-panel-dim: .29;
-        --cc-sidebar-dim: .31;
-        --cc-sidebar-deep-dim: .38;
-        --cc-topbar-dim: .33;
+        --cc-glass-tint: .34;
+        --cc-card-tint: .44;
+        --cc-panel-tint: .40;
+        --cc-glass-dim: var(--cc-glass-tint);
+        --cc-card-dim: var(--cc-card-tint);
+        --cc-panel-dim: var(--cc-panel-tint);
+        --cc-sidebar-dim: .42;
+        --cc-sidebar-deep-dim: .48;
+        --cc-topbar-dim: .44;
         --cc-glass-blur: 4px;
         --cc-glass-sat: 1.15;
       }
       body:not(.light) .main-content.surface {
         border-color: rgba(255,255,255,.18) !important;
-        background: linear-gradient(180deg, rgba(5,7,10,var(--cc-panel-dim)), rgba(5,7,10,var(--cc-glass-dim))) !important;
+        background: linear-gradient(180deg, rgba(5,7,10,var(--cc-panel-tint)), rgba(5,7,10,var(--cc-glass-tint))) !important;
         box-shadow:
           0 24px 90px rgba(0,0,0,.36),
           inset 0 1px rgba(255,255,255,.10),
@@ -18564,7 +18572,7 @@ window._archRender = function() {
       body:not(.light) .calendar-side-card,
       body:not(.light) .calendar-summary-card {
         border-color: rgba(255,255,255,.17) !important;
-        background: linear-gradient(180deg, rgba(5,7,10,var(--cc-card-dim)), rgba(5,7,10,var(--cc-panel-dim))) !important;
+        background: linear-gradient(180deg, rgba(5,7,10,var(--cc-card-tint)), rgba(5,7,10,var(--cc-panel-tint))) !important;
         box-shadow:
           0 12px 42px rgba(0,0,0,.28),
           inset 0 1px rgba(255,255,255,.11),
@@ -18605,7 +18613,7 @@ window._archRender = function() {
       body:not(.light) #page-stats .card {
         border: 1px solid rgba(255,255,255,.13) !important;
         border-radius: 18px !important;
-        background: linear-gradient(180deg, rgba(5,7,10,var(--cc-card-dim)), rgba(5,7,10,var(--cc-panel-dim))) !important;
+        background: linear-gradient(180deg, rgba(5,7,10,var(--cc-card-tint)), rgba(5,7,10,var(--cc-panel-tint))) !important;
         box-shadow:
           0 12px 42px rgba(0,0,0,.28),
           inset 0 1px rgba(255,255,255,.11),
@@ -18616,7 +18624,7 @@ window._archRender = function() {
       body:not(.light) #page-stats table,
       body:not(.light) #page-stats .table-container {
         border-color: rgba(255,255,255,.10) !important;
-        background: rgba(5,7,10,var(--cc-glass-dim)) !important;
+        background: rgba(5,7,10,var(--cc-glass-tint)) !important;
       }
       body:not(.light) #page-stats th {
         color: rgba(247,242,232,.46) !important;
@@ -18634,7 +18642,7 @@ window._archRender = function() {
       body:not(.light) #page-settings [style*="background:#0b0e14"] {
         border-color: rgba(255,255,255,.13) !important;
         border-radius: 18px !important;
-        background: linear-gradient(180deg, rgba(5,7,10,var(--cc-card-dim)), rgba(5,7,10,var(--cc-panel-dim))) !important;
+        background: linear-gradient(180deg, rgba(5,7,10,var(--cc-card-tint)), rgba(5,7,10,var(--cc-panel-tint))) !important;
         box-shadow:
           0 12px 42px rgba(0,0,0,.28),
           inset 0 1px rgba(255,255,255,.11),
@@ -18660,7 +18668,7 @@ window._archRender = function() {
       body:not(.light) .event-modal-card,
       body:not(.light) .info-modal-box,
       body:not(.light) .cc-tab-bg-dialog {
-        background: linear-gradient(180deg, rgba(5,7,10,var(--cc-card-dim)), rgba(5,7,10,var(--cc-panel-dim))) !important;
+        background: linear-gradient(180deg, rgba(5,7,10,var(--cc-card-tint)), rgba(5,7,10,var(--cc-panel-tint))) !important;
         backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
         -webkit-backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
       }
@@ -19049,37 +19057,58 @@ window._archRender = function() {
         applyShellToggles();
       }
 
-      function glassValue() {
-        var raw = parseInt(localStorage.getItem('cc-glass-dim'), 10);
-        if (isNaN(raw)) raw = 40;
-        return Math.max(0, Math.min(100, raw));
+      function readGlassNumber(key, fallback, min, max) {
+        var raw = parseInt(localStorage.getItem(key), 10);
+        if (isNaN(raw)) raw = fallback;
+        return Math.max(min, Math.min(max, raw));
       }
-      function applyGlassDim(value) {
-        value = Math.max(0, Math.min(100, parseInt(value, 10) || 0));
-        function mix(low, mid, high) {
-          if (value <= 50) return low + (mid - low) * (value / 50);
-          return mid + (high - mid) * ((value - 50) / 50);
+      function migrateGlassTint() {
+        if (localStorage.getItem('cc-glass-tint') == null && localStorage.getItem('cc-glass-dim') != null) {
+          localStorage.setItem('cc-glass-tint', String(readGlassNumber('cc-glass-dim', 34, 0, 80)));
         }
-        var glass = mix(0.06, 0.34, 0.72);
-        var card = mix(0.08, 0.42, 0.78);
-        var panel = mix(0.10, 0.38, 0.74);
-        var sidebar = mix(0.08, 0.42, 0.76);
-        var sidebarDeep = mix(0.12, 0.50, 0.82);
-        var topbar = mix(0.10, 0.44, 0.78);
+      }
+      function glassBlurValue() {
+        return readGlassNumber('cc-glass-blur', 4, 0, 20);
+      }
+      function glassTintValue() {
+        migrateGlassTint();
+        return readGlassNumber('cc-glass-tint', 34, 0, 80);
+      }
+      function applyGlassBlur(value) {
+        value = Math.max(0, Math.min(20, parseInt(value, 10) || 0));
+        var sat = 1 + Math.min(0.20, value * 0.01);
+        document.documentElement.style.setProperty('--cc-glass-blur', value + 'px');
+        document.documentElement.style.setProperty('--cc-glass-sat', sat.toFixed(2));
+        var range = document.getElementById('glassBlurRange');
+        var label = document.getElementById('glassBlurValue');
+        if (range) range.value = String(value);
+        if (label) label.textContent = value + 'px';
+      }
+      function applyGlassTint(value) {
+        value = Math.max(0, Math.min(80, parseInt(value, 10) || 0));
+        var glass = value / 100;
+        var card = Math.min(0.80, glass + 0.10);
+        var panel = Math.min(0.76, glass + 0.06);
+        var sidebar = Math.min(0.78, glass + 0.08);
+        var sidebarDeep = Math.min(0.84, glass + 0.14);
+        var topbar = Math.min(0.80, glass + 0.10);
+        document.documentElement.style.setProperty('--cc-glass-tint', glass.toFixed(2));
+        document.documentElement.style.setProperty('--cc-card-tint', card.toFixed(2));
+        document.documentElement.style.setProperty('--cc-panel-tint', panel.toFixed(2));
         document.documentElement.style.setProperty('--cc-glass-dim', glass.toFixed(2));
         document.documentElement.style.setProperty('--cc-card-dim', card.toFixed(2));
         document.documentElement.style.setProperty('--cc-panel-dim', panel.toFixed(2));
         document.documentElement.style.setProperty('--cc-sidebar-dim', sidebar.toFixed(2));
         document.documentElement.style.setProperty('--cc-sidebar-deep-dim', sidebarDeep.toFixed(2));
         document.documentElement.style.setProperty('--cc-topbar-dim', topbar.toFixed(2));
-        var blurPx = mix(0, 5, 9);
-        var sat    = mix(1.0, 1.15, 1.35);
-        document.documentElement.style.setProperty('--cc-glass-blur', blurPx.toFixed(1) + 'px');
-        document.documentElement.style.setProperty('--cc-glass-sat',  sat.toFixed(2));
-        var range = document.getElementById('glassDimRange');
-        var label = document.getElementById('glassDimValue');
+        var range = document.getElementById('glassTintRange');
+        var label = document.getElementById('glassTintValue');
         if (range) range.value = String(value);
         if (label) label.textContent = value + '%';
+      }
+      function applyGlassControls() {
+        applyGlassBlur(glassBlurValue());
+        applyGlassTint(glassTintValue());
       }
       function closeGlassPopover() {
         var pop = document.getElementById('glassDimPopover');
@@ -19100,9 +19129,10 @@ window._archRender = function() {
         btn.setAttribute('aria-expanded', open ? 'true' : 'false');
       }
       function bindGlassDimControl() {
-        applyGlassDim(glassValue());
+        applyGlassControls();
         var btn = document.getElementById('glassDimToggle');
-        var range = document.getElementById('glassDimRange');
+        var blurRange = document.getElementById('glassBlurRange');
+        var tintRange = document.getElementById('glassTintRange');
         var reset = document.getElementById('glassDimReset');
         if (btn && btn.dataset.ccGlassBound !== '1') {
           btn.dataset.ccGlassBound = '1';
@@ -19112,19 +19142,27 @@ window._archRender = function() {
             toggleGlassPopover();
           });
         }
-        if (range && range.dataset.ccGlassBound !== '1') {
-          range.dataset.ccGlassBound = '1';
-          range.addEventListener('input', function(){
-            localStorage.setItem('cc-glass-dim', range.value);
-            applyGlassDim(range.value);
+        if (blurRange && blurRange.dataset.ccGlassBound !== '1') {
+          blurRange.dataset.ccGlassBound = '1';
+          blurRange.addEventListener('input', function(){
+            localStorage.setItem('cc-glass-blur', blurRange.value);
+            applyGlassBlur(blurRange.value);
+          });
+        }
+        if (tintRange && tintRange.dataset.ccGlassBound !== '1') {
+          tintRange.dataset.ccGlassBound = '1';
+          tintRange.addEventListener('input', function(){
+            localStorage.setItem('cc-glass-tint', tintRange.value);
+            applyGlassTint(tintRange.value);
           });
         }
         if (reset && reset.dataset.ccGlassBound !== '1') {
           reset.dataset.ccGlassBound = '1';
           reset.addEventListener('click', function(e){
             e.preventDefault();
-            localStorage.setItem('cc-glass-dim', '40');
-            applyGlassDim(40);
+            localStorage.setItem('cc-glass-blur', '4');
+            localStorage.setItem('cc-glass-tint', '34');
+            applyGlassControls();
           });
         }
         if (!document.documentElement.dataset.ccGlassDocBound) {
@@ -19522,10 +19560,13 @@ window._archRender = function() {
       }
       body:not(.light) .cc-glass-popover label {
         display: block;
-        margin-bottom: 10px;
+        margin: 10px 0 8px;
         color: rgba(247,242,232,.78);
         font-size: 12px;
         font-weight: 800;
+      }
+      body:not(.light) .cc-glass-popover label:first-child {
+        margin-top: 0;
       }
       body:not(.light) .cc-glass-row {
         display: grid;
@@ -19537,7 +19578,8 @@ window._archRender = function() {
         width: 100%;
         accent-color: #e8be58;
       }
-      body:not(.light) #glassDimValue {
+      body:not(.light) #glassBlurValue,
+      body:not(.light) #glassTintValue {
         color: #f2cb73;
         font-size: 12px;
         font-weight: 850;
