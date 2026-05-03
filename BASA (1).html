@@ -19876,20 +19876,21 @@ window._archRender = function() {
       body:not(.light) .cc-v20-fireflies {
         position: fixed;
         inset: 0;
-        z-index: 1;
+        z-index: 2;
+        display: block;
         pointer-events: none;
         mix-blend-mode: screen;
-        opacity: .86;
+        opacity: .94;
         background:
-          radial-gradient(circle at 12% 18%, rgba(255,216,130,.42) 0 1px, rgba(255,216,130,.18) 2px, transparent 9px),
-          radial-gradient(circle at 22% 72%, rgba(255,205,116,.30) 0 1px, rgba(255,205,116,.12) 2px, transparent 8px),
-          radial-gradient(circle at 34% 34%, rgba(185,205,255,.22) 0 1px, rgba(185,205,255,.08) 2px, transparent 7px),
-          radial-gradient(circle at 48% 16%, rgba(255,230,160,.28) 0 1px, rgba(255,230,160,.10) 2px, transparent 8px),
-          radial-gradient(circle at 58% 58%, rgba(255,216,130,.32) 0 1px, rgba(255,216,130,.12) 2px, transparent 9px),
-          radial-gradient(circle at 72% 28%, rgba(255,205,116,.36) 0 1px, rgba(255,205,116,.12) 2px, transparent 10px),
-          radial-gradient(circle at 82% 78%, rgba(185,205,255,.18) 0 1px, rgba(185,205,255,.07) 2px, transparent 7px),
-          radial-gradient(circle at 92% 42%, rgba(255,226,150,.28) 0 1px, rgba(255,226,150,.10) 2px, transparent 8px);
-        filter: drop-shadow(0 0 7px rgba(255,206,112,.26));
+          radial-gradient(circle at 12% 18%, rgba(255,216,130,.58) 0 1px, rgba(255,216,130,.22) 3px, transparent 13px),
+          radial-gradient(circle at 22% 72%, rgba(255,205,116,.44) 0 1px, rgba(255,205,116,.17) 3px, transparent 12px),
+          radial-gradient(circle at 34% 34%, rgba(185,205,255,.34) 0 1px, rgba(185,205,255,.12) 3px, transparent 11px),
+          radial-gradient(circle at 48% 16%, rgba(255,230,160,.42) 0 1px, rgba(255,230,160,.15) 3px, transparent 12px),
+          radial-gradient(circle at 58% 58%, rgba(255,216,130,.48) 0 1px, rgba(255,216,130,.18) 3px, transparent 13px),
+          radial-gradient(circle at 72% 28%, rgba(255,205,116,.50) 0 1px, rgba(255,205,116,.18) 3px, transparent 14px),
+          radial-gradient(circle at 82% 78%, rgba(185,205,255,.28) 0 1px, rgba(185,205,255,.10) 3px, transparent 11px),
+          radial-gradient(circle at 92% 42%, rgba(255,226,150,.42) 0 1px, rgba(255,226,150,.15) 3px, transparent 12px);
+        filter: drop-shadow(0 0 10px rgba(255,206,112,.38));
         animation: ccFireflyFlicker 8s ease-in-out infinite alternate;
       }
       body:not(.light) .cc-v20-fireflies i {
@@ -19899,22 +19900,25 @@ window._archRender = function() {
         width: var(--s);
         height: var(--s);
         border-radius: 999px;
-        background: hsla(var(--hue), 92%, 70%, var(--a, .72));
+        background: hsla(var(--hue), 94%, 72%, var(--a, .76));
         box-shadow:
-          0 0 calc(var(--s) * 2.8) hsla(var(--hue), 92%, 65%, .62),
-          0 0 calc(var(--s) * 7) hsla(var(--hue), 92%, 62%, .24);
-        opacity: .72;
+          0 0 calc(var(--s) * 3.2) hsla(var(--hue), 94%, 68%, .78),
+          0 0 calc(var(--s) * 8.5) hsla(var(--hue), 94%, 64%, .34),
+          0 0 18px hsla(var(--hue), 94%, 62%, .20);
+        opacity: .78;
         transform: translate(-50%, -50%);
-        animation: ccFireflyDotPulse var(--d, 7s) ease-in-out var(--delay, 0s) infinite alternate;
+        animation:
+          ccFireflyFloat var(--float, 12s) ease-in-out var(--delay, 0s) infinite alternate,
+          ccFireflyDotPulse var(--d, 5s) ease-in-out var(--delay, 0s) infinite;
       }
       body:not(.light) .cc-v20-fireflies i:nth-child(4n) {
-        background: hsla(224, 92%, 76%, .55);
+        background: hsla(224, 94%, 78%, .66);
         box-shadow:
-          0 0 calc(var(--s) * 2.6) hsla(224, 92%, 72%, .45),
-          0 0 calc(var(--s) * 6) hsla(224, 92%, 70%, .18);
+          0 0 calc(var(--s) * 3) hsla(224, 94%, 74%, .58),
+          0 0 calc(var(--s) * 8) hsla(224, 94%, 72%, .26);
       }
       body:not(.light) .cc-v20-fireflies i:nth-child(6n) {
-        opacity: .52;
+        opacity: .60;
       }
       body:not(.light) .cc-v20-fireflies::before,
       body:not(.light) .cc-v20-fireflies::after {
@@ -19946,9 +19950,13 @@ window._archRender = function() {
         to { opacity: .66; }
       }
       @keyframes ccFireflyDotPulse {
-        from { opacity: .30; }
-        45% { opacity: .86; }
-        to { opacity: .52; }
+        0%, 100% { opacity: .42; }
+        42% { opacity: .92; }
+        68% { opacity: .58; }
+      }
+      @keyframes ccFireflyFloat {
+        from { transform: translate(-50%, -50%) translate3d(0, 0, 0); }
+        to { transform: translate(-50%, -50%) translate3d(var(--tx, 8px), var(--ty, -7px), 0); }
       }
       @media (prefers-reduced-motion: reduce) {
         body:not(.light) .cc-v20-fireflies,
@@ -19958,7 +19966,8 @@ window._archRender = function() {
           animation: none !important;
         }
         body:not(.light) .cc-v20-fireflies i {
-          opacity: .62 !important;
+          opacity: .78 !important;
+          transform: translate(-50%, -50%) !important;
         }
       }
       body:not(.light) .cc-v20-noise {
@@ -20153,22 +20162,29 @@ window._archRender = function() {
           document.body.insertBefore(fireflies, document.body.firstChild.nextSibling);
         }
         if (!fireflies.querySelector('i')) {
-          var pts = [
-            [8,18,2.2,42,.68,0,7],[13,44,1.4,38,.52,-2,9],[17,76,2.8,42,.72,-4,8],
-            [22,28,1.8,224,.48,-1,10],[26,61,3.2,42,.70,-5,9],[31,14,2.1,46,.56,-3,7],
-            [35,83,1.5,42,.50,-6,11],[39,36,2.6,224,.46,-2,8],[43,68,1.9,42,.62,-7,10],
-            [48,21,3.4,43,.74,-4,8],[51,89,1.3,42,.48,-1,12],[55,49,2.4,46,.66,-6,9],
-            [59,12,1.7,224,.44,-3,11],[63,74,3.0,42,.70,-8,8],[67,31,2.2,43,.62,-5,10],
-            [71,57,1.6,42,.54,-2,9],[74,18,3.6,42,.75,-7,8],[78,86,2.0,224,.46,-4,11],
-            [82,43,2.7,46,.68,-1,9],[86,69,1.5,42,.52,-6,10],[91,24,2.3,42,.64,-3,8],
-            [94,52,1.8,224,.44,-8,12],[11,91,1.7,42,.50,-5,10],[29,49,2.9,46,.68,-7,9],
-            [46,6,1.5,42,.46,-2,12],[57,64,1.8,224,.42,-5,11],[69,8,2.6,42,.62,-6,8],
-            [88,10,1.4,46,.48,-4,10],[6,58,2.5,42,.58,-6,9],[19,9,1.6,224,.42,-1,12],
-            [37,58,3.1,42,.72,-8,8],[52,33,1.4,46,.50,-3,11],[64,92,2.2,42,.56,-7,10],
-            [76,39,1.7,224,.44,-2,12],[84,94,2.9,42,.64,-5,9],[97,80,1.6,46,.48,-6,11]
-          ];
+          var pts = [];
+          var seed = 1741;
+          function rnd(){
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            return seed / 4294967296;
+          }
+          for (var i = 0; i < 60; i++) {
+            var cool = i % 7 === 0 || i % 13 === 0;
+            var x = Math.round((4 + rnd() * 92) * 10) / 10;
+            var y = Math.round((5 + rnd() * 90) * 10) / 10;
+            var size = Math.round((2 + rnd() * 3.1) * 10) / 10;
+            var hue = cool ? Math.round(218 + rnd() * 26) : Math.round(38 + rnd() * 10);
+            var alpha = Math.round((0.50 + rnd() * 0.34) * 100) / 100;
+            var delay = -Math.round(rnd() * 90) / 10;
+            var pulse = Math.round((3.4 + rnd() * 4.2) * 10) / 10;
+            var drift = Math.round((8 + rnd() * 8) * 10) / 10;
+            var tx = Math.round((rnd() > .5 ? drift : -drift) * 10) / 10;
+            var ty = Math.round((rnd() > .5 ? drift * .75 : -drift * .75) * 10) / 10;
+            var floatDur = Math.round((8 + rnd() * 8) * 10) / 10;
+            pts.push([x, y, size, hue, alpha, delay, pulse, tx, ty, floatDur]);
+          }
           fireflies.innerHTML = pts.map(function(p){
-            return '<i style="--x:'+p[0]+'%;--y:'+p[1]+'%;--s:'+p[2]+'px;--hue:'+p[3]+';--a:'+p[4]+';--delay:'+p[5]+'s;--d:'+p[6]+'s"></i>';
+            return '<i style="--x:'+p[0]+'%;--y:'+p[1]+'%;--s:'+p[2]+'px;--hue:'+p[3]+';--a:'+p[4]+';--delay:'+p[5]+'s;--d:'+p[6]+'s;--tx:'+p[7]+'px;--ty:'+p[8]+'px;--float:'+p[9]+'s"></i>';
           }).join('');
         }
         if (!document.querySelector('.cc-v20-noise')) {
