@@ -18,6 +18,8 @@ KNOWN_NAME_ALIASES = {
     "tpaxhyhenga": "ТрахнуНетГлядя",
     "tpaxhyhena": "ТрахнуНетГлядя",
     "6ycb": "бусь",
+    "bpatpeebl4": "БратРевыч",
+    "akek": "Джейк",
 }
 
 _LAT_TO_CYR = str.maketrans({
