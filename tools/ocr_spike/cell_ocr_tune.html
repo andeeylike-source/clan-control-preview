@@ -1,0 +1,912 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Cell OCR Tuner v2 — clan-control</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:13px/1.4 system-ui,sans-serif;background:#1a1d22;color:#d4d8e0;min-height:100vh}
+h1{font-size:16px;font-weight:700;color:#e8c97a;letter-spacing:.04em}
+h2{font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+
+.topbar{display:flex;align-items:center;gap:16px;padding:10px 16px;background:#12151b;border-bottom:1px solid #2d3748;flex-wrap:wrap}
+.topbar label{font-size:11px;color:#64748b}
+.topbar input[type=url]{background:#0d1117;border:1px solid #2d3748;color:#d4d8e0;border-radius:5px;padding:4px 8px;font-size:12px;width:300px}
+
+.controls{display:flex;gap:8px;padding:10px 16px;background:#131720;border-bottom:1px solid #2d3748;flex-wrap:wrap;align-items:flex-end}
+.ctrl-group{display:flex;flex-direction:column;gap:4px;padding:8px 10px;background:#1a1f2b;border-radius:6px;border:1px solid #2a3345}
+.row-inputs{display:flex;gap:4px;flex-wrap:wrap}
+label.fi{display:flex;flex-direction:column;gap:2px;font-size:10px;color:#64748b}
+label.fi input{width:66px;background:#0d1117;border:1px solid #2d3748;color:#c0c8d8;border-radius:4px;padding:3px 5px;font-size:12px}
+label.fi input:focus{outline:none;border-color:#5f8cff}
+
+.actions{display:flex;gap:8px;padding:8px 16px;background:#131720;border-top:1px solid #2d3748;border-bottom:1px solid #2d3748;flex-wrap:wrap;align-items:center}
+button{padding:6px 14px;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;transition:opacity .15s}
+#btnUpload{background:#2d3748;color:#d4d8e0}#btnUpload:hover{background:#3d4a5f}
+#btnRun{background:#4f46e5;color:#fff}#btnRun:hover{opacity:.85}#btnRun:disabled{opacity:.35;cursor:not-allowed}
+#btnExport{background:#1e3a5a;color:#5f8cff;border:1px solid #2d4a6a}#btnExport:hover{background:#25496e}
+.status{font-size:11px;color:#64748b;flex:1}
+
+.canvases{display:flex;gap:14px;padding:12px 16px;overflow-x:auto;align-items:flex-start}
+.canvas-wrap{display:flex;flex-direction:column;gap:5px}
+.canvas-wrap h2{font-size:10px}
+.canvas-container{position:relative;display:inline-block;border:1px solid #2d3748;border-radius:4px;overflow:hidden}
+canvas{display:block}
+#overlayCanvas{position:absolute;top:0;left:0;pointer-events:none}
+
+.results{padding:10px 16px;overflow-x:auto}
+#resultTable{width:100%;border-collapse:collapse;font-size:11px}
+#resultTable th{background:#131720;color:#64748b;font-weight:700;text-align:left;padding:5px 7px;border-bottom:2px solid #2d3748;position:sticky;top:0;white-space:nowrap}
+#resultTable td{padding:4px 7px;border-bottom:1px solid #1e2530;vertical-align:middle}
+#resultTable tr:hover td{background:#1a1f2b}
+.cp{width:80px;height:26px;object-fit:fill;border:1px solid #2d3748;border-radius:2px;display:block;cursor:zoom-in}
+.attempts-cell{display:flex;flex-direction:column;gap:2px;max-width:280px}
+.att-row{display:flex;align-items:center;gap:5px;font-size:10px}
+.att-label{color:#475569;width:78px;flex-shrink:0;font-family:monospace}
+.att-thumb{width:44px;height:18px;object-fit:fill;border:1px solid #2d3748;border-radius:2px;flex-shrink:0;cursor:zoom-in;image-rendering:pixelated}
+.att-raw{color:#94a3b8;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px}
+.att-num{font-weight:700;width:36px;text-align:right;flex-shrink:0}
+.att-chosen{background:rgba(95,140,255,0.12);border-radius:3px;padding:0 3px}
+.num-ok{color:#30db76;font-weight:700;font-size:13px}
+.num-zero{color:#64748b;font-size:13px}
+.num-warn{color:#f59e0b;font-size:13px}
+.num-err{color:#ff5555}
+.reason-badge{font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;display:inline-block;margin-top:3px;letter-spacing:.03em}
+.reason-majority{background:#0e2a18;color:#30db76;border:1px solid #1a4a28}
+.reason-priority{background:#0e1a30;color:#60a5fa;border:1px solid #1a3050}
+.reason-ambiguous_6_9{background:#2a1800;color:#f59e0b;border:1px solid #4a3000}
+.reason-ambiguous_6_9_force_9{background:#2a1400;color:#fb923c;border:1px solid #5a2800;font-weight:900}
+.reason-visual_6_to_9{background:#1a0e2a;color:#c084fc;border:1px solid #4a2880;font-weight:900}
+.reason-no_result{background:#2a0e0e;color:#f87171;border:1px solid #4a1a1a}
+.reason-single{background:#1a1f2b;color:#475569;border:1px solid #2a3040}
+.reason-fallback{background:#1e1428;color:#a78bfa;border:1px solid #362050}
+.reason-fast{background:#0a2010;color:#4ade80;border:1px solid #1a4020}
+#btnCalibrate{background:#1a3820;color:#30db76;border:1px solid #2d5a35}#btnCalibrate:hover{background:#224a2a}#btnCalibrate:disabled{opacity:.35;cursor:not-allowed}
+#btnSaveGeo{background:#162030;color:#60a5fa;border:1px solid #2d4060}#btnSaveGeo:hover{background:#1e2e40}
+#btnLoadGeo{background:#1e1630;color:#a78bfa;border:1px solid #3a2860}#btnLoadGeo:hover{background:#281e40}
+#btnResetGeo{background:#2a1818;color:#f87171;border:1px solid #4a2828}#btnResetGeo:hover{background:#381818}
+.geo-sep{width:1px;height:22px;background:#2d3748;margin:0 2px;align-self:center;flex-shrink:0}
+.export-box{background:#0d1117;border:1px solid #2d3748;border-radius:6px;padding:10px;font-family:monospace;font-size:12px;color:#c0e0ff;white-space:pre;margin-top:10px}
+
+/* Lightbox */
+#lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out}
+#lb.on{display:flex}
+#lb img{max-width:90vw;max-height:90vh;image-rendering:pixelated;border:2px solid #2d3748;border-radius:4px}
+</style>
+</head>
+<body>
+
+<div id="lb" onclick="this.classList.remove('on')"><img id="lbImg" src=""></div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <h1>Cell OCR Tuner v2</h1>
+  <label>Proxy <input type="url" id="proxyUrl" value="http://localhost:8787/ocr-read"></label>
+  <input type="file" id="fileInput" accept="image/*" style="display:none">
+  <span class="status" id="statusMsg">Загрузи скриншот →</span>
+</div>
+
+<!-- CONTROLS -->
+<div class="controls">
+
+  <div class="ctrl-group">
+    <h2>Crop</h2>
+    <div class="row-inputs">
+      <label class="fi">cropX <input type="number" id="cropX" value="398"></label>
+      <label class="fi">cropY <input type="number" id="cropY" value="90"></label>
+      <label class="fi">cropW <input type="number" id="cropW" value="375"></label>
+      <label class="fi">cropH <input type="number" id="cropH" value="205"></label>
+      <label class="fi">scale <input type="number" id="scale" value="3" min="1" max="6"></label>
+    </div>
+  </div>
+
+  <div class="ctrl-group">
+    <h2>Preprocess</h2>
+    <div class="row-inputs">
+      <label class="fi">contrast% <input type="number" id="contrast" value="140" min="0" max="300"></label>
+      <label class="fi">maskX <input type="number" id="maskX" value="152"></label>
+      <label class="fi">maskW <input type="number" id="maskW" value="32"></label>
+    </div>
+  </div>
+
+  <div class="ctrl-group">
+    <h2>Grid</h2>
+    <div class="row-inputs">
+      <label class="fi">headerY <input type="number" id="headerY" value="62" min="0"></label>
+      <label class="fi">rowH <input type="number" id="rowH" value="61" min="4"></label>
+      <label class="fi">rowCount <input type="number" id="rowCount" value="9" min="1" max="20"></label>
+      <label class="fi">upscale <input type="number" id="upscale" value="4" min="1" max="8"></label>
+    </div>
+  </div>
+
+  <div class="ctrl-group">
+    <h2>Columns (processed px)</h2>
+    <div class="row-inputs">
+      <label class="fi">kills x <input type="number" id="killsX" value="552"></label>
+      <label class="fi">kills w <input type="number" id="killsW" value="143"></label>
+      <label class="fi">deaths x <input type="number" id="deathsX" value="695"></label>
+      <label class="fi">deaths w <input type="number" id="deathsW" value="143"></label>
+      <label class="fi">pvp x <input type="number" id="pvpX" value="838"></label>
+      <label class="fi">pvp w <input type="number" id="pvpW" value="143"></label>
+      <label class="fi">pve x <input type="number" id="pveX" value="981"></label>
+      <label class="fi">pve w <input type="number" id="pveW" value="144"></label>
+    </div>
+  </div>
+
+</div>
+
+<!-- ACTIONS -->
+<div class="actions">
+  <button id="btnUpload" onclick="document.getElementById('fileInput').click()">📁 Загрузить скриншот</button>
+  <button id="btnRun" disabled onclick="runCellOcr()">▶ Run Cell OCR (fast adaptive)</button>
+  <button id="btnCalibrate" disabled onclick="autoCalibrate()">⊞ Auto Calibrate Columns</button>
+  <div class="geo-sep"></div>
+  <button id="btnSaveGeo" onclick="saveGeo()">💾 Save CELL_GEO</button>
+  <button id="btnLoadGeo" onclick="loadGeoBtn()">📂 Load saved</button>
+  <button id="btnResetGeo" onclick="resetGeo()">↺ Reset</button>
+  <div class="geo-sep"></div>
+  <button id="btnExport" onclick="exportGeo()">⬇ Export CELL_GEO</button>
+  <span class="status" id="runStatus"></span>
+</div>
+
+<!-- CANVASES -->
+<div class="canvases">
+  <div class="canvas-wrap">
+    <h2>Original crop (source px, click = lightbox)</h2>
+    <canvas id="cropCanvas" style="cursor:zoom-in" onclick="lb(this)"></canvas>
+  </div>
+  <div class="canvas-wrap">
+    <h2>Processed + overlay (click = lightbox)</h2>
+    <div class="canvas-container">
+      <canvas id="processedCanvas" style="cursor:zoom-in" onclick="lb(this)"></canvas>
+      <canvas id="overlayCanvas"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- RESULTS -->
+<div class="results">
+  <table id="resultTable" style="display:none">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>kills preview</th><th>kills attempts</th><th>kills ✓ / reason</th>
+        <th>deaths preview</th><th>deaths attempts</th><th>deaths ✓ / reason</th>
+        <th>pvp preview</th><th>pvp attempts</th><th>pvp ✓ / reason</th>
+        <th>pve preview</th><th>pve attempts</th><th>pve ✓ / reason</th>
+      </tr>
+    </thead>
+    <tbody id="resultBody"></tbody>
+  </table>
+  <pre id="exportBox" class="export-box" style="display:none"></pre>
+</div>
+
+<script>
+'use strict';
+
+// ── State ─────────────────────────────────────────────────────
+let _srcImg      = null;  // HTMLImageElement (original screenshot)
+let _procCvs     = null;  // offscreen processed canvas (grayscale+contrast+sharpen+mask)
+let _origCropCvs = null;  // original crop canvas (color, no processing)
+
+// ── Helpers ───────────────────────────────────────────────────
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function ni(id) { return Number(document.getElementById(id).value) || 0; }
+
+function getGeo() {
+  const sc = Math.max(1, ni('scale'));
+  return {
+    cropX:ni('cropX'), cropY:ni('cropY'), cropW:ni('cropW'), cropH:ni('cropH'),
+    scale:sc, contrast:ni('contrast'), maskX:ni('maskX'), maskW:ni('maskW'),
+    headerY:ni('headerY'), rowH:Math.max(4,ni('rowH')), rowCount:Math.max(1,ni('rowCount')),
+    upscale:Math.max(1,ni('upscale')),
+    cols:{
+      kills:   {x:ni('killsX'),  w:ni('killsW')  },
+      deaths:  {x:ni('deathsX'), w:ni('deathsW') },
+      pvp_dmg: {x:ni('pvpX'),    w:ni('pvpW')    },
+      pve_dmg: {x:ni('pveX'),    w:ni('pveW')    },
+    }
+  };
+}
+
+// ── Sharpen kernel ────────────────────────────────────────────
+function sharpenImageData(id, w, h) {
+  const src = id.data, out = new Uint8ClampedArray(src.length);
+  const k = [0,-1,0,-1,5,-1,0,-1,0];
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++) {
+    const i=(y*w+x)*4;
+    if (x===0||y===0||x===w-1||y===h-1){out[i]=src[i];out[i+1]=src[i+1];out[i+2]=src[i+2];out[i+3]=src[i+3];continue;}
+    let r=0,g=0,b=0,ki=0;
+    for (let yy=-1;yy<=1;yy++) for (let xx=-1;xx<=1;xx++){const si=((y+yy)*w+x+xx)*4,kw=k[ki++];r+=src[si]*kw;g+=src[si+1]*kw;b+=src[si+2]*kw;}
+    out[i]=clamp(r,0,255);out[i+1]=clamp(g,0,255);out[i+2]=clamp(b,0,255);out[i+3]=src[i+3];
+  }
+  return new ImageData(out,w,h);
+}
+
+// ── Build processed canvas (mirrors BASA) ────────────────────
+function buildProcessed(img) {
+  const g = getGeo();
+  const cw = clamp(g.cropW,1,Math.max(1,img.naturalWidth-g.cropX));
+  const ch = clamp(g.cropH,1,Math.max(1,img.naturalHeight-g.cropY));
+
+  // Original crop (color, no processing)
+  const origCvs = document.getElementById('cropCanvas');
+  origCvs.width=cw; origCvs.height=ch;
+  origCvs.getContext('2d').drawImage(img, g.cropX, g.cropY, cw, ch, 0, 0, cw, ch);
+  _origCropCvs = origCvs;
+
+  // Processed canvas
+  const pw=Math.round(cw*g.scale), ph=Math.round(ch*g.scale);
+  const cvs=document.createElement('canvas'); cvs.width=pw; cvs.height=ph;
+  const ctx=cvs.getContext('2d',{willReadFrequently:true});
+  ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+  ctx.drawImage(origCvs, 0, 0, pw, ph);
+
+  // Grayscale + contrast (BASA formula)
+  const c=g.contrast/100;
+  const factor=(259*(c*255+255))/(255*(259-c*255));
+  let id=ctx.getImageData(0,0,pw,ph); const d=id.data;
+  for (let i=0;i<d.length;i+=4){
+    const gray=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+    const v=clamp(factor*(gray-128)+128,0,255);
+    d[i]=v; d[i+1]=v; d[i+2]=v;
+  }
+  id=sharpenImageData(id,pw,ph);
+  ctx.putImageData(id,0,0);
+
+  // Mask icon column
+  const mx=clamp(Math.round(g.maskX*g.scale),0,pw);
+  const mw=clamp(Math.round(g.maskW*g.scale),0,pw-mx);
+  ctx.fillStyle='#fff'; ctx.fillRect(mx,0,mw,ph);
+  _procCvs=cvs;
+
+  // Display
+  const dispCvs=document.getElementById('processedCanvas');
+  const ovCvs=document.getElementById('overlayCanvas');
+  dispCvs.width=pw; dispCvs.height=ph;
+  ovCvs.width=pw; ovCvs.height=ph;
+  dispCvs.getContext('2d').drawImage(cvs,0,0);
+
+  drawOverlay();
+  document.getElementById('btnRun').disabled=false;
+  setStatus(`Processed ${pw}×${ph}. Настрой overlay → Run Cell OCR.`);
+}
+
+// ── Overlay ───────────────────────────────────────────────────
+const COL_COLORS={kills:'#f59e0b',deaths:'#60a5fa',pvp_dmg:'#34d399',pve_dmg:'#f472b6'};
+
+function drawOverlay() {
+  const cvs=document.getElementById('overlayCanvas');
+  const ctx=cvs.getContext('2d');
+  ctx.clearRect(0,0,cvs.width,cvs.height);
+  if (!_procCvs) return;
+  const g=getGeo(), ph=cvs.height;
+
+  for (let ri=0;ri<g.rowCount;ri++) {
+    const ry=g.headerY+ri*g.rowH; if (ry>=ph) break;
+    const rh=Math.min(g.rowH,ph-ry);
+    ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    ctx.strokeRect(0,ry,cvs.width,rh); ctx.setLineDash([]);
+    ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.font='10px system-ui';
+    ctx.fillText(ri,4,ry+12);
+    for (const [ck,col] of Object.entries(g.cols)) {
+      if (col.x>=cvs.width) continue;
+      const drawW=Math.min(col.w,cvs.width-col.x);
+      const color=COL_COLORS[ck]||'#fff';
+      ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.globalAlpha=0.65;
+      ctx.strokeRect(col.x+0.5,ry+0.5,drawW-1,rh-1); ctx.globalAlpha=1;
+      if (ri===0){
+        ctx.fillStyle=color; ctx.font='9px system-ui';
+        ctx.fillText(ck.replace('_dmg',''),col.x+2,ry>8?ry-2:ry+10);
+      }
+    }
+  }
+  ctx.strokeStyle='rgba(232,190,88,0.65)'; ctx.lineWidth=2; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(0,g.headerY); ctx.lineTo(cvs.width,g.headerY); ctx.stroke();
+}
+
+// ── Lightbox ──────────────────────────────────────────────────
+function lb(el){ document.getElementById('lbImg').src=el.toDataURL('image/png'); document.getElementById('lb').classList.add('on'); }
+
+// ── Canvas → Blob ─────────────────────────────────────────────
+function toBlob(cvs){
+  return new Promise((res,rej)=>cvs.toBlob(b=>b?res(b):rej(new Error('toBlob failed')),'image/png'));
+}
+
+// ── Number parser ─────────────────────────────────────────────
+// Uses proxy.parsed[].numbersFound (proxy normalizeNumber handles "1,685"→1685)
+// Returns: first finite number found (including 0), or null if truly nothing.
+function parseCellResponse(json) {
+  for (const row of (json?.parsed ?? [])) {
+    for (const nv of (row?.numbersFound ?? [])) {
+      if (typeof nv === 'number' && Number.isFinite(nv)) return nv;
+    }
+  }
+  // Fallback: scan raw text
+  const txt = String(json?.text ?? json?.parsedText ?? '');
+  const m = txt.match(/\d[\d,]*/);
+  if (m) { const v=parseInt(m[0].replace(/,/g,''),10); if (Number.isFinite(v)) return v; }
+  return null; // null = truly nothing recognized
+}
+
+// ── Build preprocessing variants for a cell ───────────────────
+// Each variant returns {label, canvas} or {label, canvas:null} on skip.
+// All coordinates in PROCESSED canvas space.
+function buildCellVariants(cellRect) {
+  const {x,y,w,h} = cellRect;
+  const g = getGeo();
+  const up = g.upscale;
+  const ow = Math.max(1, Math.round(w*up));
+  const oh = Math.max(1, Math.round(h*up));
+
+  // Source-space cell coords (for _origCropCvs which is at scale=1)
+  const sx = Math.max(0, Math.round(x / g.scale));
+  const sy = Math.max(0, Math.round(y / g.scale));
+  const sw = Math.max(1, Math.round(w / g.scale));
+  const sh = Math.max(1, Math.round(h / g.scale));
+
+  function makeCvs(src, srcX, srcY, srcW, srcH, outW, outH, smooth, post) {
+    if (!src) return null;
+    const c = document.createElement('canvas'); c.width=outW; c.height=outH;
+    const ctx = c.getContext('2d',{willReadFrequently:true});
+    ctx.imageSmoothingEnabled = smooth;
+    if (smooth) ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(src, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
+    if (post) { const id=ctx.getImageData(0,0,outW,outH); post(id.data,outW,outH); ctx.putImageData(id,0,0); }
+    return c;
+  }
+
+  const variants = [];
+
+  // A: processed canvas, SMOOTH upscale (bilinear anti-aliasing, avoids blocky pixels)
+  variants.push({ label:'proc_smooth', canvas: makeCvs(_procCvs, x,y,w,h, ow,oh, true, null) });
+
+  // B: processed canvas, INVERTED → dark bg, light digits (game's natural look in gray)
+  variants.push({ label:'proc_invert', canvas: makeCvs(_procCvs, x,y,w,h, ow,oh, true, d=>{
+    for (let i=0;i<d.length;i+=4){d[i]=255-d[i];d[i+1]=255-d[i+1];d[i+2]=255-d[i+2];}
+  })});
+
+  // C: original crop, grayscale + mild positive contrast (no inversion, natural brightness)
+  variants.push({ label:'src_gray', canvas: makeCvs(_origCropCvs, sx,sy,sw,sh, ow,oh, true, d=>{
+    for (let i=0;i<d.length;i+=4){
+      const g2=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+      const v=clamp(1.6*(g2-128)+128,0,255);
+      d[i]=v;d[i+1]=v;d[i+2]=v;
+    }
+  })});
+
+  // D: original crop, color (no grayscale — most natural for OCR)
+  variants.push({ label:'src_color', canvas: makeCvs(_origCropCvs, sx,sy,sw,sh, ow,oh, true, null) });
+
+  // E: padded original crop (extra context around the cell, ×2 upscale since area is larger)
+  if (_origCropCvs) {
+    const pad = Math.max(3, Math.round(sh * 0.35));
+    const psx=Math.max(0, sx-pad), psy=Math.max(0, sy-pad);
+    const pex=Math.min(_origCropCvs.width,  sx+sw+pad);
+    const pey=Math.min(_origCropCvs.height, sy+sh+pad);
+    const psw=pex-psx, psh=pey-psy;
+    const pup=Math.max(1,Math.round(up*g.scale/2)); // scale ×1.5 (orig is source res)
+    const pow=Math.max(1,Math.round(psw*pup)), poh=Math.max(1,Math.round(psh*pup));
+    variants.push({ label:'padded_color', canvas: makeCvs(_origCropCvs, psx,psy,psw,psh, pow,poh, true, null) });
+  }
+
+  return variants;
+}
+
+// ── OCR one variant ───────────────────────────────────────────
+async function ocrVariant(canvas, proxyUrl) {
+  const blob = await toBlob(canvas);
+  const form = new FormData();
+  form.append('file', blob, 'cell.png');
+  const ctrl = new AbortController();
+  const tid  = setTimeout(()=>ctrl.abort(), 15000);
+  let json;
+  try {
+    const r   = await fetch(proxyUrl, {method:'POST', body:form, signal:ctrl.signal});
+    const txt = await r.text();
+    json = JSON.parse(txt);
+  } finally { clearTimeout(tid); }
+  return json;
+}
+
+// ── Voting logic ──────────────────────────────────────────────
+const PRIORITY_ORDER = ['proc_smooth','src_color','src_gray','proc_invert','padded_color'];
+
+// Given all attempts, return {chosen, finalNum, chosenReason}.
+// Rules (in priority order):
+//   1. ambiguous_6_9_force_9 — result set ⊆ {6,9} AND 9 present → always pick 9
+//      (must run BEFORE majority so "2×6 + 1×9" doesn't wrongly return 6)
+//   2. majority  — >50% of successful attempts agree on a number
+//   3. priority  — no majority; pick highest-priority attempt with any result
+//   4. single    — only one successful attempt
+//   5. no_result — no attempt returned text
+function voteForNumber(attempts) {
+  const ok = attempts.filter(a => !a.skipped && a.ok && a.num !== null);
+
+  if (ok.length === 0) return { chosen:'none', finalNum:0, chosenReason:'no_result' };
+  if (ok.length === 1) return { chosen:ok[0].label, finalNum:ok[0].num, chosenReason:'single' };
+
+  // Count how many attempts returned each number
+  const counts = new Map();
+  for (const a of ok) counts.set(a.num, (counts.get(a.num) || 0) + 1);
+
+  // 6/9 hard rule — BEFORE majority.
+  // If every distinct result is 6 or 9 AND at least one attempt says 9 → force 9.
+  // OCR misreads 9 as 6 far more often than the reverse; never trust a 6-majority
+  // when 9 is also present.
+  const distinctNums = [...counts.keys()];
+  if (counts.has(9) && distinctNums.every(n => n === 6 || n === 9)) {
+    const best9 = PRIORITY_ORDER.map(p => ok.find(a => a.label===p && a.num===9)).find(Boolean)
+               ?? ok.find(a => a.num === 9);
+    return { chosen:best9.label, finalNum:9, chosenReason:'ambiguous_6_9_force_9' };
+  }
+
+  // Majority: a number supported by > half of successful attempts
+  for (const [num, cnt] of counts) {
+    if (cnt > ok.length / 2) {
+      const best = PRIORITY_ORDER.map(p => ok.find(a => a.label===p && a.num===num)).find(Boolean)
+                ?? ok.find(a => a.num === num);
+      return { chosen:best.label, finalNum:num, chosenReason:'majority' };
+    }
+  }
+
+  // Priority: pick highest-priority attempt with a result
+  for (const p of PRIORITY_ORDER) {
+    const a = ok.find(a => a.label === p);
+    if (a) return { chosen:a.label, finalNum:a.num, chosenReason:'priority' };
+  }
+
+  return { chosen:ok[0].label, finalNum:ok[0].num, chosenReason:'fallback' };
+}
+
+// ── Visual 6/9 disambiguator ──────────────────────────────────
+// Analyses binarized proc_smooth cell canvas.
+// 9 has closed loop at top → topRatio > bottomRatio → positive score.
+// 6 has closed loop at bottom → bottomRatio > topRatio → negative score.
+// Returns {guess, score, confident}.
+function classifyDigit6or9(cellCanvas) {
+  const w = cellCanvas.width, h = cellCanvas.height;
+  if (w < 4 || h < 4) return { guess:6, score:0, confident:false };
+  const ctx = cellCanvas.getContext('2d', {willReadFrequently:true});
+  const d   = ctx.getImageData(0, 0, w, h).data;
+  const DARK_TH = 128;
+
+  // Bounding box of dark pixels (digits are dark on bright bg in proc_smooth)
+  let minX=w, maxX=-1, minY=h, maxY=-1;
+  for (let y=0; y<h; y++) {
+    for (let x=0; x<w; x++) {
+      if (d[(y*w+x)*4] < DARK_TH) {
+        if (x < minX) minX=x; if (x > maxX) maxX=x;
+        if (y < minY) minY=y; if (y > maxY) maxY=y;
+      }
+    }
+  }
+  if (maxX < 0) return { guess:6, score:0, confident:false };
+
+  const bbW = maxX - minX + 1;
+  const bbH = maxY - minY + 1;
+  // Single-digit geometry check: digit must be taller than wide
+  if (bbW >= bbH * 1.2) return { guess:6, score:0, confident:false };
+
+  const midY = minY + Math.round(bbH / 2);
+  let topDark=0, topTotal=0, bottomDark=0, bottomTotal=0;
+  for (let y=minY; y<=maxY; y++) {
+    for (let x=minX; x<=maxX; x++) {
+      const dark = d[(y*w+x)*4] < DARK_TH;
+      if (y < midY) { topTotal++; if (dark) topDark++; }
+      else           { bottomTotal++; if (dark) bottomDark++; }
+    }
+  }
+
+  const topRatio    = topTotal    > 0 ? topDark    / topTotal    : 0;
+  const bottomRatio = bottomTotal > 0 ? bottomDark / bottomTotal : 0;
+  const score = topRatio - bottomRatio; // positive → 9, negative → 6
+
+  if (score > 0.05) return { guess:9, score, confident:true };
+  return { guess:6, score, confident:false };
+}
+
+// ── OCR cell — fast adaptive retry ───────────────────────────
+// Phase 1: proc_smooth only.
+// If valid non-6/9 number → fast accept (1 request).
+// If 6 or 9 → minimal disambiguation: +src_color +src_gray (3 total).
+// If empty → run all remaining variants (up to 5 total).
+async function ocrCellWithFallback(cellRect, proxyUrl) {
+  const variants   = buildCellVariants(cellRect);
+  const variantMap = Object.fromEntries(variants.map(v => [v.label, v]));
+  const attempts   = [];
+
+  async function runVariant(label) {
+    const v = variantMap[label];
+    if (!v?.canvas) { attempts.push({label, raw:'', num:null, ok:false, dataUrl:'', skipped:true}); return null; }
+    const dataUrl = v.canvas.toDataURL('image/png');
+    try {
+      const json = await ocrVariant(v.canvas, proxyUrl);
+      const raw  = String(json?.text ?? json?.parsedText ?? '').trim().replace(/\n/g,' ');
+      const num  = parseCellResponse(json);
+      const ok   = raw.length > 0 && !json?.error;
+      const att  = {label, raw:raw.slice(0,60), num, ok, dataUrl};
+      attempts.push(att); return att;
+    } catch(e) {
+      const att = {label, raw:'', num:null, ok:false, dataUrl, error:String(e?.message||e)};
+      attempts.push(att); return att;
+    }
+  }
+
+  // Phase 1: proc_smooth only
+  const smoothAtt = await runVariant('proc_smooth');
+  const smoothNum = smoothAtt?.num ?? null;
+  const is69      = smoothNum === 6 || smoothNum === 9;
+  const isEmpty   = smoothNum === null;
+
+  // Decide additional variants
+  let additionalLabels = [];
+  if (!isEmpty && !is69) {
+    // fast accept — no additional requests needed
+  } else if (is69) {
+    additionalLabels = ['src_color', 'src_gray'];          // minimal disambiguation
+  } else {
+    additionalLabels = ['proc_invert', 'src_gray', 'src_color', 'padded_color'];
+  }
+
+  for (const label of additionalLabels) await runVariant(label);
+
+  // Mark remaining variants as skipped (UI completeness)
+  const runLabels = new Set(attempts.map(a => a.label));
+  for (const {label} of variants) {
+    if (!runLabels.has(label)) attempts.push({label, raw:'', num:null, ok:false, dataUrl:'', skipped:true});
+  }
+
+  const attemptsUsed = attempts.filter(a => !a.skipped).length;
+
+  let chosen, finalNum, chosenReason;
+  if (!isEmpty && !is69) {
+    chosen = 'proc_smooth'; finalNum = smoothNum; chosenReason = 'fast';
+  } else {
+    ({chosen, finalNum, chosenReason} = voteForNumber(attempts));
+  }
+
+  // Local visual 6/9 disambiguator — only when OCR settled on 6
+  let visualGuess = null, visualScore = null;
+  if (finalNum === 6) {
+    const procCanvas = variantMap['proc_smooth']?.canvas;
+    if (procCanvas) {
+      const vis = classifyDigit6or9(procCanvas);
+      visualGuess = vis.guess;
+      visualScore = +vis.score.toFixed(3);
+      if (vis.confident && vis.guess === 9) {
+        finalNum = 9;
+        chosenReason = 'visual_6_to_9';
+      }
+    }
+  }
+
+  const chosenAttempt = attempts.find(a => a.label === chosen);
+  return {
+    attempts, attemptsUsed, chosen,
+    num: finalNum, chosenReason,
+    visualGuess, visualScore,
+    dataUrl: chosenAttempt?.dataUrl ?? attempts[0]?.dataUrl ?? ''
+  };
+}
+
+// ── Run all rows × cols ───────────────────────────────────────
+async function runCellOcr() {
+  if (!_procCvs) return;
+  const g   = getGeo();
+  const ph  = _procCvs.height;
+  const pw  = _procCvs.width;
+  const url = document.getElementById('proxyUrl').value.trim();
+  const COL_KEYS = ['kills','deaths','pvp_dmg','pve_dmg'];
+
+  document.getElementById('btnRun').disabled = true;
+  document.getElementById('exportBox').style.display = 'none';
+  const tbody = document.getElementById('resultBody');
+  tbody.innerHTML = '';
+  document.getElementById('resultTable').style.display = '';
+  setRunStatus('Запускаю OCR...');
+
+  let done=0, total=g.rowCount * COL_KEYS.length;
+  let totalRequests=0;
+  const t0 = Date.now();
+
+  for (let ri=0; ri<g.rowCount; ri++) {
+    const ry = g.headerY + ri * g.rowH; if (ry>=ph) break;
+    const rh = Math.min(g.rowH, ph-ry);
+    const rowData = {ri, cells:{}};
+
+    for (const colKey of COL_KEYS) {
+      const col = g.cols[colKey];
+      const cx = clamp(col.x, 0, pw-1);
+      const cw = clamp(col.w, 1, Math.max(1, pw-cx));
+      const cy = clamp(ry, 0, ph-1);
+      const ch = clamp(rh, 1, Math.max(1, ph-ry));
+      done++;
+      setRunStatus(`Row ${ri} / ${colKey} (${done}/${total}) — ${totalRequests} req`);
+
+      try {
+        const result = await ocrCellWithFallback({x:cx,y:cy,w:cw,h:ch}, url);
+        rowData.cells[colKey] = result;
+        totalRequests += result.attemptsUsed ?? 0;
+      } catch(e) {
+        rowData.cells[colKey] = {attempts:[], attemptsUsed:0, chosen:'error', num:0, dataUrl:'', error:String(e?.message||e)};
+      }
+      await new Promise(r=>setTimeout(r,0));
+    }
+
+    renderRow(tbody, rowData, COL_KEYS);
+  }
+
+  const elapsed = ((Date.now()-t0)/1000).toFixed(1);
+  setRunStatus(`Готово. totalRequests=${totalRequests} | cells=${done} | elapsed=${elapsed}s`);
+  document.getElementById('btnRun').disabled = false;
+}
+
+// ── Render result row ─────────────────────────────────────────
+function numClass(n, chosen, reason) {
+  if (reason === 'no_result') return 'num-err';
+  if (reason === 'ambiguous_6_9') return 'num-warn';
+  if (chosen === 'none') return 'num-warn';
+  if (n === 0) return 'num-zero';
+  if (n > 0)   return 'num-ok';
+  return 'num-warn';
+}
+
+function renderRow(tbody, rd, cols) {
+  const tr = document.createElement('tr');
+  let html = `<td style="color:#64748b;font-weight:700">${rd.ri}</td>`;
+
+  for (const col of cols) {
+    const c = rd.cells[col] || {attempts:[], chosen:'none', num:0, dataUrl:''};
+
+    // Preview — chosen variant's image (or first if none succeeded)
+    const previewUrl = c.dataUrl || c.attempts?.[0]?.dataUrl || '';
+    const imgHtml = previewUrl
+      ? `<img class="cp" src="${previewUrl}" title="click to zoom" onclick="document.getElementById('lbImg').src='${previewUrl}';document.getElementById('lb').classList.add('on')">`
+      : '<span style="color:#475569;font-size:10px">—</span>';
+
+    // Attempts summary
+    const attUsed = c.attemptsUsed ?? (c.attempts?.filter(a=>!a.skipped).length ?? 0);
+    let attHtml = `<div class="attempts-cell"><div style="font-size:9px;color:#475569;margin-bottom:2px">used: ${attUsed}</div>`;
+    for (const a of (c.attempts || [])) {
+      if (a.skipped) continue;
+      const isChosen = a.label === c.chosen;
+      const rawShow  = a.error ? `<span class="num-err">ERR: ${a.error.slice(0,30)}</span>`
+                                : (a.raw || '<span style="color:#334155">empty</span>');
+      const numShow  = a.num !== null ? a.num : '?';
+      const numColor = a.num > 0 ? '#30db76' : (a.num === 0 && a.ok ? '#94a3b8' : '#334155');
+      const chosenClass = isChosen ? ' att-chosen' : '';
+      const thumbHtml = a.dataUrl
+        ? `<img class="att-thumb" src="${a.dataUrl}" title="${a.label}" onclick="document.getElementById('lbImg').src='${a.dataUrl}';document.getElementById('lb').classList.add('on')">`
+        : '<span style="width:44px;display:inline-block"></span>';
+      attHtml += `<div class="att-row${chosenClass}">
+        <span class="att-label">${a.label}</span>
+        ${thumbHtml}
+        <span class="att-raw" title="${a.raw}">${rawShow}</span>
+        <span class="att-num" style="color:${numColor}">${numShow}</span>
+      </div>`;
+    }
+    if (c.visualGuess !== null && c.visualGuess !== undefined) {
+      const vColor = c.visualGuess === 9 ? '#c084fc' : '#64748b';
+      const sColor = c.visualScore > 0   ? '#c084fc' : '#64748b';
+      attHtml += `<div style="font-size:9px;color:#64748b;margin-top:3px;border-top:1px solid #1e2530;padding-top:2px">visual: guess=<b style="color:${vColor}">${c.visualGuess}</b> score=<span style="color:${sColor}">${c.visualScore}</span></div>`;
+    }
+    attHtml += '</div>';
+
+    const reason = c.chosenReason ?? '';
+    const reasonBadge = reason
+      ? `<br><span class="reason-badge reason-${reason}">${reason.replace(/_/g,' ')}</span>`
+      : '';
+    const numHtml = `<span class="${numClass(c.num, c.chosen, reason)}" title="chosen: ${c.chosen}">${c.num}</span>${reasonBadge}`;
+    html += `<td>${imgHtml}</td><td>${attHtml}</td><td style="white-space:nowrap">${numHtml}</td>`;
+  }
+
+  tr.innerHTML = html;
+  tbody.appendChild(tr);
+}
+
+// ── Export CELL_GEO ───────────────────────────────────────────
+function exportGeo() {
+  const g = getGeo();
+  const out = {
+    headerY:  g.headerY, rowH: g.rowH, rowCount: g.rowCount, upscale: g.upscale,
+    cols: {
+      kills:   {x:g.cols.kills.x,   w:g.cols.kills.w  },
+      deaths:  {x:g.cols.deaths.x,  w:g.cols.deaths.w },
+      pvp_dmg: {x:g.cols.pvp_dmg.x, w:g.cols.pvp_dmg.w},
+      pve_dmg: {x:g.cols.pve_dmg.x, w:g.cols.pve_dmg.w},
+    }
+  };
+  const box = document.getElementById('exportBox');
+  box.textContent = JSON.stringify(out, null, 2);
+  box.style.display = '';
+  box.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+// ── Geometry presets (localStorage) ──────────────────────────
+const GEO_LS_KEY = 'clanControl_cellOcrGeo';
+
+function applyGeoToInputs(g) {
+  const map = {
+    cropX:g.cropX, cropY:g.cropY, cropW:g.cropW, cropH:g.cropH,
+    scale:g.scale, contrast:g.contrast, maskX:g.maskX, maskW:g.maskW,
+    headerY:g.headerY, rowH:g.rowH, rowCount:g.rowCount, upscale:g.upscale,
+    killsX:g.cols?.kills?.x,    killsW:g.cols?.kills?.w,
+    deathsX:g.cols?.deaths?.x,  deathsW:g.cols?.deaths?.w,
+    pvpX:g.cols?.pvp_dmg?.x,   pvpW:g.cols?.pvp_dmg?.w,
+    pveX:g.cols?.pve_dmg?.x,   pveW:g.cols?.pve_dmg?.w,
+  };
+  for (const [id, val] of Object.entries(map)) {
+    if (val != null) { const el=document.getElementById(id); if(el) el.value=val; }
+  }
+}
+
+function saveGeo() {
+  localStorage.setItem(GEO_LS_KEY, JSON.stringify(getGeo()));
+  setRunStatus('CELL_GEO сохранён — загрузится автоматически при следующем открытии.');
+}
+
+function loadGeoFromStorage() {
+  try {
+    const raw = localStorage.getItem(GEO_LS_KEY);
+    if (!raw) return false;
+    applyGeoToInputs(JSON.parse(raw));
+    return true;
+  } catch { return false; }
+}
+
+function loadGeoBtn() {
+  const ok = loadGeoFromStorage();
+  if (ok) { if (_srcImg) buildProcessed(_srcImg); else drawOverlay(); setRunStatus('Saved CELL_GEO загружен.'); }
+  else setRunStatus('Нет сохранённого CELL_GEO.');
+}
+
+function resetGeo() {
+  applyGeoToInputs({
+    cropX:398,cropY:90,cropW:375,cropH:205,scale:3,contrast:140,maskX:152,maskW:32,
+    headerY:62,rowH:61,rowCount:9,upscale:4,
+    cols:{kills:{x:552,w:143},deaths:{x:695,w:143},pvp_dmg:{x:838,w:143},pve_dmg:{x:981,w:144}}
+  });
+  if (_srcImg) buildProcessed(_srcImg); else drawOverlay();
+  setRunStatus('CELL_GEO сброшен к дефолту.');
+}
+
+// ── Auto Calibrate Columns ────────────────────────────────────
+// Scans vertical projection of dark pixels in player rows area
+// (x > maskEnd) to locate 4 numeric column bands.
+function autoCalibrate() {
+  if (!_procCvs) { setRunStatus('Нет processed canvas — сначала загрузи скриншот'); return; }
+  const g   = getGeo();
+  const pw  = _procCvs.width, ph = _procCvs.height;
+  const ctx = _procCvs.getContext('2d', {willReadFrequently:true});
+
+  const startY  = Math.max(0, g.headerY);
+  const endY    = Math.min(ph, g.headerY + g.rowCount * g.rowH);
+  const maskEnd = Math.min(pw - 2, Math.round((g.maskX + g.maskW) * g.scale));
+
+  if (endY <= startY || maskEnd >= pw - 2) {
+    setRunStatus('Калибровка: некорректный регион (проверь headerY/rowH/rowCount)');
+    return;
+  }
+
+  const scanH = endY - startY;
+  const scanW = pw - maskEnd;
+  const pxData = ctx.getImageData(maskEnd, startY, scanW, scanH).data;
+
+  // Vertical projection: fraction of rows per column that have a dark pixel.
+  // In processed canvas, numbers (bright in game) → dark (≈0) after negative contrast.
+  const DARK_TH = 80;
+  const proj = new Float32Array(scanW);
+  for (let xi = 0; xi < scanW; xi++) {
+    let n = 0;
+    for (let yi = 0; yi < scanH; yi++) {
+      if (pxData[(yi * scanW + xi) * 4] < DARK_TH) n++;
+    }
+    proj[xi] = n / scanH;
+  }
+
+  // Moving-average smooth (half-width 7)
+  const smooth = new Float32Array(scanW);
+  const SW = 7;
+  for (let xi = 0; xi < scanW; xi++) {
+    let s=0, c=0;
+    for (let dx=-SW; dx<=SW; dx++) { const xj=xi+dx; if(xj>=0&&xj<scanW){s+=proj[xj];c++;} }
+    smooth[xi] = s/c;
+  }
+
+  // Detect bands above threshold
+  const BAND_TH    = 0.025; // 2.5% of rows must have dark pixel for column to qualify
+  const MIN_BAND_W = 8;
+  const bands = [];
+  let bs = -1;
+  for (let xi = 0; xi <= scanW; xi++) {
+    const v = xi < scanW ? smooth[xi] : 0;
+    if (bs < 0 && v >= BAND_TH) { bs = xi; }
+    else if (bs >= 0 && (v < BAND_TH || xi === scanW)) {
+      const bw = xi - bs;
+      if (bw >= MIN_BAND_W) {
+        const dens = smooth.slice(bs, xi).reduce((a,b)=>a+b,0) / bw;
+        bands.push({x: maskEnd+bs, end: maskEnd+xi, w: bw, dens});
+      }
+      bs = -1;
+    }
+  }
+
+  // Merge bands with gap < 22px (sub-digit gaps, grid lines)
+  const MERGE_GAP = 22;
+  const merged = [];
+  for (const b of bands) {
+    const prev = merged[merged.length-1];
+    if (prev && b.x - prev.end < MERGE_GAP) {
+      prev.end=b.end; prev.w=prev.end-prev.x; prev.dens=Math.max(prev.dens,b.dens);
+    } else { merged.push({...b}); }
+  }
+
+  // Top-4 by density, sorted by x position = left→right column order
+  const top4 = [...merged]
+    .sort((a,b) => b.dens - a.dens)
+    .slice(0, 4)
+    .sort((a,b) => a.x - b.x);
+
+  if (top4.length < 4) {
+    setRunStatus(`Калибровка: найдено ${top4.length} из 4 колонок. Настрой headerY/rowH или попробуй другой скриншот.`);
+    return;
+  }
+
+  // Write to inputs with padding
+  const PAD = 8;
+  const COL_IDS = [['killsX','killsW'],['deathsX','deathsW'],['pvpX','pvpW'],['pveX','pveW']];
+  top4.forEach((band, i) => {
+    const [xId, wId] = COL_IDS[i];
+    const bx = Math.max(maskEnd, band.x - PAD);
+    const bw = Math.min(pw - bx, band.w + PAD*2);
+    document.getElementById(xId).value = bx;
+    document.getElementById(wId).value = bw;
+  });
+
+  if (_srcImg) buildProcessed(_srcImg); else drawOverlay();
+  const names = ['kills','deaths','pvp','pve'];
+  setRunStatus(`Калибровка OK: ${top4.map((b,i)=>names[i]+'='+b.x+'…'+b.end+'('+b.w+'px)').join(' | ')}`);
+}
+
+// ── Status ────────────────────────────────────────────────────
+function setStatus(m)    { document.getElementById('statusMsg').textContent = m; }
+function setRunStatus(m) { document.getElementById('runStatus').textContent = m; }
+
+// ── File upload ───────────────────────────────────────────────
+document.getElementById('fileInput').addEventListener('change', async e => {
+  const file = e.target.files?.[0]; if (!file) return;
+  setStatus('Загружаю...');
+  const url = URL.createObjectURL(file);
+  const img  = new Image();
+  img.onload  = () => { _srcImg=img; setStatus(`${file.name}  ${img.naturalWidth}×${img.naturalHeight}`); buildProcessed(img); document.getElementById('btnCalibrate').disabled=false; };
+  img.onerror = () => setStatus('Ошибка загрузки');
+  img.src = url; e.target.value = '';
+});
+
+// ── Live redraw on any param change ──────────────────────────
+document.querySelectorAll('.controls input[type="number"]').forEach(el => {
+  el.addEventListener('input', () => { if (_srcImg) buildProcessed(_srcImg); else drawOverlay(); });
+});
+
+// ── Drag-drop ─────────────────────────────────────────────────
+document.body.addEventListener('dragover', e => e.preventDefault());
+document.body.addEventListener('drop', e => {
+  e.preventDefault();
+  const file = e.dataTransfer?.files?.[0]; if (!file) return;
+  const dt = new DataTransfer(); dt.items.add(file);
+  const fi = document.getElementById('fileInput');
+  Object.defineProperty(fi,'files',{value:dt.files,configurable:true});
+  fi.dispatchEvent(new Event('change'));
+});
+
+// ── Init: auto-load saved CELL_GEO on page open ───────────────
+(function initGeo() {
+  const loaded = loadGeoFromStorage();
+  setStatus(loaded
+    ? 'Saved CELL_GEO загружен → загрузи скриншот → Run Cell OCR'
+    : 'Загрузи скриншот → Auto Calibrate Columns');
+})();
+</script>
+</body>
+</html>

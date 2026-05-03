@@ -1,0 +1,1099 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OCR Spike</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fa;
+      --panel: #ffffff;
+      --text: #17202a;
+      --muted: #5d6978;
+      --line: #d8dee8;
+      --accent: #1b6fd8;
+      --accent-strong: #0f56ad;
+      --bad: #a33a3a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(1440px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 20px 0 32px;
+    }
+
+    h1 {
+      margin: 0 0 16px;
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .toolbar,
+    .grid,
+    .result-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .toolbar {
+      grid-template-columns: minmax(220px, 1.2fr) repeat(2, minmax(140px, 0.4fr)) repeat(3, auto);
+      align-items: end;
+      margin-bottom: 14px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .grid {
+      grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr);
+      align-items: start;
+    }
+
+    .result-grid {
+      grid-template-columns: minmax(360px, 1fr) minmax(360px, 0.8fr);
+      margin-top: 12px;
+      align-items: start;
+    }
+
+    section {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    input[type="file"],
+    input[type="number"],
+    select {
+      width: 100%;
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      font: inherit;
+      padding: 6px 8px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+    }
+
+    button {
+      min-height: 36px;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      font: inherit;
+      font-weight: 700;
+      padding: 7px 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      background: var(--accent-strong);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    .settings {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(110px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .column-settings {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .column-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .setting-row {
+      display: grid;
+      grid-template-columns: 1fr 76px;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .checkline {
+      display: flex;
+      min-height: 34px;
+      gap: 8px;
+      align-items: center;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .canvas-wrap {
+      position: relative;
+      overflow: auto;
+      max-height: 70vh;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #eef2f7;
+    }
+
+    canvas {
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+
+    #sourceCanvas {
+      cursor: crosshair;
+    }
+
+    .crop-box {
+      position: absolute;
+      border: 2px solid #ff3b30;
+      pointer-events: none;
+      box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.18);
+    }
+
+    .column-overlay {
+      position: absolute;
+      inset: 0 auto auto 0;
+      pointer-events: none;
+    }
+
+    .column-zone {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      border-left: 2px solid var(--zone-color);
+      border-right: 2px solid var(--zone-color);
+      background: color-mix(in srgb, var(--zone-color) 18%, transparent);
+    }
+
+    .column-zone span {
+      display: inline-block;
+      margin: 3px;
+      padding: 1px 4px;
+      border-radius: 4px;
+      background: rgb(255 255 255 / 0.82);
+      color: #111;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .rows {
+      display: grid;
+      gap: 8px;
+      max-height: 520px;
+      overflow: auto;
+    }
+
+    .row-card {
+      display: grid;
+      gap: 5px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fbfcfe;
+    }
+
+    .cell-grid {
+      display: grid;
+      grid-template-columns: 2fr repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    .cell-preview {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .cell-preview span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .cell-preview .bad-cell {
+      color: var(--bad);
+    }
+
+    .row-card canvas {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .row-meta,
+    .status {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status {
+      min-height: 18px;
+      margin-top: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 7px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    pre {
+      min-height: 260px;
+      max-height: 520px;
+      overflow: auto;
+      margin: 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #101820;
+      color: #e8f0f7;
+      font: 12px/1.45 Consolas, "SFMono-Regular", monospace;
+      white-space: pre-wrap;
+    }
+
+    .error {
+      color: var(--bad);
+      font-weight: 700;
+    }
+
+    @media (max-width: 980px) {
+      .toolbar,
+      .grid,
+      .result-grid,
+      .settings,
+      .column-settings,
+      .cell-grid {
+        grid-template-columns: 1fr;
+      }
+
+      main {
+        width: min(100vw - 20px, 760px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>OCR Spike</h1>
+
+    <div class="toolbar">
+      <label>
+        Screenshot
+        <input id="fileInput" type="file" accept="image/*">
+      </label>
+      <label>
+        Language
+        <select id="langInput">
+          <option value="eng">eng</option>
+          <option value="rus">rus</option>
+          <option value="rus+eng" selected>rus+eng</option>
+        </select>
+      </label>
+      <label class="checkline">
+        <input id="thresholdInput" type="checkbox" checked>
+        threshold
+      </label>
+      <button id="runButton" disabled>Run column OCR</button>
+      <button id="debugRowButton" disabled>Debug full-row OCR</button>
+      <button id="copyButton" disabled>Copy JSON</button>
+    </div>
+
+    <div class="grid">
+      <section>
+        <h2>Source Screenshot</h2>
+        <div class="settings">
+          <label>
+            crop X
+            <span class="setting-row">
+              <input id="cropXRange" type="range" min="0" max="0" value="0">
+              <input id="cropXInput" type="number" min="0" value="0">
+            </span>
+          </label>
+          <label>
+            crop Y
+            <span class="setting-row">
+              <input id="cropYRange" type="range" min="0" max="0" value="0">
+              <input id="cropYInput" type="number" min="0" value="0">
+            </span>
+          </label>
+          <label>
+            crop W
+            <span class="setting-row">
+              <input id="cropWRange" type="range" min="1" max="1" value="1">
+              <input id="cropWInput" type="number" min="1" value="1">
+            </span>
+          </label>
+          <label>
+            crop H
+            <span class="setting-row">
+              <input id="cropHRange" type="range" min="1" max="1" value="1">
+              <input id="cropHInput" type="number" min="1" value="1">
+            </span>
+          </label>
+          <label>
+            row height
+            <span class="setting-row">
+              <input id="rowHeightRange" type="range" min="14" max="90" value="34">
+              <input id="rowHeightInput" type="number" min="8" value="34">
+            </span>
+          </label>
+          <label>
+            contrast
+            <span class="setting-row">
+              <input id="contrastRange" type="range" min="80" max="260" value="150">
+              <input id="contrastInput" type="number" min="50" value="150">
+            </span>
+          </label>
+        </div>
+        <div id="sourceWrap" class="canvas-wrap">
+          <canvas id="sourceCanvas"></canvas>
+          <div id="cropBox" class="crop-box" hidden></div>
+        </div>
+        <div id="imageInfo" class="status">Load a screenshot to start.</div>
+      </section>
+
+      <section>
+        <h2>Table Crop</h2>
+        <div class="settings">
+          <label>
+            preset
+            <select id="presetInput">
+              <option value="right-members">right table / group members</option>
+              <option value="left-leaders">left table / leaders</option>
+            </select>
+          </label>
+          <button id="presetButton" disabled>Apply Preset</button>
+          <label>
+            header offset
+            <input id="headerOffsetInput" type="number" min="0" value="34">
+          </label>
+          <label>
+            row count
+            <input id="rowCountInput" type="number" min="1" value="20">
+          </label>
+        </div>
+        <div class="column-settings">
+          <label>
+            nick X/W
+            <span class="column-pair">
+              <input id="nickXInput" type="number" min="0" value="0">
+              <input id="nickWInput" type="number" min="1" value="220">
+            </span>
+          </label>
+          <label>
+            kills X/W
+            <span class="column-pair">
+              <input id="killsXInput" type="number" min="0" value="230">
+              <input id="killsWInput" type="number" min="1" value="70">
+            </span>
+          </label>
+          <label>
+            deaths X/W
+            <span class="column-pair">
+              <input id="deathsXInput" type="number" min="0" value="305">
+              <input id="deathsWInput" type="number" min="1" value="70">
+            </span>
+          </label>
+          <label>
+            pvp X/W
+            <span class="column-pair">
+              <input id="pvpXInput" type="number" min="0" value="380">
+              <input id="pvpWInput" type="number" min="1" value="70">
+            </span>
+          </label>
+          <label>
+            pve X/W
+            <span class="column-pair">
+              <input id="pveXInput" type="number" min="0" value="455">
+              <input id="pveWInput" type="number" min="1" value="70">
+            </span>
+          </label>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="cropCanvas"></canvas>
+          <div id="columnOverlay" class="column-overlay"></div>
+        </div>
+        <div id="cropInfo" class="status"></div>
+      </section>
+    </div>
+
+    <div class="result-grid">
+      <section>
+        <h2>Found Rows</h2>
+        <div id="rowsOutput" class="rows"></div>
+      </section>
+
+      <section>
+        <h2>Recognized Result</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>nick</th>
+              <th>kills</th>
+              <th>deaths</th>
+              <th>pvp</th>
+              <th>pve</th>
+            </tr>
+          </thead>
+          <tbody id="resultBody"></tbody>
+        </table>
+        <div id="ocrStatus" class="status"></div>
+      </section>
+    </div>
+
+    <section style="margin-top: 12px;">
+      <h2>JSON Output</h2>
+      <pre id="jsonOutput">[]</pre>
+    </section>
+  </main>
+
+  <script>
+    const el = {
+      file: document.getElementById('fileInput'),
+      lang: document.getElementById('langInput'),
+      threshold: document.getElementById('thresholdInput'),
+      run: document.getElementById('runButton'),
+      debugRow: document.getElementById('debugRowButton'),
+      copy: document.getElementById('copyButton'),
+      preset: document.getElementById('presetInput'),
+      presetButton: document.getElementById('presetButton'),
+      sourceCanvas: document.getElementById('sourceCanvas'),
+      cropCanvas: document.getElementById('cropCanvas'),
+      columnOverlay: document.getElementById('columnOverlay'),
+      sourceWrap: document.getElementById('sourceWrap'),
+      cropBox: document.getElementById('cropBox'),
+      rowsOutput: document.getElementById('rowsOutput'),
+      resultBody: document.getElementById('resultBody'),
+      jsonOutput: document.getElementById('jsonOutput'),
+      imageInfo: document.getElementById('imageInfo'),
+      cropInfo: document.getElementById('cropInfo'),
+      ocrStatus: document.getElementById('ocrStatus'),
+      cropXRange: document.getElementById('cropXRange'),
+      cropXInput: document.getElementById('cropXInput'),
+      cropYRange: document.getElementById('cropYRange'),
+      cropYInput: document.getElementById('cropYInput'),
+      cropWRange: document.getElementById('cropWRange'),
+      cropWInput: document.getElementById('cropWInput'),
+      cropHRange: document.getElementById('cropHRange'),
+      cropHInput: document.getElementById('cropHInput'),
+      rowHeightRange: document.getElementById('rowHeightRange'),
+      rowHeightInput: document.getElementById('rowHeightInput'),
+      headerOffsetInput: document.getElementById('headerOffsetInput'),
+      rowCountInput: document.getElementById('rowCountInput'),
+      nickXInput: document.getElementById('nickXInput'),
+      nickWInput: document.getElementById('nickWInput'),
+      killsXInput: document.getElementById('killsXInput'),
+      killsWInput: document.getElementById('killsWInput'),
+      deathsXInput: document.getElementById('deathsXInput'),
+      deathsWInput: document.getElementById('deathsWInput'),
+      pvpXInput: document.getElementById('pvpXInput'),
+      pvpWInput: document.getElementById('pvpWInput'),
+      pveXInput: document.getElementById('pveXInput'),
+      pveWInput: document.getElementById('pveWInput'),
+      contrastRange: document.getElementById('contrastRange'),
+      contrastInput: document.getElementById('contrastInput')
+    };
+
+    const state = {
+      image: null,
+      rows: [],
+      cells: [],
+      results: [],
+      dragging: false,
+      dragStart: null
+    };
+
+    const sourceCtx = el.sourceCanvas.getContext('2d', { willReadFrequently: true });
+    const cropCtx = el.cropCanvas.getContext('2d', { willReadFrequently: true });
+
+    const controls = [
+      ['cropX', el.cropXRange, el.cropXInput],
+      ['cropY', el.cropYRange, el.cropYInput],
+      ['cropW', el.cropWRange, el.cropWInput],
+      ['cropH', el.cropHRange, el.cropHInput],
+      ['rowHeight', el.rowHeightRange, el.rowHeightInput],
+      ['contrast', el.contrastRange, el.contrastInput]
+    ];
+
+    function readNumber(input, fallback) {
+      const value = Number(input.value);
+      return Number.isFinite(value) ? value : fallback;
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function getCrop() {
+      if (!state.image) return { x: 0, y: 0, w: 1, h: 1 };
+      const maxW = state.image.width;
+      const maxH = state.image.height;
+      const x = clamp(Math.round(readNumber(el.cropXInput, 0)), 0, maxW - 1);
+      const y = clamp(Math.round(readNumber(el.cropYInput, 0)), 0, maxH - 1);
+      const w = clamp(Math.round(readNumber(el.cropWInput, maxW - x)), 1, maxW - x);
+      const h = clamp(Math.round(readNumber(el.cropHInput, maxH - y)), 1, maxH - y);
+      return { x, y, w, h };
+    }
+
+    function setControl(range, input, value, max) {
+      range.max = String(max);
+      input.max = String(max);
+      range.value = String(value);
+      input.value = String(value);
+    }
+
+    function syncPair(range, input, onChange) {
+      const update = (source, target) => {
+        target.value = source.value;
+        onChange();
+      };
+      range.addEventListener('input', () => update(range, input));
+      input.addEventListener('input', () => update(input, range));
+    }
+
+    function setValue(input, value) {
+      input.value = String(Math.max(0, Math.round(value)));
+    }
+
+    function applyColumnPreset() {
+      const width = Math.max(1, el.cropCanvas.width || getCrop().w);
+      const height = Math.max(1, el.cropCanvas.height || getCrop().h);
+      const preset = el.preset.value;
+      const scale = width / 365;
+      const base = preset === 'left-leaders'
+        ? { nickX: 0, nickW: 165, killsX: 180, killsW: 32, deathsX: 220, deathsW: 32, pvpX: 260, pvpW: 55, pveX: 320, pveW: 45 }
+        : { nickX: 0, nickW: 165, killsX: 180, killsW: 32, deathsX: 220, deathsW: 32, pvpX: 260, pvpW: 55, pveX: 320, pveW: 45 };
+
+      setValue(el.headerOffsetInput, Math.min(42, height * 0.14));
+      setValue(el.rowHeightInput, 34);
+      setValue(el.rowHeightRange, 34);
+      setValue(el.rowCountInput, 9);
+      setValue(el.nickXInput, base.nickX * scale);
+      setValue(el.nickWInput, base.nickW * scale);
+      setValue(el.killsXInput, base.killsX * scale);
+      setValue(el.killsWInput, base.killsW * scale);
+      setValue(el.deathsXInput, base.deathsX * scale);
+      setValue(el.deathsWInput, base.deathsW * scale);
+      setValue(el.pvpXInput, base.pvpX * scale);
+      setValue(el.pvpWInput, base.pvpW * scale);
+      setValue(el.pveXInput, base.pveX * scale);
+      setValue(el.pveWInput, base.pveW * scale);
+      buildRows();
+    }
+
+    controls.forEach(([, range, input]) => {
+      syncPair(range, input, () => {
+        drawSource();
+        drawCropAndRows();
+      });
+    });
+
+    const columnInputs = [
+      el.headerOffsetInput,
+      el.rowCountInput,
+      el.nickXInput,
+      el.nickWInput,
+      el.killsXInput,
+      el.killsWInput,
+      el.deathsXInput,
+      el.deathsWInput,
+      el.pvpXInput,
+      el.pvpWInput,
+      el.pveXInput,
+      el.pveWInput
+    ];
+
+    columnInputs.forEach((input) => {
+      input.addEventListener('input', buildRows);
+    });
+
+    el.threshold.addEventListener('change', drawCropAndRows);
+
+    function resetControlsForImage(img) {
+      const cropX = Math.round(img.width * 0.05);
+      const cropY = Math.round(img.height * 0.18);
+      const cropW = Math.round(img.width * 0.9);
+      const cropH = Math.round(img.height * 0.65);
+      setControl(el.cropXRange, el.cropXInput, cropX, img.width - 1);
+      setControl(el.cropYRange, el.cropYInput, cropY, img.height - 1);
+      setControl(el.cropWRange, el.cropWInput, cropW, img.width);
+      setControl(el.cropHRange, el.cropHInput, cropH, img.height);
+      setControl(el.rowHeightRange, el.rowHeightInput, 34, 120);
+      setControl(el.contrastRange, el.contrastInput, 150, 300);
+    }
+
+    function drawSource() {
+      if (!state.image) return;
+      el.sourceCanvas.width = state.image.width;
+      el.sourceCanvas.height = state.image.height;
+      sourceCtx.clearRect(0, 0, el.sourceCanvas.width, el.sourceCanvas.height);
+      sourceCtx.drawImage(state.image, 0, 0);
+      updateCropOverlay();
+    }
+
+    function updateCropOverlay() {
+      if (!state.image) {
+        el.cropBox.hidden = true;
+        return;
+      }
+      const crop = getCrop();
+      const rect = el.sourceCanvas.getBoundingClientRect();
+      const scaleX = rect.width / state.image.width;
+      const scaleY = rect.height / state.image.height;
+      el.cropBox.hidden = false;
+      el.cropBox.style.left = `${crop.x * scaleX}px`;
+      el.cropBox.style.top = `${crop.y * scaleY}px`;
+      el.cropBox.style.width = `${crop.w * scaleX}px`;
+      el.cropBox.style.height = `${crop.h * scaleY}px`;
+    }
+
+    function processImageData(imageData) {
+      const data = imageData.data;
+      const contrast = readNumber(el.contrastInput, 150) / 100;
+      const threshold = el.threshold.checked;
+      const factor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
+
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        let value = factor * (gray - 128) + 128;
+        value = clamp(value, 0, 255);
+        if (threshold) value = value > 150 ? 255 : 0;
+        data[i] = value;
+        data[i + 1] = value;
+        data[i + 2] = value;
+      }
+      return imageData;
+    }
+
+    function drawCropAndRows() {
+      if (!state.image) return;
+      const crop = getCrop();
+      el.cropCanvas.width = crop.w;
+      el.cropCanvas.height = crop.h;
+      cropCtx.clearRect(0, 0, crop.w, crop.h);
+      cropCtx.drawImage(state.image, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
+      const imageData = cropCtx.getImageData(0, 0, crop.w, crop.h);
+      cropCtx.putImageData(processImageData(imageData), 0, 0);
+      el.cropInfo.textContent = `crop: x=${crop.x}, y=${crop.y}, w=${crop.w}, h=${crop.h}`;
+      buildRows();
+    }
+
+    function getColumnSettings() {
+      const width = el.cropCanvas.width;
+      const warnings = [];
+      const clampColumn = (key, xInput, wInput) => {
+        const requestedX = Math.round(readNumber(xInput, 0));
+        const requestedW = Math.round(readNumber(wInput, 1));
+        const outOfBounds = requestedX < 0 || requestedW < 1 || requestedX >= width || requestedX + requestedW > width;
+        const x = clamp(requestedX, 0, Math.max(0, width - 1));
+        const w = clamp(requestedW, 1, Math.max(1, width - x));
+        if (outOfBounds) {
+          warnings.push(`${key} OUT_OF_BOUNDS requested x=${requestedX}, w=${requestedW}, cropW=${width}; effective x=${x}, w=${w}`);
+        }
+        return { key, requestedX, requestedW, x, w, outOfBounds };
+      };
+      return {
+        columns: {
+          nick: clampColumn('nick', el.nickXInput, el.nickWInput),
+          kills: clampColumn('kills', el.killsXInput, el.killsWInput),
+          deaths: clampColumn('deaths', el.deathsXInput, el.deathsWInput),
+          pvp: clampColumn('pvp', el.pvpXInput, el.pvpWInput),
+          pve: clampColumn('pve', el.pveXInput, el.pveWInput)
+        },
+        warnings
+      };
+    }
+
+    function makeCellCanvas(x, y, w, h) {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, w);
+      canvas.height = Math.max(1, h);
+      canvas.getContext('2d').drawImage(el.cropCanvas, x, y, w, h, 0, 0, w, h);
+      return canvas;
+    }
+
+    function renderColumnOverlay(settings) {
+      const rect = el.cropCanvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) {
+        el.columnOverlay.replaceChildren();
+        return;
+      }
+
+      const colors = {
+        nick: '#1b6fd8',
+        kills: '#168a5b',
+        deaths: '#b76d00',
+        pvp: '#8c45c7',
+        pve: '#c73952'
+      };
+      const scaleX = rect.width / el.cropCanvas.width;
+      const output = document.createDocumentFragment();
+
+      Object.values(settings.columns).forEach((col) => {
+        const zone = document.createElement('div');
+        zone.className = 'column-zone';
+        zone.style.setProperty('--zone-color', colors[col.key]);
+        zone.style.left = `${col.x * scaleX}px`;
+        zone.style.width = `${Math.max(1, col.w * scaleX)}px`;
+        const label = document.createElement('span');
+        label.textContent = col.key;
+        zone.append(label);
+        output.append(zone);
+      });
+
+      el.columnOverlay.style.width = `${rect.width}px`;
+      el.columnOverlay.style.height = `${rect.height}px`;
+      el.columnOverlay.replaceChildren(output);
+    }
+
+    function buildRows() {
+      if (!state.image || !el.cropCanvas.width || !el.cropCanvas.height) return;
+      const rowHeight = Math.max(8, Math.round(readNumber(el.rowHeightInput, 34)));
+      const headerOffset = clamp(Math.round(readNumber(el.headerOffsetInput, rowHeight)), 0, el.cropCanvas.height - 1);
+      const rowCount = Math.max(1, Math.round(readNumber(el.rowCountInput, 20)));
+      const rows = [];
+      const cells = [];
+      const output = document.createDocumentFragment();
+      const settings = getColumnSettings();
+      const columns = settings.columns;
+      const keys = ['nick', 'kills', 'deaths', 'pvp', 'pve'];
+      renderColumnOverlay(settings);
+
+      for (let index = 0; index < rowCount; index += 1) {
+        const y = headerOffset + index * rowHeight;
+        if (y + Math.floor(rowHeight * 0.45) > el.cropCanvas.height) break;
+        const h = Math.min(rowHeight, el.cropCanvas.height - y);
+        const rowCells = {};
+
+        keys.forEach((key) => {
+          const col = columns[key];
+          rowCells[key] = {
+            meta: col,
+            canvas: makeCellCanvas(col.x, y, col.w, h)
+          };
+        });
+
+        const rowCanvas = makeCellCanvas(0, y, el.cropCanvas.width, h);
+        rows.push({ index, y, h, canvas: rowCanvas });
+        cells.push({ index, y, h, cells: rowCells });
+
+        const card = document.createElement('div');
+        card.className = 'row-card';
+        const meta = document.createElement('div');
+        meta.className = 'row-meta';
+        meta.textContent = `row ${index + 1}: y=${y}, h=${h}`;
+        const cellGrid = document.createElement('div');
+        cellGrid.className = 'cell-grid';
+
+        keys.forEach((key) => {
+          const wrap = document.createElement('div');
+          wrap.className = 'cell-preview';
+          const label = document.createElement('span');
+          if (rowCells[key].meta.outOfBounds) {
+            label.className = 'bad-cell';
+            label.textContent = `${key} OUT_OF_BOUNDS`;
+          } else {
+            label.textContent = key;
+          }
+          wrap.append(label, rowCells[key].canvas);
+          cellGrid.append(wrap);
+        });
+
+        card.append(meta, cellGrid);
+        output.append(card);
+      }
+
+      state.rows = rows;
+      state.cells = cells;
+      el.rowsOutput.replaceChildren(output);
+      const warningText = settings.warnings.length ? ` Warning: ${settings.warnings.join(' | ')}` : '';
+      el.ocrStatus.textContent = `${cells.length} column row candidates.${warningText}`;
+      el.cropInfo.textContent = `${el.cropInfo.textContent.split(' | ')[0]} | columns are crop-relative.${warningText}`;
+      state.results = [];
+      renderResults();
+    }
+
+    function canvasToDataUrl(canvas) {
+      const copy = document.createElement('canvas');
+      copy.width = canvas.width;
+      copy.height = canvas.height;
+      copy.getContext('2d').drawImage(canvas, 0, 0);
+      return copy.toDataURL('image/png');
+    }
+
+    function normalizeNick(text) {
+      const cleaned = text
+        .replace(/[^\p{Script=Cyrillic}A-Za-z0-9_\-\s]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const tokens = cleaned.split(' ').filter(Boolean);
+      const token = tokens.find((item) => /[\p{Script=Cyrillic}A-Za-z]/u.test(item)) || '';
+      const hasRus = /\p{Script=Cyrillic}/u.test(token);
+      const hasEng = /[A-Za-z]/.test(token);
+      if (hasRus && hasEng) return '';
+      return token;
+    }
+
+    function parseNumbers(text) {
+      return text
+        .replace(/,/g, '')
+        .match(/\d+/g)?.slice(0, 4)
+        .map((value) => Number(value)) || [];
+    }
+
+    function parseSingleNumber(text) {
+      const cleaned = text.replace(/\s+/g, '').replace(/,/g, '');
+      const match = cleaned.match(/\d+/);
+      return match ? parseInt(match[0], 10) : null;
+    }
+
+    function renderResults() {
+      const rows = state.results.map((row) => {
+        const tr = document.createElement('tr');
+        ['nick', 'kills', 'deaths', 'pvp', 'pve'].forEach((key) => {
+          const td = document.createElement('td');
+          td.textContent = row[key] ?? '';
+          tr.append(td);
+        });
+        return tr;
+      });
+      el.resultBody.replaceChildren(...rows);
+      el.jsonOutput.textContent = JSON.stringify(state.results, null, 2);
+      el.copy.disabled = state.results.length === 0;
+    }
+
+    async function recognizeCanvas(canvas, lang, whitelist) {
+      const options = { preserve_interword_spaces: '1' };
+      if (whitelist) options.tessedit_char_whitelist = whitelist;
+      const result = await Tesseract.recognize(canvasToDataUrl(canvas), lang, options);
+      return result.data.text || '';
+    }
+
+    async function runOcr() {
+      if (!state.cells.length) return;
+      el.run.disabled = true;
+      el.debugRow.disabled = true;
+      el.copy.disabled = true;
+      el.ocrStatus.textContent = 'Column OCR running...';
+      state.results = [];
+      renderResults();
+
+      const lang = el.lang.value;
+      const numberWhitelist = '0123456789,';
+
+      try {
+        for (const row of state.cells) {
+          el.ocrStatus.textContent = `Column OCR row ${row.index + 1} / ${state.cells.length}...`;
+          const [nickText, killsText, deathsText, pvpText, pveText] = await Promise.all([
+            recognizeCanvas(row.cells.nick.canvas, lang),
+            recognizeCanvas(row.cells.kills.canvas, 'eng', numberWhitelist),
+            recognizeCanvas(row.cells.deaths.canvas, 'eng', numberWhitelist),
+            recognizeCanvas(row.cells.pvp.canvas, 'eng', numberWhitelist),
+            recognizeCanvas(row.cells.pve.canvas, 'eng', numberWhitelist)
+          ]);
+          const nick = normalizeNick(nickText);
+
+          if (nick || killsText || deathsText || pvpText || pveText) {
+            state.results.push({
+              nick,
+              kills: parseSingleNumber(killsText),
+              deaths: parseSingleNumber(deathsText),
+              pvp: parseSingleNumber(pvpText),
+              pve: parseSingleNumber(pveText)
+            });
+            renderResults();
+          }
+        }
+        el.ocrStatus.textContent = `Column OCR done. ${state.results.length} rows recognized.`;
+      } catch (error) {
+        el.ocrStatus.innerHTML = `<span class="error">${String(error.message || error)}</span>`;
+      } finally {
+        el.run.disabled = false;
+        el.debugRow.disabled = false;
+        el.copy.disabled = state.results.length === 0;
+      }
+    }
+
+    async function runDebugRowOcr() {
+      if (!state.rows.length) return;
+      el.run.disabled = true;
+      el.debugRow.disabled = true;
+      el.copy.disabled = true;
+      el.ocrStatus.textContent = 'Debug full-row OCR running...';
+      state.results = [];
+      renderResults();
+
+      const lang = el.lang.value;
+      const numberWhitelist = '0123456789,';
+
+      try {
+        for (const row of state.rows) {
+          el.ocrStatus.textContent = `Debug OCR row ${row.index + 1} / ${state.rows.length}...`;
+          const rowWidth = row.canvas.width;
+          const nickWidth = Math.max(40, Math.round(rowWidth * 0.42));
+          const statsX = Math.max(0, Math.round(rowWidth * 0.38));
+          const statsWidth = Math.max(40, rowWidth - statsX);
+
+          const nickCanvas = makeCellCanvas(0, row.y, nickWidth, row.h);
+          const statsCanvas = makeCellCanvas(statsX, row.y, statsWidth, row.h);
+
+          const [nickText, statsText] = await Promise.all([
+            recognizeCanvas(nickCanvas, lang),
+            recognizeCanvas(statsCanvas, 'eng', numberWhitelist)
+          ]);
+          const nick = normalizeNick(nickText);
+          const nums = parseNumbers(statsText);
+
+          if (nick || nums.length) {
+            state.results.push({
+              nick,
+              kills: nums[0] ?? null,
+              deaths: nums[1] ?? null,
+              pvp: nums[2] ?? null,
+              pve: nums[3] ?? null
+            });
+            renderResults();
+          }
+        }
+        el.ocrStatus.textContent = `Debug full-row OCR done. ${state.results.length} rows recognized.`;
+      } catch (error) {
+        el.ocrStatus.innerHTML = `<span class="error">${String(error.message || error)}</span>`;
+      } finally {
+        el.run.disabled = false;
+        el.debugRow.disabled = false;
+        el.copy.disabled = state.results.length === 0;
+      }
+    }
+
+    el.file.addEventListener('change', () => {
+      const file = el.file.files?.[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = () => {
+        state.image = img;
+        resetControlsForImage(img);
+        drawSource();
+        drawCropAndRows();
+        applyColumnPreset();
+        el.run.disabled = false;
+        el.debugRow.disabled = false;
+        el.presetButton.disabled = false;
+        el.imageInfo.textContent = `${file.name}: ${img.width} x ${img.height}`;
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = () => {
+        el.imageInfo.innerHTML = '<span class="error">Could not load image.</span>';
+      };
+      img.src = URL.createObjectURL(file);
+    });
+
+    el.run.addEventListener('click', runOcr);
+    el.debugRow.addEventListener('click', runDebugRowOcr);
+    el.presetButton.addEventListener('click', applyColumnPreset);
+
+    el.copy.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(el.jsonOutput.textContent);
+      el.ocrStatus.textContent = 'JSON copied.';
+    });
+
+    el.sourceCanvas.addEventListener('pointerdown', (event) => {
+      if (!state.image) return;
+      const point = imagePointFromEvent(event);
+      state.dragging = true;
+      state.dragStart = point;
+      el.sourceCanvas.setPointerCapture(event.pointerId);
+    });
+
+    el.sourceCanvas.addEventListener('pointermove', (event) => {
+      if (!state.dragging || !state.dragStart || !state.image) return;
+      const point = imagePointFromEvent(event);
+      const x = Math.min(state.dragStart.x, point.x);
+      const y = Math.min(state.dragStart.y, point.y);
+      const w = Math.max(1, Math.abs(point.x - state.dragStart.x));
+      const h = Math.max(1, Math.abs(point.y - state.dragStart.y));
+      el.cropXInput.value = el.cropXRange.value = String(clamp(x, 0, state.image.width - 1));
+      el.cropYInput.value = el.cropYRange.value = String(clamp(y, 0, state.image.height - 1));
+      el.cropWInput.value = el.cropWRange.value = String(clamp(w, 1, state.image.width - x));
+      el.cropHInput.value = el.cropHRange.value = String(clamp(h, 1, state.image.height - y));
+      drawSource();
+      drawCropAndRows();
+    });
+
+    window.addEventListener('pointerup', () => {
+      state.dragging = false;
+      state.dragStart = null;
+    });
+
+    window.addEventListener('resize', () => {
+      updateCropOverlay();
+      if (state.image) renderColumnOverlay(getColumnSettings());
+    });
+
+    function imagePointFromEvent(event) {
+      const rect = el.sourceCanvas.getBoundingClientRect();
+      const scaleX = state.image.width / rect.width;
+      const scaleY = state.image.height / rect.height;
+      return {
+        x: Math.round((event.clientX - rect.left) * scaleX),
+        y: Math.round((event.clientY - rect.top) * scaleY)
+      };
+    }
+  </script>
+</body>
+</html>

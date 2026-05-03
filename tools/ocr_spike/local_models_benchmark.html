@@ -1,0 +1,991 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Local OCR Benchmark — clan-control spike</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:13px/1.4 system-ui,sans-serif;background:#1a1d22;color:#d4d8e0;min-height:100vh}
+h1{font-size:15px;font-weight:700;color:#e8c97a}
+h2{font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+h3{font-size:12px;font-weight:700;color:#60a5fa;margin-bottom:5px}
+
+.topbar{display:flex;align-items:center;gap:12px;padding:8px 14px;background:#12151b;border-bottom:1px solid #2d3748;flex-wrap:wrap}
+.chip{font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid #2d3748;color:#475569}
+#topStatus{font-size:11px;color:#64748b;margin-left:auto}
+
+/* Upload grid */
+.upload-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:10px 14px;border-bottom:1px solid #1e2530}
+@media(max-width:900px){.upload-grid{grid-template-columns:1fr}}
+.slot{background:#131720;border:1px solid #2d3748;border-radius:6px;padding:10px;transition:border-color .2s}
+.slot.active{border-color:#4f46e5}
+.drop-zone{border:2px dashed #2d3748;border-radius:5px;padding:14px 8px;text-align:center;cursor:pointer;font-size:11px;color:#475569;margin-bottom:8px;transition:border-color .15s,color .15s;user-select:none}
+.drop-zone:hover,.drop-zone.drag{border-color:#4f46e5;color:#60a5fa}
+.thumb-row{display:flex;gap:8px;margin:6px 0;flex-wrap:wrap;align-items:flex-start}
+.cv-wrap{display:flex;flex-direction:column;gap:3px}
+.cv-label{font-size:9px;color:#64748b}
+canvas{display:block;max-width:100%;border:1px solid #2d3748;border-radius:3px;cursor:zoom-in}
+.hash-info{font:10px/1.5 Consolas,monospace;color:#334155;margin:3px 0}
+.crop-debug{font:10px/1.45 Consolas,monospace;color:#64748b;margin-top:3px}
+.crop-warn{font:10px/1.45 Consolas,monospace;color:#f59e0b;margin-top:3px}
+textarea.exp-json{width:100%;background:#0d1117;border:1px solid #2d3748;color:#c0c8d8;border-radius:4px;padding:5px;font:11px/1.4 Consolas,monospace;resize:vertical;min-height:55px;margin-top:5px}
+
+/* Controls */
+.controls{padding:8px 14px;border-bottom:1px solid #1e2530;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button{padding:5px 12px;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;transition:opacity .15s}
+#btnRunAll{background:#4f46e5;color:#fff}
+#btnRunAll:hover{opacity:.85}
+#btnRunAll:disabled{opacity:.35;cursor:not-allowed}
+#btnRunSel{background:#1a3820;color:#30db76;border:1px solid #2d5a35}
+#btnRunSel:disabled{opacity:.35;cursor:not-allowed}
+#btnClearCache{background:#2a1818;color:#f87171;border:1px solid #4a2828}
+#btnExport{background:#1e1428;color:#a78bfa;border:1px solid #362050}
+#btnStopWorkers{background:#2a1800;color:#f59e0b;border:1px solid #4a3000}
+select.sel-model{background:#0d1117;border:1px solid #2d3748;color:#c0c8d8;border-radius:4px;padding:4px 7px;font-size:12px}
+.ctrl-info{font-size:10px;color:#475569}
+
+/* Progress / Log */
+.log-section{padding:6px 14px;border-bottom:1px solid #1e2530}
+.log-header{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.prog-track{flex:1;max-width:240px;height:4px;background:#1e2530;border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:#4f46e5;transition:width .25s;border-radius:2px}
+#progLabel{font-size:10px;color:#475569}
+#log{background:#0d1117;border:1px solid #2d3748;border-radius:4px;padding:6px 8px;height:110px;overflow-y:auto;font:11px/1.5 Consolas,monospace;color:#64748b}
+.l-ok{color:#30db76}.l-err{color:#ff5555}.l-info{color:#60a5fa}.l-warn{color:#f59e0b}
+
+/* Results */
+.results-section{padding:10px 14px}
+.shot-block{background:#131720;border:1px solid #2d3748;border-radius:6px;margin-bottom:10px;overflow:hidden}
+.shot-head{padding:6px 10px;background:#12151b;border-bottom:1px solid #2d3748;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.shot-body{padding:10px}
+.shot-body.hidden{display:none}
+
+/* Model result table */
+.res-tbl{width:100%;border-collapse:collapse;font-size:11px}
+.res-tbl th{background:#0d1117;color:#64748b;font-weight:700;text-align:left;padding:4px 7px;border-bottom:2px solid #2d3748;white-space:nowrap}
+.res-tbl td{padding:4px 7px;border-bottom:1px solid #1e2530;vertical-align:top}
+.res-tbl tr:hover td{background:#1a1f2b}
+.res-tbl td:first-child{white-space:nowrap;font-weight:700;color:#94a3b8}
+
+.badge{font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;display:inline-block;letter-spacing:.02em}
+.b-ok{background:#0e2a18;color:#30db76;border:1px solid #1a4a28}
+.b-cache{background:#0a1a30;color:#60a5fa;border:1px solid #1a3050}
+.b-warn{background:#2a1800;color:#f59e0b;border:1px solid #4a3000}
+.b-err{background:#2a0e0e;color:#f87171;border:1px solid #4a1a1a}
+.b-na{background:#1a1f2b;color:#475569;border:1px solid #2a3040}
+.b-diag{background:#1a1428;color:#c084fc;border:1px solid #3a2060}
+
+.raw-pre{font:10px/1.4 Consolas,monospace;color:#64748b;max-height:70px;overflow:hidden;background:#0d1117;padding:4px 5px;border-radius:3px;white-space:pre-wrap;cursor:pointer}
+.raw-pre.expanded{max-height:none}
+
+.parsed-mini{border-collapse:collapse;font-size:10px;width:auto}
+.parsed-mini th{color:#475569;font-weight:700;padding:1px 5px;border-bottom:1px solid #1e2530}
+.parsed-mini td{padding:1px 5px;border-bottom:1px solid #131720}
+.parsed-mini td:first-child{max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* CV diag cells */
+.diag-row-label{font-size:9px;color:#475569;margin-top:6px;margin-bottom:2px;border-top:1px solid #1e2530;padding-top:3px}
+.diag-cells{display:flex;flex-wrap:wrap;gap:4px}
+.diag-cell{display:flex;flex-direction:column;align-items:center;gap:2px}
+.diag-cell img{width:44px;height:18px;image-rendering:pixelated;border:1px solid #2d3748;border-radius:2px}
+.diag-cell-label{font-size:8px;color:#475569;text-align:center}
+
+/* Summary */
+.summary-block{margin-top:12px;padding-top:12px;border-top:1px solid #2d3748}
+.sum-tbl{width:100%;border-collapse:collapse;font-size:11px}
+.sum-tbl th{background:#0d1117;color:#64748b;font-weight:700;text-align:left;padding:5px 8px;border-bottom:2px solid #2d3748}
+.sum-tbl td{padding:4px 8px;border-bottom:1px solid #1e2530}
+.sum-tbl tr:hover td{background:#1a1f2b}
+.acc-bar{display:inline-block;height:9px;border-radius:2px;vertical-align:middle;margin-right:4px;min-width:2px}
+
+/* Lightbox */
+#lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out}
+#lb.on{display:flex}
+#lb img{max-width:92vw;max-height:92vh;image-rendering:pixelated;border:2px solid #2d3748;border-radius:4px}
+</style>
+</head>
+<body>
+<div id="lb" onclick="this.classList.remove('on')"><img id="lbImg" alt=""></div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <h1>Local OCR Benchmark</h1>
+  <span class="chip">no cloud APIs</span>
+  <span class="chip">Tesseract.js + CV diagnostic</span>
+  <span id="topStatus">Загрузи скрины → Run All Models</span>
+</div>
+
+<!-- UPLOAD SLOTS -->
+<div class="upload-grid">
+  <!-- Slot 0 -->
+  <div class="slot" id="slot0">
+    <h3>Screenshot 1</h3>
+    <div class="drop-zone" id="dz0"
+      onclick="document.getElementById('fi0').click()"
+      ondragover="dzOver(event,0)" ondragleave="dzLeave(0)" ondrop="dzDrop(event,0)">
+      <input type="file" id="fi0" accept="image/*" style="display:none" onchange="loadShot(0,this)">
+      <span id="dzLabel0">Click or drag-drop screenshot</span>
+    </div>
+    <div class="thumb-row" id="thumbs0"></div>
+    <div class="hash-info" id="hashInfo0"></div>
+    <h2 style="margin-top:8px">Expected JSON (optional)</h2>
+    <textarea class="exp-json" id="exp0" placeholder='[{"nick":"Player","kills":5,"deaths":9,"pvp":0,"pve":0}]'></textarea>
+  </div>
+  <!-- Slot 1 -->
+  <div class="slot" id="slot1">
+    <h3>Screenshot 2</h3>
+    <div class="drop-zone" id="dz1"
+      onclick="document.getElementById('fi1').click()"
+      ondragover="dzOver(event,1)" ondragleave="dzLeave(1)" ondrop="dzDrop(event,1)">
+      <input type="file" id="fi1" accept="image/*" style="display:none" onchange="loadShot(1,this)">
+      <span id="dzLabel1">Click or drag-drop screenshot</span>
+    </div>
+    <div class="thumb-row" id="thumbs1"></div>
+    <div class="hash-info" id="hashInfo1"></div>
+    <h2 style="margin-top:8px">Expected JSON (optional)</h2>
+    <textarea class="exp-json" id="exp1" placeholder='[{"nick":"Player","kills":5,"deaths":9,"pvp":0,"pve":0}]'></textarea>
+  </div>
+  <!-- Slot 2 -->
+  <div class="slot" id="slot2">
+    <h3>Screenshot 3</h3>
+    <div class="drop-zone" id="dz2"
+      onclick="document.getElementById('fi2').click()"
+      ondragover="dzOver(event,2)" ondragleave="dzLeave(2)" ondrop="dzDrop(event,2)">
+      <input type="file" id="fi2" accept="image/*" style="display:none" onchange="loadShot(2,this)">
+      <span id="dzLabel2">Click or drag-drop screenshot</span>
+    </div>
+    <div class="thumb-row" id="thumbs2"></div>
+    <div class="hash-info" id="hashInfo2"></div>
+    <h2 style="margin-top:8px">Expected JSON (optional)</h2>
+    <textarea class="exp-json" id="exp2" placeholder='[{"nick":"Player","kills":5,"deaths":9,"pvp":0,"pve":0}]'></textarea>
+  </div>
+</div>
+
+<!-- CONTROLS -->
+<div class="controls">
+  <button id="btnRunAll" disabled onclick="runAll()">▶ Run All Models</button>
+  <select class="sel-model" id="selModel">
+    <option value="tess_rus_eng">A: Tesseract rus+eng</option>
+    <option value="tess_eng">B: Tesseract eng</option>
+    <option value="tess_rus">C: Tesseract rus</option>
+    <option value="tess_num">D: Tesseract numeric</option>
+    <option value="cv_diag">E: CV Diagnostic</option>
+    <option value="paddleocr">F: PaddleOCR</option>
+    <option value="tess_proc">G: Tesseract preprocessed</option>
+    <option value="tess_num_cells">H: Tesseract num cells</option>
+    <option value="tess_nick_col">I: Tesseract nick column</option>
+    <option value="hybrid">J: Hybrid (H+I)</option>
+  </select>
+  <button id="btnRunSel" disabled onclick="runSelected()">▶ Run Selected</button>
+  <button id="btnStopWorkers" onclick="terminateWorkers()">⏹ Stop workers</button>
+  <button id="btnClearCache" onclick="clearCache()">🗑 Clear Cache</button>
+  <button id="btnExport" onclick="exportResults()">⬇ Export JSON</button>
+  <span class="ctrl-info" id="cacheCount"></span>
+</div>
+
+<!-- LOG -->
+<div class="log-section">
+  <div class="log-header">
+    <h2>Status Log</h2>
+    <div class="prog-track"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+    <span id="progLabel"></span>
+    <button onclick="document.getElementById('log').innerHTML=''" style="background:#1a1f2b;color:#475569;border:1px solid #2d3748;font-size:10px;padding:2px 8px;margin-left:4px">Clear log</button>
+  </div>
+  <div id="log"></div>
+</div>
+
+<!-- RESULTS -->
+<div class="results-section" id="resultsSection">
+  <div id="resultsGrid"></div>
+  <div id="summarySection" style="display:none">
+    <div class="summary-block">
+      <h2 style="margin-bottom:8px">Model Summary (across all screenshots with expected JSON)</h2>
+      <table class="sum-tbl">
+        <thead>
+          <tr><th>Model</th><th>Shots</th><th>Avg ms</th><th>Nick acc</th><th>Num acc</th><th>Full row acc</th><th>Status</th></tr>
+        </thead>
+        <tbody id="summaryBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Tesseract.js from CDN — async so page renders first -->
+<script async src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" id="tessScript"></script>
+<script>
+'use strict';
+
+// ── Crop geometry ─────────────────────────────────────────────
+// Baseline crop for 775x456 full screenshots. Scale x/y independently for real images.
+const CROP_PRESET = { x:398, y:90, w:375, h:205 };
+const CROP_BASE   = { w:775, h:456 };
+
+// Cell positions WITHIN the cropped region (crop-px units, at crop-scale=1):
+// processed_x / 3 gives position in the source crop
+const CELL_GEO = {
+  headerY: 21,  // 62/3
+  rowH:    20,  // 61/3
+  rowCount: 9,
+  nickCol: { x:0,   w:160 },
+  cols: {
+    kills:  { x:184, w:48 },   // 552/3, 143/3
+    deaths: { x:232, w:48 },   // 695/3
+    pvp:    { x:279, w:48 },   // 838/3
+    pve:    { x:327, w:48 },   // 981/3
+  },
+};
+const COL_KEYS = ['kills','deaths','pvp','pve'];
+
+// ── Model definitions ─────────────────────────────────────────
+const MODELS = [
+  { id:'tess_rus_eng', label:'A: Tesseract rus+eng', type:'tess', langs:'rus+eng', psm:'6', wl:null },
+  { id:'tess_eng',     label:'B: Tesseract eng',     type:'tess', langs:'eng',     psm:'6', wl:null },
+  { id:'tess_rus',     label:'C: Tesseract rus',     type:'tess', langs:'rus',     psm:'6', wl:null },
+  { id:'tess_num',     label:'D: Tesseract numeric', type:'tess', langs:'eng',     psm:'6', wl:'0123456789, ' },
+  { id:'cv_diag',      label:'E: CV Diagnostic',     type:'cv'   },
+  { id:'paddleocr',    label:'F: PaddleOCR',         type:'paddle' },
+];
+
+// ── State ─────────────────────────────────────────────────────
+const S = {
+  shots:   [null, null, null],  // { img, fullCv, cropCv, fullHash, cropHash }
+  results: {},                  // `${shotIdx}_${modelId}` → result
+  workers: {},                  // langs → Tesseract.Worker (reused)
+  running: false,
+};
+
+// ── Utils ─────────────────────────────────────────────────────
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function log(msg, cls) {
+  const el = document.getElementById('log');
+  const d  = document.createElement('div');
+  if (cls) d.className = 'l-' + cls;
+  d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progFill').style.width  = clamp(pct,0,100) + '%';
+  document.getElementById('progLabel').textContent = label || '';
+}
+
+function lbShow(canvas) {
+  document.getElementById('lbImg').src = canvas.toDataURL('image/png');
+  document.getElementById('lb').classList.add('on');
+}
+
+// Simple pixel-sampling hash (djb2-ish, 32×32 downscale)
+function pixHash(canvas) {
+  const tmp = document.createElement('canvas');
+  tmp.width = tmp.height = 32;
+  tmp.getContext('2d').drawImage(canvas, 0, 0, 32, 32);
+  const d = tmp.getContext('2d',{willReadFrequently:true}).getImageData(0,0,32,32).data;
+  let h = 5381;
+  for (let i=0; i<d.length; i+=8) {
+    h = (Math.imul(h,31) + d[i])   | 0;
+    h = (Math.imul(h,31) + d[i+1]) | 0;
+    h = (Math.imul(h,31) + d[i+2]) | 0;
+  }
+  return ((h>>>0) ^ d.length).toString(16).padStart(8,'0');
+}
+
+// ── Crop ─────────────────────────────────────────────────────
+function scaledCrop(imgW, imgH) {
+  const sx = imgW / CROP_BASE.w;
+  const sy = imgH / CROP_BASE.h;
+  return {
+    x: Math.round(CROP_PRESET.x * sx),
+    y: Math.round(CROP_PRESET.y * sy),
+    w: Math.round(CROP_PRESET.w * sx),
+    h: Math.round(CROP_PRESET.h * sy),
+    sx, sy,
+  };
+}
+
+function cropRect(img) {
+  const raw = scaledCrop(img.naturalWidth, img.naturalHeight);
+  const x = clamp(raw.x,0,img.naturalWidth-1), y = clamp(raw.y,0,img.naturalHeight-1);
+  const w = clamp(raw.w,1,img.naturalWidth-x), h = clamp(raw.h,1,img.naturalHeight-y);
+  return { ...raw, x, y, w, h, clamped:x!==raw.x || y!==raw.y || w!==raw.w || h!==raw.h };
+}
+
+function makeCropCanvas(img, rect) {
+  const { x:sx, y:sy, w:sw, h:sh } = rect || cropRect(img);
+  const cv = document.createElement('canvas');
+  cv.width=sw; cv.height=sh;
+  cv.getContext('2d').drawImage(img, sx,sy,sw,sh, 0,0,sw,sh);
+  return cv;
+}
+
+function cropLooksLikeMemberTable(cv) {
+  const w=cv.width, h=cv.height;
+  if (w < 80 || h < 60) return { ok:false, density:0, hEdges:0, vEdges:0 };
+  const ctx=cv.getContext('2d',{willReadFrequently:true});
+  const d=ctx.getImageData(0,0,w,h).data;
+  const lum=(x,y)=>{ const i=(y*w+x)*4; return d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114; };
+  let textish=0,total=0;
+  for (let y=Math.round(h*.08); y<Math.round(h*.92); y+=2) {
+    for (let x=Math.round(w*.02); x<Math.round(w*.98); x+=2) {
+      const l=lum(x,y);
+      if (l>95 && l<245) textish++;
+      total++;
+    }
+  }
+  let hEdges=0;
+  for (let y=Math.round(h*.12); y<Math.round(h*.90); y++) {
+    let hits=0;
+    for (let x=Math.round(w*.04); x<Math.round(w*.96); x+=3) {
+      if (Math.abs(lum(x,y)-lum(x,Math.max(0,y-1)))>22) hits++;
+    }
+    if (hits>w/20) hEdges++;
+  }
+  let vEdges=0;
+  for (let x=Math.round(w*.42); x<Math.round(w*.96); x++) {
+    let hits=0;
+    for (let y=Math.round(h*.10); y<Math.round(h*.90); y+=3) {
+      if (Math.abs(lum(x,y)-lum(Math.max(0,x-1),y))>20) hits++;
+    }
+    if (hits>h/28) vEdges++;
+  }
+  const density = total ? textish/total : 0;
+  const ok = density>0.020 && density<0.55 && hEdges>=3 && vEdges>=1;
+  return { ok, density:+density.toFixed(3), hEdges, vEdges };
+}
+
+// ── Screenshot upload ─────────────────────────────────────────
+function loadShot(idx, inp) {
+  const file = inp.files?.[0]; if (!file) return;
+  const img  = new Image();
+  img.onload = () => {
+    const fullCv = document.createElement('canvas');
+    fullCv.width = img.naturalWidth; fullCv.height = img.naturalHeight;
+    fullCv.getContext('2d').drawImage(img,0,0);
+    const crop     = cropRect(img);
+    const cropCv   = makeCropCanvas(img, crop);
+    const fullHash = pixHash(fullCv);
+    const cropHash = pixHash(cropCv);
+    const cropDiag = cropLooksLikeMemberTable(cropCv);
+    const cropOk   = cropDiag.ok;
+    S.shots[idx] = { img, fullCv, cropCv, crop, cropOk, cropDiag, fullHash, cropHash };
+
+    // Labels
+    document.getElementById('slot'+idx).classList.add('active');
+    document.getElementById('dzLabel'+idx).textContent = `✓ ${file.name}  ${img.naturalWidth}×${img.naturalHeight}`;
+    document.getElementById('hashInfo'+idx).textContent =
+      `full: ${fullHash}  |  crop: ${cropHash}  |  crop size: ${cropCv.width}×${cropCv.height}`;
+
+    // Thumbnails
+    const wrap = document.getElementById('thumbs'+idx);
+    wrap.innerHTML = '';
+
+    function addThumb(src, label, max=140) {
+      const sc = Math.min(1, max/src.width);
+      const cv = document.createElement('canvas');
+      cv.width=Math.round(src.width*sc); cv.height=Math.round(src.height*sc);
+      cv.getContext('2d').drawImage(src,0,0,cv.width,cv.height);
+      cv.onclick = () => lbShow(src);
+      const w = document.createElement('div'); w.className = 'cv-wrap';
+      const l = document.createElement('div'); l.className = 'cv-label'; l.textContent = label;
+      w.append(l,cv); wrap.append(w);
+    }
+
+    // Full thumbnail with orange crop-area overlay
+    {
+      const sc = Math.min(1, 160/fullCv.width, 110/fullCv.height);
+      const ov = document.createElement('canvas');
+      ov.width=Math.round(fullCv.width*sc); ov.height=Math.round(fullCv.height*sc);
+      const octx = ov.getContext('2d');
+      octx.drawImage(fullCv,0,0,ov.width,ov.height);
+      octx.strokeStyle = '#f59e0b';
+      octx.lineWidth = Math.max(1, Math.ceil(sc*2));
+      octx.strokeRect(
+        Math.round(crop.x*sc)+0.5, Math.round(crop.y*sc)+0.5,
+        Math.round(crop.w*sc), Math.round(crop.h*sc)
+      );
+      ov.onclick = () => lbShow(fullCv);
+      const ww = document.createElement('div'); ww.className = 'cv-wrap';
+      const ll = document.createElement('div'); ll.className = 'cv-label'; ll.textContent = 'full + crop area';
+      ww.append(ll,ov); wrap.append(ww);
+    }
+    addThumb(cropCv, `crop ${cropCv.width}×${cropCv.height}`, 140);
+
+    const dbg = document.createElement('div');
+    dbg.className = 'crop-debug';
+    dbg.textContent = `image ${img.naturalWidth}×${img.naturalHeight} | crop x=${crop.x} y=${crop.y} w=${crop.w} h=${crop.h} | base ${CROP_BASE.w}×${CROP_BASE.h}${crop.clamped?' clamped':''}`;
+    wrap.append(dbg);
+    if (!cropOk) {
+      const warn = document.createElement('div');
+      warn.className = 'crop-warn';
+      warn.textContent = `crop does not look like member table — density=${cropDiag.density} hEdges=${cropDiag.hEdges} vEdges=${cropDiag.vEdges}`;
+      wrap.append(warn);
+      log(`Shot ${idx+1}: crop validation failed — density=${cropDiag.density} hEdges=${cropDiag.hEdges} vEdges=${cropDiag.vEdges}`, 'warn');
+    }
+
+    updateRunButtons();
+    updateCacheCount();
+    log(`Shot ${idx+1}: ${img.naturalWidth}×${img.naturalHeight}, crop ${cropCv.width}×${cropCv.height}${cropOk?' ✓':' ⚠ validation failed'}, cropHash=${cropHash}`, 'info');
+    URL.revokeObjectURL(img.src);
+  };
+  img.onerror = () => log(`Shot ${idx+1}: load error`, 'err');
+  img.src = URL.createObjectURL(file);
+  inp.value = '';
+}
+
+function updateRunButtons() {
+  const any = S.shots.some(Boolean);
+  ['btnRunAll','btnRunSel'].forEach(id => {
+    document.getElementById(id).disabled = !any || S.running;
+  });
+}
+
+// ── Drag-drop helpers ─────────────────────────────────────────
+function dzOver(e, i)  { e.preventDefault(); document.getElementById('dz'+i).classList.add('drag'); }
+function dzLeave(i)    { document.getElementById('dz'+i).classList.remove('drag'); }
+function dzDrop(e, i)  {
+  e.preventDefault(); dzLeave(i);
+  const file = e.dataTransfer?.files?.[0]; if (!file) return;
+  const fi = document.getElementById('fi'+i);
+  const dt = new DataTransfer(); dt.items.add(file);
+  Object.defineProperty(fi,'files',{value:dt.files,configurable:true});
+  fi.dispatchEvent(new Event('change'));
+}
+
+// ── Cache (localStorage) ──────────────────────────────────────
+const CPFX = 'ocr_bench_v2_';
+function cKey(cropHash, modelId) { return `${CPFX}${cropHash}_${modelId}`; }
+function getCached(h,m) { try { const r=localStorage.getItem(cKey(h,m)); return r?JSON.parse(r):null; } catch { return null; } }
+function setCached(h,m,r) { try { localStorage.setItem(cKey(h,m),JSON.stringify(r)); } catch(e) { log('Cache write failed: '+e.message,'warn'); } }
+function clearCache() {
+  const keys = Object.keys(localStorage).filter(k=>k.startsWith(CPFX));
+  keys.forEach(k=>localStorage.removeItem(k));
+  log(`Cleared ${keys.length} cache entries`);
+  updateCacheCount();
+}
+function updateCacheCount() {
+  const n = Object.keys(localStorage).filter(k=>k.startsWith(CPFX)).length;
+  document.getElementById('cacheCount').textContent = n>0 ? `cache: ${n}` : '';
+}
+
+// ── Tesseract workers ─────────────────────────────────────────
+let _tessOk = null;
+
+async function checkTess() {
+  if (_tessOk !== null) return _tessOk;
+  // Tesseract CDN script may still be loading (async)
+  for (let i=0; i<30; i++) {
+    if (typeof Tesseract !== 'undefined') break;
+    await new Promise(r=>setTimeout(r,200));
+  }
+  _tessOk = typeof Tesseract !== 'undefined';
+  if (!_tessOk) log('Tesseract.js failed to load from CDN — check internet / file:// restrictions','err');
+  else log(`Tesseract.js ready (v${Tesseract.version||'?'})`, 'ok');
+  return _tessOk;
+}
+
+async function getWorker(langs) {
+  if (S.workers[langs]) return S.workers[langs];
+  log(`Init Tesseract worker: ${langs}…`, 'info');
+  const worker = await Tesseract.createWorker(langs, 1, {
+    logger: m => {
+      if (m.status==='loading tesseract core')        setProgress(m.progress*20, 'loading core');
+      else if (m.status==='loading language traineddata') setProgress(20+m.progress*50, `loading ${langs}`);
+      else if (m.status==='initializing api')         setProgress(70+m.progress*30, 'init');
+    },
+  });
+  S.workers[langs] = worker;
+  log(`Worker ready: ${langs}`, 'ok');
+  return worker;
+}
+
+async function terminateWorkers() {
+  let n = 0;
+  for (const [k,w] of Object.entries(S.workers)) {
+    try { await w.terminate(); } catch {}
+    delete S.workers[k]; n++;
+  }
+  _tessOk = null;
+  log(`Terminated ${n} worker(s)`, 'info');
+}
+
+// ── OCR text parser ───────────────────────────────────────────
+// Attempts to extract rows from Tesseract raw text.
+// Assumes each player line has: (nick text) N N N N
+function parseOcrText(text) {
+  const rows = [];
+  for (const line of text.split('\n').map(l=>l.trim()).filter(l=>l)) {
+    // All numbers in the line (allow comma-separated groups)
+    const matches = [...line.matchAll(/\b(\d[\d,]*)\b/g)];
+    const nums = matches
+      .map(m=>({ val:parseInt(m[0].replace(/,/g,''),10), idx:m.index }))
+      .filter(n=>!isNaN(n.val) && n.val>=0 && n.val<10_000_000);
+
+    if (nums.length < 4) continue;
+
+    const stats = nums.slice(-4); // last 4 = kills,deaths,pvp,pve
+    const [kills,deaths,pvp,pve] = stats.map(s=>s.val);
+
+    const firstStatIdx = stats[0].idx;
+    const nick = line.slice(0, firstStatIdx)
+      .replace(/[^\wа-яёА-ЯЁ\s\-_.]/gi,' ')
+      .trim().replace(/\s{2,}/g,' ');
+
+    if (!nick) continue;
+    rows.push({ nick, kills, deaths, pvp, pve });
+  }
+  return rows;
+}
+
+// ── Model runners ─────────────────────────────────────────────
+
+// A/B/C: Tesseract on full crop (text + numbers)
+// D: Tesseract on full crop with numeric whitelist
+async function runTesseract(shot, model) {
+  if (!await checkTess())
+    return { unavailable:true, reason:'Tesseract.js not loaded from CDN. Check internet or use an HTTP server (not file://).' };
+
+  const t0 = Date.now();
+  let worker;
+  try { worker = await getWorker(model.langs); }
+  catch(e) { return { unavailable:true, reason:'Worker init error: '+e.message }; }
+
+  try {
+    const params = { tessedit_pageseg_mode: model.psm };
+    if (model.wl) params.tessedit_char_whitelist = model.wl;
+    await worker.setParameters(params);
+
+    setProgress(75, `recognizing…`);
+    const { data } = await worker.recognize(shot.cropCv);
+    const elapsed  = Date.now()-t0;
+    const rows = parseOcrText(data.text);
+
+    return { rawText:data.text, confidence:data.confidence, rows, elapsed };
+  } catch(e) {
+    return { error:e.message, rows:[], elapsed:Date.now()-t0 };
+  }
+}
+
+// E: Local CV diagnostic — binarize each numeric cell, show crops, density, no fake numbers
+function runCvDiag(shot) {
+  const t0   = Date.now();
+  const crop = shot.cropCv;
+  const cw   = crop.width, ch = crop.height;
+  const ctx  = crop.getContext('2d',{willReadFrequently:true});
+
+  // Scale CELL_GEO from CROP_PRESET size to actual crop size
+  const sx = cw / CROP_PRESET.w;
+  const sy = ch / CROP_PRESET.h;
+
+  const diagRows = [];
+
+  for (let ri=0; ri<CELL_GEO.rowCount; ri++) {
+    const ry = Math.round((CELL_GEO.headerY + ri*CELL_GEO.rowH) * sy);
+    const rh = Math.max(1, Math.round(CELL_GEO.rowH * sy));
+    if (ry+rh > ch) break;
+
+    const cells = {};
+    for (const ck of COL_KEYS) {
+      const col = CELL_GEO.cols[ck];
+      const cx  = Math.round(col.x * sx);
+      const ccw = Math.max(1, Math.round(col.w * sx));
+      if (cx+ccw > cw) { cells[ck]=null; continue; }
+
+      // Extract cell
+      const cellCv = document.createElement('canvas');
+      cellCv.width=ccw; cellCv.height=rh;
+      cellCv.getContext('2d').drawImage(crop, cx,ry,ccw,rh, 0,0,ccw,rh);
+
+      // Binarize and measure content density
+      const id = cellCv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,ccw,rh);
+      const d  = id.data;
+      let bright=0;
+      for (let i=0;i<d.length;i+=4) {
+        const lum = 0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+        // game digits = bright gold on dark bg → lum>80 = possible digit pixel
+        if (lum>60 && lum<240) bright++;
+      }
+      const density = +(bright/(ccw*rh)).toFixed(3);
+
+      cells[ck] = { canvas:cellCv, density };
+    }
+
+    // Nick cell
+    const ncol = CELL_GEO.nickCol;
+    const nx   = Math.round(ncol.x*sx), nw = Math.max(1,Math.round(ncol.w*sx));
+    const nickCv = document.createElement('canvas');
+    nickCv.width=nw; nickCv.height=rh;
+    nickCv.getContext('2d').drawImage(crop, nx,ry,nw,rh, 0,0,nw,rh);
+
+    diagRows.push({ ri, cells, nickCv });
+  }
+
+  return {
+    diagRows,
+    rows: [],
+    elapsed: Date.now()-t0,
+    note: 'Diagnostic only — cell crops shown, no OCR. Density = fraction of mid-lum pixels (possible digit content).',
+  };
+}
+
+// F: PaddleOCR — unavailable in plain browser without build
+function runPaddle() {
+  return {
+    unavailable: true,
+    reason: 'PaddleOCR requires ~50 MB WASM + model files and a build step. No usable CDN bundle exists for plain browser. ' +
+            'To enable: use @paddlejs-models/ocr (npm) with bundler, or run paddleocr-browser server locally.',
+  };
+}
+
+// ── Run one model on one shot ─────────────────────────────────
+async function runModel(shotIdx, model) {
+  const shot = S.shots[shotIdx];
+  if (!shot) return null;
+
+  const key    = `${shotIdx}_${model.id}`;
+  if (!shot.cropOk) {
+    const r = {
+      error:true,
+      reason:'crop does not look like member table',
+      rows:[],
+      raw:'crop does not look like member table',
+      elapsed:0,
+    };
+    S.results[key] = r;
+    log(`Skipped: shot${shotIdx+1} ${model.label} — crop does not look like member table`, 'warn');
+    renderResult(shotIdx, model, r);
+    return;
+  }
+
+  const cached = getCached(shot.cropHash, model.id);
+
+  if (cached && !cached.diagRows) {
+    log(`Cache HIT: shot${shotIdx+1} ${model.label}`, 'info');
+    S.results[key] = { ...cached, fromCache:true };
+    renderResult(shotIdx, model, S.results[key]);
+    return;
+  }
+
+  log(`Running: shot${shotIdx+1} ${model.label}…`);
+  setProgress(5, `${model.label}`);
+
+  let r;
+  if      (model.type==='tess')   r = await runTesseract(shot, model);
+  else if (model.type==='cv')     r = runCvDiag(shot);
+  else                             r = runPaddle();
+
+  S.results[key] = r;
+
+  if (!r.unavailable && !r.error && !r.diagRows) {
+    setCached(shot.cropHash, model.id, r);
+  }
+
+  if (r.elapsed != null)
+    log(`Done: shot${shotIdx+1} ${model.label} → ${r.elapsed}ms, ${r.rows?.length??0} rows`, r.error?'err':'ok');
+  else if (r.unavailable)
+    log(`Unavailable: ${model.label}`, 'warn');
+
+  renderResult(shotIdx, model, r);
+}
+
+async function runAll() {
+  if (S.running) return;
+  S.running=true; updateRunButtons();
+  log('=== Run All Models ===','info');
+
+  const active = S.shots.map((s,i)=>s?i:null).filter(i=>i!==null);
+  const total  = active.length * MODELS.length;
+  let done=0;
+
+  for (const si of active) {
+    ensureShotSection(si);
+    for (const model of MODELS) {
+      await runModel(si, model);
+      setProgress(Math.round(++done/total*100), `${done}/${total}`);
+    }
+  }
+
+  S.running=false; updateRunButtons(); updateSummary(); updateCacheCount();
+  setProgress(100,'Done'); log('=== Run All complete ===','ok');
+}
+
+async function runSelected() {
+  if (S.running) return;
+  const model = MODELS.find(m=>m.id===document.getElementById('selModel').value);
+  if (!model) return;
+  S.running=true; updateRunButtons();
+  log(`=== Run: ${model.label} ===`,'info');
+
+  const active = S.shots.map((s,i)=>s?i:null).filter(i=>i!==null);
+  for (const si of active) {
+    ensureShotSection(si);
+    await runModel(si, model);
+  }
+
+  S.running=false; updateRunButtons(); updateSummary(); updateCacheCount();
+  setProgress(100,'Done');
+}
+
+// ── Scoring ───────────────────────────────────────────────────
+function scoreRows(expStr, actual) {
+  if (!expStr?.trim() || !Array.isArray(actual)) return null;
+  let exp;
+  try { exp=JSON.parse(expStr); } catch { return null; }
+  if (!Array.isArray(exp)||exp.length===0) return null;
+
+  let nickOk=0, numOk=0, rowOk=0, n=exp.length;
+  exp.forEach((e,i)=>{
+    const a=actual[i];
+    if (!a) return;
+    const nm = String(e.nick||'').toLowerCase().trim()===String(a.nick||'').toLowerCase().trim();
+    const allNum = ['kills','deaths','pvp','pve'].every(f=>Number(e[f])===Number(a[f]));
+    if (nm) nickOk++;
+    if (allNum) numOk++;
+    if (nm&&allNum) rowOk++;
+  });
+  return {
+    nickAcc:  n ? +(nickOk/n).toFixed(3) : 0,
+    numAcc:   n ? +(numOk/n).toFixed(3)  : 0,
+    rowAcc:   n ? +(rowOk/n).toFixed(3)  : 0,
+    total: n,
+  };
+}
+
+// ── Rendering ─────────────────────────────────────────────────
+function ensureShotSection(si) {
+  if (document.getElementById(`sec${si}`)) return;
+  const grid = document.getElementById('resultsGrid');
+  const div  = document.createElement('div');
+  div.id = `sec${si}`;
+  div.className = 'shot-block';
+  const s = S.shots[si];
+  div.innerHTML = `
+    <div class="shot-head" onclick="toggleSec(${si})">
+      <span style="font-weight:700;color:#60a5fa;font-size:12px">Screenshot ${si+1}</span>
+      <span style="font-size:10px;color:#475569">crop hash: ${s?.cropHash||'?'}</span>
+      <span style="margin-left:auto;font-size:12px;color:#475569" id="secArrow${si}">▲</span>
+    </div>
+    <div class="shot-body" id="secBody${si}">
+      <table class="res-tbl" id="rtbl${si}">
+        <thead><tr>
+          <th>Model</th><th>Status</th><th>Time</th>
+          <th>Raw output preview</th><th>Parsed rows</th>
+          <th>nick%</th><th>num%</th><th>row%</th>
+        </tr></thead>
+        <tbody id="rtbody${si}"></tbody>
+      </table>
+    </div>`;
+  grid.appendChild(div);
+}
+
+function toggleSec(si) {
+  const body  = document.getElementById(`secBody${si}`);
+  const arrow = document.getElementById(`secArrow${si}`);
+  const h = body.classList.toggle('hidden');
+  arrow.textContent = h ? '▼' : '▲';
+}
+
+function badge(txt, cls) { return `<span class="badge b-${cls}">${esc(txt)}</span>`; }
+
+function accBar(v) {
+  const p   = Math.round(v*100);
+  const col = p>=80?'#30db76':p>=50?'#f59e0b':'#ff5555';
+  return `<span class="acc-bar" style="width:${Math.max(2,p)}px;background:${col}"></span><span style="font-size:10px;color:${col}">${p}%</span>`;
+}
+
+function renderResult(si, model, r) {
+  ensureShotSection(si);
+  const tbody = document.getElementById(`rtbody${si}`);
+  const rowId = `rrow-${si}-${model.id}`;
+  document.getElementById(rowId)?.remove();
+
+  const tr = document.createElement('tr');
+  tr.id = rowId;
+
+  let statusCell, timeCell, rawCell, parsedCell, accCells;
+
+  if (r.unavailable) {
+    statusCell = badge('UNAVAILABLE','na');
+    timeCell   = '—';
+    rawCell    = `<span style="font-size:10px;color:#475569">${esc(r.reason||'')}</span>`;
+    parsedCell = '—';
+    accCells   = '<td>—</td><td>—</td><td>—</td>';
+
+  } else if (r.error) {
+    statusCell = badge('ERROR','err');
+    timeCell   = r.elapsed!=null ? r.elapsed+'ms' : '—';
+    rawCell    = `<span style="color:#ff5555;font-size:10px">${esc(r.error.slice(0,100))}</span>`;
+    parsedCell = '0 rows';
+    accCells   = '<td>—</td><td>—</td><td>—</td>';
+
+  } else if (r.diagRows) {
+    statusCell = badge('DIAG','diag');
+    timeCell   = r.elapsed+'ms';
+    rawCell    = `<span style="font-size:9px;color:#94a3b8">${esc(r.note||'')}</span>`;
+    parsedCell = buildDiagHtml(r.diagRows);
+    accCells   = '<td colspan="3" style="font-size:10px;color:#475569">n/a (diagnostic only)</td>';
+
+  } else {
+    statusCell = r.fromCache ? badge('OK cache','cache') : badge('OK','ok');
+    timeCell   = r.elapsed!=null ? r.elapsed+'ms' : '—';
+    const conf = r.confidence!=null ? ` conf:${r.confidence?.toFixed(0)}%` : '';
+    const rowId2 = `raw-${si}-${model.id}`;
+    rawCell    = `<div class="raw-pre" id="${rowId2}" onclick="this.classList.toggle('expanded')" title="click to expand">${esc((r.rawText||'').slice(0,400))}${conf}</div>`;
+    parsedCell = buildParsedHtml(r.rows||[]);
+
+    const sc = scoreRows(document.getElementById('exp'+si)?.value, r.rows);
+    if (sc) {
+      accCells = `<td>${accBar(sc.nickAcc)}</td><td>${accBar(sc.numAcc)}</td><td>${accBar(sc.rowAcc)}</td>`;
+    } else {
+      accCells = '<td>—</td><td>—</td><td>—</td>';
+    }
+  }
+
+  tr.innerHTML = `
+    <td>${esc(model.label)}</td>
+    <td>${statusCell}</td>
+    <td style="white-space:nowrap;font-size:11px">${timeCell}</td>
+    <td style="max-width:220px">${rawCell}</td>
+    <td>${parsedCell}</td>
+    ${accCells}`;
+  tbody.appendChild(tr);
+}
+
+function buildParsedHtml(rows) {
+  if (!rows.length) return `<span style="color:#475569;font-size:10px">0 rows parsed</span>`;
+  let h = `<span style="font-size:9px;color:#475569;display:block;margin-bottom:2px">${rows.length} rows</span>
+    <table class="parsed-mini"><thead><tr><th>nick</th><th>k</th><th>d</th><th>pvp</th><th>pve</th></tr></thead><tbody>`;
+  for (const r of rows.slice(0,6)) {
+    h += `<tr><td>${esc(r.nick||'')}</td><td>${r.kills}</td><td>${r.deaths}</td><td>${r.pvp}</td><td>${r.pve}</td></tr>`;
+  }
+  if (rows.length>6) h += `<tr><td colspan="5" style="color:#475569;font-size:9px">…+${rows.length-6}</td></tr>`;
+  return h + '</tbody></table>';
+}
+
+function buildDiagHtml(diagRows) {
+  let h = `<div style="font-size:10px;color:#c084fc;margin-bottom:4px">Visual cell crops — no OCR, no fake numbers</div>`;
+  for (const row of diagRows.slice(0,5)) {
+    h += `<div class="diag-row-label">row ${row.ri}</div><div class="diag-cells">`;
+    for (const [ck,cell] of Object.entries(row.cells)) {
+      if (!cell) continue;
+      const url   = cell.canvas.toDataURL('image/png');
+      const dColor = cell.density>0.12 ? '#30db76' : cell.density>0.03 ? '#f59e0b' : '#475569';
+      h += `<div class="diag-cell">
+        <img src="${url}" alt="${ck}">
+        <span class="diag-cell-label" style="color:${dColor}">${ck}<br>${cell.density}</span>
+      </div>`;
+    }
+    // Nick thumb
+    if (row.nickCv) {
+      h += `<div class="diag-cell">
+        <img src="${row.nickCv.toDataURL('image/png')}" alt="nick" style="width:60px!important">
+        <span class="diag-cell-label">nick</span>
+      </div>`;
+    }
+    h += '</div>';
+  }
+  if (diagRows.length>5) h += `<div style="font-size:9px;color:#475569;margin-top:4px">…+${diagRows.length-5} more rows</div>`;
+  return h;
+}
+
+// ── Summary table ─────────────────────────────────────────────
+function updateSummary() {
+  const tbody = document.getElementById('summaryBody');
+  tbody.innerHTML = '';
+  let anyData = false;
+
+  for (const model of MODELS) {
+    const recs = [0,1,2]
+      .map(si => ({ si, r: S.results[`${si}_${model.id}`] }))
+      .filter(x=>x.r);
+    if (!recs.length) continue;
+    anyData = true;
+
+    const valid    = recs.filter(x=>!x.r.unavailable&&!x.r.error&&!x.r.diagRows);
+    const avgMs    = valid.length ? Math.round(valid.reduce((s,x)=>s+(x.r.elapsed||0),0)/valid.length) : null;
+
+    const nickAccs=[],numAccs=[],rowAccs=[];
+    for (const {si,r} of valid) {
+      const sc = scoreRows(document.getElementById('exp'+si)?.value, r.rows);
+      if (sc) { nickAccs.push(sc.nickAcc); numAccs.push(sc.numAcc); rowAccs.push(sc.rowAcc); }
+    }
+    const avg = a => a.length ? +(a.reduce((s,v)=>s+v,0)/a.length).toFixed(3) : null;
+
+    let statusHtml;
+    if (recs.some(x=>x.r.unavailable)) {
+      const reason = recs.find(x=>x.r.unavailable)?.r.reason||'';
+      statusHtml = `${badge('UNAVAILABLE','na')}<div style="font-size:9px;color:#475569;max-width:180px;margin-top:2px">${esc(reason.slice(0,90))}</div>`;
+    } else if (recs.some(x=>x.r.diagRows)) {
+      statusHtml = badge('DIAG only','diag');
+    } else if (recs.some(x=>x.r.error)) {
+      statusHtml = badge('Error','err');
+    } else {
+      statusHtml = badge('OK','ok');
+    }
+
+    const na = avg(nickAccs), na2 = avg(numAccs), ra = avg(rowAccs);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-weight:700;color:#94a3b8">${esc(model.label)}</td>
+      <td>${recs.length}</td>
+      <td>${avgMs!=null?avgMs+'ms':'—'}</td>
+      <td>${na!=null?accBar(na):'—'}</td>
+      <td>${na2!=null?accBar(na2):'—'}</td>
+      <td>${ra!=null?accBar(ra):'—'}</td>
+      <td>${statusHtml}</td>`;
+    tbody.appendChild(tr);
+  }
+
+  document.getElementById('summarySection').style.display = anyData ? '' : 'none';
+}
+
+// ── Export ────────────────────────────────────────────────────
+function exportResults() {
+  const payload = {
+    timestamp: new Date().toISOString(),
+    shots: S.shots.map((s,i) => s ? {
+      idx:i, size:`${s.img.naturalWidth}×${s.img.naturalHeight}`,
+      fullHash:s.fullHash, cropHash:s.cropHash,
+      cropActual:`${s.cropCv.width}×${s.cropCv.height}`,
+      expected: (() => { try { return JSON.parse(document.getElementById('exp'+i).value||'[]'); } catch { return []; } })(),
+    } : null),
+    results: Object.fromEntries(
+      Object.entries(S.results).map(([k,r]) => [k, {
+        rows: r.rows||[], elapsed:r.elapsed, confidence:r.confidence,
+        unavailable:r.unavailable||false, error:r.error||null,
+        diagRows: r.diagRows ? `${r.diagRows.length} rows (diagnostic only, canvases stripped)` : undefined,
+        note: r.note||undefined,
+      }])
+    ),
+  };
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
+  a.download = `ocr_bench_${Date.now()}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+// ── Init ──────────────────────────────────────────────────────
+function init() {
+  updateCacheCount();
+  log('Local OCR Benchmark ready.', 'info');
+  log('Models A-D: Tesseract.js (CDN load on first run, ~10-20 MB language data).', 'info');
+  log('Model E: local CV diagnostic — no network needed.', 'info');
+  log('Model F: PaddleOCR — will be marked unavailable (requires build step).', 'warn');
+  if (location.protocol === 'file:') {
+    log('Running from file:// — Tesseract Web Workers may be restricted in some browsers. Use a local HTTP server (start_ocr_test.cmd) if OCR fails.', 'warn');
+  }
+
+  // Check Tesseract load status after short delay
+  setTimeout(() => {
+    if (typeof Tesseract !== 'undefined')
+      log(`Tesseract.js loaded: v${Tesseract.version||'?'}`, 'ok');
+    else
+      log('Tesseract.js not yet loaded (CDN may be slow or blocked). Models A-D will wait.', 'warn');
+  }, 2500);
+}
+
+init();
+</script>
+</body>
+</html>

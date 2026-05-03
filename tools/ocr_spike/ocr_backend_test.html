@@ -1,0 +1,1041 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OCR Backend Spike</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #fff;
+      --text: #17202a;
+      --muted: #5d6978;
+      --line: #d8dee8;
+      --accent: #1b6fd8;
+      --bad: #a33a3a;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(1440px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 20px 0 32px;
+    }
+
+    h1 { margin: 0 0 16px; font-size: 24px; }
+    h2 { margin: 0 0 12px; font-size: 16px; }
+
+    .toolbar,
+    .settings,
+    .grid,
+    .result-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .toolbar {
+      grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.2fr) auto;
+      align-items: end;
+      margin-bottom: 12px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .settings {
+      grid-template-columns: repeat(6, minmax(110px, 1fr));
+      margin-bottom: 12px;
+    }
+
+    .grid { grid-template-columns: repeat(2, minmax(360px, 1fr)); align-items: start; }
+    .result-grid { grid-template-columns: minmax(360px, .8fr) minmax(360px, 1fr); margin-top: 12px; }
+
+    section {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    input,
+    select {
+      width: 100%;
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      font: inherit;
+      padding: 6px 8px;
+    }
+
+    button {
+      min-height: 36px;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      font: inherit;
+      font-weight: 700;
+      padding: 7px 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button:disabled { opacity: .55; cursor: not-allowed; }
+
+    .checkline {
+      display: flex;
+      min-height: 34px;
+      gap: 8px;
+      align-items: center;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .canvas-wrap {
+      overflow: auto;
+      max-height: 66vh;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #eef2f7;
+    }
+
+    canvas {
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .pair {
+      display: grid;
+      grid-template-columns: 1fr 78px;
+      gap: 8px;
+      align-items: center;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 7px 8px;
+      text-align: left;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    pre {
+      min-height: 260px;
+      max-height: 520px;
+      overflow: auto;
+      margin: 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #101820;
+      color: #e8f0f7;
+      font: 12px/1.45 Consolas, monospace;
+      white-space: pre-wrap;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 160px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font: 12px/1.45 Consolas, monospace;
+      padding: 10px;
+    }
+
+    .status {
+      min-height: 18px;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status.running { color: #1b5ca8; font-weight: 800; }
+    .status.success { color: #146c43; font-weight: 800; }
+    .status.fail {
+      border: 1px solid var(--bad);
+      border-radius: 8px;
+      background: #fff1f1;
+      color: var(--bad);
+      font-size: 15px;
+      font-weight: 850;
+      padding: 10px 12px;
+    }
+
+    .error { color: var(--bad); font-weight: 700; }
+
+    .warning {
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border: 1px solid #d99a22;
+      border-radius: 8px;
+      background: #fff7e6;
+      color: #6f4300;
+      font-weight: 800;
+    }
+
+    @media (max-width: 980px) {
+      .toolbar,
+      .settings,
+      .grid,
+      .result-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>OCR Backend Spike</h1>
+
+    <div class="toolbar">
+      <label>
+        Screenshot
+        <input id="fileInput" type="file" accept="image/*">
+      </label>
+      <label>
+        API URL
+        <input id="apiUrlInput" type="url" value="http://localhost:8787/ocr-read">
+      </label>
+      <button id="checkBackendButton">Check backend</button>
+      <button id="runButton" disabled>Run backend OCR</button>
+    </div>
+    <div id="backendStatus" class="status">backend: idle</div>
+
+    <section>
+      <h2>Crop And Preprocessing</h2>
+      <div class="warning">Crop must include full table including PvE column.</div>
+      <div class="settings">
+        <label>
+          preset
+          <button id="rightGroupPresetButton" disabled>Right group table full width</button>
+        </label>
+        <label>crop X <span class="pair"><input id="cropXRange" type="range" min="0" max="0" value="0"><input id="cropXInput" type="number" value="0"></span></label>
+        <label>crop Y <span class="pair"><input id="cropYRange" type="range" min="0" max="0" value="0"><input id="cropYInput" type="number" value="0"></span></label>
+        <label>crop W <span class="pair"><input id="cropWRange" type="range" min="1" max="1" value="1"><input id="cropWInput" type="number" value="1"></span></label>
+        <label>crop H <span class="pair"><input id="cropHRange" type="range" min="1" max="1" value="1"><input id="cropHInput" type="number" value="1"></span></label>
+        <label>
+          scale
+          <select id="scaleInput">
+            <option value="2" selected>2x</option>
+            <option value="3">3x</option>
+            <option value="4">4x</option>
+          </select>
+        </label>
+        <label>contrast <span class="pair"><input id="contrastRange" type="range" min="50" max="260" value="140"><input id="contrastInput" type="number" value="140"></span></label>
+        <label class="checkline"><input id="grayscaleInput" type="checkbox" checked> grayscale</label>
+        <label class="checkline"><input id="sharpenInput" type="checkbox" checked> sharpen</label>
+        <label class="checkline"><input id="iconMaskEnabledInput" type="checkbox" checked> mask icon column before OCR</label>
+        <label>icon mask X <span class="pair"><input id="iconMaskXRange" type="range" min="0" max="375" value="152"><input id="iconMaskXInput" type="number" value="152"></span></label>
+        <label>icon mask W <span class="pair"><input id="iconMaskWRange" type="range" min="1" max="120" value="32"><input id="iconMaskWInput" type="number" value="32"></span></label>
+      </div>
+      <h2>Overlay Columns Parser Bands</h2>
+      <div class="settings">
+        <label>nick X/W <span class="pair"><input id="nickBandXInput" type="number" value="0"><input id="nickBandWInput" type="number" value="360"></span></label>
+        <label>kills X/W <span class="pair"><input id="killsBandXInput" type="number" value="430"><input id="killsBandWInput" type="number" value="90"></span></label>
+        <label>deaths X/W <span class="pair"><input id="deathsBandXInput" type="number" value="530"><input id="deathsBandWInput" type="number" value="90"></span></label>
+        <label>pvp X/W <span class="pair"><input id="pvpBandXInput" type="number" value="650"><input id="pvpBandWInput" type="number" value="210"></span></label>
+        <label>pve X/W <span class="pair"><input id="pveBandXInput" type="number" value="880"><input id="pveBandWInput" type="number" value="200"></span></label>
+      </div>
+      <div class="grid">
+        <section>
+          <h2>Original Crop</h2>
+          <div class="canvas-wrap"><canvas id="cropCanvas"></canvas></div>
+          <div id="cropStatus" class="status">Load a screenshot to start.</div>
+        </section>
+        <section>
+          <h2>Processed Crop</h2>
+          <div class="canvas-wrap"><canvas id="processedCanvas"></canvas></div>
+          <div id="processedStatus" class="status"></div>
+        </section>
+        <section>
+          <h2>OCR Sent Crop</h2>
+          <div class="canvas-wrap"><canvas id="sentCanvas"></canvas></div>
+          <div id="sentStatus" class="status"></div>
+        </section>
+      </div>
+    </section>
+
+    <div class="result-grid">
+      <section>
+        <h2>Parsed Table</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>raw line</th>
+              <th>parserMode</th>
+              <th>nick</th>
+              <th>kills</th>
+              <th>deaths</th>
+              <th>pvp</th>
+              <th>pve</th>
+              <th>numbers</th>
+              <th>token positions</th>
+              <th>mapped columns</th>
+              <th>status</th>
+              <th>error</th>
+            </tr>
+          </thead>
+          <tbody id="resultBody"></tbody>
+        </table>
+      </section>
+      <section>
+        <h2>Raw OCR Text</h2>
+        <pre id="rawOutput"></pre>
+      </section>
+    </div>
+
+    <section style="margin-top: 12px;">
+      <h2>JSON Output</h2>
+      <pre id="parserMetaOutput">parserMode: idle</pre>
+      <pre id="jsonOutput">[]</pre>
+      <div id="statusOutput" class="status"></div>
+    </section>
+
+    <section style="margin-top: 12px;">
+      <h2>OCR Overlay Words</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>text</th>
+            <th>x</th>
+            <th>y</th>
+            <th>w</th>
+            <th>h</th>
+            <th>mappedRow</th>
+            <th>mappedColumn</th>
+          </tr>
+        </thead>
+        <tbody id="overlayWordsBody"></tbody>
+      </table>
+    </section>
+
+    <section style="margin-top: 12px;">
+      <h2>Expected JSON Compare</h2>
+      <textarea id="expectedInput" placeholder='[{"nick":"Christmas","kills":48,"deaths":16,"pvp":1000,"pve":154}]'></textarea>
+      <div style="margin-top: 8px;"><button id="compareButton" disabled>Compare</button></div>
+      <pre id="compareOutput"></pre>
+    </section>
+  </main>
+
+  <script>
+    const el = {
+      file: document.getElementById('fileInput'),
+      apiUrl: document.getElementById('apiUrlInput'),
+      checkBackend: document.getElementById('checkBackendButton'),
+      run: document.getElementById('runButton'),
+      rightGroupPreset: document.getElementById('rightGroupPresetButton'),
+      cropCanvas: document.getElementById('cropCanvas'),
+      processedCanvas: document.getElementById('processedCanvas'),
+      sentCanvas: document.getElementById('sentCanvas'),
+      cropStatus: document.getElementById('cropStatus'),
+      processedStatus: document.getElementById('processedStatus'),
+      sentStatus: document.getElementById('sentStatus'),
+      resultBody: document.getElementById('resultBody'),
+      rawOutput: document.getElementById('rawOutput'),
+      parserMetaOutput: document.getElementById('parserMetaOutput'),
+      jsonOutput: document.getElementById('jsonOutput'),
+      statusOutput: document.getElementById('statusOutput'),
+      backendStatus: document.getElementById('backendStatus'),
+      expectedInput: document.getElementById('expectedInput'),
+      compare: document.getElementById('compareButton'),
+      compareOutput: document.getElementById('compareOutput'),
+      cropXRange: document.getElementById('cropXRange'),
+      cropXInput: document.getElementById('cropXInput'),
+      cropYRange: document.getElementById('cropYRange'),
+      cropYInput: document.getElementById('cropYInput'),
+      cropWRange: document.getElementById('cropWRange'),
+      cropWInput: document.getElementById('cropWInput'),
+      cropHRange: document.getElementById('cropHRange'),
+      cropHInput: document.getElementById('cropHInput'),
+      scale: document.getElementById('scaleInput'),
+      grayscale: document.getElementById('grayscaleInput'),
+      sharpen: document.getElementById('sharpenInput'),
+      iconMaskEnabled: document.getElementById('iconMaskEnabledInput'),
+      iconMaskXRange: document.getElementById('iconMaskXRange'),
+      iconMaskXInput: document.getElementById('iconMaskXInput'),
+      iconMaskWRange: document.getElementById('iconMaskWRange'),
+      iconMaskWInput: document.getElementById('iconMaskWInput'),
+      nickBandXInput: document.getElementById('nickBandXInput'),
+      nickBandWInput: document.getElementById('nickBandWInput'),
+      killsBandXInput: document.getElementById('killsBandXInput'),
+      killsBandWInput: document.getElementById('killsBandWInput'),
+      deathsBandXInput: document.getElementById('deathsBandXInput'),
+      deathsBandWInput: document.getElementById('deathsBandWInput'),
+      pvpBandXInput: document.getElementById('pvpBandXInput'),
+      pvpBandWInput: document.getElementById('pvpBandWInput'),
+      pveBandXInput: document.getElementById('pveBandXInput'),
+      pveBandWInput: document.getElementById('pveBandWInput'),
+      contrastRange: document.getElementById('contrastRange'),
+      contrastInput: document.getElementById('contrastInput'),
+      overlayWordsBody: document.getElementById('overlayWordsBody')
+    };
+
+    const state = { image: null, lastJson: null };
+    const cropCtx = el.cropCanvas.getContext('2d', { willReadFrequently: true });
+    const processedCtx = el.processedCanvas.getContext('2d', { willReadFrequently: true });
+    const sentCtx = el.sentCanvas.getContext('2d', { willReadFrequently: true });
+
+    function readNumber(input, fallback) {
+      const value = Number(input.value);
+      return Number.isFinite(value) ? value : fallback;
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function setPair(range, input, value, max) {
+      range.max = String(max);
+      input.max = String(max);
+      range.value = String(value);
+      input.value = String(value);
+    }
+
+    function applyRightGroupPreset() {
+      if (!state.image) return;
+      setPair(el.cropXRange, el.cropXInput, clamp(398, 0, state.image.width - 1), state.image.width - 1);
+      setPair(el.cropYRange, el.cropYInput, clamp(90, 0, state.image.height - 1), state.image.height - 1);
+      setPair(el.cropWRange, el.cropWInput, clamp(375, 1, state.image.width - readNumber(el.cropXInput, 398)), state.image.width);
+      setPair(el.cropHRange, el.cropHInput, clamp(205, 1, state.image.height - readNumber(el.cropYInput, 90)), state.image.height);
+      el.scale.value = '3';
+      el.contrastInput.value = '140';
+      el.contrastRange.value = '140';
+      el.grayscale.checked = true;
+      el.sharpen.checked = true;
+      el.iconMaskEnabled.checked = true;
+      setPair(el.iconMaskXRange, el.iconMaskXInput, 152, 375);
+      setPair(el.iconMaskWRange, el.iconMaskWInput, 32, 120);
+      el.nickBandXInput.value = '0';
+      el.nickBandWInput.value = '360';
+      el.killsBandXInput.value = '430';
+      el.killsBandWInput.value = '90';
+      el.deathsBandXInput.value = '530';
+      el.deathsBandWInput.value = '90';
+      el.pvpBandXInput.value = '650';
+      el.pvpBandWInput.value = '210';
+      el.pveBandXInput.value = '880';
+      el.pveBandWInput.value = '200';
+      redraw();
+    }
+
+    function syncPair(range, input) {
+      range.addEventListener('input', () => { input.value = range.value; redraw(); });
+      input.addEventListener('input', () => { range.value = input.value; redraw(); });
+    }
+
+    [[el.cropXRange, el.cropXInput], [el.cropYRange, el.cropYInput], [el.cropWRange, el.cropWInput], [el.cropHRange, el.cropHInput], [el.contrastRange, el.contrastInput], [el.iconMaskXRange, el.iconMaskXInput], [el.iconMaskWRange, el.iconMaskWInput]]
+      .forEach(([range, input]) => syncPair(range, input));
+    [el.scale, el.grayscale, el.sharpen, el.iconMaskEnabled].forEach((input) => input.addEventListener('input', redraw));
+    [el.grayscale, el.sharpen, el.iconMaskEnabled].forEach((input) => input.addEventListener('change', redraw));
+
+    function getCrop() {
+      const maxW = state.image?.width || 1;
+      const maxH = state.image?.height || 1;
+      const x = clamp(Math.round(readNumber(el.cropXInput, 0)), 0, maxW - 1);
+      const y = clamp(Math.round(readNumber(el.cropYInput, 0)), 0, maxH - 1);
+      const w = clamp(Math.round(readNumber(el.cropWInput, maxW - x)), 1, maxW - x);
+      const h = clamp(Math.round(readNumber(el.cropHInput, maxH - y)), 1, maxH - y);
+      return { x, y, w, h };
+    }
+
+    function preprocessImageData(imageData) {
+      const data = imageData.data;
+      const contrast = readNumber(el.contrastInput, 140) / 100;
+      const factor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
+
+      for (let i = 0; i < data.length; i += 4) {
+        if (el.grayscale.checked) {
+          const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          data[i] = gray;
+          data[i + 1] = gray;
+          data[i + 2] = gray;
+        }
+        data[i] = clamp(factor * (data[i] - 128) + 128, 0, 255);
+        data[i + 1] = clamp(factor * (data[i + 1] - 128) + 128, 0, 255);
+        data[i + 2] = clamp(factor * (data[i + 2] - 128) + 128, 0, 255);
+      }
+      return imageData;
+    }
+
+    function sharpen(imageData, width, height) {
+      const src = imageData.data;
+      const out = new Uint8ClampedArray(src.length);
+      const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const idx = (y * width + x) * 4;
+          if (x === 0 || y === 0 || x === width - 1 || y === height - 1) {
+            out[idx] = src[idx]; out[idx + 1] = src[idx + 1]; out[idx + 2] = src[idx + 2]; out[idx + 3] = src[idx + 3];
+            continue;
+          }
+          let r = 0, g = 0, b = 0, k = 0;
+          for (let yy = -1; yy <= 1; yy += 1) {
+            for (let xx = -1; xx <= 1; xx += 1) {
+              const srcIdx = ((y + yy) * width + x + xx) * 4;
+              const weight = kernel[k++];
+              r += src[srcIdx] * weight;
+              g += src[srcIdx + 1] * weight;
+              b += src[srcIdx + 2] * weight;
+            }
+          }
+          out[idx] = clamp(r, 0, 255);
+          out[idx + 1] = clamp(g, 0, 255);
+          out[idx + 2] = clamp(b, 0, 255);
+          out[idx + 3] = src[idx + 3];
+        }
+      }
+      return new ImageData(out, width, height);
+    }
+
+    function redraw() {
+      if (!state.image) return;
+      const crop = getCrop();
+      el.cropCanvas.width = crop.w;
+      el.cropCanvas.height = crop.h;
+      cropCtx.clearRect(0, 0, crop.w, crop.h);
+      cropCtx.drawImage(state.image, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
+      el.cropStatus.textContent = `crop: x=${crop.x}, y=${crop.y}, w=${crop.w}, h=${crop.h}`;
+
+      const scale = Math.max(1, readNumber(el.scale, 2));
+      el.processedCanvas.width = Math.round(crop.w * scale);
+      el.processedCanvas.height = Math.round(crop.h * scale);
+      processedCtx.imageSmoothingEnabled = true;
+      processedCtx.imageSmoothingQuality = 'high';
+      processedCtx.clearRect(0, 0, el.processedCanvas.width, el.processedCanvas.height);
+      processedCtx.drawImage(el.cropCanvas, 0, 0, el.processedCanvas.width, el.processedCanvas.height);
+      let imageData = processedCtx.getImageData(0, 0, el.processedCanvas.width, el.processedCanvas.height);
+      imageData = preprocessImageData(imageData);
+      if (el.sharpen.checked) imageData = sharpen(imageData, el.processedCanvas.width, el.processedCanvas.height);
+      processedCtx.putImageData(imageData, 0, 0);
+      el.processedStatus.textContent = `processed: ${el.processedCanvas.width} x ${el.processedCanvas.height}`;
+      drawSentCrop();
+    }
+
+    function drawSentCrop() {
+      const width = el.processedCanvas.width;
+      const height = el.processedCanvas.height;
+      el.sentCanvas.width = width;
+      el.sentCanvas.height = height;
+      sentCtx.clearRect(0, 0, width, height);
+      sentCtx.drawImage(el.processedCanvas, 0, 0);
+
+      if (el.iconMaskEnabled.checked) {
+        const scale = Math.max(1, readNumber(el.scale, 2));
+        const x = clamp(Math.round(readNumber(el.iconMaskXInput, 152) * scale), 0, Math.max(0, width - 1));
+        const w = clamp(Math.round(readNumber(el.iconMaskWInput, 32) * scale), 1, Math.max(1, width - x));
+        sentCtx.fillStyle = '#fff';
+        sentCtx.fillRect(x, 0, w, height);
+        sentCtx.strokeStyle = '#d33';
+        sentCtx.lineWidth = Math.max(2, scale);
+        sentCtx.strokeRect(x, 0, w, height);
+        el.sentStatus.textContent = `sent: ${width} x ${height}, icon mask cropX=${Math.round(x / scale)}, cropW=${Math.round(w / scale)}`;
+      } else {
+        el.sentStatus.textContent = `sent: ${width} x ${height}, icon mask off`;
+      }
+    }
+
+    function renderResult(json) {
+      el.rawOutput.textContent = json.text || '';
+      const overlayWords = extractOverlayWords(json.textOverlay);
+      const overlayParsed = overlayWords.length ? parseOverlayRows(overlayWords) : [];
+      const hasOverlay = Boolean(json.hasOverlay || overlayWords.length);
+      const rawPositionResult = parseRawTextByPositions(json.text || json.parsedText || '');
+      const parserMode = 'raw_position';
+      const finalParsed = rawPositionResult.rows;
+      json.overlayWords = overlayWords;
+      json.parsedOverlayRows = overlayParsed;
+      json.rawPositionParser = rawPositionResult;
+      json.finalParsed = finalParsed;
+      json.parserMode = parserMode;
+      el.parserMetaOutput.textContent = [
+        `parserMode: ${parserMode}`,
+        `hasOverlay: ${hasOverlay}`,
+        `overlayLinesCount: ${json.overlayLinesCount ?? 0}`,
+        `overlayWordsCount: ${json.overlayWordsCount ?? overlayWords.length}`,
+        `rawPositionColumnCenters: ${JSON.stringify(rawPositionResult.columnCenters)}`
+      ].join('\n');
+      el.jsonOutput.textContent = JSON.stringify(finalParsed, null, 2);
+      renderOverlayWords(overlayWords);
+      const rows = finalParsed.map((row) => {
+        const tr = document.createElement('tr');
+        ['rawLine', 'parserMode', 'nick', 'kills', 'deaths', 'pvp', 'pve', 'numbersFound', 'tokenPositions', 'mappedColumns', 'parseStatus', 'parse_error'].forEach((key) => {
+          const td = document.createElement('td');
+          td.textContent = Array.isArray(row[key]) || typeof row[key] === 'object' && row[key] !== null
+            ? JSON.stringify(row[key])
+            : row[key] ?? '';
+          tr.append(td);
+        });
+        return tr;
+      });
+      el.resultBody.replaceChildren(...rows);
+      el.compare.disabled = !finalParsed.length;
+    }
+
+    function getBands() {
+      const make = (xInput, wInput) => {
+        const x = readNumber(xInput, 0);
+        const w = readNumber(wInput, 1);
+        return { x, w, end: x + w };
+      };
+      return {
+        nick: make(el.nickBandXInput, el.nickBandWInput),
+        kills: make(el.killsBandXInput, el.killsBandWInput),
+        deaths: make(el.deathsBandXInput, el.deathsBandWInput),
+        pvp: make(el.pvpBandXInput, el.pvpBandWInput),
+        pve: make(el.pveBandXInput, el.pveBandWInput)
+      };
+    }
+
+    function columnForWord(word, bands = getBands()) {
+      const cx = word.x + word.w / 2;
+      for (const key of ['nick', 'kills', 'deaths', 'pvp', 'pve']) {
+        const band = bands[key];
+        if (cx >= band.x && cx <= band.end) return key;
+      }
+      return '';
+    }
+
+    function extractOverlayWords(overlay) {
+      const words = [];
+      const lines = overlay?.Lines || overlay?.lines || [];
+      lines.forEach((line, lineIndex) => {
+        const lineWords = line.Words || line.words || [];
+        lineWords.forEach((word) => {
+          const text = String(word.WordText ?? word.wordText ?? word.text ?? '').trim();
+          if (!text) return;
+          const left = Number(word.Left ?? word.left ?? word.x ?? 0);
+          const top = Number(word.Top ?? word.top ?? word.y ?? 0);
+          const width = Number(word.Width ?? word.width ?? word.w ?? 0);
+          const height = Number(word.Height ?? word.height ?? word.h ?? 0);
+          words.push({ text, x: left, y: top, w: width, h: height, lineIndex });
+        });
+      });
+      return words;
+    }
+
+    function isNumericToken(token) {
+      return /^[\d,\s]+$/.test(String(token || ''));
+    }
+
+    function normalizeNumber(value) {
+      const cleaned = String(value || '').replace(/\s+/g, '').replace(/,/g, '');
+      const match = cleaned.match(/\d+/);
+      return match ? parseInt(match[0], 10) : null;
+    }
+
+    function normalizeNick(value) {
+      return String(value || '').replace(/[^\p{L}0-9_\-\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    function isHeaderLine(line) {
+      return /(?:Член\s+группы|PvP\s*урон|PvE\s*урон|kills|deaths|member)/iu.test(String(line || ''));
+    }
+
+    function extractRawNumericTokens(line) {
+      const tokens = [];
+      const regex = /\d[\d,]*/g;
+      let match;
+      while ((match = regex.exec(line)) !== null) {
+        const raw = match[0];
+        const startIndex = match.index;
+        const endIndex = startIndex + raw.length;
+        tokens.push({
+          raw,
+          value: normalizeNumber(raw),
+          startIndex,
+          endIndex,
+          centerIndex: (startIndex + endIndex) / 2
+        });
+      }
+      return tokens;
+    }
+
+    function nearestColumn(center, columnCenters) {
+      let best = 'kills';
+      let bestDistance = Infinity;
+      for (const column of ['kills', 'deaths', 'pvp', 'pve']) {
+        const distance = Math.abs(center - columnCenters[column]);
+        if (distance < bestDistance) {
+          best = column;
+          bestDistance = distance;
+        }
+      }
+      return best;
+    }
+
+    function deriveRawColumnCenters(lineInfos) {
+      const complete = lineInfos.filter((line) => line.tokens.length >= 4);
+      const defaults = { kills: 24, deaths: 31, pvp: 39, pve: 48 };
+      if (!complete.length) return defaults;
+
+      const sums = [0, 0, 0, 0];
+      complete.forEach((line) => {
+        const lastFour = line.tokens.slice(-4);
+        lastFour.forEach((token, index) => { sums[index] += token.centerIndex; });
+      });
+      const centers = sums.map((sum) => sum / complete.length);
+      return {
+        kills: centers[0],
+        deaths: centers[1],
+        pvp: centers[2],
+        pve: centers[3]
+      };
+    }
+
+    function parseRawTextByPositions(text) {
+      const rawLines = String(text || '').split(/\r?\n/);
+      const lineInfos = rawLines
+        .map((rawLine) => ({ rawLine, trimmed: rawLine.trim(), tokens: extractRawNumericTokens(rawLine) }))
+        .filter((line) => line.trimmed && !isHeaderLine(line.trimmed));
+      const playerLines = lineInfos.filter((line) => normalizeNick(line.rawLine.slice(0, line.tokens[0]?.startIndex ?? line.rawLine.length)));
+      const columnCenters = deriveRawColumnCenters(playerLines);
+      const rows = playerLines.map((line) => {
+        const firstTokenStart = line.tokens[0]?.startIndex ?? line.rawLine.length;
+        const rawNick = line.rawLine.slice(0, firstTokenStart).trim();
+        const nick = normalizeNick(rawNick);
+        if (!line.tokens.length) {
+          return {
+            rawLine: line.rawLine,
+            parserMode: 'raw_position',
+            rawNick,
+            normalizedNick: nick,
+            nick,
+            kills: null,
+            deaths: null,
+            pvp: null,
+            pve: null,
+            numbersFound: [],
+            tokenPositions: [],
+            mappedColumns: {},
+            parseStatus: 'parse_error_no_numbers',
+            parse_error: 'parse_error_no_numbers'
+          };
+        }
+        if (!nick) {
+          return {
+            rawLine: line.rawLine,
+            parserMode: 'raw_position',
+            rawNick,
+            normalizedNick: nick,
+            nick,
+            kills: null,
+            deaths: null,
+            pvp: null,
+            pve: null,
+            numbersFound: line.tokens.map((token) => token.value),
+            tokenPositions: line.tokens,
+            mappedColumns: {},
+            parseStatus: 'parse_error_no_nick',
+            parse_error: 'parse_error_no_nick'
+          };
+        }
+
+        const mapped = {};
+        line.tokens.forEach((token) => {
+          const column = nearestColumn(token.centerIndex, columnCenters);
+          const existing = mapped[column];
+          if (!existing || Math.abs(token.centerIndex - columnCenters[column]) < Math.abs(existing.centerIndex - columnCenters[column])) {
+            mapped[column] = token;
+          }
+        });
+
+        const missing = [];
+        const values = {};
+        ['kills', 'deaths', 'pvp', 'pve'].forEach((column) => {
+          if (mapped[column]) {
+            values[column] = mapped[column].value;
+          } else {
+            values[column] = 0;
+            missing.push(column);
+          }
+        });
+
+        return {
+          rawLine: line.rawLine,
+          parserMode: 'raw_position',
+          rawNick,
+          normalizedNick: nick,
+          nick,
+          kills: values.kills,
+          deaths: values.deaths,
+          pvp: values.pvp,
+          pve: values.pve,
+          numbersFound: line.tokens.map((token) => token.value),
+          tokenPositions: line.tokens.map((token) => ({ value: token.value, start: token.startIndex, end: token.endIndex, center: token.centerIndex })),
+          mappedColumns: Object.fromEntries(Object.entries(mapped).map(([key, token]) => [key, { value: token.value, center: token.centerIndex }])),
+          parseStatus: missing.length ? 'missing_zero_filled_by_position' : 'ok',
+          parse_error: null,
+          missingColumnsFilledAsZero: missing
+        };
+      });
+
+      return { rows, columnCenters, rawLines };
+    }
+
+    function parseOverlayRows(words) {
+      const bands = getBands();
+      const usable = words
+        .map((word) => ({ ...word, column: columnForWord(word, bands) }))
+        .filter((word) => word.column);
+      const sorted = usable.slice().sort((a, b) => a.y - b.y || a.x - b.x);
+      const lineGroups = [];
+      const threshold = Math.max(14, el.sentCanvas.height / 32);
+
+      sorted.forEach((word) => {
+        let group = lineGroups.find((item) => Math.abs(item.cy - (word.y + word.h / 2)) <= threshold);
+        if (!group) {
+          group = { cy: word.y + word.h / 2, words: [] };
+          lineGroups.push(group);
+        }
+        group.words.push(word);
+        group.cy = group.words.reduce((sum, item) => sum + item.y + item.h / 2, 0) / group.words.length;
+      });
+
+      return lineGroups
+        .sort((a, b) => a.cy - b.cy)
+        .map((group, rowIndex) => {
+          const rowWords = group.words.sort((a, b) => a.x - b.x);
+          rowWords.forEach((word) => { word.mappedRow = rowIndex + 1; });
+          const nickWords = rowWords.filter((word) => word.column === 'nick');
+          const rawNick = nickWords.map((word) => word.text).join(' ');
+          const nick = normalizeNick(rawNick);
+          const stats = {};
+          const missing = [];
+          ['kills', 'deaths', 'pvp', 'pve'].forEach((column) => {
+            const nums = rowWords
+              .filter((word) => word.column === column && isNumericToken(word.text))
+              .sort((a, b) => a.x - b.x);
+            if (nums.length) {
+              stats[column] = normalizeNumber(nums[0].text);
+            } else {
+              stats[column] = 0;
+              missing.push(column);
+            }
+          });
+          const parseStatus = nick
+            ? missing.length ? 'missing_zero_filled_by_column' : 'ok'
+            : 'overlay_parse_error';
+          return {
+            rawLine: rowWords.map((word) => word.text).join(' '),
+            parserMode: 'overlay',
+            rawNick,
+            normalizedNick: nick,
+            nick,
+            kills: stats.kills,
+            deaths: stats.deaths,
+            pvp: stats.pvp,
+            pve: stats.pve,
+            numbersFound: rowWords.filter((word) => isNumericToken(word.text)).map((word) => normalizeNumber(word.text)),
+            parseStatus,
+            parse_error: nick ? null : 'missing_nick',
+            parsedBy: 'overlayParser',
+            missingColumnsFilledAsZero: missing
+          };
+        })
+        .filter((row) => row.nick);
+    }
+
+    function renderOverlayWords(words) {
+      const bands = getBands();
+      const rows = words.map((word) => {
+        const tr = document.createElement('tr');
+        [word.text, word.x, word.y, word.w, word.h, word.mappedRow ?? '', columnForWord(word, bands)].forEach((value) => {
+          const td = document.createElement('td');
+          td.textContent = value ?? '';
+          tr.append(td);
+        });
+        return tr;
+      });
+      el.overlayWordsBody.replaceChildren(...rows);
+    }
+
+    function setStatus(kind, message) {
+      el.statusOutput.className = `status ${kind || ''}`.trim();
+      el.statusOutput.textContent = message;
+    }
+
+    function clearOutputs() {
+      state.lastJson = null;
+      el.rawOutput.textContent = '';
+      el.parserMetaOutput.textContent = 'parserMode: idle';
+      el.jsonOutput.textContent = '[]';
+      el.resultBody.replaceChildren();
+      el.overlayWordsBody.replaceChildren();
+      el.compareOutput.textContent = '';
+      el.compare.disabled = true;
+    }
+
+    function getBackendBaseUrl() {
+      try {
+        const apiUrl = new URL(el.apiUrl.value || 'http://localhost:8787/ocr-read', window.location.href);
+        return apiUrl.origin;
+      } catch {
+        return 'http://localhost:8787';
+      }
+    }
+
+    async function checkBackend() {
+      el.backendStatus.className = 'status running';
+      el.backendStatus.textContent = 'backend: checking /health...';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      try {
+        const response = await fetch(`${getBackendBaseUrl()}/health`, { signal: controller.signal });
+        const json = await response.json();
+        if (!response.ok || !json.ok) throw new Error(json.error || `HTTP ${response.status}`);
+        el.backendStatus.className = 'status success';
+        el.backendStatus.textContent = 'backend: ok';
+      } catch (error) {
+        const message = error?.name === 'AbortError' ? 'health check timed out' : String(error.message || error);
+        el.backendStatus.className = 'status fail';
+        el.backendStatus.textContent = `backend: fail: ${message}`;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    }
+
+    function validateApiUrl() {
+      try {
+        const apiUrl = new URL(el.apiUrl.value, window.location.href);
+        if (!/^https?:$/.test(apiUrl.protocol)) throw new Error('API URL must be http(s)');
+        if (!apiUrl.pathname.endsWith('/ocr-read')) throw new Error('API URL should end with /ocr-read');
+        return apiUrl.href;
+      } catch (error) {
+        throw new Error(`Invalid API URL: ${String(error.message || error)}`);
+      }
+    }
+
+    function normalizeExpectedNick(value) {
+      return String(value || '').trim().toLowerCase();
+    }
+
+    function compareExpected() {
+      if (!state.lastJson?.parsed?.length) return;
+      try {
+        const expected = JSON.parse(el.expectedInput.value || '[]');
+        const actual = state.lastJson.finalParsed || state.lastJson.parsed || [];
+        const fields = ['nick', 'kills', 'deaths', 'pvp', 'pve'];
+        let total = 0;
+        let matched = 0;
+        const rows = expected.map((exp, index) => {
+          const act = actual[index] || {};
+          const result = { row: index + 1 };
+          fields.forEach((field) => {
+            total += 1;
+            const expValue = field === 'nick' ? normalizeExpectedNick(exp[field]) : exp[field];
+            const actValue = field === 'nick' ? normalizeExpectedNick(act[field]) : act[field];
+            const ok = expValue === actValue;
+            if (ok) matched += 1;
+            result[field] = { expected: exp[field] ?? null, actual: act[field] ?? null, ok };
+          });
+          return result;
+        });
+        el.compareOutput.textContent = JSON.stringify({ accuracy: total ? matched / total : 0, matched, total, rows }, null, 2);
+      } catch (error) {
+        el.compareOutput.textContent = `Invalid expected JSON: ${String(error.message || error)}`;
+      }
+    }
+
+    async function runBackendOcr() {
+      if (!state.image) return;
+      el.run.disabled = true;
+      const previousButtonText = el.run.textContent;
+      el.run.textContent = 'OCR running...';
+      clearOutputs();
+      setStatus('running', 'preparing image');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      try {
+        const apiUrl = validateApiUrl();
+        drawSentCrop();
+        const blob = await new Promise((resolve) => el.sentCanvas.toBlob(resolve, 'image/png'));
+        if (!blob) throw new Error('Could not create PNG blob from processed crop.');
+        const form = new FormData();
+        form.append('file', blob, 'clan_control_crop_processed.png');
+        const started = performance.now();
+        setStatus('running', 'sending');
+        const response = await fetch(apiUrl, { method: 'POST', body: form, signal: controller.signal });
+        setStatus('running', 'OCR response received');
+        const responseText = await response.text();
+        let json;
+        try {
+          json = JSON.parse(responseText);
+        } catch {
+          throw new Error(`Backend returned non-JSON response: HTTP ${response.status}`);
+        }
+        const duration = Math.round(performance.now() - started);
+        state.lastJson = json;
+        if (!response.ok || json.error || json.ok === false) throw new Error(json.error || `HTTP ${response.status}`);
+        renderResult(json);
+        if (json.hasOverlay && (json.finalParsed || []).length) {
+          setStatus('success', `parsed rows: ${(json.finalParsed || []).length} (${duration} ms)`);
+        }
+      } catch (error) {
+        const message = error?.name === 'AbortError'
+          ? 'timeout after 60 seconds. Check proxy console logs and OCR.space availability.'
+          : String(error.message || error);
+        setStatus('fail', `fail: ${message}`);
+      } finally {
+        clearTimeout(timeoutId);
+        el.run.disabled = false;
+        el.run.textContent = previousButtonText;
+      }
+    }
+
+    el.file.addEventListener('change', () => {
+      const file = el.file.files?.[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = () => {
+        state.image = img;
+        applyRightGroupPreset();
+        el.run.disabled = false;
+        el.rightGroupPreset.disabled = false;
+        setStatus('', 'idle: screenshot loaded. Check crop includes the PvE column, then click Run backend OCR.');
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = () => {
+        el.cropStatus.innerHTML = '<span class="error">Could not load image.</span>';
+      };
+      img.src = URL.createObjectURL(file);
+    });
+
+    el.run.addEventListener('click', runBackendOcr);
+    el.checkBackend.addEventListener('click', checkBackend);
+    el.rightGroupPreset.addEventListener('click', applyRightGroupPreset);
+    checkBackend();
+    el.compare.addEventListener('click', compareExpected);
+  </script>
+</body>
+</html>

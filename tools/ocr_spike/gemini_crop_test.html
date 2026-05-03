@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gemini Crop Vision Spike</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #fff;
+      --text: #17202a;
+      --muted: #5d6978;
+      --line: #d8dee8;
+      --accent: #1b6fd8;
+      --bad: #a33a3a;
+      --warn: #fff2cc;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { width: min(1440px, calc(100vw - 32px)); margin: 0 auto; padding: 20px 0 32px; }
+    h1 { margin: 0 0 14px; font-size: 24px; }
+    h2 { margin: 0 0 12px; font-size: 16px; }
+    section, .toolbar { padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+    .toolbar, .settings, .grid, .result-grid { display: grid; gap: 12px; }
+    .toolbar { grid-template-columns: minmax(220px, 1fr) minmax(300px, 1.2fr) auto; align-items: end; margin-bottom: 12px; }
+    .settings { grid-template-columns: repeat(6, minmax(110px, 1fr)); margin-bottom: 12px; }
+    .grid { grid-template-columns: repeat(2, minmax(360px, 1fr)); align-items: start; }
+    .result-grid { grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr); margin-top: 12px; }
+    label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; font-weight: 700; }
+    input, select, textarea {
+      width: 100%; min-height: 34px; border: 1px solid var(--line); border-radius: 6px;
+      background: #fff; color: var(--text); font: inherit; padding: 6px 8px;
+    }
+    textarea { min-height: 150px; font: 12px/1.45 Consolas, monospace; resize: vertical; }
+    button {
+      min-height: 36px; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent);
+      color: #fff; font: inherit; font-weight: 700; padding: 7px 12px; cursor: pointer; white-space: nowrap;
+    }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .warning { margin-bottom: 12px; padding: 10px 12px; border: 1px solid #d99a22; border-radius: 8px; background: var(--warn); color: #6f4300; font-weight: 800; }
+    .checkline { display: flex; min-height: 34px; gap: 8px; align-items: center; color: var(--text); font-size: 13px; }
+    .pair { display: grid; grid-template-columns: 1fr 78px; gap: 8px; align-items: center; }
+    .canvas-wrap { overflow: auto; max-height: 66vh; border: 1px solid var(--line); border-radius: 6px; background: #eef2f7; }
+    canvas { display: block; max-width: 100%; height: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 7px 8px; text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-size: 12px; }
+    pre {
+      min-height: 260px; max-height: 520px; overflow: auto; margin: 0; padding: 10px;
+      border: 1px solid var(--line); border-radius: 6px; background: #101820; color: #e8f0f7;
+      font: 12px/1.45 Consolas, monospace; white-space: pre-wrap;
+    }
+    .status { min-height: 18px; margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .status.running { color: #1b5ca8; font-weight: 800; }
+    .status.success { color: #146c43; font-weight: 800; }
+    .status.fail { color: var(--bad); font-weight: 850; }
+    @media (max-width: 980px) { .toolbar, .settings, .grid, .result-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Gemini Crop Vision Spike</h1>
+    <div class="warning">UNSAFE LOCAL TEST ONLY — key is embedded in this file. Do not commit or deploy.</div>
+
+    <div class="toolbar">
+      <label>
+        Screenshot
+        <input id="fileInput" type="file" accept="image/*">
+      </label>
+      <label>
+        OpenRouter model
+        <input id="modelInput" value="google/gemini-2.0-flash-lite-001">
+      </label>
+      <button id="runButton" disabled>Run Gemini Vision</button>
+    </div>
+
+    <section>
+      <h2>Crop And Preprocessing</h2>
+      <div class="warning">Only the processed crop image is sent to OpenRouter.</div>
+      <div class="settings">
+        <label>
+          preset
+          <button id="rightGroupPresetButton" disabled>Right group table full width</button>
+        </label>
+        <label>crop X <span class="pair"><input id="cropXRange" type="range" min="0" max="0" value="0"><input id="cropXInput" type="number" value="0"></span></label>
+        <label>crop Y <span class="pair"><input id="cropYRange" type="range" min="0" max="0" value="0"><input id="cropYInput" type="number" value="0"></span></label>
+        <label>crop W <span class="pair"><input id="cropWRange" type="range" min="1" max="1" value="1"><input id="cropWInput" type="number" value="1"></span></label>
+        <label>crop H <span class="pair"><input id="cropHRange" type="range" min="1" max="1" value="1"><input id="cropHInput" type="number" value="1"></span></label>
+        <label>
+          scale
+          <select id="scaleInput">
+            <option value="2">2x</option>
+            <option value="3" selected>3x</option>
+            <option value="4">4x</option>
+          </select>
+        </label>
+        <label>contrast <span class="pair"><input id="contrastRange" type="range" min="50" max="260" value="140"><input id="contrastInput" type="number" value="140"></span></label>
+        <label class="checkline"><input id="grayscaleInput" type="checkbox" checked> grayscale</label>
+        <label class="checkline"><input id="sharpenInput" type="checkbox" checked> sharpen</label>
+      </div>
+      <div class="grid">
+        <section>
+          <h2>Crop Preview</h2>
+          <div class="canvas-wrap"><canvas id="cropCanvas"></canvas></div>
+          <div id="cropStatus" class="status">Load a screenshot to start.</div>
+        </section>
+        <section>
+          <h2>Processed Crop Sent To Model</h2>
+          <div class="canvas-wrap"><canvas id="processedCanvas"></canvas></div>
+          <div id="processedStatus" class="status"></div>
+        </section>
+      </div>
+    </section>
+
+    <div class="result-grid">
+      <section>
+        <h2>Parsed JSON Table</h2>
+        <table>
+          <thead>
+            <tr><th>nick</th><th>kills</th><th>deaths</th><th>pvp</th><th>pve</th></tr>
+          </thead>
+          <tbody id="resultBody"></tbody>
+        </table>
+      </section>
+      <section>
+        <h2>Raw Model Response</h2>
+        <pre id="rawOutput"></pre>
+      </section>
+    </div>
+
+    <section style="margin-top: 12px;">
+      <h2>JSON Output</h2>
+      <pre id="jsonOutput">[]</pre>
+      <div id="statusOutput" class="status">idle</div>
+    </section>
+
+    <section style="margin-top: 12px;">
+      <h2>Expected JSON Compare</h2>
+      <textarea id="expectedInput" placeholder='[{"nick":"ТОХАШАОЛИНЬ","kills":0,"deaths":12,"pvp":0,"pve":0}]'></textarea>
+      <div style="margin-top: 8px;"><button id="compareButton" disabled>Compare</button></div>
+      <pre id="compareOutput"></pre>
+    </section>
+  </main>
+
+  <script>
+    const OPENROUTER_API_KEY = "PASTE_OPENROUTER_KEY_HERE";
+
+    const el = {
+      file: document.getElementById('fileInput'),
+      model: document.getElementById('modelInput'),
+      run: document.getElementById('runButton'),
+      rightGroupPreset: document.getElementById('rightGroupPresetButton'),
+      cropCanvas: document.getElementById('cropCanvas'),
+      processedCanvas: document.getElementById('processedCanvas'),
+      cropStatus: document.getElementById('cropStatus'),
+      processedStatus: document.getElementById('processedStatus'),
+      rawOutput: document.getElementById('rawOutput'),
+      jsonOutput: document.getElementById('jsonOutput'),
+      resultBody: document.getElementById('resultBody'),
+      statusOutput: document.getElementById('statusOutput'),
+      expectedInput: document.getElementById('expectedInput'),
+      compare: document.getElementById('compareButton'),
+      compareOutput: document.getElementById('compareOutput'),
+      cropXRange: document.getElementById('cropXRange'),
+      cropXInput: document.getElementById('cropXInput'),
+      cropYRange: document.getElementById('cropYRange'),
+      cropYInput: document.getElementById('cropYInput'),
+      cropWRange: document.getElementById('cropWRange'),
+      cropWInput: document.getElementById('cropWInput'),
+      cropHRange: document.getElementById('cropHRange'),
+      cropHInput: document.getElementById('cropHInput'),
+      scale: document.getElementById('scaleInput'),
+      grayscale: document.getElementById('grayscaleInput'),
+      sharpen: document.getElementById('sharpenInput'),
+      contrastRange: document.getElementById('contrastRange'),
+      contrastInput: document.getElementById('contrastInput')
+    };
+
+    const state = { image: null, parsed: [] };
+    const cropCtx = el.cropCanvas.getContext('2d', { willReadFrequently: true });
+    const processedCtx = el.processedCanvas.getContext('2d', { willReadFrequently: true });
+
+    function setStatus(kind, message) {
+      el.statusOutput.className = `status ${kind || ''}`.trim();
+      el.statusOutput.textContent = message;
+    }
+
+    function readNumber(input, fallback) {
+      const value = Number(input.value);
+      return Number.isFinite(value) ? value : fallback;
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function setPair(range, input, value, max) {
+      const safe = Math.round(clamp(value, Number(range.min || 0), max));
+      range.max = String(max);
+      input.max = String(max);
+      range.value = String(safe);
+      input.value = String(safe);
+    }
+
+    function syncPair(range, input) {
+      range.addEventListener('input', () => { input.value = range.value; redraw(); });
+      input.addEventListener('input', () => { range.value = input.value; redraw(); });
+    }
+
+    [[el.cropXRange, el.cropXInput], [el.cropYRange, el.cropYInput], [el.cropWRange, el.cropWInput], [el.cropHRange, el.cropHInput], [el.contrastRange, el.contrastInput]]
+      .forEach(([range, input]) => syncPair(range, input));
+    [el.scale, el.grayscale, el.sharpen].forEach((input) => input.addEventListener('input', redraw));
+    [el.grayscale, el.sharpen].forEach((input) => input.addEventListener('change', redraw));
+
+    function applyRightGroupPreset() {
+      if (!state.image) return;
+      setPair(el.cropXRange, el.cropXInput, clamp(398, 0, state.image.width - 1), state.image.width - 1);
+      setPair(el.cropYRange, el.cropYInput, clamp(90, 0, state.image.height - 1), state.image.height - 1);
+      setPair(el.cropWRange, el.cropWInput, clamp(375, 1, state.image.width - readNumber(el.cropXInput, 398)), state.image.width);
+      setPair(el.cropHRange, el.cropHInput, clamp(205, 1, state.image.height - readNumber(el.cropYInput, 90)), state.image.height);
+      el.scale.value = '3';
+      el.contrastInput.value = '140';
+      el.contrastRange.value = '140';
+      el.grayscale.checked = true;
+      el.sharpen.checked = true;
+      redraw();
+    }
+
+    function getCrop() {
+      const maxW = state.image?.width || 1;
+      const maxH = state.image?.height || 1;
+      const x = clamp(Math.round(readNumber(el.cropXInput, 0)), 0, maxW - 1);
+      const y = clamp(Math.round(readNumber(el.cropYInput, 0)), 0, maxH - 1);
+      const w = clamp(Math.round(readNumber(el.cropWInput, maxW - x)), 1, maxW - x);
+      const h = clamp(Math.round(readNumber(el.cropHInput, maxH - y)), 1, maxH - y);
+      return { x, y, w, h };
+    }
+
+    function preprocessImageData(imageData) {
+      const data = imageData.data;
+      const contrast = readNumber(el.contrastInput, 140) / 100;
+      const factor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
+      for (let i = 0; i < data.length; i += 4) {
+        if (el.grayscale.checked) {
+          const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          data[i] = gray;
+          data[i + 1] = gray;
+          data[i + 2] = gray;
+        }
+        data[i] = clamp(factor * (data[i] - 128) + 128, 0, 255);
+        data[i + 1] = clamp(factor * (data[i + 1] - 128) + 128, 0, 255);
+        data[i + 2] = clamp(factor * (data[i + 2] - 128) + 128, 0, 255);
+      }
+      return imageData;
+    }
+
+    function sharpen(imageData, width, height) {
+      const src = imageData.data;
+      const out = new Uint8ClampedArray(src.length);
+      const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const idx = (y * width + x) * 4;
+          if (x === 0 || y === 0 || x === width - 1 || y === height - 1) {
+            out[idx] = src[idx]; out[idx + 1] = src[idx + 1]; out[idx + 2] = src[idx + 2]; out[idx + 3] = src[idx + 3];
+            continue;
+          }
+          let r = 0, g = 0, b = 0, k = 0;
+          for (let yy = -1; yy <= 1; yy += 1) {
+            for (let xx = -1; xx <= 1; xx += 1) {
+              const srcIdx = ((y + yy) * width + x + xx) * 4;
+              const weight = kernel[k++];
+              r += src[srcIdx] * weight;
+              g += src[srcIdx + 1] * weight;
+              b += src[srcIdx + 2] * weight;
+            }
+          }
+          out[idx] = clamp(r, 0, 255);
+          out[idx + 1] = clamp(g, 0, 255);
+          out[idx + 2] = clamp(b, 0, 255);
+          out[idx + 3] = src[idx + 3];
+        }
+      }
+      return new ImageData(out, width, height);
+    }
+
+    function redraw() {
+      if (!state.image) return;
+      const crop = getCrop();
+      el.cropCanvas.width = crop.w;
+      el.cropCanvas.height = crop.h;
+      cropCtx.clearRect(0, 0, crop.w, crop.h);
+      cropCtx.drawImage(state.image, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
+      el.cropStatus.textContent = `crop: x=${crop.x}, y=${crop.y}, w=${crop.w}, h=${crop.h}`;
+
+      const scale = Math.max(1, readNumber(el.scale, 3));
+      el.processedCanvas.width = Math.round(crop.w * scale);
+      el.processedCanvas.height = Math.round(crop.h * scale);
+      processedCtx.imageSmoothingEnabled = true;
+      processedCtx.imageSmoothingQuality = 'high';
+      processedCtx.clearRect(0, 0, el.processedCanvas.width, el.processedCanvas.height);
+      processedCtx.drawImage(el.cropCanvas, 0, 0, el.processedCanvas.width, el.processedCanvas.height);
+      let imageData = processedCtx.getImageData(0, 0, el.processedCanvas.width, el.processedCanvas.height);
+      imageData = preprocessImageData(imageData);
+      if (el.sharpen.checked) imageData = sharpen(imageData, el.processedCanvas.width, el.processedCanvas.height);
+      processedCtx.putImageData(imageData, 0, 0);
+      el.processedStatus.textContent = `processed: ${el.processedCanvas.width} x ${el.processedCanvas.height}`;
+    }
+
+    function getPrompt() {
+      return `Read this game party table from the image. Ignore profession icons. Return only a JSON array, no markdown, no explanation.
+Each row must have exactly these fields: nick, kills, deaths, pvp, pve.
+Numbers are table columns. Missing visible zero must be 0. Do not guess professions.
+Keep nick exactly as visible, Russian or English. Stats are integers.`;
+    }
+
+    function extractJsonArray(text) {
+      const raw = String(text || '').trim();
+      try { return JSON.parse(raw); } catch {}
+      const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+      if (fenced) {
+        try { return JSON.parse(fenced[1].trim()); } catch {}
+      }
+      const start = raw.indexOf('[');
+      const end = raw.lastIndexOf(']');
+      if (start >= 0 && end > start) return JSON.parse(raw.slice(start, end + 1));
+      throw new Error('Model response does not contain a JSON array.');
+    }
+
+    function normalizeRows(rows) {
+      return (Array.isArray(rows) ? rows : []).map((row) => ({
+        nick: String(row.nick ?? row.name ?? '').trim(),
+        kills: Number.parseInt(String(row.kills ?? 0).replace(/,/g, ''), 10) || 0,
+        deaths: Number.parseInt(String(row.deaths ?? 0).replace(/,/g, ''), 10) || 0,
+        pvp: Number.parseInt(String(row.pvp ?? row.pvpDamage ?? 0).replace(/,/g, ''), 10) || 0,
+        pve: Number.parseInt(String(row.pve ?? row.pveDamage ?? 0).replace(/,/g, ''), 10) || 0
+      })).filter((row) => row.nick);
+    }
+
+    function renderRows(rows) {
+      state.parsed = rows;
+      el.jsonOutput.textContent = JSON.stringify(rows, null, 2);
+      const trs = rows.map((row) => {
+        const tr = document.createElement('tr');
+        ['nick', 'kills', 'deaths', 'pvp', 'pve'].forEach((key) => {
+          const td = document.createElement('td');
+          td.textContent = row[key] ?? '';
+          tr.append(td);
+        });
+        return tr;
+      });
+      el.resultBody.replaceChildren(...trs);
+      el.compare.disabled = !rows.length;
+    }
+
+    async function runGeminiVision() {
+      if (!state.image) return;
+      if (!OPENROUTER_API_KEY || OPENROUTER_API_KEY === 'PASTE_OPENROUTER_KEY_HERE') {
+        setStatus('fail', 'Paste OpenRouter key into OPENROUTER_API_KEY in this HTML file.');
+        return;
+      }
+      el.run.disabled = true;
+      const previousText = el.run.textContent;
+      el.run.textContent = 'Running...';
+      setStatus('running', 'preparing crop image');
+      el.rawOutput.textContent = '';
+      renderRows([]);
+      try {
+        const imageDataUrl = el.processedCanvas.toDataURL('image/png');
+        setStatus('running', 'sending crop to OpenRouter');
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+            'HTTP-Referer': location.href,
+            'X-Title': 'Clan Control OCR Spike'
+          },
+          body: JSON.stringify({
+            model: el.model.value.trim() || 'google/gemini-2.0-flash-lite-001',
+            temperature: 0,
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'text', text: getPrompt() },
+                { type: 'image_url', image_url: { url: imageDataUrl } }
+              ]
+            }]
+          })
+        });
+        const json = await response.json();
+        const text = json.choices?.[0]?.message?.content ?? '';
+        el.rawOutput.textContent = typeof text === 'string' ? text : JSON.stringify(text, null, 2);
+        if (!response.ok || json.error) throw new Error(json.error?.message || `OpenRouter HTTP ${response.status}`);
+        const parsed = normalizeRows(extractJsonArray(el.rawOutput.textContent));
+        renderRows(parsed);
+        setStatus('success', `parsed rows: ${parsed.length}`);
+      } catch (error) {
+        setStatus('fail', `fail: ${String(error.message || error)}`);
+      } finally {
+        el.run.disabled = false;
+        el.run.textContent = previousText;
+      }
+    }
+
+    function normalizeNickForCompare(value) {
+      return String(value || '').trim().toLowerCase();
+    }
+
+    function compareExpected() {
+      try {
+        const expected = JSON.parse(el.expectedInput.value || '[]');
+        const fields = ['nick', 'kills', 'deaths', 'pvp', 'pve'];
+        let total = 0;
+        let matched = 0;
+        const rows = expected.map((exp, index) => {
+          const act = state.parsed[index] || {};
+          const result = { row: index + 1 };
+          fields.forEach((field) => {
+            total += 1;
+            const expValue = field === 'nick' ? normalizeNickForCompare(exp[field]) : exp[field];
+            const actValue = field === 'nick' ? normalizeNickForCompare(act[field]) : act[field];
+            const ok = expValue === actValue;
+            if (ok) matched += 1;
+            result[field] = { expected: exp[field] ?? null, actual: act[field] ?? null, ok };
+          });
+          return result;
+        });
+        el.compareOutput.textContent = JSON.stringify({ accuracy: total ? matched / total : 0, matched, total, rows }, null, 2);
+      } catch (error) {
+        el.compareOutput.textContent = `Invalid expected JSON: ${String(error.message || error)}`;
+      }
+    }
+
+    el.file.addEventListener('change', () => {
+      const file = el.file.files?.[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = () => {
+        state.image = img;
+        applyRightGroupPreset();
+        el.run.disabled = false;
+        el.rightGroupPreset.disabled = false;
+        setStatus('', 'idle: screenshot loaded. Check crop, then run Gemini Vision.');
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = () => setStatus('fail', 'Could not load image.');
+      img.src = URL.createObjectURL(file);
+    });
+
+    el.run.addEventListener('click', runGeminiVision);
+    el.rightGroupPreset.addEventListener('click', applyRightGroupPreset);
+    el.compare.addEventListener('click', compareExpected);
+  </script>
+</body>
+</html>

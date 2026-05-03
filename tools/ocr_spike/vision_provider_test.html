@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Vision Provider Test — clan-control OCR spike</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:13px/1.4 system-ui,sans-serif;background:#1a1d22;color:#d4d8e0;min-height:100vh}
+h1{font-size:16px;font-weight:700;color:#e8c97a;letter-spacing:.04em}
+h2{font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+
+.topbar{display:flex;align-items:center;gap:16px;padding:10px 16px;background:#12151b;border-bottom:1px solid #2d3748;flex-wrap:wrap}
+.topbar .st{font-size:11px;color:#64748b;flex:1}
+.topbar .st.ok{color:#30db76;font-weight:700}
+.topbar .st.err{color:#ff5555;font-weight:700}
+
+.section{padding:12px 16px;border-bottom:1px solid #1e2530}
+
+/* Form elements */
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+label.lf{display:flex;flex-direction:column;gap:3px;font-size:10px;color:#64748b}
+label.lf select,label.lf input[type=text],label.lf input[type=password]{
+  background:#0d1117;border:1px solid #2d3748;color:#c0c8d8;border-radius:4px;
+  padding:4px 7px;font-size:12px}
+label.lf select{width:220px}
+label.lf input[type=text]{width:300px}
+label.lf input[type=password]{width:260px}
+label.lf input[type=number]{width:64px;background:#0d1117;border:1px solid #2d3748;color:#c0c8d8;border-radius:4px;padding:4px 6px;font-size:12px}
+.pair{display:flex;gap:4px;align-items:center}
+.pair input[type=range]{width:80px;accent-color:#4f46e5}
+
+label.ck{display:flex;align-items:center;gap:5px;font-size:11px;color:#94a3b8;cursor:pointer}
+label.ck input{accent-color:#4f46e5}
+
+button{padding:6px 14px;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;transition:opacity .15s}
+#btnRun{background:#4f46e5;color:#fff}#btnRun:hover{opacity:.85}#btnRun:disabled{opacity:.35;cursor:not-allowed}
+#btnUpload{background:#2d3748;color:#d4d8e0}#btnUpload:hover{background:#3d4a5f}
+#btnSaveKey{background:#1a3820;color:#30db76;border:1px solid #2d5a35}#btnSaveKey:hover{background:#224a2a}
+#btnPreset{background:#162030;color:#60a5fa;border:1px solid #2d4060}#btnPreset:hover{background:#1e2e40}
+#btnCompare{background:#1e1428;color:#a78bfa;border:1px solid #362050}#btnCompare:hover{background:#281e40}
+#btnCompare:disabled{opacity:.35;cursor:not-allowed}
+
+.hint{font-size:10px;color:#475569;margin-top:4px}
+.mhint{font-size:10px;color:#334155;margin-top:3px}
+
+/* Canvases */
+.cvrow{display:flex;gap:14px;overflow-x:auto;padding:10px 0;align-items:flex-start}
+.cvwrap{display:flex;flex-direction:column;gap:5px}
+.cvlabel{font-size:10px;color:#64748b}
+canvas{border:1px solid #2d3748;border-radius:3px;cursor:zoom-in;display:block;max-width:480px;height:auto}
+.cvst{font-size:10px;color:#475569;margin-top:2px}
+
+/* Results */
+.resrow{display:flex;gap:14px;flex-wrap:wrap;padding:10px 0}
+.respanel{flex:1;min-width:300px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#131720;color:#64748b;font-weight:700;text-align:left;padding:5px 7px;border-bottom:2px solid #2d3748}
+td{padding:4px 7px;border-bottom:1px solid #1e2530}
+tr:hover td{background:#1a1f2b}
+
+pre{background:#0d1117;border:1px solid #2d3748;border-radius:5px;padding:10px;
+  font:12px/1.5 Consolas,monospace;color:#c0e0ff;white-space:pre-wrap;
+  overflow-x:auto;max-height:400px;overflow-y:auto;margin-top:6px}
+
+.runst{font-size:11px;color:#64748b;margin-top:6px}
+.runst.ok{color:#30db76;font-weight:700}
+.runst.err{color:#ff5555;font-weight:700}
+.runst.run{color:#60a5fa;font-weight:700}
+
+textarea{background:#0d1117;border:1px solid #2d3748;color:#c0c8d8;border-radius:4px;
+  padding:8px;font:11px/1.5 Consolas,monospace;width:100%;resize:vertical;min-height:70px}
+
+#lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out}
+#lb.on{display:flex}
+#lb img{max-width:92vw;max-height:92vh;image-rendering:pixelated;border:2px solid #2d3748}
+</style>
+</head>
+<body>
+
+<div id="lb" onclick="this.classList.remove('on')"><img id="lbImg" src=""></div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <h1>Vision Provider Test</h1>
+  <input type="file" id="fileInput" accept="image/*" style="display:none">
+  <button id="btnUpload" onclick="document.getElementById('fileInput').click()">📁 Скриншот</button>
+  <span class="st" id="globalSt">Загрузи скриншот →</span>
+</div>
+
+<!-- PROVIDER CONFIG -->
+<div class="section">
+  <h2>Provider &amp; Key</h2>
+  <div class="row">
+    <label class="lf">Provider
+      <select id="selProvider">
+        <option value="gemini">Google Gemini Direct (free tier)</option>
+        <option value="openrouter">OpenRouter (free vision models)</option>
+        <option value="nvidia">NVIDIA NIM (free credits)</option>
+      </select>
+    </label>
+    <label class="lf">Model
+      <input type="text" id="modelInput" value="gemini-2.0-flash" spellcheck="false">
+    </label>
+    <label class="lf">API Key
+      <input type="password" id="keyInput" placeholder="вставь ключ → Save key">
+    </label>
+    <button id="btnSaveKey" onclick="saveKey()">💾 Save key</button>
+    <button id="btnRun" disabled onclick="runVision()">▶ Run Vision OCR</button>
+  </div>
+  <div class="hint" id="keyHint"></div>
+  <div class="mhint" id="modelHint"></div>
+</div>
+
+<!-- CROP + PREPROCESS -->
+<div class="section">
+  <h2>Crop &amp; Preprocess</h2>
+  <div class="row" style="margin-bottom:8px">
+    <button id="btnPreset" onclick="applyPreset()">⊞ Right-group preset</button>
+    <label class="lf">cropX <div class="pair"><input type="range" id="cropXR" min="0" max="1" value="398"><input type="number" id="cropX" value="398"></div></label>
+    <label class="lf">cropY <div class="pair"><input type="range" id="cropYR" min="0" max="1" value="90"><input type="number" id="cropY" value="90"></div></label>
+    <label class="lf">cropW <div class="pair"><input type="range" id="cropWR" min="1" max="1" value="375"><input type="number" id="cropW" value="375"></div></label>
+    <label class="lf">cropH <div class="pair"><input type="range" id="cropHR" min="1" max="1" value="205"><input type="number" id="cropH" value="205"></div></label>
+    <label class="lf">scale <input type="number" id="scale" value="2" min="1" max="6"></label>
+    <!-- contrast 0 = identity (no change). 140 = BASA heavy contrast (inverts image for VLMs). Default 0 for VLMs. -->
+    <label class="lf">contrast% <div class="pair"><input type="range" id="contrastR" min="0" max="260" value="0"><input type="number" id="contrast" value="0"></div></label>
+    <label class="ck"><input type="checkbox" id="cbGray"> grayscale</label>
+    <label class="ck"><input type="checkbox" id="cbSharpen"> sharpen</label>
+  </div>
+  <div class="hint">Для VLM рекомендуется: contrast=0, grayscale=off, sharpen=off (отправляем цветной оригинал). BASA-режим: contrast=140, gray=on, sharpen=on (инвертирует изображение — плохо для VLM).</div>
+  <div class="cvrow">
+    <div class="cvwrap">
+      <div class="cvlabel">Original crop (click = zoom)</div>
+      <canvas id="cvCrop" onclick="lb(this)"></canvas>
+      <div class="cvst" id="cropSt">—</div>
+    </div>
+    <div class="cvwrap">
+      <div class="cvlabel">Sent to model (click = zoom)</div>
+      <canvas id="cvSend" onclick="lb(this)"></canvas>
+      <div class="cvst" id="sendSt">—</div>
+    </div>
+  </div>
+</div>
+
+<!-- RESULTS -->
+<div class="section">
+  <div class="resrow">
+    <div class="respanel">
+      <h2>Parsed rows</h2>
+      <table>
+        <thead><tr><th>nick</th><th>kills</th><th>deaths</th><th>pvp</th><th>pve</th></tr></thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+      <pre id="jsonOut">[]</pre>
+      <div class="runst" id="runSt">idle</div>
+    </div>
+    <div class="respanel">
+      <h2>Raw model response</h2>
+      <pre id="rawOut"></pre>
+    </div>
+  </div>
+</div>
+
+<!-- COMPARE -->
+<div class="section">
+  <h2>Expected JSON Compare (optional)</h2>
+  <div class="row" style="align-items:flex-start;gap:8px">
+    <textarea id="expectedInput" placeholder='[{"nick":"Джейк","kills":5,"deaths":9,"pvp":0,"pve":0}]' style="flex:1"></textarea>
+    <button id="btnCompare" onclick="doCompare()" disabled style="align-self:flex-start">Compare</button>
+  </div>
+  <pre id="compareOut" style="margin-top:8px"></pre>
+</div>
+
+<script>
+'use strict';
+
+// ── Provider metadata ─────────────────────────────────────────
+const PROVIDERS = {
+  gemini: {
+    lsKey:  'vpt_gemini_key',
+    hint:   'Ключ: aistudio.google.com → "Get API key". Free: gemini-2.0-flash 30 RPM / 1500 RPD, gemini-1.5-flash 15 RPM / 1500 RPD.',
+    models: 'gemini-2.0-flash  |  gemini-1.5-flash  |  gemini-2.0-flash-lite  |  gemini-2.5-flash-preview-04-17',
+    dflt:   'gemini-2.0-flash',
+  },
+  openrouter: {
+    lsKey:  'vpt_or_key',
+    hint:   'Ключ: openrouter.ai → Keys. Free-tier models стоят $0. Нужно указать ":free" суффикс.',
+    models: 'google/gemini-2.0-flash-exp:free  |  meta-llama/llama-4-scout:free  |  meta-llama/llama-4-maverick:free  |  google/gemma-3-27b-it:free',
+    dflt:   'google/gemini-2.0-flash-exp:free',
+  },
+  nvidia: {
+    lsKey:  'vpt_nvidia_key',
+    hint:   'Ключ: build.nvidia.com → "Get API Key". ~$10 бесплатных кредитов для новых аккаунтов.',
+    models: 'microsoft/phi-4-vision-instruct  |  meta/llama-3.2-11b-vision-instruct  |  meta/llama-3.2-90b-vision-instruct  |  nvidia/nemotron-ocr-v1 (проверь наличие на build.nvidia.com)',
+    dflt:   'microsoft/phi-4-vision-instruct',
+  },
+};
+
+// ── State ─────────────────────────────────────────────────────
+let _img    = null;
+let _parsed = [];
+
+// ── Helpers ───────────────────────────────────────────────────
+function ni(id) { return Number(document.getElementById(id).value) || 0; }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function lb(el) { document.getElementById('lbImg').src = el.toDataURL('image/png'); document.getElementById('lb').classList.add('on'); }
+
+function setGlobal(m, cls='') {
+  const el = document.getElementById('globalSt');
+  el.className = 'st ' + cls; el.textContent = m;
+}
+function setRunSt(m, cls='') {
+  const el = document.getElementById('runSt');
+  el.className = 'runst ' + cls; el.textContent = m;
+}
+
+// ── Provider change ───────────────────────────────────────────
+function onProviderChange() {
+  const p = PROVIDERS[document.getElementById('selProvider').value];
+  if (!p) return;
+  document.getElementById('keyHint').textContent  = p.hint;
+  document.getElementById('modelHint').textContent = 'Модели: ' + p.models;
+  document.getElementById('modelInput').value = p.dflt;
+  const saved = localStorage.getItem(p.lsKey) || '';
+  const ki = document.getElementById('keyInput');
+  ki.value = saved ? '••••••••' : '';
+  ki.dataset.saved = saved ? '1' : '0';
+}
+
+document.getElementById('selProvider').addEventListener('change', onProviderChange);
+
+function saveKey() {
+  const p = PROVIDERS[document.getElementById('selProvider').value];
+  const ki = document.getElementById('keyInput');
+  const raw = ki.value.trim();
+  if (!raw || raw.startsWith('•')) { setGlobal('Введи новый ключ в поле', 'err'); return; }
+  localStorage.setItem(p.lsKey, raw);
+  ki.dataset.saved = '1';
+  ki.value = '••••••••';
+  setGlobal(`Key saved → localStorage["${p.lsKey}"]`, 'ok');
+}
+
+function getKey() {
+  const p = PROVIDERS[document.getElementById('selProvider').value];
+  const ki = document.getElementById('keyInput');
+  const v = ki.value.trim();
+  if (v && !v.startsWith('•')) return v;                 // freshly typed
+  return localStorage.getItem(p.lsKey) || '';            // from localStorage
+}
+
+// ── Crop sync ─────────────────────────────────────────────────
+function syncPair(rId, nId) {
+  const r = document.getElementById(rId), n = document.getElementById(nId);
+  r.addEventListener('input', () => { n.value = r.value; redraw(); });
+  n.addEventListener('input', () => { r.value = n.value; redraw(); });
+}
+['X','Y','W','H'].forEach(k => syncPair('crop'+k+'R', 'crop'+k));
+document.getElementById('contrastR').addEventListener('input', e => {
+  document.getElementById('contrast').value = e.target.value; redraw();
+});
+document.getElementById('contrast').addEventListener('input', e => {
+  document.getElementById('contrastR').value = e.target.value; redraw();
+});
+['scale','cbGray','cbSharpen'].forEach(id => {
+  document.getElementById(id).addEventListener('input', redraw);
+  document.getElementById(id).addEventListener('change', redraw);
+});
+
+function applyPreset() {
+  if (!_img) return;
+  const W = _img.naturalWidth, H = _img.naturalHeight;
+  function setR(rid, nid, v, max) {
+    const r=document.getElementById(rid), n=document.getElementById(nid);
+    const s=clamp(Math.round(v),0,max);
+    r.max=String(max); n.max=String(max); r.value=String(s); n.value=String(s);
+  }
+  setR('cropXR','cropX',398,W-1); setR('cropYR','cropY',90,H-1);
+  setR('cropWR','cropW',375,W);   setR('cropHR','cropH',205,H);
+  document.getElementById('scale').value='2';
+  document.getElementById('contrastR').value='0';
+  document.getElementById('contrast').value='0';
+  document.getElementById('cbGray').checked=false;
+  document.getElementById('cbSharpen').checked=false;
+  redraw();
+}
+
+// ── Image processing ──────────────────────────────────────────
+function sharpenData(data, w, h) {
+  const src = new Uint8ClampedArray(data);
+  const k = [0,-1,0,-1,5,-1,0,-1,0];
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++) {
+    const i=(y*w+x)*4;
+    if (!x||!y||x===w-1||y===h-1) continue;
+    let r=0,g=0,b=0,ki=0;
+    for (let yy=-1;yy<=1;yy++) for (let xx=-1;xx<=1;xx++) {
+      const si=((y+yy)*w+(x+xx))*4, kw=k[ki++];
+      r+=src[si]*kw; g+=src[si+1]*kw; b+=src[si+2]*kw;
+    }
+    data[i]=clamp(r,0,255); data[i+1]=clamp(g,0,255); data[i+2]=clamp(b,0,255);
+  }
+}
+
+function redraw() {
+  if (!_img) return;
+  const iw=_img.naturalWidth, ih=_img.naturalHeight;
+  const x=clamp(ni('cropX'),0,iw-1), y=clamp(ni('cropY'),0,ih-1);
+  const w=clamp(ni('cropW'),1,iw-x), h=clamp(ni('cropH'),1,ih-y);
+  const sc=Math.max(1,ni('scale'));
+  const cPct=ni('contrast');
+  const c=cPct/100;
+  const gray=document.getElementById('cbGray').checked;
+  const sharp=document.getElementById('cbSharpen').checked;
+
+  // Original crop
+  const cvCrop=document.getElementById('cvCrop');
+  cvCrop.width=w; cvCrop.height=h;
+  const cc=cvCrop.getContext('2d',{willReadFrequently:true});
+  cc.drawImage(_img, x,y,w,h, 0,0,w,h);
+  document.getElementById('cropSt').textContent = `${w}×${h} px`;
+
+  // Sent canvas (upscaled + optional processing)
+  const cvSend=document.getElementById('cvSend');
+  cvSend.width=Math.round(w*sc); cvSend.height=Math.round(h*sc);
+  const cs=cvSend.getContext('2d',{willReadFrequently:true});
+  cs.imageSmoothingEnabled=true; cs.imageSmoothingQuality='high';
+  cs.drawImage(cvCrop, 0,0,cvSend.width,cvSend.height);
+
+  const needsProcess = gray || sharp || cPct !== 0;
+  if (needsProcess) {
+    const factor=(259*(c*255+255))/(255*(259-c*255));
+    const id=cs.getImageData(0,0,cvSend.width,cvSend.height);
+    const d=id.data;
+    for (let i=0;i<d.length;i+=4) {
+      let r=d[i],g=d[i+1],b=d[i+2];
+      if (gray) { const v=0.299*r+0.587*g+0.114*b; r=g=b=v; }
+      if (cPct!==0) {
+        r=clamp(factor*(r-128)+128,0,255);
+        g=clamp(factor*(g-128)+128,0,255);
+        b=clamp(factor*(b-128)+128,0,255);
+      }
+      d[i]=r; d[i+1]=g; d[i+2]=b;
+    }
+    if (sharp) sharpenData(id.data, cvSend.width, cvSend.height);
+    cs.putImageData(id,0,0);
+  }
+  document.getElementById('sendSt').textContent = `${cvSend.width}×${cvSend.height} px → model`;
+}
+
+// ── Prompt ────────────────────────────────────────────────────
+const PROMPT = `This is a crop from a game clan stats table ("Член группы").
+Extract ALL player rows. Return ONLY a valid JSON array — no markdown, no code block, no explanation.
+Each element must have exactly these fields:
+{"nick":"PlayerName","kills":0,"deaths":0,"pvp":0,"pve":0}
+Rules:
+- nick: exact player name as shown, preserve Cyrillic/Latin and original case
+- kills, deaths, pvp, pve: integers; blank or zero cell = 0; strip commas from large numbers
+- Skip header rows, clan name, totals, and any non-player rows
+- Do NOT add profession, level, or any extra fields`;
+
+// ── JSON extraction ───────────────────────────────────────────
+function extractJsonArr(text) {
+  const t = String(text||'').trim();
+  try { return JSON.parse(t); } catch {}
+  const m = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (m) try { return JSON.parse(m[1].trim()); } catch {}
+  const s=t.indexOf('['), e=t.lastIndexOf(']');
+  if (s>=0 && e>s) return JSON.parse(t.slice(s,e+1));
+  throw new Error('No JSON array found in model response');
+}
+
+function normalizeRows(rows) {
+  return (Array.isArray(rows)?rows:[]).map(r=>({
+    nick:   String(r.nick??r.name??'').trim(),
+    kills:  parseInt(String(r.kills??0).replace(/[,\s]/g,''),10)||0,
+    deaths: parseInt(String(r.deaths??0).replace(/[,\s]/g,''),10)||0,
+    pvp:    parseInt(String(r.pvp??r.pvp_dmg??r.pvpDamage??0).replace(/[,\s]/g,''),10)||0,
+    pve:    parseInt(String(r.pve??r.pve_dmg??r.pveDamage??0).replace(/[,\s]/g,''),10)||0,
+  })).filter(r=>r.nick);
+}
+
+function renderRows(rows) {
+  _parsed = rows;
+  document.getElementById('jsonOut').textContent = JSON.stringify(rows, null, 2);
+  document.getElementById('btnCompare').disabled = !rows.length;
+  const tbody = document.getElementById('resultBody');
+  tbody.innerHTML = '';
+  for (const r of rows) {
+    const tr=document.createElement('tr');
+    ['nick','kills','deaths','pvp','pve'].forEach(k=>{
+      const td=document.createElement('td');
+      td.textContent=String(r[k]??'');
+      tr.append(td);
+    });
+    tbody.append(tr);
+  }
+}
+
+// ── API: Gemini Direct ────────────────────────────────────────
+async function callGemini(imgB64, model, key) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      generationConfig: {temperature:0},
+      contents: [{parts:[
+        {text: PROMPT},
+        {inlineData:{mimeType:'image/png', data:imgB64}}
+      ]}]
+    })
+  });
+  const j = await r.json();
+  if (!r.ok||j.error) throw new Error(j.error?.message || `Gemini HTTP ${r.status}: ${JSON.stringify(j).slice(0,300)}`);
+  return j.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+}
+
+// ── API: OpenAI-compatible (OpenRouter / NVIDIA NIM) ──────────
+async function callOpenAICompat(imgDataUrl, model, key, endpoint, extraHeaders={}) {
+  const r = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type':'application/json',
+      'Authorization':`Bearer ${key}`,
+      ...extraHeaders
+    },
+    body: JSON.stringify({
+      model, temperature:0,
+      messages:[{role:'user', content:[
+        {type:'text', text:PROMPT},
+        {type:'image_url', image_url:{url:imgDataUrl}}
+      ]}]
+    })
+  });
+  const j = await r.json();
+  if (!r.ok||j.error) throw new Error(j.error?.message || `HTTP ${r.status}: ${JSON.stringify(j).slice(0,300)}`);
+  return j.choices?.[0]?.message?.content ?? '';
+}
+
+// ── Run ───────────────────────────────────────────────────────
+async function runVision() {
+  if (!_img) { setRunSt('Загрузи скриншот', 'err'); return; }
+  const key = getKey();
+  if (!key) { setRunSt('Нет API key — вставь в поле и нажми Save key', 'err'); return; }
+  const provider = document.getElementById('selProvider').value;
+  const model    = document.getElementById('modelInput').value.trim();
+  if (!model) { setRunSt('Укажи model', 'err'); return; }
+
+  document.getElementById('btnRun').disabled = true;
+  document.getElementById('rawOut').textContent = '…';
+  renderRows([]);
+  setRunSt('Подготовка изображения…', 'run');
+
+  try {
+    const cvSend   = document.getElementById('cvSend');
+    const dataUrl  = cvSend.toDataURL('image/png');
+    const base64   = dataUrl.split(',')[1];
+    const pLabel   = PROVIDERS[provider]?.lsKey?.replace('vpt_','').replace('_key','') || provider;
+
+    setRunSt(`Отправка к ${pLabel} (${model})…`, 'run');
+
+    let text = '';
+    if (provider === 'gemini') {
+      text = await callGemini(base64, model, key);
+    } else if (provider === 'openrouter') {
+      text = await callOpenAICompat(dataUrl, model, key,
+        'https://openrouter.ai/api/v1/chat/completions',
+        {'HTTP-Referer': location.href, 'X-Title': 'Clan Control OCR Spike'});
+    } else if (provider === 'nvidia') {
+      // NVIDIA NIM may block data: URLs for large images — resize if needed
+      text = await callOpenAICompat(dataUrl, model, key,
+        'https://integrate.api.nvidia.com/v1/chat/completions');
+    }
+
+    document.getElementById('rawOut').textContent = text;
+    const rows = normalizeRows(extractJsonArr(text));
+    renderRows(rows);
+    setRunSt(`OK — ${rows.length} строк`, 'ok');
+  } catch(e) {
+    const msg = String(e?.message||e);
+    document.getElementById('rawOut').textContent = msg;
+    setRunSt('Ошибка: ' + msg.slice(0,120), 'err');
+  } finally {
+    document.getElementById('btnRun').disabled = false;
+  }
+}
+
+// ── Compare ───────────────────────────────────────────────────
+function doCompare() {
+  try {
+    const expected = JSON.parse(document.getElementById('expectedInput').value || '[]');
+    const fields   = ['nick','kills','deaths','pvp','pve'];
+    let total=0, matched=0;
+    const rows = expected.map((exp,i) => {
+      const act = _parsed[i] || {};
+      const result = {row: i+1};
+      fields.forEach(f => {
+        total++;
+        const ev = f==='nick' ? String(exp[f]||'').toLowerCase() : exp[f];
+        const av = f==='nick' ? String(act[f]||'').toLowerCase() : act[f];
+        const ok = ev === av;
+        if (ok) matched++;
+        result[f] = {exp:exp[f]??null, act:act[f]??null, ok};
+      });
+      return result;
+    });
+    document.getElementById('compareOut').textContent = JSON.stringify(
+      {accuracy: total ? +(matched/total).toFixed(3) : 0, matched, total, rows}, null, 2
+    );
+  } catch(e) {
+    document.getElementById('compareOut').textContent = 'JSON error: ' + e.message;
+  }
+}
+
+// ── File upload ───────────────────────────────────────────────
+document.getElementById('fileInput').addEventListener('change', e => {
+  const file = e.target.files?.[0]; if (!file) return;
+  const img  = new Image();
+  img.onload = () => {
+    _img = img;
+    const W=img.naturalWidth, H=img.naturalHeight;
+    ['X','W'].forEach(k => {
+      document.getElementById('crop'+k+'R').max = String(k==='X' ? W-1 : W);
+      document.getElementById('crop'+k).max     = String(k==='X' ? W-1 : W);
+    });
+    ['Y','H'].forEach(k => {
+      document.getElementById('crop'+k+'R').max = String(k==='Y' ? H-1 : H);
+      document.getElementById('crop'+k).max     = String(k==='Y' ? H-1 : H);
+    });
+    applyPreset();
+    document.getElementById('btnRun').disabled = false;
+    setGlobal(`${file.name}  ${W}×${H}`, 'ok');
+    URL.revokeObjectURL(img.src);
+  };
+  img.onerror = () => setGlobal('Ошибка загрузки', 'err');
+  img.src = URL.createObjectURL(file);
+  e.target.value = '';
+});
+
+// Drag-drop
+document.body.addEventListener('dragover', e => e.preventDefault());
+document.body.addEventListener('drop', e => {
+  e.preventDefault();
+  const file = e.dataTransfer?.files?.[0]; if (!file) return;
+  const dt = new DataTransfer(); dt.items.add(file);
+  const fi = document.getElementById('fileInput');
+  Object.defineProperty(fi, 'files', {value:dt.files, configurable:true});
+  fi.dispatchEvent(new Event('change'));
+});
+
+// ── Init ──────────────────────────────────────────────────────
+onProviderChange();
+</script>
+</body>
+</html>
