@@ -14,7 +14,7 @@
 - PROJECT_STATE обновлять только при новом проверяемом факте, не после каждого edit
 
 ## Текущее состояние
-- current task: GT exemplar catalog matcher — авто-определение профы игроков по скриншоту КМ (scan preview); работа активна, последний коммит 8fc52e6 (2026-04-29)
+- current task: KM party review wizard — пошаговая сверка распознанных пакета за пакетом после AI-анализа; profa picker теперь searchable combobox с reuse PROFA_INFO + switchKeyboardLayout, последний коммит bfb59dc (2026-05-01)
 - current layer: scan / KM recognition / auto-profa detection
 - active file: BASA (1).html
 - last tested file: BASA (1).html
@@ -45,8 +45,13 @@
 - Bucket km-screenshots в Supabase: создан, Storage RLS policies — на усмотрение
 
 ## Последние изменения (хронологически, новые сверху)
-- 2026-04-29 — 8fc52e6 fix gt matcher maxDy: use adjacent-row-centre criterion, restore recall — _maxDy = rowH − floor(sz/2) − 1; для rowH=17: sz=20→maxDy=6 (было 0), sz=22→5 (было 0), sz=24→4 (было 0); сохраняет bleed-guard, восстанавливает recall
-- 2026-04-29 — 6db483e fix gt matcher row bleed and ambiguous top3 flag — ВВЁЛ РЕГРЕССИЮ: _maxDy = max(0, floor(rowH/2 − sz/2) + 2) слишком агрессивен для rowH≈17; большинство иконок ушли в LOW_SIM; AMBIGUOUS_TOP3 margin 0.05 оставлен
+- 2026-05-03 — 9d8d5a7 feat add local ocr spike — tools/ocr_spike добавлен (26 файлов): PaddleOCR CPU-only, parser.py (row clustering, name correction, script validator), compare_rows.py, regression_check.py; 3 samples regression PASS (9/9, 8/8, 9/9); BASA (1).html не тронут; production не тронут
+- 2026-05-01 — bfb59dc feat(km wizard): replace profa <select> with searchable picker — кнопка-триггер вместо <select> в строках wizard; floating picker (300×360px) с input поиска и списком; searchable string = pf + PROFA_INFO.{ru,short,ru2,en2,role} + PROFA_NAMES[pf] + новый _KMRW_LATIN_ALIASES (wc, tk, sk/shk, pp, svs, bd, th, pw, aw, bers, sb и т.д.); поддержка typo через switchKeyboardLayout; клавиши ↑↓ Enter Esc; outside-click и Prev/Next закрывают picker; pick всегда идёт через kmRwSetProfa → profaSource='manual_review' → manual override побеждает matcher в applyDayParsedStats
+- 2026-05-01 — ba02391 fix(km wizard): tighten layout, crop «Член группы», compact rows — добавлен глобал dayPackGeometry (заполняется в runLocalIconMatcher после _ccSelectBestGeometry); левый блок wizard теперь показывает автокроп таблицы «Член группы» (canvas-crop из dayScreenShotMap по сохранённой геометрии: padL≈6.5×iconW, padR≈13×iconW, padTop≈2×rowH, padBot≈1.5×rowH); fallback на полный скрин если геометрии нет; async crop с per-render request token; правый блок переписан как CC-style grid (1.55fr|56|56|78|78) с одной строкой на игрока вместо раздутых карточек; top3 убран в title badge'а; modal max-width 1340px / max-height 88vh; mobile breakpoint 900px
+- 2026-05-01 — 3475b47 feat(km): add party review wizard after screenshot analysis — авто-открывающаяся модалка #kmReviewWizard после analyzeDayScreenshots; страниц = Object.keys(dayScreenPlayersMap).length; слева исходный скрин из dayScreenShotMap[packName], справа editable rows (ник/профа/kills/deaths/pvp_dmg/pve_dmg); правки мутируют dayScreenPlayersMap[packName][i] и зеркалятся в dayLastParsed; profa picker с profaSource='manual_review'; бейджи AUTO/MANUAL/LOW_SIM/AMBIGUOUS/BAD CROP/ROW UNSTABLE; кнопка «Применить в ростер» вызывает существующий applyDayParsedStats() уже по исправленным данным
+- 2026-05-01 — f153bfb revert: undo gt matcher maxdy bleed guard — откат 6db483e + 8fc52e6; удалён _maxDy guard целиком (SWEEP_OFF снова полный [-6..6]); AMBIGUOUS_TOP3 возвращён к class-name diversity (было margin < 0.05); ожидается восстановление recall
+- 2026-04-29 — 8fc52e6 РЕГРЕССИЯ (откачена): fix gt matcher maxDy adjacent-row-centre criterion — формула rowH−floor(sz/2)−1 слишком широка → bleed → неверные классы, sim 40–59%
+- 2026-04-29 — 6db483e РЕГРЕССИЯ (откачена): fix gt matcher row bleed — формула floor(rowH/2−sz/2)+2 слишком узка → LOW_SIM массово; + AMBIGUOUS_TOP3 margin-based
 - 2026-04-26 — e3b7c10 add gt_ex debug strip to scan preview — диагностическая полоса GT exemplar в scan preview
 - 2026-04-26 — 3cd0414 enable safe auto profa with review queue — авто-проставление профы через очередь ревью (safe mode)
 - 2026-04-26 — 967f502 restore stable gt exemplar crop selection — стабилизация выбора кропа exemplar
@@ -86,7 +91,7 @@
 ## Preview deploy (подтверждено)
 - repo: andeeylike-source/clan-control-preview
 - remote: preview
-- последний commit на preview: 6db483e (fix gt matcher row bleed and ambiguous top3 flag)
+- последний commit на preview: 9d8d5a7 (feat add local ocr spike) — 2026-05-03
 
 ## Что нельзя ломать
 - позиции CVE-блоков в режиме просмотра календаря (hero-meta layout)
@@ -101,6 +106,15 @@
 - поймать "Invalid Date" через console.error guard (preview активен); после поимки — минимальный фикс + push production
 - при наличии реального kmArchive — добавить kmArchiveCount в system map и обновить switch case 'archive_page'
 - screenshot cloud storage: полноценное тестирование перед включением в production
+
+## OCR Spike (tools/ocr_spike) — подтверждено 2026-05-03
+- статус: зафиксирован в preview (commit 9d8d5a7), production не затронут
+- pipeline: crop → PaddleOCR local CPU → boxes → geometry parser → script validator → known_names/aliases correction → rows JSON
+- regression gate: regression_check.py — 3/3 PASS (competitor 9/9, second 8/8, third 9/9)
+- script validator: classify_name_script() → latin | cyrillic | latin_digits | cyrillic_digits | digits_only | mixed_invalid | unknown
+- correction order: exact known_names → explicit aliases → fuzzy skeleton match → visual OCR confusion mapping (только если is_valid_name_script)
+- known_names: 26 имён (expected/known_names.json)
+- следующий этап: отдельный integration plan, не сейчас
 
 ## GT Exemplar Matcher (текущая фича)
 - цель: авто-определение профы (класса) игрока по скриншоту КМ, без ручного ввода
