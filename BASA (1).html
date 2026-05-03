@@ -16073,11 +16073,8 @@ window._archRender = function() {
       <button class="cc-tab-bg-close-btn" id="ccTabBgClose" type="button" aria-label="Закрыть">×</button>
     </div>
     <div class="cc-tab-bg-toolbar">
-      <label class="cc-tab-check">
-        <input type="checkbox" id="ccTabApplyAll">
-        <span>Применить выбранную картинку ко всем</span>
-      </label>
       <button class="cc-tab-bg-reset-btn" id="ccTabBgReset" type="button">Сбросить фоны</button>
+      <button class="cc-tab-bg-apply-all-btn" id="ccTabBgApplyAll" type="button" disabled>Применить ко всем</button>
       <button class="cc-tab-bg-save-btn" id="ccTabBgSave" type="button">Сохранить</button>
     </div>
     <div class="cc-tab-bg-list" id="ccTabBgList"></div>
@@ -16611,6 +16608,11 @@ window._archRender = function() {
       border-color: rgba(232,190,88,0.42);
       box-shadow: 0 0 0 1px rgba(232,190,88,0.12), 0 0 22px rgba(232,190,88,0.07);
     }
+    .cc-tab-bg-row.is-selected {
+      border-color: rgba(232,190,88,0.66);
+      box-shadow: 0 0 0 1px rgba(232,190,88,0.24), 0 0 24px rgba(232,190,88,0.10);
+      background: rgba(232,190,88,0.055);
+    }
     .cc-tab-bg-row strong { display:block; font-size:13px; font-weight:700; color:#f0ede4; }
     .cc-tab-bg-row span { display:block; margin-top:3px; color:rgba(240,236,220,0.44); font-size:11px; }
     .cc-tab-bg-preview {
@@ -16656,6 +16658,29 @@ window._archRender = function() {
     .cc-tab-bg-save-btn:hover {
       filter: brightness(1.10);
       box-shadow: 0 4px 20px rgba(201,168,76,0.28);
+    }
+    .cc-tab-bg-apply-all-btn {
+      height: 36px;
+      padding: 0 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(232,190,88,0.28);
+      background: rgba(232,190,88,0.08);
+      color: #f1d68a;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.17s;
+      font-family: inherit;
+    }
+    .cc-tab-bg-apply-all-btn:hover:not(:disabled) {
+      border-color: rgba(232,190,88,0.48);
+      background: rgba(232,190,88,0.12);
+      box-shadow: 0 4px 20px rgba(201,168,76,0.18);
+    }
+    .cc-tab-bg-apply-all-btn:disabled {
+      cursor: not-allowed;
+      opacity: .42;
+      box-shadow: none;
     }
     .cc-tab-bg-reset-btn {
       height: 36px;
@@ -18665,10 +18690,12 @@ window._archRender = function() {
         ru: {
           title:'Фоны вкладок',
           note:'Загрузи отдельную обложку для каждого раздела или одну картинку сразу для всех.',
-          all:'Применить выбранную картинку ко всем',
           reset:'Сбросить фоны',
           save:'Сохранить',
           upload:'Загрузить обложку',
+          applyAll:'Применить ко всем',
+          appliedAll:'Применено',
+          chooseLoaded:'Сначала выбери вкладку с загруженной обложкой',
           current:'Текущая вкладка',
           global:'Общий фон',
           loaded:'Загружено',
@@ -18680,10 +18707,12 @@ window._archRender = function() {
         en: {
           title:'Tab Backgrounds',
           note:'Upload a separate cover for each section or apply one image to every tab.',
-          all:'Apply selected image to all',
           reset:'Reset backgrounds',
           save:'Save',
           upload:'Upload cover',
+          applyAll:'Apply to all',
+          appliedAll:'Applied',
+          chooseLoaded:'Choose a tab with an uploaded cover first',
           current:'Current tab',
           global:'Global background',
           loaded:'Uploaded',
@@ -18889,8 +18918,8 @@ window._archRender = function() {
         var modal = modalText[l];
         setText(document.getElementById('ccTabBgTitle'), modal.title);
         setText(document.querySelector('.cc-tab-bg-head p'), modal.note);
-        setText(document.querySelector('.cc-tab-check span'), modal.all);
         setText(document.getElementById('ccTabBgReset'), modal.reset);
+        setText(document.getElementById('ccTabBgApplyAll'), modal.applyAll);
         setText(document.getElementById('ccTabBgSave'), modal.save);
         document.querySelectorAll('.cc-tab-upload-btn').forEach(function(b){ setText(b, modal.upload); });
         var settingsBtn = document.querySelector('#topbar button[onclick*="settings"]');
@@ -18989,6 +19018,7 @@ window._archRender = function() {
       function replaceModalApi() {
         var fileInput = document.getElementById('ccTabBgFile');
         var uploadTarget = null;
+        var selectedTab = currentPage();
         var pending = {};
         function tabs() {
           return Object.keys(pageLabels).filter(function(id){ return id !== 'backup'; }).map(function(id){
@@ -19008,6 +19038,20 @@ window._archRender = function() {
           Object.keys(pending).forEach(function(k){ if (pending[k]) last = pending[k]; });
           return last;
         }
+        function imageForTab(tabId) {
+          return pending[tabId] || localStorage.getItem(KEY_TAB + tabId) || (boolGlobal() ? localStorage.getItem(KEY_GLOBAL) : '') || '';
+        }
+        function selectedImage() {
+          if (selectedTab && imageForTab(selectedTab)) return imageForTab(selectedTab);
+          return lastPendingImage() || '';
+        }
+        function updateApplyAllButton(applied) {
+          var btn = document.getElementById('ccTabBgApplyAll');
+          if (!btn) return;
+          var mt = modalText[lang()];
+          btn.disabled = !selectedImage();
+          btn.textContent = applied ? mt.appliedAll : mt.applyAll;
+        }
         function status(tabId) {
           var mt = modalText[lang()];
           if (pending[tabId]) return mt.pending;
@@ -19019,20 +19063,19 @@ window._archRender = function() {
           if (!box) return;
           var cur = currentPage();
           var mt = modalText[lang()];
-          var applyAll = document.getElementById('ccTabApplyAll');
-          var hasPending = Object.keys(pending).some(function(id){ return !!pending[id]; });
-          if (applyAll && !hasPending) applyAll.checked = boolGlobal();
-          var globalPreview = applyAll && applyAll.checked ? (lastPendingImage() || localStorage.getItem(KEY_GLOBAL) || '') : '';
+          if (!selectedTab) selectedTab = cur;
           box.innerHTML = tabs().map(function(tab){
-            var preview = globalPreview || pending[tab.id] || selectedBg(tab.id);
+            var selected = tab.id === selectedTab;
+            var preview = pending[tab.id] || selectedBg(tab.id);
             var bgStyle = preview ? 'background-image:url(&quot;'+escapeAttr(preview)+'&quot;)' : '';
             var mark = tab.id === cur ? '<span>'+mt.current+'</span>' : '<span>'+status(tab.id)+'</span>';
-            return '<div class="cc-tab-bg-row'+(tab.id===cur?' is-current':'')+'">'
+            return '<div class="cc-tab-bg-row'+(tab.id===cur?' is-current':'')+(selected?' is-selected':'')+'" data-bg-row-tab="'+tab.id+'">'
               + '<div><strong>'+tab.label+'</strong>'+mark+'</div>'
               + '<div class="cc-tab-bg-preview" style="'+bgStyle+'"></div>'
               + '<button class="cc-tab-upload-btn" type="button" data-upload-tab="'+tab.id+'">'+mt.upload+'</button>'
               + '</div>';
           }).join('');
+          updateApplyAllButton(false);
         }
         function toast(text) {
           var t = document.getElementById('ccTabBgToast');
@@ -19045,6 +19088,7 @@ window._archRender = function() {
         function open() {
           document.body.classList.remove('light');
           localStorage.setItem('cc_theme','dark');
+          selectedTab = currentPage();
           applyLang();
           renderRows();
           var m = document.getElementById('ccTabBgModal');
@@ -19081,20 +19125,34 @@ window._archRender = function() {
           });
         }
         function save() {
-          var applyAll = document.getElementById('ccTabApplyAll');
-          var useAll = !!(applyAll && applyAll.checked);
-          var last = lastPendingImage();
-          if (useAll) {
-            if (last) localStorage.setItem(KEY_GLOBAL, last);
-            if (localStorage.getItem(KEY_GLOBAL)) localStorage.setItem(KEY_USE_GLOBAL, 'true');
-          } else {
+          var pendingKeys = Object.keys(pending).filter(function(k){ return !!pending[k]; });
+          if (pendingKeys.length) {
             localStorage.setItem(KEY_USE_GLOBAL, 'false');
-            Object.keys(pending).forEach(function(k){ localStorage.setItem(KEY_TAB + k, pending[k]); });
+            pendingKeys.forEach(function(k){ localStorage.setItem(KEY_TAB + k, pending[k]); });
           }
           pending = {};
           ccApplyCurrentBackground(currentPage());
           close();
           toast(modalText[lang()].toastSaved);
+        }
+        function applySelectedToAll() {
+          var img = selectedImage();
+          var btn = document.getElementById('ccTabBgApplyAll');
+          if (!img) {
+            toast(modalText[lang()].chooseLoaded);
+            updateApplyAllButton(false);
+            return;
+          }
+          localStorage.setItem(KEY_GLOBAL, img);
+          localStorage.setItem(KEY_USE_GLOBAL, 'true');
+          ccApplyCurrentBackground(currentPage());
+          renderRows();
+          if (btn) {
+            btn.textContent = modalText[lang()].appliedAll;
+            clearTimeout(window._ccApplyAllTextTimer);
+            window._ccApplyAllTextTimer = setTimeout(function(){ updateApplyAllButton(false); }, 1200);
+          }
+          toast(modalText[lang()].appliedAll);
         }
         function reset() {
           clearTabBackgroundKeys();
@@ -19121,6 +19179,11 @@ window._archRender = function() {
           saveBtn.dataset.finalLock = '1';
           saveBtn.addEventListener('click', function(e){ e.preventDefault(); e.stopImmediatePropagation(); save(); }, true);
         }
+        var applyAllBtn = document.getElementById('ccTabBgApplyAll');
+        if (applyAllBtn && !applyAllBtn.dataset.finalLock) {
+          applyAllBtn.dataset.finalLock = '1';
+          applyAllBtn.addEventListener('click', function(e){ e.preventDefault(); e.stopImmediatePropagation(); applySelectedToAll(); }, true);
+        }
         var resetBtn = document.getElementById('ccTabBgReset');
         if (resetBtn && !resetBtn.dataset.finalLock) {
           resetBtn.dataset.finalLock = '1';
@@ -19133,6 +19196,7 @@ window._archRender = function() {
             if (!file || !uploadTarget) return;
             compress(file).then(function(data){
               pending[uploadTarget] = data;
+              selectedTab = uploadTarget;
               if (uploadTarget === currentPage()) {
                 var tag = document.getElementById('cceGlobalBgStyle');
                 if (!tag) {
@@ -19153,10 +19217,17 @@ window._archRender = function() {
           e.preventDefault();
           e.stopImmediatePropagation();
           uploadTarget = btn.dataset.uploadTab;
+          selectedTab = uploadTarget;
           if (fileInput) {
             fileInput.value = '';
             fileInput.click();
           }
+        }, true);
+        document.addEventListener('click', function(e){
+          var row = e.target.closest('[data-bg-row-tab]');
+          if (!row || e.target.closest('[data-upload-tab]')) return;
+          selectedTab = row.dataset.bgRowTab;
+          renderRows();
         }, true);
         var modal = document.getElementById('ccTabBgModal');
         if (modal && !modal.dataset.finalLock) {
