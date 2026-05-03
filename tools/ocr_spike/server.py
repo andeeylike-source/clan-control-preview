@@ -20,6 +20,7 @@ from ocr_spike import run_paddle
 PORT = int(os.environ.get("OCR_LOCAL_PORT", 5050))
 OUT_DIR = SPIKE_DIR / "out"
 TMP_DIR = SPIKE_DIR / "tmp"
+CACHE_VERSION = "paddle-local-v2-name-aliases"
 OUT_DIR.mkdir(exist_ok=True)
 TMP_DIR.mkdir(exist_ok=True)
 
@@ -40,8 +41,30 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _cache_path(stem: str, hx: str) -> Path:
-    return OUT_DIR / f"{stem}.paddle.{hx[:12]}.json"
+def _effective_known_names(known_names: list[str] | None) -> list[str]:
+    source = known_names if known_names is not None else km_parser._load_known_names()
+    return [str(name).strip() for name in source if str(name).strip()]
+
+
+def _effective_aliases(aliases: dict[str, str] | None) -> dict[str, str]:
+    effective = dict(km_parser.KNOWN_NAME_ALIASES)
+    if aliases:
+        effective.update({km_parser._name_skeleton(k): str(v).strip() for k, v in aliases.items() if str(v).strip()})
+    return effective
+
+
+def _names_cache_hash(known_names: list[str] | None, aliases: dict[str, str] | None) -> str:
+    payload = {
+        "version": CACHE_VERSION,
+        "known_names": _effective_known_names(known_names),
+        "aliases": _effective_aliases(aliases),
+    }
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return _sha256(raw)
+
+
+def _cache_path(stem: str, hx: str, names_hash: str) -> Path:
+    return OUT_DIR / f"{stem}.paddle.{CACHE_VERSION}.{hx[:12]}.{names_hash[:12]}.json"
 
 
 @contextmanager
@@ -90,7 +113,8 @@ def handle_ocr(
     stem = Path(filename).stem
     suffix = Path(filename).suffix or ".png"
     hx = _sha256(img_bytes)
-    cache = _cache_path(stem, hx)
+    names_hash = _names_cache_hash(known_names, aliases)
+    cache = _cache_path(stem, hx, names_hash)
 
     if cache.exists():
         data = json.loads(cache.read_text(encoding="utf-8"))
@@ -100,7 +124,8 @@ def handle_ocr(
             rows = km_parser.parse_rows(boxes, image_width=data.get("image_width"))
         return {
             "ok": True, "provider": "paddle_local", "cached": True,
-            "hash": hx, "timing_ms": data.get("timing_ms", 0),
+            "hash": hx, "cache_version": CACHE_VERSION, "names_hash": names_hash[:12],
+            "timing_ms": data.get("timing_ms", 0),
             "boxes_count": len(boxes), "rows": rows, "parsed": _to_parsed(rows),
         }
 
@@ -123,6 +148,7 @@ def handle_ocr(
             json.dumps(
                 {
                     "hash": hx, "engine": "paddle", "image_width": image_width,
+                    "cache_version": CACHE_VERSION, "names_hash": names_hash,
                     "text": "\n".join(b["text"] for b in boxes),
                     "boxes": boxes, "rows": rows, "timing_ms": timing_ms,
                 },
@@ -132,7 +158,8 @@ def handle_ocr(
         )
         return {
             "ok": True, "provider": "paddle_local", "cached": False,
-            "hash": hx, "timing_ms": timing_ms,
+            "hash": hx, "cache_version": CACHE_VERSION, "names_hash": names_hash[:12],
+            "timing_ms": timing_ms,
             "boxes_count": len(boxes), "rows": rows, "parsed": _to_parsed(rows),
         }
     finally:
