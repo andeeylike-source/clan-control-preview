@@ -3155,9 +3155,18 @@
         </span>
         <button id="ccAdminBtn" class="chip icon-chip" onclick="window._ccTabBg&&window._ccTabBg.open()" title="Фоны вкладок" style="display:none;color:#e8c97a">✏️</button>
         <button id="shellToggleBtn" class="chip" onclick="shellToggle()" title="Убрать оболочку" style="display:none">Оболочка</button>
+        <button id="glassDimToggle" type="button" class="chip v20-shell-chip" aria-expanded="false" style="display:none">Стекло</button>
         <button id="dfToggle" type="button" class="chip v20-shell-chip" aria-pressed="false">DF</button>
         <button id="fxToggle" type="button" class="chip v20-shell-chip" aria-pressed="false">✦ FX</button>
         <button class="chip icon-chip danger" onclick="loginLogout()" title="Выйти">⏻</button>
+    </div>
+    <div class="cc-glass-popover" id="glassDimPopover" aria-hidden="true">
+        <label for="glassDimRange">Затемнение стекла</label>
+        <div class="cc-glass-row">
+            <input id="glassDimRange" type="range" min="0" max="80" step="1" value="34" aria-label="Интенсивность затемнения стекла">
+            <span id="glassDimValue">34%</span>
+        </div>
+        <button id="glassDimReset" type="button">Сброс</button>
     </div>
 </div>
 
@@ -14649,6 +14658,10 @@ ${playerList}
             if(typeof cveClose==="function")cveClose();
             var _sb = document.getElementById('shellToggleBtn');
             if (_sb) _sb.style.display = 'none';
+            var _gb = document.getElementById('glassDimToggle');
+            if (_gb) _gb.style.display = 'none';
+            var _gp = document.getElementById('glassDimPopover');
+            if (_gp) { _gp.classList.remove('open'); _gp.setAttribute('aria-hidden','true'); }
             document.body.classList.remove('shell-off');
             var _db = document.getElementById('dev-inspect-toggle');
             if (_db) _db.style.display = 'none';
@@ -14683,6 +14696,12 @@ ${playerList}
             if (_ab) _ab.style.display = _isAdmin ? '' : 'none';
             var _sb = document.getElementById('shellToggleBtn');
             if (_sb) _sb.style.display = _isAdmin ? '' : 'none';
+            var _gb = document.getElementById('glassDimToggle');
+            if (_gb) _gb.style.display = _isAdmin ? '' : 'none';
+            if (!_isAdmin) {
+                var _gp = document.getElementById('glassDimPopover');
+                if (_gp) { _gp.classList.remove('open'); _gp.setAttribute('aria-hidden','true'); }
+            }
             var _db = document.getElementById('dev-inspect-toggle');
             if (_db) _db.style.display = _isAdmin ? '' : 'none';
             if (!_isAdmin && typeof window._devStop === 'function') window._devStop();
@@ -18509,9 +18528,14 @@ window._archRender = function() {
     </style>
     <style id="v20-targeted-ui-fixes">
       /* Targeted v20 visual fixes only: shell transparency, stats/settings panels, roster role badges. */
+      :root {
+        --cc-glass-dim: .34;
+        --cc-card-dim: .44;
+        --cc-panel-dim: .40;
+      }
       body:not(.light) .main-content.surface {
         border-color: rgba(255,255,255,.18) !important;
-        background: linear-gradient(180deg, rgba(5,7,10,.48), rgba(5,7,10,.30)) !important;
+        background: linear-gradient(180deg, rgba(5,7,10,var(--cc-panel-dim)), rgba(5,7,10,var(--cc-glass-dim))) !important;
         box-shadow:
           0 24px 90px rgba(0,0,0,.36),
           inset 0 1px rgba(255,255,255,.10),
@@ -18534,7 +18558,7 @@ window._archRender = function() {
       body:not(.light) .calendar-side-card,
       body:not(.light) .calendar-summary-card {
         border-color: rgba(255,255,255,.17) !important;
-        background: linear-gradient(180deg, rgba(5,7,10,.56), rgba(5,7,10,.40)) !important;
+        background: linear-gradient(180deg, rgba(5,7,10,var(--cc-card-dim)), rgba(5,7,10,var(--cc-panel-dim))) !important;
         box-shadow:
           0 12px 42px rgba(0,0,0,.28),
           inset 0 1px rgba(255,255,255,.11),
@@ -18575,7 +18599,7 @@ window._archRender = function() {
       body:not(.light) #page-stats .card {
         border: 1px solid rgba(255,255,255,.13) !important;
         border-radius: 18px !important;
-        background: linear-gradient(180deg, rgba(5,7,10,.56), rgba(5,7,10,.40)) !important;
+        background: linear-gradient(180deg, rgba(5,7,10,var(--cc-card-dim)), rgba(5,7,10,var(--cc-panel-dim))) !important;
         box-shadow:
           0 12px 42px rgba(0,0,0,.28),
           inset 0 1px rgba(255,255,255,.11),
@@ -18604,7 +18628,7 @@ window._archRender = function() {
       body:not(.light) #page-settings [style*="background:#0b0e14"] {
         border-color: rgba(255,255,255,.13) !important;
         border-radius: 18px !important;
-        background: linear-gradient(180deg, rgba(5,7,10,.56), rgba(5,7,10,.40)) !important;
+        background: linear-gradient(180deg, rgba(5,7,10,var(--cc-card-dim)), rgba(5,7,10,var(--cc-panel-dim))) !important;
         box-shadow:
           0 12px 42px rgba(0,0,0,.28),
           inset 0 1px rgba(255,255,255,.11),
@@ -19015,6 +19039,85 @@ window._archRender = function() {
         applyShellToggles();
       }
 
+      function glassValue() {
+        var raw = parseInt(localStorage.getItem('cc-glass-dim'), 10);
+        if (isNaN(raw)) raw = 34;
+        return Math.max(0, Math.min(80, raw));
+      }
+      function applyGlassDim(value) {
+        value = Math.max(0, Math.min(80, parseInt(value, 10) || 0));
+        var glass = value / 100;
+        var card = Math.min(0.72, glass + 0.10);
+        var panel = Math.min(0.68, glass + 0.06);
+        document.documentElement.style.setProperty('--cc-glass-dim', glass.toFixed(2));
+        document.documentElement.style.setProperty('--cc-card-dim', card.toFixed(2));
+        document.documentElement.style.setProperty('--cc-panel-dim', panel.toFixed(2));
+        var range = document.getElementById('glassDimRange');
+        var label = document.getElementById('glassDimValue');
+        if (range) range.value = String(value);
+        if (label) label.textContent = value + '%';
+      }
+      function closeGlassPopover() {
+        var pop = document.getElementById('glassDimPopover');
+        var btn = document.getElementById('glassDimToggle');
+        if (pop) {
+          pop.classList.remove('open');
+          pop.setAttribute('aria-hidden', 'true');
+        }
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+      }
+      function toggleGlassPopover() {
+        var pop = document.getElementById('glassDimPopover');
+        var btn = document.getElementById('glassDimToggle');
+        if (!pop || !btn) return;
+        var open = !pop.classList.contains('open');
+        pop.classList.toggle('open', open);
+        pop.setAttribute('aria-hidden', open ? 'false' : 'true');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+      function bindGlassDimControl() {
+        applyGlassDim(glassValue());
+        var btn = document.getElementById('glassDimToggle');
+        var range = document.getElementById('glassDimRange');
+        var reset = document.getElementById('glassDimReset');
+        if (btn && btn.dataset.ccGlassBound !== '1') {
+          btn.dataset.ccGlassBound = '1';
+          btn.addEventListener('click', function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            toggleGlassPopover();
+          });
+        }
+        if (range && range.dataset.ccGlassBound !== '1') {
+          range.dataset.ccGlassBound = '1';
+          range.addEventListener('input', function(){
+            localStorage.setItem('cc-glass-dim', range.value);
+            applyGlassDim(range.value);
+          });
+        }
+        if (reset && reset.dataset.ccGlassBound !== '1') {
+          reset.dataset.ccGlassBound = '1';
+          reset.addEventListener('click', function(e){
+            e.preventDefault();
+            localStorage.setItem('cc-glass-dim', '34');
+            applyGlassDim(34);
+          });
+        }
+        if (!document.documentElement.dataset.ccGlassDocBound) {
+          document.documentElement.dataset.ccGlassDocBound = '1';
+          document.addEventListener('click', function(e){
+            var pop = document.getElementById('glassDimPopover');
+            var toggle = document.getElementById('glassDimToggle');
+            if (!pop || !pop.classList.contains('open')) return;
+            if (pop.contains(e.target) || (toggle && toggle.contains(e.target))) return;
+            closeGlassPopover();
+          });
+          document.addEventListener('keydown', function(e){
+            if (e.key === 'Escape') closeGlassPopover();
+          });
+        }
+      }
+
       function replaceModalApi() {
         var fileInput = document.getElementById('ccTabBgFile');
         var uploadTarget = null;
@@ -19281,6 +19384,7 @@ window._archRender = function() {
         ccApplyCurrentBackground(currentPage());
         applyLang();
         initClanAndShellToggles();
+        bindGlassDimControl();
         renderExtraDashboard();
       }
       if (document.readyState === 'loading') {
@@ -19366,6 +19470,63 @@ window._archRender = function() {
         border-color: rgba(232,190,88,.38) !important;
         color: #f2cb73 !important;
         background: rgba(232,190,88,.10) !important;
+      }
+      body:not(.light) .cc-glass-popover {
+        position: fixed;
+        top: 58px;
+        right: 166px;
+        z-index: 140;
+        width: 244px;
+        padding: 14px;
+        display: none;
+        border: 1px solid rgba(255,255,255,.14);
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(8,10,14,.96), rgba(5,6,8,.91));
+        box-shadow: 0 20px 70px rgba(0,0,0,.50), inset 0 1px rgba(255,255,255,.08);
+      }
+      body:not(.light) .cc-glass-popover.open {
+        display: block;
+      }
+      body:not(.light) .cc-glass-popover label {
+        display: block;
+        margin-bottom: 10px;
+        color: rgba(247,242,232,.78);
+        font-size: 12px;
+        font-weight: 800;
+      }
+      body:not(.light) .cc-glass-row {
+        display: grid;
+        grid-template-columns: 1fr 42px;
+        gap: 10px;
+        align-items: center;
+      }
+      body:not(.light) .cc-glass-row input[type="range"] {
+        width: 100%;
+        accent-color: #e8be58;
+      }
+      body:not(.light) #glassDimValue {
+        color: #f2cb73;
+        font-size: 12px;
+        font-weight: 850;
+        text-align: right;
+      }
+      body:not(.light) #glassDimReset {
+        margin-top: 12px;
+        height: 30px;
+        padding: 0 12px;
+        border-radius: 9px;
+        border: 1px solid rgba(255,255,255,.12);
+        background: rgba(255,255,255,.055);
+        color: rgba(247,242,232,.70);
+        font: inherit;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      body:not(.light) #glassDimReset:hover {
+        border-color: rgba(232,190,88,.34);
+        color: #f2cb73;
+        background: rgba(232,190,88,.08);
       }
       body:not(.light) #topbar,
       body:not(.light) #appLayout,
