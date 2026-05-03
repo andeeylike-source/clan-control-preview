@@ -3173,6 +3173,47 @@
         </div>
         <button id="glassDimReset" type="button">Сброс</button>
     </div>
+    <div class="cc-fx-popover" id="ccFxPopover" aria-hidden="true">
+        <label for="ccFxType">Тип эффекта</label>
+        <select id="ccFxType" aria-label="Тип эффекта">
+            <option value="none">Выкл</option>
+            <option value="embers">Огоньки</option>
+            <option value="fireflies">Светлячки</option>
+            <option value="snow">Снег</option>
+            <option value="leaves">Листья</option>
+            <option value="ash">Пепел</option>
+            <option value="magic">Магия</option>
+        </select>
+        <label for="ccFxCount">Количество</label>
+        <div class="cc-fx-row">
+            <input id="ccFxCount" type="range" min="0" max="160" step="1" value="60" aria-label="Количество частиц">
+            <span id="ccFxCountValue">60</span>
+        </div>
+        <label for="ccFxSize">Размер</label>
+        <div class="cc-fx-row">
+            <input id="ccFxSize" type="range" min="1" max="12" step="1" value="4" aria-label="Размер частиц">
+            <span id="ccFxSizeValue">4</span>
+        </div>
+        <label for="ccFxSpeed">Скорость</label>
+        <div class="cc-fx-row">
+            <input id="ccFxSpeed" type="range" min="0" max="100" step="1" value="35" aria-label="Скорость частиц">
+            <span id="ccFxSpeedValue">35</span>
+        </div>
+        <label for="ccFxOpacity">Прозрачность</label>
+        <div class="cc-fx-row">
+            <input id="ccFxOpacity" type="range" min="0" max="100" step="1" value="55" aria-label="Прозрачность частиц">
+            <span id="ccFxOpacityValue">55</span>
+        </div>
+        <label for="ccFxGlow">Свечение</label>
+        <div class="cc-fx-row">
+            <input id="ccFxGlow" type="range" min="0" max="100" step="1" value="45" aria-label="Свечение частиц">
+            <span id="ccFxGlowValue">45</span>
+        </div>
+        <div class="cc-fx-actions">
+            <button id="ccFxReset" type="button">Сброс</button>
+            <button id="ccFxClose" type="button">Закрыть</button>
+        </div>
+    </div>
 </div>
 
 <!-- =============================================
@@ -19394,7 +19435,7 @@ window._archRender = function() {
 
       function applyShellToggles() {
         var df = localStorage.getItem('cc-df-enabled') === 'true';
-        var fx = localStorage.getItem('cc-fx-enabled') === 'true';
+        var fx = localStorage.getItem('cc-fx-type') && localStorage.getItem('cc-fx-type') !== 'none';
         document.body.classList.toggle('df-on', df);
         document.body.classList.toggle('fx-on', fx);
         var dfBtn = document.getElementById('dfToggle');
@@ -19416,8 +19457,225 @@ window._archRender = function() {
         bindClanNameEditor();
         applyClanName();
         bindShellToggleButton('dfToggle', 'cc-df-enabled');
-        bindShellToggleButton('fxToggle', 'cc-fx-enabled');
         applyShellToggles();
+      }
+
+      var FX_DEFAULTS = {
+        type: 'none',
+        count: 60,
+        size: 4,
+        speed: 35,
+        opacity: 55,
+        glow: 45
+      };
+      var FX_KEYS = {
+        type: 'cc-fx-type',
+        count: 'cc-fx-count',
+        size: 'cc-fx-size',
+        speed: 'cc-fx-speed',
+        opacity: 'cc-fx-opacity',
+        glow: 'cc-fx-glow'
+      };
+      function readFxNumber(key, fallback, min, max) {
+        var raw = parseInt(localStorage.getItem(key), 10);
+        if (isNaN(raw)) raw = fallback;
+        return Math.max(min, Math.min(max, raw));
+      }
+      function fxSettings() {
+        var type = localStorage.getItem(FX_KEYS.type) || FX_DEFAULTS.type;
+        if (!/^(none|embers|fireflies|snow|leaves|ash|magic)$/.test(type)) type = 'none';
+        return {
+          type: type,
+          count: readFxNumber(FX_KEYS.count, FX_DEFAULTS.count, 0, 160),
+          size: readFxNumber(FX_KEYS.size, FX_DEFAULTS.size, 1, 12),
+          speed: readFxNumber(FX_KEYS.speed, FX_DEFAULTS.speed, 0, 100),
+          opacity: readFxNumber(FX_KEYS.opacity, FX_DEFAULTS.opacity, 0, 100),
+          glow: readFxNumber(FX_KEYS.glow, FX_DEFAULTS.glow, 0, 100)
+        };
+      }
+      function ensureFxLayer() {
+        document.querySelectorAll('.cc-v20-fireflies').forEach(function(node){ node.remove(); });
+        var layer = document.getElementById('ccFxLayer');
+        if (!layer) {
+          layer = document.createElement('div');
+          layer.id = 'ccFxLayer';
+          layer.className = 'cc-fx-layer';
+          document.body.appendChild(layer);
+        }
+        return layer;
+      }
+      window.ensureFxLayer = ensureFxLayer;
+      function fxRand(seed) {
+        return function(){
+          seed = (seed * 1664525 + 1013904223) >>> 0;
+          return seed / 4294967296;
+        };
+      }
+      function fxPalette(type, index) {
+        var palettes = {
+          embers: ['#ffb84a', '#ff7a24', '#ffd36d'],
+          fireflies: ['#ffd866', '#baff6b', '#b98cff'],
+          snow: ['#ffffff', '#eaf6ff', '#f7fbff'],
+          leaves: ['#d7b85a', '#8c9637', '#b58b32'],
+          ash: ['#bebeb6', '#8f9089', '#d6d2c8'],
+          magic: ['#9d7cff', '#6aa8ff', '#ffd866']
+        };
+        var list = palettes[type] || palettes.embers;
+        return list[index % list.length];
+      }
+      function makeFxParticle(settings, rnd, index) {
+        var particle = document.createElement('i');
+        particle.className = 'cc-fx-particle';
+        var size = Math.max(1, settings.size * (0.65 + rnd() * 0.9));
+        var speedFactor = 1.45 - settings.speed / 130;
+        var dur = Math.max(3.2, (7 + rnd() * 9) * speedFactor);
+        var x = rnd() * 100;
+        var y = rnd() * 100;
+        if (settings.type === 'snow' || settings.type === 'leaves' || settings.type === 'ash') y = -12 - rnd() * 92;
+        if (settings.type === 'embers') y = 62 + rnd() * 42;
+        var opacity = Math.max(0, Math.min(1, settings.opacity / 100));
+        var glow = 0.6 + settings.glow / 32;
+        var dx = (rnd() * 2 - 1) * (settings.type === 'fireflies' || settings.type === 'magic' ? 120 : 52);
+        var dy = settings.type === 'embers' ? 110 + rnd() * 210 : (rnd() * 2 - 1) * 90;
+        if (settings.type === 'snow' || settings.type === 'leaves' || settings.type === 'ash') {
+          dy = 0;
+          dx = (rnd() * 2 - 1) * (settings.type === 'leaves' ? 190 : 90);
+        }
+        particle.style.cssText = [
+          '--x:' + x.toFixed(2) + '%',
+          '--y:' + y.toFixed(2) + '%',
+          '--s:' + size.toFixed(2) + 'px',
+          '--o:' + opacity.toFixed(2),
+          '--g:' + glow.toFixed(2),
+          '--c:' + fxPalette(settings.type, index),
+          '--dx:' + dx.toFixed(1) + 'px',
+          '--dy:' + dy.toFixed(1) + 'px',
+          '--rot:' + Math.round(240 + rnd() * 620) + 'deg',
+          '--dur:' + dur.toFixed(2) + 's',
+          '--delay:-' + (rnd() * dur).toFixed(2) + 's'
+        ].join(';');
+        return particle;
+      }
+      function syncFxControls(settings) {
+        var map = [
+          ['ccFxCount', 'ccFxCountValue', settings.count],
+          ['ccFxSize', 'ccFxSizeValue', settings.size],
+          ['ccFxSpeed', 'ccFxSpeedValue', settings.speed],
+          ['ccFxOpacity', 'ccFxOpacityValue', settings.opacity],
+          ['ccFxGlow', 'ccFxGlowValue', settings.glow]
+        ];
+        var type = document.getElementById('ccFxType');
+        if (type) type.value = settings.type;
+        map.forEach(function(row){
+          var input = document.getElementById(row[0]);
+          var value = document.getElementById(row[1]);
+          if (input) input.value = String(row[2]);
+          if (value) value.textContent = String(row[2]);
+        });
+      }
+      function applyFx() {
+        var settings = fxSettings();
+        var layer = ensureFxLayer();
+        layer.dataset.effect = settings.type;
+        layer.setAttribute('aria-hidden', settings.type === 'none' || settings.count < 1 ? 'true' : 'false');
+        layer.innerHTML = '';
+        if (settings.type !== 'none' && settings.count > 0) {
+          var rnd = fxRand(9109 + settings.count * 17 + settings.size * 31 + settings.speed * 43 + settings.opacity * 59 + settings.glow * 71 + settings.type.length * 101);
+          var frag = document.createDocumentFragment();
+          for (var i = 0; i < settings.count; i++) frag.appendChild(makeFxParticle(settings, rnd, i));
+          layer.appendChild(frag);
+        }
+        syncFxControls(settings);
+        applyShellToggles();
+      }
+      function closeFxPopover() {
+        var pop = document.getElementById('ccFxPopover');
+        var btn = document.getElementById('fxToggle');
+        if (pop) {
+          pop.classList.remove('open');
+          pop.setAttribute('aria-hidden', 'true');
+        }
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+      }
+      function toggleFxPopover() {
+        var pop = document.getElementById('ccFxPopover');
+        var btn = document.getElementById('fxToggle');
+        if (!pop || !btn) return;
+        var open = !pop.classList.contains('open');
+        pop.classList.toggle('open', open);
+        pop.setAttribute('aria-hidden', open ? 'false' : 'true');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+      function bindFxControl() {
+        applyFx();
+        var btn = document.getElementById('fxToggle');
+        var type = document.getElementById('ccFxType');
+        var reset = document.getElementById('ccFxReset');
+        var close = document.getElementById('ccFxClose');
+        var ranges = [
+          ['ccFxCount', FX_KEYS.count],
+          ['ccFxSize', FX_KEYS.size],
+          ['ccFxSpeed', FX_KEYS.speed],
+          ['ccFxOpacity', FX_KEYS.opacity],
+          ['ccFxGlow', FX_KEYS.glow]
+        ];
+        if (btn && btn.dataset.ccFxBound !== '1') {
+          btn.dataset.ccFxBound = '1';
+          btn.addEventListener('click', function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            toggleFxPopover();
+          });
+        }
+        if (type && type.dataset.ccFxBound !== '1') {
+          type.dataset.ccFxBound = '1';
+          type.addEventListener('change', function(){
+            localStorage.setItem(FX_KEYS.type, type.value);
+            applyFx();
+          });
+        }
+        ranges.forEach(function(row){
+          var input = document.getElementById(row[0]);
+          if (!input || input.dataset.ccFxBound === '1') return;
+          input.dataset.ccFxBound = '1';
+          input.addEventListener('input', function(){
+            localStorage.setItem(row[1], input.value);
+            applyFx();
+          });
+        });
+        if (reset && reset.dataset.ccFxBound !== '1') {
+          reset.dataset.ccFxBound = '1';
+          reset.addEventListener('click', function(e){
+            e.preventDefault();
+            localStorage.setItem(FX_KEYS.type, FX_DEFAULTS.type);
+            localStorage.setItem(FX_KEYS.count, String(FX_DEFAULTS.count));
+            localStorage.setItem(FX_KEYS.size, String(FX_DEFAULTS.size));
+            localStorage.setItem(FX_KEYS.speed, String(FX_DEFAULTS.speed));
+            localStorage.setItem(FX_KEYS.opacity, String(FX_DEFAULTS.opacity));
+            localStorage.setItem(FX_KEYS.glow, String(FX_DEFAULTS.glow));
+            applyFx();
+          });
+        }
+        if (close && close.dataset.ccFxBound !== '1') {
+          close.dataset.ccFxBound = '1';
+          close.addEventListener('click', function(e){
+            e.preventDefault();
+            closeFxPopover();
+          });
+        }
+        if (!document.documentElement.dataset.ccFxDocBound) {
+          document.documentElement.dataset.ccFxDocBound = '1';
+          document.addEventListener('click', function(e){
+            var pop = document.getElementById('ccFxPopover');
+            var toggle = document.getElementById('fxToggle');
+            if (!pop || !pop.classList.contains('open')) return;
+            if (pop.contains(e.target) || (toggle && toggle.contains(e.target))) return;
+            closeFxPopover();
+          });
+          document.addEventListener('keydown', function(e){
+            if (e.key === 'Escape') closeFxPopover();
+          });
+        }
       }
 
       function readGlassNumber(key, fallback, min, max) {
@@ -19809,6 +20067,7 @@ window._archRender = function() {
         ccApplyCurrentBackground(currentPage());
         applyLang();
         initClanAndShellToggles();
+        bindFxControl();
         bindGlassDimControl();
         renderExtraDashboard();
       }
@@ -19873,102 +20132,8 @@ window._archRender = function() {
         background:
           linear-gradient(180deg, rgba(32,18,7,.08), rgba(0,0,0,.14)) !important;
       }
-      body:not(.light) .cc-v20-fireflies {
-        position: fixed;
-        inset: 0;
-        z-index: 2;
-        display: block;
-        pointer-events: none;
-        mix-blend-mode: screen;
-        opacity: .94;
-        background:
-          radial-gradient(circle at 12% 18%, rgba(255,216,130,.58) 0 1px, rgba(255,216,130,.22) 3px, transparent 13px),
-          radial-gradient(circle at 22% 72%, rgba(255,205,116,.44) 0 1px, rgba(255,205,116,.17) 3px, transparent 12px),
-          radial-gradient(circle at 34% 34%, rgba(185,205,255,.34) 0 1px, rgba(185,205,255,.12) 3px, transparent 11px),
-          radial-gradient(circle at 48% 16%, rgba(255,230,160,.42) 0 1px, rgba(255,230,160,.15) 3px, transparent 12px),
-          radial-gradient(circle at 58% 58%, rgba(255,216,130,.48) 0 1px, rgba(255,216,130,.18) 3px, transparent 13px),
-          radial-gradient(circle at 72% 28%, rgba(255,205,116,.50) 0 1px, rgba(255,205,116,.18) 3px, transparent 14px),
-          radial-gradient(circle at 82% 78%, rgba(185,205,255,.28) 0 1px, rgba(185,205,255,.10) 3px, transparent 11px),
-          radial-gradient(circle at 92% 42%, rgba(255,226,150,.42) 0 1px, rgba(255,226,150,.15) 3px, transparent 12px);
-        filter: drop-shadow(0 0 10px rgba(255,206,112,.38));
-        animation: ccFireflyFlicker 8s ease-in-out infinite alternate;
-      }
-      body:not(.light) .cc-v20-fireflies i {
-        position: absolute;
-        left: var(--x);
-        top: var(--y);
-        width: var(--s);
-        height: var(--s);
-        border-radius: 999px;
-        background: hsla(var(--hue), 94%, 72%, var(--a, .76));
-        box-shadow:
-          0 0 calc(var(--s) * 3.2) hsla(var(--hue), 94%, 68%, .78),
-          0 0 calc(var(--s) * 8.5) hsla(var(--hue), 94%, 64%, .34),
-          0 0 18px hsla(var(--hue), 94%, 62%, .20);
-        opacity: .78;
-        transform: translate(-50%, -50%);
-        animation:
-          ccFireflyFloat var(--float, 12s) ease-in-out var(--delay, 0s) infinite alternate,
-          ccFireflyDotPulse var(--d, 5s) ease-in-out var(--delay, 0s) infinite;
-      }
-      body:not(.light) .cc-v20-fireflies i:nth-child(4n) {
-        background: hsla(224, 94%, 78%, .66);
-        box-shadow:
-          0 0 calc(var(--s) * 3) hsla(224, 94%, 74%, .58),
-          0 0 calc(var(--s) * 8) hsla(224, 94%, 72%, .26);
-      }
-      body:not(.light) .cc-v20-fireflies i:nth-child(6n) {
-        opacity: .60;
-      }
-      body:not(.light) .cc-v20-fireflies::before,
-      body:not(.light) .cc-v20-fireflies::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        background:
-          radial-gradient(circle at 18% 46%, rgba(255,216,130,.22) 0 1px, transparent 7px),
-          radial-gradient(circle at 39% 82%, rgba(255,238,176,.24) 0 1px, transparent 8px),
-          radial-gradient(circle at 66% 12%, rgba(255,216,130,.20) 0 1px, transparent 7px),
-          radial-gradient(circle at 76% 64%, rgba(190,205,255,.14) 0 1px, transparent 6px),
-          radial-gradient(circle at 88% 20%, rgba(255,226,150,.20) 0 1px, transparent 7px);
-        opacity: .62;
-        animation: ccFireflyFlicker 11s ease-in-out infinite alternate-reverse;
-      }
-      body:not(.light) .cc-v20-fireflies::after {
-        background:
-          radial-gradient(circle at 8% 88%, rgba(255,216,130,.18) 0 1px, transparent 6px),
-          radial-gradient(circle at 28% 12%, rgba(190,205,255,.13) 0 1px, transparent 6px),
-          radial-gradient(circle at 52% 74%, rgba(255,238,176,.20) 0 1px, transparent 7px),
-          radial-gradient(circle at 69% 48%, rgba(255,216,130,.18) 0 1px, transparent 7px),
-          radial-gradient(circle at 96% 86%, rgba(255,226,150,.18) 0 1px, transparent 6px);
-        opacity: .48;
-        animation-duration: 13s;
-      }
-      @keyframes ccFireflyFlicker {
-        from { opacity: .42; }
-        to { opacity: .66; }
-      }
-      @keyframes ccFireflyDotPulse {
-        0%, 100% { opacity: .42; }
-        42% { opacity: .92; }
-        68% { opacity: .58; }
-      }
-      @keyframes ccFireflyFloat {
-        from { transform: translate(-50%, -50%) translate3d(0, 0, 0); }
-        to { transform: translate(-50%, -50%) translate3d(var(--tx, 8px), var(--ty, -7px), 0); }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        body:not(.light) .cc-v20-fireflies,
-        body:not(.light) .cc-v20-fireflies::before,
-        body:not(.light) .cc-v20-fireflies::after,
-        body:not(.light) .cc-v20-fireflies i {
-          animation: none !important;
-        }
-        body:not(.light) .cc-v20-fireflies i {
-          opacity: .78 !important;
-          transform: translate(-50%, -50%) !important;
-        }
+      .cc-v20-fireflies {
+        display: none !important;
       }
       body:not(.light) .cc-v20-noise {
         position: fixed;
@@ -19980,17 +20145,194 @@ window._archRender = function() {
         background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='.75'/%3E%3C/svg%3E");
       }
       body:not(.light).fx-on .cc-v20-noise {
-        opacity: .045;
+        opacity: 0 !important;
       }
       body:not(.light).fx-on .cc-v20-bg-layer::before {
         display: none;
         opacity: 0;
+      }
+      #ccFxLayer.cc-fx-layer {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 3 !important;
+        pointer-events: none !important;
+        overflow: hidden;
+        mix-blend-mode: screen;
+        contain: layout style paint;
+      }
+      #ccFxLayer.cc-fx-layer[aria-hidden="true"] {
+        display: none;
+      }
+      .cc-fx-particle {
+        position: absolute;
+        left: var(--x);
+        top: var(--y);
+        width: var(--s);
+        height: var(--s);
+        opacity: var(--o);
+        pointer-events: none;
+        will-change: transform, opacity;
+      }
+      .cc-fx-layer[data-effect="embers"] .cc-fx-particle {
+        border-radius: 999px;
+        background: var(--c, #ffb84a);
+        box-shadow:
+          0 0 calc(var(--s) * var(--g) * 1.8) var(--c, #ffb84a),
+          0 0 calc(var(--s) * var(--g) * 5.6) rgba(255,125,38,.55);
+        animation: ccFxEmber var(--dur) ease-in-out var(--delay) infinite;
+      }
+      .cc-fx-layer[data-effect="fireflies"] .cc-fx-particle {
+        border-radius: 999px;
+        background: var(--c, #d8ff72);
+        box-shadow:
+          0 0 calc(var(--s) * var(--g) * 2.2) var(--c, #d8ff72),
+          0 0 calc(var(--s) * var(--g) * 7.2) rgba(202,255,118,.45);
+        animation: ccFxFirefly var(--dur) ease-in-out var(--delay) infinite alternate;
+      }
+      .cc-fx-layer[data-effect="snow"] .cc-fx-particle {
+        border-radius: 999px;
+        background: rgba(255,255,255,.96);
+        box-shadow: 0 0 calc(var(--s) * var(--g) * 1.6) rgba(255,255,255,.62);
+        animation: ccFxSnow var(--dur) linear var(--delay) infinite;
+      }
+      .cc-fx-layer[data-effect="leaves"] .cc-fx-particle {
+        width: calc(var(--s) * 1.9);
+        height: var(--s);
+        border-radius: 80% 18% 78% 24%;
+        background: linear-gradient(135deg, #9b8f35, #d7b85a 58%, #5d6d2d);
+        box-shadow: 0 0 calc(var(--s) * var(--g) * 1.4) rgba(216,184,90,.42);
+        animation: ccFxLeaf var(--dur) linear var(--delay) infinite;
+      }
+      .cc-fx-layer[data-effect="ash"] .cc-fx-particle {
+        border-radius: 45%;
+        background: rgba(188,188,180,.88);
+        box-shadow: 0 0 calc(var(--s) * var(--g) * .7) rgba(210,210,200,.32);
+        animation: ccFxAsh var(--dur) linear var(--delay) infinite;
+      }
+      .cc-fx-layer[data-effect="magic"] .cc-fx-particle {
+        border-radius: 999px;
+        background: var(--c, #9d7cff);
+        box-shadow:
+          0 0 calc(var(--s) * var(--g) * 2.5) var(--c, #9d7cff),
+          0 0 calc(var(--s) * var(--g) * 8) rgba(105,157,255,.50);
+        animation: ccFxMagic var(--dur) ease-in-out var(--delay) infinite;
+      }
+      @keyframes ccFxEmber {
+        0% { transform: translate3d(0, 18px, 0) scale(.75); opacity: 0; }
+        18% { opacity: var(--o); }
+        100% { transform: translate3d(var(--dx), calc(var(--dy) * -1), 0) scale(1.12); opacity: 0; }
+      }
+      @keyframes ccFxFirefly {
+        0% { transform: translate3d(0, 0, 0) scale(.72); opacity: calc(var(--o) * .55); }
+        45% { opacity: var(--o); }
+        100% { transform: translate3d(var(--dx), var(--dy), 0) scale(1.15); opacity: calc(var(--o) * .72); }
+      }
+      @keyframes ccFxSnow {
+        0% { transform: translate3d(0, -16vh, 0); opacity: 0; }
+        10% { opacity: var(--o); }
+        100% { transform: translate3d(var(--dx), 116vh, 0); opacity: calc(var(--o) * .38); }
+      }
+      @keyframes ccFxLeaf {
+        0% { transform: translate3d(0, -14vh, 0) rotate(0deg); opacity: 0; }
+        12% { opacity: var(--o); }
+        100% { transform: translate3d(var(--dx), 114vh, 0) rotate(var(--rot)); opacity: calc(var(--o) * .45); }
+      }
+      @keyframes ccFxAsh {
+        0% { transform: translate3d(0, -12vh, 0) scale(.72); opacity: 0; }
+        18% { opacity: var(--o); }
+        100% { transform: translate3d(var(--dx), 112vh, 0) scale(1.18); opacity: 0; }
+      }
+      @keyframes ccFxMagic {
+        0%, 100% { transform: translate3d(0, 0, 0) scale(.45); opacity: 0; }
+        36% { opacity: var(--o); }
+        66% { transform: translate3d(var(--dx), var(--dy), 0) scale(1.28); opacity: calc(var(--o) * .78); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .cc-fx-particle {
+          animation: none !important;
+        }
       }
       body:not(.light) #dfToggle[aria-pressed="true"],
       body:not(.light) #fxToggle[aria-pressed="true"] {
         border-color: rgba(232,190,88,.38) !important;
         color: #f2cb73 !important;
         background: rgba(232,190,88,.10) !important;
+      }
+      body:not(.light) .cc-fx-popover {
+        position: fixed;
+        top: 58px;
+        right: 88px;
+        z-index: 142;
+        width: 268px;
+        padding: 14px;
+        display: none;
+        border: 1px solid rgba(255,255,255,.14);
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(8,10,14,.96), rgba(5,6,8,.91));
+        box-shadow: 0 20px 70px rgba(0,0,0,.50), inset 0 1px rgba(255,255,255,.08);
+      }
+      body:not(.light) .cc-fx-popover.open {
+        display: block;
+      }
+      body:not(.light) .cc-fx-popover label {
+        display: block;
+        margin: 10px 0 8px;
+        color: rgba(247,242,232,.78);
+        font-size: 12px;
+        font-weight: 800;
+      }
+      body:not(.light) .cc-fx-popover label:first-child {
+        margin-top: 0;
+      }
+      body:not(.light) .cc-fx-popover select {
+        width: 100%;
+        height: 32px;
+        border: 1px solid rgba(255,255,255,.12);
+        border-radius: 9px;
+        background: rgba(255,255,255,.07);
+        color: rgba(247,242,232,.88);
+        font: inherit;
+        font-size: 12px;
+        font-weight: 800;
+      }
+      body:not(.light) .cc-fx-row {
+        display: grid;
+        grid-template-columns: 1fr 42px;
+        gap: 10px;
+        align-items: center;
+      }
+      body:not(.light) .cc-fx-row input[type="range"] {
+        width: 100%;
+        accent-color: #e8be58;
+      }
+      body:not(.light) .cc-fx-row span {
+        color: #f2cb73;
+        font-size: 12px;
+        font-weight: 850;
+        text-align: right;
+      }
+      body:not(.light) .cc-fx-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      body:not(.light) .cc-fx-actions button {
+        flex: 1 1 0;
+        height: 30px;
+        padding: 0 10px;
+        border-radius: 9px;
+        border: 1px solid rgba(255,255,255,.12);
+        background: rgba(255,255,255,.055);
+        color: rgba(247,242,232,.70);
+        font: inherit;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      body:not(.light) .cc-fx-actions button:hover {
+        border-color: rgba(232,190,88,.34);
+        color: #f2cb73;
+        background: rgba(232,190,88,.08);
       }
       body:not(.light) .cc-glass-popover {
         position: fixed;
@@ -20155,38 +20497,8 @@ window._archRender = function() {
           bg.className = 'cc-v20-bg-layer';
           document.body.insertBefore(bg, document.body.firstChild);
         }
-        var fireflies = document.querySelector('.cc-v20-fireflies');
-        if (!fireflies) {
-          fireflies = document.createElement('div');
-          fireflies.className = 'cc-v20-fireflies';
-          document.body.insertBefore(fireflies, document.body.firstChild.nextSibling);
-        }
-        if (!fireflies.querySelector('i')) {
-          var pts = [];
-          var seed = 1741;
-          function rnd(){
-            seed = (seed * 1664525 + 1013904223) >>> 0;
-            return seed / 4294967296;
-          }
-          for (var i = 0; i < 60; i++) {
-            var cool = i % 7 === 0 || i % 13 === 0;
-            var x = Math.round((4 + rnd() * 92) * 10) / 10;
-            var y = Math.round((5 + rnd() * 90) * 10) / 10;
-            var size = Math.round((2 + rnd() * 3.1) * 10) / 10;
-            var hue = cool ? Math.round(218 + rnd() * 26) : Math.round(38 + rnd() * 10);
-            var alpha = Math.round((0.50 + rnd() * 0.34) * 100) / 100;
-            var delay = -Math.round(rnd() * 90) / 10;
-            var pulse = Math.round((3.4 + rnd() * 4.2) * 10) / 10;
-            var drift = Math.round((8 + rnd() * 8) * 10) / 10;
-            var tx = Math.round((rnd() > .5 ? drift : -drift) * 10) / 10;
-            var ty = Math.round((rnd() > .5 ? drift * .75 : -drift * .75) * 10) / 10;
-            var floatDur = Math.round((8 + rnd() * 8) * 10) / 10;
-            pts.push([x, y, size, hue, alpha, delay, pulse, tx, ty, floatDur]);
-          }
-          fireflies.innerHTML = pts.map(function(p){
-            return '<i style="--x:'+p[0]+'%;--y:'+p[1]+'%;--s:'+p[2]+'px;--hue:'+p[3]+';--a:'+p[4]+';--delay:'+p[5]+'s;--d:'+p[6]+'s;--tx:'+p[7]+'px;--ty:'+p[8]+'px;--float:'+p[9]+'s"></i>';
-          }).join('');
-        }
+        document.querySelectorAll('.cc-v20-fireflies').forEach(function(node){ node.remove(); });
+        if (typeof window.ensureFxLayer === 'function') window.ensureFxLayer();
         if (!document.querySelector('.cc-v20-noise')) {
           var noise = document.createElement('div');
           noise.className = 'cc-v20-noise';
