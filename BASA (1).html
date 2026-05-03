@@ -3134,7 +3134,7 @@
 <div id="topbar" class="top hidden" translate="no">
     <div class="tools">
         <span id="roleBadge" style="display:none"></span>
-        <span class="chip dark" id="topbarClan" style="display:none"></span>
+        <span class="chip dark" id="topbarClan" style="display:none" title="Изменить название клана"></span>
         <button id="adminModeToggle" class="chip" onclick="window._toggleAdminMode&&window._toggleAdminMode()" style="display:none" title="Тест-режим для admin">▸ TEST</button>
         <button class="flip-toggle" id="themeToggle" type="button" onclick="toggleTheme()" aria-label="Theme" data-state="left">
             <span class="flip-toggle-track"></span>
@@ -3191,11 +3191,14 @@
             <button class="nav-item" id="nav-backup" onclick="exportData()" title="Скачать резервную копию всех данных"><span class="ico">⤓</span>Бэкап данных</button>
         </nav>
         <div class="tier" id="autoSaveTier">
-            <small>Автосохранение</small>
-            <b>Synced</b>
-            <span id="autoSaveText">Сохранено</span>
+            <small>Clan tier</small>
+            <b>CHAMPION I</b>
+            <span>♛ 3,520 rating</span>
             <hr>
-            <small id="autoSaveIndicator" style="opacity:.0;transition:opacity .4s">●  cloud ok</small>
+            <small>Season ends in</small>
+            <b>12D 18H 42M</b>
+            <span id="autoSaveText" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden">Сохранено</span>
+            <small id="autoSaveIndicator" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;opacity:0;transition:opacity .4s">●  cloud ok</small>
         </div>
     </aside>
 
@@ -8292,6 +8295,8 @@ function getClass2IconByClass3(c3) {
             console.debug('[ocrspace] normalized row', normalized);
             return normalized;
         }
+
+        // OCR.space cell OCR disabled: geometry must be tuned in tools/ocr_spike before reintegration.
 
         function _ccOcrValidateProxyUrl() {
             try {
@@ -16076,6 +16081,7 @@ window._archRender = function() {
       <button class="cc-tab-bg-save-btn" id="ccTabBgSave" type="button">Сохранить</button>
     </div>
     <div class="cc-tab-bg-list" id="ccTabBgList"></div>
+    <script>/* TODO: optional video backgrounds later via IndexedDB/ObjectURL, not localStorage. */</script>
     <input type="file" id="ccTabBgFile" accept="image/*" hidden>
   </div>
 </div>
@@ -18742,7 +18748,7 @@ window._archRender = function() {
         return localStorage.getItem('cc_lang') === 'en' ? 'en' : 'ru';
       }
       function boolGlobal() {
-        return localStorage.getItem(KEY_USE_GLOBAL) === 'true' || localStorage.getItem(KEY_USE_GLOBAL) === '1';
+        return localStorage.getItem(KEY_USE_GLOBAL) === 'true';
       }
       function setText(el, text) {
         if (el && text !== undefined) el.textContent = text;
@@ -18767,9 +18773,20 @@ window._archRender = function() {
       function escapeAttr(s) {
         return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
       }
-      function ccApplyTabBackground(pid) {
+      function backgroundCss(safe) {
+        return 'body,body:not(.light){background-image:url("' + safe + '") !important;background-size:cover !important;background-position:center center !important;background-attachment:fixed !important;}'
+          + 'body:not(.light) .cc-v20-bg-layer{background:'
+          + 'linear-gradient(90deg,rgba(0,0,0,.34),rgba(0,0,0,.04),rgba(0,0,0,.46)),'
+          + 'radial-gradient(circle at 48% 12%,rgba(232,190,88,.18),transparent 30%),'
+          + 'radial-gradient(circle at 78% 8%,rgba(95,140,255,.12),transparent 28%),'
+          + 'radial-gradient(circle at 30% 78%,rgba(155,102,255,.10),transparent 34%),'
+          + 'url("' + safe + '") center center/cover no-repeat,'
+          + 'linear-gradient(120deg,#17130e,#07080b 43%,#151114) !important;}';
+      }
+      function ccApplyCurrentBackground(pid) {
         pid = pid || currentPage();
-        var url = selectedBg(pid || currentPage());
+        var useGlobal = boolGlobal();
+        var url = useGlobal ? (localStorage.getItem(KEY_GLOBAL) || '') : (localStorage.getItem(KEY_TAB + pid) || '');
         var tag = document.getElementById('cceGlobalBgStyle');
         if (!tag) {
           tag = document.createElement('style');
@@ -18777,24 +18794,21 @@ window._archRender = function() {
           document.head.appendChild(tag);
         }
         if (url) {
-          var safe = cssUrl(url);
-          tag.textContent =
-            'body,body:not(.light){background-image:url("' + safe + '") !important;background-size:cover !important;background-position:center center !important;background-attachment:fixed !important;}'
-            + 'body:not(.light) .cc-v20-bg-layer{background:'
-            + 'linear-gradient(90deg,rgba(0,0,0,.34),rgba(0,0,0,.04),rgba(0,0,0,.46)),'
-            + 'radial-gradient(circle at 48% 12%,rgba(232,190,88,.18),transparent 30%),'
-            + 'radial-gradient(circle at 78% 8%,rgba(95,140,255,.12),transparent 28%),'
-            + 'radial-gradient(circle at 30% 78%,rgba(155,102,255,.10),transparent 34%),'
-            + 'url("' + safe + '") center center/cover no-repeat,'
-            + 'linear-gradient(120deg,#17130e,#07080b 43%,#151114) !important;}';
+          tag.textContent = backgroundCss(cssUrl(url));
+          var sup = document.getElementById('cvePreloadBgSuppress');
+          if (sup) sup.remove();
         } else {
           tag.textContent = '';
         }
         return url;
       }
+      window.ccApplyCurrentBackground = ccApplyCurrentBackground;
+      function ccApplyTabBackground(pid) {
+        return ccApplyCurrentBackground(pid);
+      }
       window.ccApplyTabBackground = ccApplyTabBackground;
       function applyStoredBackground(pid) {
-        return ccApplyTabBackground(pid);
+        return ccApplyCurrentBackground(pid);
       }
       function renderExtraDashboard() {
         var dates = Object.keys(window.appliedStatsByDate || {}).sort();
@@ -18885,6 +18899,91 @@ window._archRender = function() {
         if (pencil) pencil.title = l === 'en' ? 'Tab backgrounds' : 'Фоны вкладок';
         var logout = document.querySelector('#topbar button[onclick*="loginLogout"]');
         if (logout) logout.title = l === 'en' ? 'Sign out' : 'Выйти';
+        applyClanName();
+      }
+
+      function storedClanName() {
+        return (localStorage.getItem('cc-clan-name') || '').trim();
+      }
+      function currentClanName() {
+        var el = document.getElementById('topbarClan');
+        return (storedClanName() || (el && el.textContent || '').trim() || 'Doom').trim();
+      }
+      function applyClanName(name) {
+        var value = (name || currentClanName()).trim() || 'Doom';
+        var chip = document.getElementById('topbarClan');
+        if (chip) {
+          if (chip.textContent !== value) chip.textContent = value;
+          chip.style.display = '';
+          chip.title = 'Изменить название клана';
+        }
+        document.querySelectorAll('[data-clan-name]').forEach(function(el){
+          if (el.textContent !== value) el.textContent = value;
+        });
+        return value;
+      }
+      function editClanName() {
+        var next = prompt(lang() === 'en' ? 'Clan name' : 'Название клана', currentClanName());
+        if (next == null) return;
+        next = next.trim();
+        if (!next) return;
+        localStorage.setItem('cc-clan-name', next);
+        applyClanName(next);
+      }
+      function bindClanNameEditor() {
+        var chip = document.getElementById('topbarClan');
+        if (!chip || chip.dataset.ccClanEdit === '1') return;
+        chip.dataset.ccClanEdit = '1';
+        chip.style.cursor = 'pointer';
+        chip.title = 'Изменить название клана';
+        chip.setAttribute('role', 'button');
+        chip.setAttribute('tabindex', '0');
+        chip.addEventListener('click', function(e){
+          e.preventDefault();
+          editClanName();
+        });
+        chip.addEventListener('keydown', function(e){
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            editClanName();
+          }
+        });
+        var guard = false;
+        var obs = new MutationObserver(function(){
+          if (guard || !storedClanName()) return;
+          guard = true;
+          applyClanName();
+          guard = false;
+        });
+        obs.observe(chip, { childList:true, characterData:true, subtree:true });
+      }
+
+      function applyShellToggles() {
+        var df = localStorage.getItem('cc-df-enabled') === 'true';
+        var fx = localStorage.getItem('cc-fx-enabled') === 'true';
+        document.body.classList.toggle('df-on', df);
+        document.body.classList.toggle('fx-on', fx);
+        var dfBtn = document.getElementById('dfToggle');
+        var fxBtn = document.getElementById('fxToggle');
+        if (dfBtn) dfBtn.setAttribute('aria-pressed', df ? 'true' : 'false');
+        if (fxBtn) fxBtn.setAttribute('aria-pressed', fx ? 'true' : 'false');
+      }
+      function bindShellToggleButton(id, key) {
+        var btn = document.getElementById(id);
+        if (!btn || btn.dataset.ccToggleBound === '1') return;
+        btn.dataset.ccToggleBound = '1';
+        btn.addEventListener('click', function(){
+          var enabled = localStorage.getItem(key) !== 'true';
+          localStorage.setItem(key, enabled ? 'true' : 'false');
+          applyShellToggles();
+        });
+      }
+      function initClanAndShellToggles() {
+        bindClanNameEditor();
+        applyClanName();
+        bindShellToggleButton('dfToggle', 'cc-df-enabled');
+        bindShellToggleButton('fxToggle', 'cc-fx-enabled');
+        applyShellToggles();
       }
 
       function replaceModalApi() {
@@ -18895,6 +18994,19 @@ window._archRender = function() {
           return Object.keys(pageLabels).filter(function(id){ return id !== 'backup'; }).map(function(id){
             return { id:id, label:pageLabels[id][lang()] };
           });
+        }
+        function clearTabBackgroundKeys() {
+          var keys = [];
+          for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (k && k.indexOf(KEY_TAB) === 0) keys.push(k);
+          }
+          keys.forEach(function(k){ localStorage.removeItem(k); });
+        }
+        function lastPendingImage() {
+          var last = null;
+          Object.keys(pending).forEach(function(k){ if (pending[k]) last = pending[k]; });
+          return last;
         }
         function status(tabId) {
           var mt = modalText[lang()];
@@ -18910,8 +19022,9 @@ window._archRender = function() {
           var applyAll = document.getElementById('ccTabApplyAll');
           var hasPending = Object.keys(pending).some(function(id){ return !!pending[id]; });
           if (applyAll && !hasPending) applyAll.checked = boolGlobal();
+          var globalPreview = applyAll && applyAll.checked ? (lastPendingImage() || localStorage.getItem(KEY_GLOBAL) || '') : '';
           box.innerHTML = tabs().map(function(tab){
-            var preview = pending[tab.id] || selectedBg(tab.id);
+            var preview = globalPreview || pending[tab.id] || selectedBg(tab.id);
             var bgStyle = preview ? 'background-image:url(&quot;'+escapeAttr(preview)+'&quot;)' : '';
             var mark = tab.id === cur ? '<span>'+mt.current+'</span>' : '<span>'+status(tab.id)+'</span>';
             return '<div class="cc-tab-bg-row'+(tab.id===cur?' is-current':'')+'">'
@@ -18970,26 +19083,29 @@ window._archRender = function() {
         function save() {
           var applyAll = document.getElementById('ccTabApplyAll');
           var useAll = !!(applyAll && applyAll.checked);
-          var last = null;
-          Object.keys(pending).forEach(function(k){ if (pending[k]) last = pending[k]; });
+          var last = lastPendingImage();
           if (useAll) {
             if (last) localStorage.setItem(KEY_GLOBAL, last);
             if (localStorage.getItem(KEY_GLOBAL)) localStorage.setItem(KEY_USE_GLOBAL, 'true');
           } else {
-            localStorage.removeItem(KEY_USE_GLOBAL);
+            localStorage.setItem(KEY_USE_GLOBAL, 'false');
             Object.keys(pending).forEach(function(k){ localStorage.setItem(KEY_TAB + k, pending[k]); });
           }
           pending = {};
-          applyStoredBackground(currentPage());
+          ccApplyCurrentBackground(currentPage());
           close();
           toast(modalText[lang()].toastSaved);
         }
         function reset() {
-          tabs().forEach(function(t){ localStorage.removeItem(KEY_TAB + t.id); });
+          clearTabBackgroundKeys();
           localStorage.removeItem(KEY_GLOBAL);
           localStorage.removeItem(KEY_USE_GLOBAL);
           pending = {};
-          applyStoredBackground(currentPage());
+          var cve = document.getElementById('cveGlobalBgStyle');
+          if (cve) cve.textContent = '';
+          var sup = document.getElementById('cvePreloadBgSuppress');
+          if (sup) sup.remove();
+          ccApplyCurrentBackground(currentPage());
           renderRows();
           toast(modalText[lang()].toastReset);
         }
@@ -19024,16 +19140,7 @@ window._archRender = function() {
                   tag.id = 'cceGlobalBgStyle';
                   document.head.appendChild(tag);
                 }
-                var safe = cssUrl(data);
-                tag.textContent =
-                  'body,body:not(.light){background-image:url("' + safe + '") !important;background-size:cover !important;background-position:center center !important;background-attachment:fixed !important;}'
-                  + 'body:not(.light) .cc-v20-bg-layer{background:'
-                  + 'linear-gradient(90deg,rgba(0,0,0,.34),rgba(0,0,0,.04),rgba(0,0,0,.46)),'
-                  + 'radial-gradient(circle at 48% 12%,rgba(232,190,88,.18),transparent 30%),'
-                  + 'radial-gradient(circle at 78% 8%,rgba(95,140,255,.12),transparent 28%),'
-                  + 'radial-gradient(circle at 30% 78%,rgba(155,102,255,.10),transparent 34%),'
-                  + 'url("' + safe + '") center center/cover no-repeat,'
-                  + 'linear-gradient(120deg,#17130e,#07080b 43%,#151114) !important;}';
+                tag.textContent = backgroundCss(cssUrl(data));
               }
               fileInput.value = '';
               renderRows();
@@ -19100,8 +19207,9 @@ window._archRender = function() {
       function init() {
         patchFunctions();
         replaceModalApi();
-        applyStoredBackground(currentPage());
+        ccApplyCurrentBackground(currentPage());
         applyLang();
+        initClanAndShellToggles();
         renderExtraDashboard();
       }
       if (document.readyState === 'loading') {
@@ -19118,16 +19226,30 @@ window._archRender = function() {
       }
       body:not(.light) .cc-v20-bg-layer {
         position: fixed;
-        inset: 0;
+        inset: -2%;
         z-index: 0;
         pointer-events: none;
         overflow: hidden;
+        transform: scale(1.02) translate3d(0,0,0);
+        transform-origin: 50% 50%;
+        animation: ccBgCinematicMotion 32s ease-in-out infinite alternate;
+        will-change: transform;
         background:
           linear-gradient(90deg, rgba(0,0,0,.34), rgba(0,0,0,.04), rgba(0,0,0,.46)),
           radial-gradient(circle at 48% 12%, rgba(232,190,88,.18), transparent 30%),
           radial-gradient(circle at 78% 8%, rgba(95,140,255,.12), transparent 28%),
           radial-gradient(circle at 30% 78%, rgba(155,102,255,.10), transparent 34%),
           linear-gradient(120deg, #17130e, #07080b 43%, #151114);
+      }
+      @keyframes ccBgCinematicMotion {
+        from { transform: scale(1.02) translate3d(-1%, -.6%, 0); }
+        to { transform: scale(1.055) translate3d(1%, .8%, 0); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        body:not(.light) .cc-v20-bg-layer {
+          animation: none !important;
+          transform: none !important;
+        }
       }
       body:not(.light) .cc-v20-bg-layer::before {
         content: "";
@@ -19148,13 +19270,31 @@ window._archRender = function() {
           radial-gradient(circle at 50% 30%, transparent, rgba(0,0,0,.48) 48%, rgba(0,0,0,.86)),
           linear-gradient(180deg, rgba(0,0,0,.03), rgba(0,0,0,.62));
       }
+      body:not(.light).df-on .cc-v20-bg-layer::after {
+        background:
+          radial-gradient(circle at 50% 28%, transparent, rgba(0,0,0,.54) 48%, rgba(0,0,0,.90)),
+          linear-gradient(180deg, rgba(32,18,7,.10), rgba(0,0,0,.70)) !important;
+      }
       body:not(.light) .cc-v20-noise {
         position: fixed;
         inset: 0;
         z-index: 1;
         pointer-events: none;
-        opacity: .10;
+        opacity: 0;
+        transition: opacity .18s ease;
         background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='.75'/%3E%3C/svg%3E");
+      }
+      body:not(.light).fx-on .cc-v20-noise {
+        opacity: .10;
+      }
+      body:not(.light).fx-on .cc-v20-bg-layer::before {
+        opacity: .22;
+      }
+      body:not(.light) #dfToggle[aria-pressed="true"],
+      body:not(.light) #fxToggle[aria-pressed="true"] {
+        border-color: rgba(232,190,88,.38) !important;
+        color: #f2cb73 !important;
+        background: rgba(232,190,88,.10) !important;
       }
       body:not(.light) #topbar,
       body:not(.light) #appLayout,
