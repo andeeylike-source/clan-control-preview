@@ -18662,6 +18662,235 @@ window._archRender = function() {
         border-radius: 12px !important;
         border-color: rgba(255,255,255,.12) !important;
       }
+      body:not(.light) #page-settings .v20-page-body,
+      body:not(.light) #page-settings:not(.v20-grafted) {
+        width: min(1120px, 100%) !important;
+        margin: 0 auto !important;
+      }
+      body:not(.light) #page-settings .v20-page-body {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+        gap: 18px !important;
+        align-items: start !important;
+      }
+      body:not(.light) #page-settings .v20-page-body > .card,
+      body:not(.light) #page-settings:not(.v20-grafted) > .card {
+        margin: 0 !important;
+        padding: 22px !important;
+        min-width: 0 !important;
+      }
+      body:not(.light) #page-settings .v20-page-body > .card:nth-of-type(1),
+      body:not(.light) #page-settings .v20-page-body > .card:nth-of-type(4),
+      body:not(.light) #page-settings .v20-page-body > .card:nth-of-type(n+5),
+      body:not(.light) #page-settings:not(.v20-grafted) > .card:nth-of-type(1),
+      body:not(.light) #page-settings:not(.v20-grafted) > .card:nth-of-type(4),
+      body:not(.light) #page-settings:not(.v20-grafted) > .card:nth-of-type(n+5) {
+        grid-column: 1 / -1 !important;
+      }
+      body:not(.light) #page-settings h2 {
+        margin: 0 0 8px !important;
+        color: #fff8e8 !important;
+        font-size: 15px !important;
+        line-height: 1.2 !important;
+        font-weight: 850 !important;
+        letter-spacing: .01em !important;
+      }
+      body:not(.light) #page-settings p {
+        max-width: 760px !important;
+        color: rgba(226,232,240,.62) !important;
+        line-height: 1.55 !important;
+      }
+      body:not(.light) #page-settings a {
+        color: #e8be58 !important;
+        text-decoration: none !important;
+      }
+      body:not(.light) #page-settings label {
+        min-width: 0 !important;
+      }
+      body:not(.light) #page-settings label > div[style*="text-transform:uppercase"] {
+        color: rgba(226,232,240,.54) !important;
+        font-size: 10px !important;
+        letter-spacing: .08em !important;
+      }
+      body:not(.light) #page-settings input:not([type="checkbox"]):not([type="file"]),
+      body:not(.light) #page-settings select,
+      body:not(.light) #page-settings textarea {
+        width: 100% !important;
+        min-width: 0 !important;
+        min-height: 42px !important;
+        padding: 10px 12px !important;
+        font-size: 13px !important;
+        line-height: 1.35 !important;
+        box-shadow: inset 0 1px rgba(255,255,255,.05) !important;
+      }
+      body:not(.light) #page-settings input[type="checkbox"] {
+        accent-color: #d6a83f !important;
+      }
+      body:not(.light) #page-settings input::placeholder,
+      body:not(.light) #page-settings textarea::placeholder {
+        color: rgba(226,232,240,.36) !important;
+      }
+      body:not(.light) #page-settings button,
+      body:not(.light) #page-settings label[style*="cursor:pointer"] {
+        min-height: 40px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 7px !important;
+        padding: 9px 15px !important;
+        font-size: 12px !important;
+        line-height: 1.1 !important;
+        font-weight: 800 !important;
+        white-space: nowrap !important;
+        border: 1px solid rgba(255,255,255,.12) !important;
+        background: rgba(255,255,255,.055) !important;
+        color: rgba(247,242,232,.82) !important;
+      }
+      body:not(.light) #page-settings .btn-primary,
+      body:not(.light) #page-settings button[onclick*="save"],
+      body:not(.light) #page-settings button[onclick*="add"] {
+        border-color: rgba(232,190,88,.34) !important;
+        background: linear-gradient(180deg, rgba(232,190,88,.24), rgba(147,97,29,.24)) !important;
+        color: #ffe6a7 !important;
+        box-shadow: inset 0 1px rgba(255,255,255,.12), 0 8px 22px rgba(0,0,0,.18) !important;
+      }
+      body:not(.light) #page-settings button[onclick*="clearStorage"],
+      body:not(.light) #page-settings button[onclick*="remove"],
+      body:not(.light) #page-settings button[onclick*="delete"] {
+        border-color: rgba(239,68,68,.28) !important;
+        background: rgba(127,29,29,.20) !important;
+        color: #fca5a5 !important;
+      }
+      body:not(.light) #page-settings label:has(input[type="checkbox"]) {
+        min-height: auto !important;
+        justify-content: flex-start !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        color: rgba(247,242,232,.82) !important;
+      }
+      body:not(.light) #page-settings .flex.gap-3,
+      body:not(.light) #page-settings .flex.gap-3.flex-wrap,
+      body:not(.light) #page-settings [style*="display:flex"][style*="gap:10px"],
+      body:not(.light) #page-settings [style*="display:flex"][style*="gap:8px"] {
+        align-items: center !important;
+        gap: 10px !important;
+        flex-wrap: wrap !important;
+      }
+      body:not(.light) #apiKeysList,
+      body:not(.light) #aliasesList {
+        display: grid !important;
+        gap: 10px !important;
+        margin-bottom: 14px !important;
+      }
+      body:not(.light) #apiKeysList > div,
+      body:not(.light) #aliasesList > div {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) auto !important;
+        gap: 8px !important;
+        align-items: center !important;
+        padding: 8px !important;
+        border: 1px solid rgba(255,255,255,.09) !important;
+        border-radius: 14px !important;
+        background: rgba(0,0,0,.16) !important;
+      }
+      body:not(.light) #aliasesList > div {
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto !important;
+      }
+      body:not(.light) #apiKeysList button,
+      body:not(.light) #aliasesList button {
+        width: 40px !important;
+        min-width: 40px !important;
+        padding: 0 !important;
+      }
+      body:not(.light) #apiKeysList p,
+      body:not(.light) #aliasesList p {
+        margin: 0 !important;
+        padding: 12px 14px !important;
+        border: 1px dashed rgba(255,255,255,.11) !important;
+        border-radius: 14px !important;
+        color: rgba(226,232,240,.52) !important;
+      }
+      body:not(.light) #aliasesBody {
+        padding-top: 12px !important;
+      }
+      body:not(.light) #aliasesBody code {
+        background: rgba(0,0,0,.28) !important;
+        border: 1px solid rgba(255,255,255,.08) !important;
+        color: #ffe6a7 !important;
+      }
+      body:not(.light) #valueWeightsConfig {
+        display: grid !important;
+        gap: 12px !important;
+      }
+      body:not(.light) #valueWeightsConfig > div {
+        margin: 0 !important;
+        padding: 14px !important;
+        border: 1px solid rgba(255,255,255,.10) !important;
+        border-radius: 16px !important;
+        background: rgba(0,0,0,.15) !important;
+      }
+      body:not(.light) #valueWeightsConfig > div > div:first-child {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 12px !important;
+        margin-bottom: 12px !important;
+        color: #fff8e8 !important;
+        font-size: 13px !important;
+      }
+      body:not(.light) #valueWeightsConfig > div > div:nth-child(2) {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fit, minmax(172px, 1fr)) !important;
+        gap: 8px !important;
+      }
+      body:not(.light) #valueWeightsConfig > div > div:nth-child(2) > div {
+        justify-content: space-between !important;
+        min-width: 0 !important;
+        min-height: 42px !important;
+        border-color: rgba(255,255,255,.09) !important;
+        background: rgba(0,0,0,.18) !important;
+        border-radius: 12px !important;
+        padding: 7px 9px !important;
+      }
+      body:not(.light) #valueWeightsConfig input[type="number"] {
+        width: 56px !important;
+        min-height: 30px !important;
+        padding: 4px 6px !important;
+        text-align: center !important;
+        font-weight: 850 !important;
+      }
+      body:not(.light) #apiKeyStatus,
+      body:not(.light) #analysisProviderStatus,
+      body:not(.light) #importStatus {
+        border-radius: 12px !important;
+        line-height: 1.45 !important;
+      }
+      @media (max-width: 980px) {
+        body:not(.light) #page-settings .v20-page-body {
+          grid-template-columns: 1fr !important;
+        }
+        body:not(.light) #page-settings .v20-page-body > .card,
+        body:not(.light) #page-settings:not(.v20-grafted) > .card {
+          grid-column: 1 / -1 !important;
+        }
+      }
+      @media (max-width: 640px) {
+        body:not(.light) #page-settings .v20-page-body > .card,
+        body:not(.light) #page-settings:not(.v20-grafted) > .card {
+          padding: 16px !important;
+        }
+        body:not(.light) #aliasesList > div {
+          grid-template-columns: minmax(0, 1fr) auto !important;
+        }
+        body:not(.light) #aliasesList > div > span {
+          display: none !important;
+        }
+        body:not(.light) #page-settings button,
+        body:not(.light) #page-settings label[style*="cursor:pointer"] {
+          width: 100% !important;
+        }
+      }
       body:not(.light) .table-container,
       body:not(.light) .modal-content,
       body:not(.light) .modal .card,
