@@ -3174,8 +3174,8 @@
         <button id="glassDimReset" type="button">Сброс</button>
     </div>
     <div class="cc-fx-popover" id="ccFxPopover" aria-hidden="true">
-        <label for="ccFxType">Тип эффекта</label>
-        <select id="ccFxType" aria-label="Тип эффекта">
+        <label id="ccFxTypeLabel" for="ccFxTypeButton">Тип эффекта</label>
+        <select id="ccFxType" aria-label="Тип эффекта" hidden>
             <option value="none">Выкл</option>
             <option value="embers">Огоньки</option>
             <option value="fireflies">Светлячки</option>
@@ -3184,6 +3184,18 @@
             <option value="ash">Пепел</option>
             <option value="magic">Магия</option>
         </select>
+        <div class="cc-fx-select" id="ccFxTypeCustom">
+            <button id="ccFxTypeButton" type="button" class="cc-fx-select-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="ccFxTypeLabel ccFxTypeButton">Выкл</button>
+            <div id="ccFxTypeList" class="cc-fx-select-list" role="listbox" aria-labelledby="ccFxTypeLabel">
+                <button type="button" role="option" data-value="none" aria-selected="true">Выкл</button>
+                <button type="button" role="option" data-value="embers" aria-selected="false">Огоньки</button>
+                <button type="button" role="option" data-value="fireflies" aria-selected="false">Светлячки</button>
+                <button type="button" role="option" data-value="snow" aria-selected="false">Снег</button>
+                <button type="button" role="option" data-value="leaves" aria-selected="false">Листья</button>
+                <button type="button" role="option" data-value="ash" aria-selected="false">Пепел</button>
+                <button type="button" role="option" data-value="magic" aria-selected="false">Магия</button>
+            </div>
+        </div>
         <label for="ccFxCount">Количество</label>
         <div class="cc-fx-row">
             <input id="ccFxCount" type="range" min="0" max="160" step="1" value="60" aria-label="Количество частиц">
@@ -19513,12 +19525,12 @@ window._archRender = function() {
       }
       function fxPalette(type, index) {
         var palettes = {
-          embers: ['#ffb84a', '#ff7a24', '#ffd36d'],
-          fireflies: ['#ffd866', '#baff6b', '#b98cff'],
+          embers: ['#ffca55', '#ff8a22', '#f2451d', '#ffd66a'],
+          fireflies: ['#fff08a', '#d8ff6a', '#a9ff58', '#c5e95b'],
           snow: ['#ffffff', '#eaf6ff', '#f7fbff'],
-          leaves: ['#d7b85a', '#8c9637', '#b58b32'],
-          ash: ['#bebeb6', '#8f9089', '#d6d2c8'],
-          magic: ['#9d7cff', '#6aa8ff', '#ffd866']
+          leaves: ['#d7b85a', '#9c762e', '#77833a', '#b58b32'],
+          ash: ['#aaa79b', '#777871', '#c6c0b2', '#5f615d'],
+          magic: ['#a886ff', '#66d9ff', '#ff7be5', '#ffd866', '#6f8cff']
         };
         var list = palettes[type] || palettes.embers;
         return list[index % list.length];
@@ -19526,35 +19538,93 @@ window._archRender = function() {
       function makeFxParticle(settings, rnd, index) {
         var particle = document.createElement('i');
         particle.className = 'cc-fx-particle';
-        var size = Math.max(1, settings.size * (0.65 + rnd() * 0.9));
-        var speedFactor = 1.45 - settings.speed / 130;
-        var dur = Math.max(3.2, (7 + rnd() * 9) * speedFactor);
+        particle.classList.add('cc-fx-particle-' + (index % 5));
+        var motion = settings.speed <= 0 ? 0.08 : settings.speed / 100;
+        var typeScale = { embers: .92, fireflies: 1.55, snow: .82, leaves: 1.18, ash: .90, magic: 1.10 }[settings.type] || 1;
+        var size = Math.max(1, settings.size * typeScale * (0.58 + rnd() * 1.05));
+        var speedFactor = 1.85 - motion * 1.18;
+        var baseDur = { embers: 8.5, fireflies: 12.5, snow: 13, leaves: 12, ash: 18, magic: 9.5 }[settings.type] || 10;
+        var dur = Math.max(4.5, (baseDur + rnd() * baseDur * .75) * speedFactor);
         var x = rnd() * 100;
         var y = rnd() * 100;
         if (settings.type === 'snow' || settings.type === 'leaves' || settings.type === 'ash') y = -12 - rnd() * 92;
         if (settings.type === 'embers') y = 62 + rnd() * 42;
-        var opacity = Math.max(0, Math.min(1, settings.opacity / 100));
-        var glow = 0.6 + settings.glow / 32;
-        var dx = (rnd() * 2 - 1) * (settings.type === 'fireflies' || settings.type === 'magic' ? 120 : 52);
-        var dy = settings.type === 'embers' ? 110 + rnd() * 210 : (rnd() * 2 - 1) * 90;
+        var opacityBase = Math.max(0, Math.min(1, settings.opacity / 100));
+        var opacityType = { embers: 1, fireflies: .92, snow: .72, leaves: .88, ash: .52, magic: .96 }[settings.type] || 1;
+        var opacity = opacityBase * opacityType * (.70 + rnd() * .30);
+        var glowBase = settings.glow / 100;
+        var glowType = { embers: 3.3, fireflies: 4.4, snow: .42, leaves: .55, ash: .16, magic: 5.2 }[settings.type] || 2;
+        var glow = 0.45 + glowBase * glowType;
+        var dxRange = { embers: 74, fireflies: 180, snow: 95, leaves: 250, ash: 125, magic: 150 }[settings.type] || 120;
+        var dx = (rnd() * 2 - 1) * dxRange * (.45 + motion * .80);
+        var dy = settings.type === 'embers' ? (125 + rnd() * 250) * (.55 + motion) : (rnd() * 2 - 1) * 95;
         if (settings.type === 'snow' || settings.type === 'leaves' || settings.type === 'ash') {
           dy = 0;
-          dx = (rnd() * 2 - 1) * (settings.type === 'leaves' ? 190 : 90);
+          dx = (rnd() * 2 - 1) * dxRange * (.42 + motion);
         }
+        if (settings.type === 'fireflies') y = 8 + rnd() * 84;
+        if (settings.type === 'magic') y = 5 + rnd() * 90;
+        var width = size;
+        var height = size;
+        if (settings.type === 'leaves') {
+          width = size * (1.75 + rnd() * .65);
+          height = size * (.72 + rnd() * .32);
+        }
+        if (settings.type === 'ash') {
+          width = size * (1.05 + rnd() * .75);
+          height = size * (.62 + rnd() * .50);
+        }
+        var blur = settings.type === 'snow' ? (rnd() > .58 ? .65 + rnd() * .9 : 0) : 0;
+        if (settings.type === 'ash') blur = .18 + rnd() * .65;
+        if (settings.type === 'fireflies') blur = .2 + rnd() * .35;
         particle.style.cssText = [
           '--x:' + x.toFixed(2) + '%',
           '--y:' + y.toFixed(2) + '%',
           '--s:' + size.toFixed(2) + 'px',
+          '--w:' + width.toFixed(2) + 'px',
+          '--h:' + height.toFixed(2) + 'px',
           '--o:' + opacity.toFixed(2),
           '--g:' + glow.toFixed(2),
+          '--blur:' + blur.toFixed(2) + 'px',
           '--c:' + fxPalette(settings.type, index),
           '--dx:' + dx.toFixed(1) + 'px',
           '--dy:' + dy.toFixed(1) + 'px',
           '--rot:' + Math.round(240 + rnd() * 620) + 'deg',
+          '--trail:' + Math.round(size * (2.5 + rnd() * 4.5)),
+          '--pulse:' + (2.4 + rnd() * 4.8).toFixed(2) + 's',
+          '--spark:' + (rnd() > .68 ? .78 : .30).toFixed(2),
           '--dur:' + dur.toFixed(2) + 's',
           '--delay:-' + (rnd() * dur).toFixed(2) + 's'
         ].join(';');
         return particle;
+      }
+      function fxTypeLabel(value) {
+        var labels = {
+          none: 'Выкл',
+          embers: 'Огоньки',
+          fireflies: 'Светлячки',
+          snow: 'Снег',
+          leaves: 'Листья',
+          ash: 'Пепел',
+          magic: 'Магия'
+        };
+        return labels[value] || labels.none;
+      }
+      function closeFxTypeList() {
+        var wrap = document.getElementById('ccFxTypeCustom');
+        var btn = document.getElementById('ccFxTypeButton');
+        if (wrap) wrap.classList.remove('open');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+      }
+      function openFxTypeList() {
+        var wrap = document.getElementById('ccFxTypeCustom');
+        var btn = document.getElementById('ccFxTypeButton');
+        if (wrap) wrap.classList.add('open');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+      }
+      function setFxType(value) {
+        localStorage.setItem(FX_KEYS.type, value);
+        applyFx();
       }
       function syncFxControls(settings) {
         var map = [
@@ -19565,7 +19635,15 @@ window._archRender = function() {
           ['ccFxGlow', 'ccFxGlowValue', settings.glow]
         ];
         var type = document.getElementById('ccFxType');
+        var typeBtn = document.getElementById('ccFxTypeButton');
+        var typeList = document.getElementById('ccFxTypeList');
         if (type) type.value = settings.type;
+        if (typeBtn) typeBtn.textContent = fxTypeLabel(settings.type);
+        if (typeList) {
+          typeList.querySelectorAll('[data-value]').forEach(function(option){
+            option.setAttribute('aria-selected', option.dataset.value === settings.type ? 'true' : 'false');
+          });
+        }
         map.forEach(function(row){
           var input = document.getElementById(row[0]);
           var value = document.getElementById(row[1]);
@@ -19610,6 +19688,8 @@ window._archRender = function() {
         applyFx();
         var btn = document.getElementById('fxToggle');
         var type = document.getElementById('ccFxType');
+        var typeBtn = document.getElementById('ccFxTypeButton');
+        var typeList = document.getElementById('ccFxTypeList');
         var reset = document.getElementById('ccFxReset');
         var close = document.getElementById('ccFxClose');
         var ranges = [
@@ -19630,8 +19710,44 @@ window._archRender = function() {
         if (type && type.dataset.ccFxBound !== '1') {
           type.dataset.ccFxBound = '1';
           type.addEventListener('change', function(){
-            localStorage.setItem(FX_KEYS.type, type.value);
-            applyFx();
+            setFxType(type.value);
+          });
+        }
+        if (typeBtn && typeBtn.dataset.ccFxBound !== '1') {
+          typeBtn.dataset.ccFxBound = '1';
+          typeBtn.addEventListener('click', function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            var wrap = document.getElementById('ccFxTypeCustom');
+            if (wrap && wrap.classList.contains('open')) closeFxTypeList();
+            else openFxTypeList();
+          });
+          typeBtn.addEventListener('keydown', function(e){
+            if (e.key === 'Escape') closeFxTypeList();
+            if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              openFxTypeList();
+              var selected = document.querySelector('#ccFxTypeList [aria-selected="true"]');
+              if (selected) selected.focus();
+            }
+          });
+        }
+        if (typeList && typeList.dataset.ccFxBound !== '1') {
+          typeList.dataset.ccFxBound = '1';
+          typeList.querySelectorAll('[data-value]').forEach(function(option){
+            option.addEventListener('click', function(e){
+              e.preventDefault();
+              setFxType(option.dataset.value);
+              closeFxTypeList();
+              if (typeBtn) typeBtn.focus();
+            });
+            option.addEventListener('keydown', function(e){
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                closeFxTypeList();
+                if (typeBtn) typeBtn.focus();
+              }
+            });
           });
         }
         ranges.forEach(function(row){
@@ -19668,12 +19784,17 @@ window._archRender = function() {
           document.addEventListener('click', function(e){
             var pop = document.getElementById('ccFxPopover');
             var toggle = document.getElementById('fxToggle');
+            var custom = document.getElementById('ccFxTypeCustom');
+            if (custom && custom.classList.contains('open') && !custom.contains(e.target)) closeFxTypeList();
             if (!pop || !pop.classList.contains('open')) return;
             if (pop.contains(e.target) || (toggle && toggle.contains(e.target))) return;
             closeFxPopover();
           });
           document.addEventListener('keydown', function(e){
-            if (e.key === 'Escape') closeFxPopover();
+            if (e.key === 'Escape') {
+              closeFxTypeList();
+              closeFxPopover();
+            }
           });
         }
       }
@@ -20167,89 +20288,155 @@ window._archRender = function() {
         position: absolute;
         left: var(--x);
         top: var(--y);
-        width: var(--s);
-        height: var(--s);
+        width: var(--w, var(--s));
+        height: var(--h, var(--s));
         opacity: var(--o);
         pointer-events: none;
-        will-change: transform, opacity;
+        filter: blur(var(--blur, 0px));
+        will-change: transform, opacity, filter;
+      }
+      .cc-fx-particle::before,
+      .cc-fx-particle::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
       }
       .cc-fx-layer[data-effect="embers"] .cc-fx-particle {
         border-radius: 999px;
-        background: var(--c, #ffb84a);
+        background: radial-gradient(circle, #fff2a4 0 12%, var(--c, #ff9c25) 38%, rgba(178,42,14,.12) 72%, transparent 100%);
         box-shadow:
-          0 0 calc(var(--s) * var(--g) * 1.8) var(--c, #ffb84a),
-          0 0 calc(var(--s) * var(--g) * 5.6) rgba(255,125,38,.55);
-        animation: ccFxEmber var(--dur) ease-in-out var(--delay) infinite;
+          0 0 calc(var(--s) * var(--g) * 1.5) rgba(255,164,56,.84),
+          0 0 calc(var(--s) * var(--g) * 4.8) rgba(255,72,24,.42);
+        animation:
+          ccFxEmber var(--dur) cubic-bezier(.22,.74,.34,1) var(--delay) infinite,
+          ccFxHotPulse var(--pulse) ease-in-out var(--delay) infinite;
+      }
+      .cc-fx-layer[data-effect="embers"] .cc-fx-particle::after {
+        inset: auto auto calc(var(--s) * -1.3) 50%;
+        width: calc(var(--s) * .42);
+        height: calc(var(--trail) * 1px);
+        border-radius: 999px;
+        background: linear-gradient(180deg, rgba(255,205,98,.62), rgba(255,80,28,0));
+        transform: translateX(-50%);
+        opacity: .58;
       }
       .cc-fx-layer[data-effect="fireflies"] .cc-fx-particle {
         border-radius: 999px;
-        background: var(--c, #d8ff72);
+        background: radial-gradient(circle, rgba(255,255,210,.95) 0 10%, var(--c, #cfff64) 35%, rgba(150,255,88,.20) 68%, transparent 100%);
         box-shadow:
-          0 0 calc(var(--s) * var(--g) * 2.2) var(--c, #d8ff72),
-          0 0 calc(var(--s) * var(--g) * 7.2) rgba(202,255,118,.45);
-        animation: ccFxFirefly var(--dur) ease-in-out var(--delay) infinite alternate;
+          0 0 calc(var(--s) * var(--g) * 2.8) var(--c, #cfff64),
+          0 0 calc(var(--s) * var(--g) * 9.5) rgba(172,255,88,.34);
+        animation:
+          ccFxFirefly var(--dur) ease-in-out var(--delay) infinite alternate,
+          ccFxFireflyPulse var(--pulse) ease-in-out var(--delay) infinite;
+      }
+      .cc-fx-layer[data-effect="fireflies"] .cc-fx-particle::before {
+        inset: calc(var(--s) * -2.2);
+        border-radius: 999px;
+        background: radial-gradient(circle, var(--c, #cfff64), transparent 66%);
+        opacity: .28;
       }
       .cc-fx-layer[data-effect="snow"] .cc-fx-particle {
         border-radius: 999px;
-        background: rgba(255,255,255,.96);
-        box-shadow: 0 0 calc(var(--s) * var(--g) * 1.6) rgba(255,255,255,.62);
+        background: radial-gradient(circle, rgba(255,255,255,.96), rgba(214,236,255,.70) 66%, rgba(214,236,255,.22));
+        box-shadow: 0 0 calc(var(--s) * .8) rgba(230,245,255,.22);
         animation: ccFxSnow var(--dur) linear var(--delay) infinite;
       }
       .cc-fx-layer[data-effect="leaves"] .cc-fx-particle {
-        width: calc(var(--s) * 1.9);
-        height: var(--s);
         border-radius: 80% 18% 78% 24%;
-        background: linear-gradient(135deg, #9b8f35, #d7b85a 58%, #5d6d2d);
-        box-shadow: 0 0 calc(var(--s) * var(--g) * 1.4) rgba(216,184,90,.42);
-        animation: ccFxLeaf var(--dur) linear var(--delay) infinite;
+        background: linear-gradient(135deg, var(--c, #b88a34), #d4b45b 48%, #556c2c 100%);
+        box-shadow: inset calc(var(--s) * .12) 0 rgba(255,242,160,.32), 0 0 calc(var(--s) * .7) rgba(210,155,64,.22);
+        animation: ccFxLeaf var(--dur) cubic-bezier(.36,.04,.64,.98) var(--delay) infinite;
+      }
+      .cc-fx-layer[data-effect="leaves"] .cc-fx-particle::before {
+        left: 50%;
+        width: 1px;
+        background: rgba(70,54,24,.40);
+        transform: rotate(18deg);
       }
       .cc-fx-layer[data-effect="ash"] .cc-fx-particle {
-        border-radius: 45%;
-        background: rgba(188,188,180,.88);
-        box-shadow: 0 0 calc(var(--s) * var(--g) * .7) rgba(210,210,200,.32);
-        animation: ccFxAsh var(--dur) linear var(--delay) infinite;
+        border-radius: 48% 36% 54% 42%;
+        background: linear-gradient(135deg, rgba(165,162,150,.72), rgba(78,78,74,.40));
+        box-shadow: none;
+        animation: ccFxAsh var(--dur) ease-in-out var(--delay) infinite;
       }
       .cc-fx-layer[data-effect="magic"] .cc-fx-particle {
         border-radius: 999px;
-        background: var(--c, #9d7cff);
+        background: radial-gradient(circle, #fff 0 8%, var(--c, #9d7cff) 34%, transparent 78%);
         box-shadow:
-          0 0 calc(var(--s) * var(--g) * 2.5) var(--c, #9d7cff),
-          0 0 calc(var(--s) * var(--g) * 8) rgba(105,157,255,.50);
+          0 0 calc(var(--s) * var(--g) * 2.8) var(--c, #9d7cff),
+          0 0 calc(var(--s) * var(--g) * 9) rgba(105,157,255,.48);
         animation: ccFxMagic var(--dur) ease-in-out var(--delay) infinite;
       }
+      .cc-fx-layer[data-effect="magic"] .cc-fx-particle::before,
+      .cc-fx-layer[data-effect="magic"] .cc-fx-particle::after {
+        inset: 50% auto auto 50%;
+        width: calc(var(--s) * 2.2);
+        height: 1px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,.95), transparent);
+        transform: translate(-50%, -50%) rotate(var(--rot));
+        opacity: var(--spark, .35);
+        animation: ccFxMagicGlint var(--pulse) steps(1, end) var(--delay) infinite;
+      }
+      .cc-fx-layer[data-effect="magic"] .cc-fx-particle::after {
+        transform: translate(-50%, -50%) rotate(calc(var(--rot) + 90deg));
+      }
       @keyframes ccFxEmber {
-        0% { transform: translate3d(0, 18px, 0) scale(.75); opacity: 0; }
-        18% { opacity: var(--o); }
-        100% { transform: translate3d(var(--dx), calc(var(--dy) * -1), 0) scale(1.12); opacity: 0; }
+        0% { transform: translate3d(0, 18px, 0) scale(.55); opacity: 0; }
+        15% { opacity: var(--o); }
+        58% { transform: translate3d(calc(var(--dx) * .55), calc(var(--dy) * -.58), 0) scale(1); }
+        100% { transform: translate3d(var(--dx), calc(var(--dy) * -1), 0) scale(.34); opacity: 0; }
+      }
+      @keyframes ccFxHotPulse {
+        0%, 100% { filter: brightness(.80) blur(var(--blur, 0px)); }
+        42% { filter: brightness(1.52) blur(var(--blur, 0px)); }
       }
       @keyframes ccFxFirefly {
-        0% { transform: translate3d(0, 0, 0) scale(.72); opacity: calc(var(--o) * .55); }
-        45% { opacity: var(--o); }
-        100% { transform: translate3d(var(--dx), var(--dy), 0) scale(1.15); opacity: calc(var(--o) * .72); }
+        0% { transform: translate3d(0, 0, 0) scale(.72); }
+        28% { transform: translate3d(calc(var(--dx) * .33), calc(var(--dy) * -.48), 0) scale(1.08); }
+        63% { transform: translate3d(calc(var(--dx) * -.28), calc(var(--dy) * .40), 0) scale(.92); }
+        100% { transform: translate3d(var(--dx), var(--dy), 0) scale(1.18); }
+      }
+      @keyframes ccFxFireflyPulse {
+        0%, 100% { opacity: calc(var(--o) * .32); filter: brightness(.70) blur(var(--blur, 0px)); }
+        38% { opacity: var(--o); filter: brightness(1.85) blur(var(--blur, 0px)); }
+        62% { opacity: calc(var(--o) * .55); }
       }
       @keyframes ccFxSnow {
         0% { transform: translate3d(0, -16vh, 0); opacity: 0; }
         10% { opacity: var(--o); }
-        100% { transform: translate3d(var(--dx), 116vh, 0); opacity: calc(var(--o) * .38); }
+        48% { transform: translate3d(calc(var(--dx) * -.35), 48vh, 0); }
+        100% { transform: translate3d(var(--dx), 116vh, 0); opacity: calc(var(--o) * .46); }
       }
       @keyframes ccFxLeaf {
-        0% { transform: translate3d(0, -14vh, 0) rotate(0deg); opacity: 0; }
+        0% { transform: translate3d(0, -14vh, 0) rotate(0deg) rotateY(0deg); opacity: 0; }
         12% { opacity: var(--o); }
-        100% { transform: translate3d(var(--dx), 114vh, 0) rotate(var(--rot)); opacity: calc(var(--o) * .45); }
+        38% { transform: translate3d(calc(var(--dx) * .52), 36vh, 0) rotate(calc(var(--rot) * .35)) rotateY(170deg); }
+        72% { transform: translate3d(calc(var(--dx) * -.22), 78vh, 0) rotate(calc(var(--rot) * .72)) rotateY(300deg); }
+        100% { transform: translate3d(var(--dx), 114vh, 0) rotate(var(--rot)) rotateY(520deg); opacity: calc(var(--o) * .52); }
       }
       @keyframes ccFxAsh {
-        0% { transform: translate3d(0, -12vh, 0) scale(.72); opacity: 0; }
-        18% { opacity: var(--o); }
-        100% { transform: translate3d(var(--dx), 112vh, 0) scale(1.18); opacity: 0; }
+        0% { transform: translate3d(0, -12vh, 0) rotate(0deg) scale(.72); opacity: 0; }
+        20% { opacity: var(--o); }
+        58% { transform: translate3d(calc(var(--dx) * .35), 50vh, 0) rotate(calc(var(--rot) * .45)) scale(.94); opacity: calc(var(--o) * .76); }
+        100% { transform: translate3d(var(--dx), 112vh, 0) rotate(var(--rot)) scale(1.12); opacity: 0; }
       }
       @keyframes ccFxMagic {
-        0%, 100% { transform: translate3d(0, 0, 0) scale(.45); opacity: 0; }
-        36% { opacity: var(--o); }
-        66% { transform: translate3d(var(--dx), var(--dy), 0) scale(1.28); opacity: calc(var(--o) * .78); }
+        0%, 100% { transform: translate3d(0, 0, 0) scale(.38) rotate(0deg); opacity: calc(var(--o) * .18); }
+        24% { opacity: var(--o); }
+        52% { transform: translate3d(calc(var(--dx) * .45), calc(var(--dy) * .45), 0) scale(1.32) rotate(calc(var(--rot) * .35)); opacity: calc(var(--o) * .92); }
+        78% { transform: translate3d(var(--dx), var(--dy), 0) scale(.62) rotate(var(--rot)); opacity: calc(var(--o) * .42); }
+      }
+      @keyframes ccFxMagicGlint {
+        0%, 76%, 100% { opacity: 0; }
+        77%, 82% { opacity: var(--spark, .55); }
       }
       @media (prefers-reduced-motion: reduce) {
         .cc-fx-particle {
-          animation: none !important;
+          animation-duration: 90s !important;
+          animation-iteration-count: 1 !important;
         }
       }
       body:not(.light) #dfToggle[aria-pressed="true"],
@@ -20284,16 +20471,83 @@ window._archRender = function() {
       body:not(.light) .cc-fx-popover label:first-child {
         margin-top: 0;
       }
-      body:not(.light) .cc-fx-popover select {
+      body:not(.light) .cc-fx-select {
+        position: relative;
+      }
+      body:not(.light) .cc-fx-select-btn {
+        position: relative;
         width: 100%;
-        height: 32px;
-        border: 1px solid rgba(255,255,255,.12);
+        height: 34px;
+        padding: 0 34px 0 12px;
+        border: 1px solid rgba(255,255,255,.14);
         border-radius: 9px;
-        background: rgba(255,255,255,.07);
-        color: rgba(247,242,232,.88);
+        background: linear-gradient(180deg, rgba(255,255,255,.085), rgba(255,255,255,.045));
+        color: rgba(247,242,232,.90);
+        font: inherit;
+        font-size: 12px;
+        font-weight: 850;
+        text-align: left;
+        cursor: pointer;
+        box-shadow: inset 0 1px rgba(255,255,255,.06);
+      }
+      body:not(.light) .cc-fx-select-btn::after {
+        content: "";
+        position: absolute;
+        right: 13px;
+        top: 50%;
+        width: 7px;
+        height: 7px;
+        border-right: 2px solid rgba(242,203,115,.82);
+        border-bottom: 2px solid rgba(242,203,115,.82);
+        transform: translateY(-65%) rotate(45deg);
+      }
+      body:not(.light) .cc-fx-select-btn:hover,
+      body:not(.light) .cc-fx-select-btn[aria-expanded="true"] {
+        border-color: rgba(232,190,88,.36);
+        background: linear-gradient(180deg, rgba(232,190,88,.14), rgba(255,255,255,.055));
+        color: #f7e8bc;
+      }
+      body:not(.light) .cc-fx-select-list {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        right: 0;
+        z-index: 4;
+        display: none;
+        padding: 6px;
+        border: 1px solid rgba(232,190,88,.22);
+        border-radius: 10px;
+        background: linear-gradient(180deg, rgba(13,15,19,.99), rgba(7,8,11,.98));
+        box-shadow: 0 16px 38px rgba(0,0,0,.46), inset 0 1px rgba(255,255,255,.07);
+      }
+      body:not(.light) .cc-fx-select.open .cc-fx-select-list {
+        display: grid;
+        gap: 3px;
+      }
+      body:not(.light) .cc-fx-select-list button {
+        height: 28px;
+        padding: 0 9px;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        background: transparent;
+        color: rgba(247,242,232,.78);
         font: inherit;
         font-size: 12px;
         font-weight: 800;
+        text-align: left;
+        cursor: pointer;
+      }
+      body:not(.light) .cc-fx-select-list button:hover,
+      body:not(.light) .cc-fx-select-list button:focus-visible {
+        outline: none;
+        border-color: rgba(232,190,88,.24);
+        background: rgba(232,190,88,.10);
+        color: #f7e8bc;
+      }
+      body:not(.light) .cc-fx-select-list button[aria-selected="true"] {
+        border-color: rgba(232,190,88,.36);
+        background: linear-gradient(90deg, rgba(232,190,88,.18), rgba(232,190,88,.05));
+        color: #f2cb73;
       }
       body:not(.light) .cc-fx-row {
         display: grid;
@@ -20304,6 +20558,21 @@ window._archRender = function() {
       body:not(.light) .cc-fx-row input[type="range"] {
         width: 100%;
         accent-color: #e8be58;
+        cursor: pointer;
+      }
+      body:not(.light) .cc-fx-row input[type="range"]::-webkit-slider-runnable-track {
+        height: 5px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, rgba(232,190,88,.62), rgba(255,255,255,.12));
+      }
+      body:not(.light) .cc-fx-row input[type="range"]::-webkit-slider-thumb {
+        margin-top: -5px;
+        width: 15px;
+        height: 15px;
+        border: 1px solid rgba(255,232,166,.75);
+        border-radius: 50%;
+        background: #e8be58;
+        box-shadow: 0 0 12px rgba(232,190,88,.32);
       }
       body:not(.light) .cc-fx-row span {
         color: #f2cb73;
