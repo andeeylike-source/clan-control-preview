@@ -3161,10 +3161,10 @@
         <button class="chip icon-chip danger" onclick="loginLogout()" title="Выйти">⏻</button>
     </div>
     <div class="cc-glass-popover" id="glassDimPopover" aria-hidden="true">
-        <label for="glassDimRange">Затемнение стекла</label>
+        <label for="glassDimRange">Стекло — матовость и тонировка</label>
         <div class="cc-glass-row">
-            <input id="glassDimRange" type="range" min="0" max="100" step="1" value="34" aria-label="Интенсивность затемнения стекла">
-            <span id="glassDimValue">34%</span>
+            <input id="glassDimRange" type="range" min="0" max="100" step="1" value="40" aria-label="Матовость и тонировка стекла">
+            <span id="glassDimValue">40%</span>
         </div>
         <button id="glassDimReset" type="button">Сброс</button>
     </div>
@@ -17489,8 +17489,8 @@ window._archRender = function() {
       gap: 12px !important;
       background: linear-gradient(180deg, rgba(9,9,10,var(--cc-topbar-dim)), rgba(9,9,10,var(--cc-glass-dim))) !important;
       border-bottom: 1px solid rgba(255,255,255,.07) !important;
-      backdrop-filter: blur(18px) !important;
-      -webkit-backdrop-filter: blur(18px) !important;
+      backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
+      -webkit-backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
       z-index: 120 !important;
     }
     body:not(.light) #topbar.top .brand {
@@ -17569,8 +17569,8 @@ window._archRender = function() {
       border-radius: 26px !important;
       background: linear-gradient(180deg, rgba(11,11,12,var(--cc-sidebar-dim)), rgba(6,6,7,var(--cc-sidebar-deep-dim))) !important;
       box-shadow: 0 22px 80px rgba(0,0,0,.45), inset 0 1px rgba(255,255,255,.08) !important;
-      backdrop-filter: blur(22px) !important;
-      -webkit-backdrop-filter: blur(22px) !important;
+      backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
+      -webkit-backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
       display: flex !important;
       flex-direction: column !important;
       overflow: hidden !important;
@@ -18536,6 +18536,8 @@ window._archRender = function() {
         --cc-sidebar-dim: .31;
         --cc-sidebar-deep-dim: .38;
         --cc-topbar-dim: .33;
+        --cc-glass-blur: 4px;
+        --cc-glass-sat: 1.15;
       }
       body:not(.light) .main-content.surface {
         border-color: rgba(255,255,255,.18) !important;
@@ -18544,8 +18546,8 @@ window._archRender = function() {
           0 24px 90px rgba(0,0,0,.36),
           inset 0 1px rgba(255,255,255,.10),
           inset 0 0 0 1px rgba(0,0,0,.14) !important;
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
+        backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
+        -webkit-backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
       }
       body:not(.light) .main-content.surface::before {
         background:
@@ -18567,8 +18569,8 @@ window._archRender = function() {
           0 12px 42px rgba(0,0,0,.28),
           inset 0 1px rgba(255,255,255,.11),
           inset 0 0 0 1px rgba(0,0,0,.14) !important;
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
+        backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
+        -webkit-backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
       }
       body:not(.light) .card::before,
       body:not(.light) .dash-card::before,
@@ -18608,8 +18610,8 @@ window._archRender = function() {
           0 12px 42px rgba(0,0,0,.28),
           inset 0 1px rgba(255,255,255,.11),
           inset 0 0 0 1px rgba(0,0,0,.14) !important;
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
+        backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
+        -webkit-backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
       }
       body:not(.light) #page-stats table,
       body:not(.light) #page-stats .table-container {
@@ -18637,8 +18639,8 @@ window._archRender = function() {
           0 12px 42px rgba(0,0,0,.28),
           inset 0 1px rgba(255,255,255,.11),
           inset 0 0 0 1px rgba(0,0,0,.14) !important;
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
+        backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
+        -webkit-backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
       }
       body:not(.light) #page-settings input,
       body:not(.light) #page-settings select,
@@ -18659,6 +18661,8 @@ window._archRender = function() {
       body:not(.light) .info-modal-box,
       body:not(.light) .cc-tab-bg-dialog {
         background: linear-gradient(180deg, rgba(5,7,10,var(--cc-card-dim)), rgba(5,7,10,var(--cc-panel-dim))) !important;
+        backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
+        -webkit-backdrop-filter: blur(var(--cc-glass-blur)) saturate(var(--cc-glass-sat)) !important;
       }
       body:not(.light) #rosterBody td:first-child {
         white-space: nowrap !important;
@@ -19047,7 +19051,7 @@ window._archRender = function() {
 
       function glassValue() {
         var raw = parseInt(localStorage.getItem('cc-glass-dim'), 10);
-        if (isNaN(raw)) raw = 34;
+        if (isNaN(raw)) raw = 40;
         return Math.max(0, Math.min(100, raw));
       }
       function applyGlassDim(value) {
@@ -19068,6 +19072,10 @@ window._archRender = function() {
         document.documentElement.style.setProperty('--cc-sidebar-dim', sidebar.toFixed(2));
         document.documentElement.style.setProperty('--cc-sidebar-deep-dim', sidebarDeep.toFixed(2));
         document.documentElement.style.setProperty('--cc-topbar-dim', topbar.toFixed(2));
+        var blurPx = mix(0, 5, 9);
+        var sat    = mix(1.0, 1.15, 1.35);
+        document.documentElement.style.setProperty('--cc-glass-blur', blurPx.toFixed(1) + 'px');
+        document.documentElement.style.setProperty('--cc-glass-sat',  sat.toFixed(2));
         var range = document.getElementById('glassDimRange');
         var label = document.getElementById('glassDimValue');
         if (range) range.value = String(value);
@@ -19115,8 +19123,8 @@ window._archRender = function() {
           reset.dataset.ccGlassBound = '1';
           reset.addEventListener('click', function(e){
             e.preventDefault();
-            localStorage.setItem('cc-glass-dim', '34');
-            applyGlassDim(34);
+            localStorage.setItem('cc-glass-dim', '40');
+            applyGlassDim(40);
           });
         }
         if (!document.documentElement.dataset.ccGlassDocBound) {
