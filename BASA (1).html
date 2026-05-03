@@ -17487,7 +17487,7 @@ window._archRender = function() {
       align-items: center !important;
       justify-content: space-between !important;
       gap: 12px !important;
-      background: linear-gradient(180deg, rgba(9,9,10,.68), rgba(9,9,10,.18)) !important;
+      background: linear-gradient(180deg, rgba(9,9,10,var(--cc-topbar-dim)), rgba(9,9,10,var(--cc-glass-dim))) !important;
       border-bottom: 1px solid rgba(255,255,255,.07) !important;
       backdrop-filter: blur(18px) !important;
       -webkit-backdrop-filter: blur(18px) !important;
@@ -17504,6 +17504,7 @@ window._archRender = function() {
       display: flex !important;
       align-items: center !important;
       gap: 8px !important;
+      background: rgba(5,7,10,var(--cc-topbar-dim)) !important;
     }
     body:not(.light) .chip {
       display: inline-flex !important;
@@ -17566,7 +17567,7 @@ window._archRender = function() {
       top: 72px !important;
       border: 1px solid var(--line) !important;
       border-radius: 26px !important;
-      background: linear-gradient(180deg, rgba(11,11,12,.44), rgba(6,6,7,.64)) !important;
+      background: linear-gradient(180deg, rgba(11,11,12,var(--cc-sidebar-dim)), rgba(6,6,7,var(--cc-sidebar-deep-dim))) !important;
       box-shadow: 0 22px 80px rgba(0,0,0,.45), inset 0 1px rgba(255,255,255,.08) !important;
       backdrop-filter: blur(22px) !important;
       -webkit-backdrop-filter: blur(22px) !important;
@@ -18532,6 +18533,9 @@ window._archRender = function() {
         --cc-glass-dim: .34;
         --cc-card-dim: .44;
         --cc-panel-dim: .40;
+        --cc-sidebar-dim: .44;
+        --cc-sidebar-deep-dim: .64;
+        --cc-topbar-dim: .68;
       }
       body:not(.light) .main-content.surface {
         border-color: rgba(255,255,255,.18) !important;
@@ -19049,9 +19053,15 @@ window._archRender = function() {
         var glass = value / 100;
         var card = Math.min(0.72, glass + 0.10);
         var panel = Math.min(0.68, glass + 0.06);
+        var sidebar = Math.min(0.72, glass + 0.10);
+        var sidebarDeep = Math.min(0.86, glass + 0.30);
+        var topbar = Math.min(0.82, glass + 0.34);
         document.documentElement.style.setProperty('--cc-glass-dim', glass.toFixed(2));
         document.documentElement.style.setProperty('--cc-card-dim', card.toFixed(2));
         document.documentElement.style.setProperty('--cc-panel-dim', panel.toFixed(2));
+        document.documentElement.style.setProperty('--cc-sidebar-dim', sidebar.toFixed(2));
+        document.documentElement.style.setProperty('--cc-sidebar-deep-dim', sidebarDeep.toFixed(2));
+        document.documentElement.style.setProperty('--cc-topbar-dim', topbar.toFixed(2));
         var range = document.getElementById('glassDimRange');
         var label = document.getElementById('glassDimValue');
         if (range) range.value = String(value);
