@@ -11,7 +11,35 @@ py -3.11 -m venv tools\ocr_spike\.venv
 .\tools\ocr_spike\.venv\Scripts\python -m pip install "paddleocr[all]" opencv-python pillow
 ```
 
-## Run
+## Run local OCR server
+
+Start the HTTP server (port 5050, or set `$env:OCR_LOCAL_PORT`):
+
+```powershell
+.\tools\ocr_spike\.venv\Scripts\python tools\ocr_spike\server.py
+```
+
+### Test endpoints
+
+```powershell
+# Health check
+Invoke-RestMethod http://localhost:5050/health
+
+# OCR a crop image
+$bytes = [System.IO.File]::ReadAllBytes((Resolve-Path "tools\ocr_spike\competitor_test_crop.png"))
+$b64   = [Convert]::ToBase64String($bytes)
+$body  = @{ base64 = $b64; filename = "competitor_test_crop.png" } | ConvertTo-Json -Compress
+Invoke-RestMethod -Method POST -Uri http://localhost:5050/ocr `
+    -Body $body -ContentType "application/json; charset=utf-8" |
+    Select-Object ok, provider, cached, timing_ms, boxes_count,
+        @{n='rows';e={$_.parsed.Count}}
+```
+
+Pass `known_names` (string array) and `aliases` (object) in the body to override
+the default `expected/known_names.json` with the site's live roster — per-request only,
+no global mutation.
+
+## Run (CLI, single file)
 
 ```powershell
 .\tools\ocr_spike\.venv\Scripts\python tools\ocr_spike\ocr_spike.py --engine paddle --input tools\ocr_spike\competitor_test_crop.png --out tools\ocr_spike\out
