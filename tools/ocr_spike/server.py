@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import os
+import socket
 import sys
 import time
 from contextlib import contextmanager
@@ -162,13 +163,17 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Connection", "close")
+        self.close_connection = True
         self.end_headers()
         self.wfile.write(body)
+        self.wfile.flush()
 
     def do_OPTIONS(self):  # noqa: N802
         self.send_response(204)
         self._cors()
         self.send_header("Content-Length", "0")
+        self.send_header("Connection", "close")
+        self.close_connection = True
         self.end_headers()
 
     def do_GET(self):  # noqa: N802
@@ -217,6 +222,17 @@ class _Handler(BaseHTTPRequestHandler):
             })
 
 
+class _DualStackHTTPServer(HTTPServer):
+    address_family = socket.AF_INET6
+
+    def server_bind(self) -> None:
+        try:
+            self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        except OSError:
+            pass
+        super().server_bind()
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -224,7 +240,7 @@ class _Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    srv = HTTPServer(("localhost", PORT), _Handler)
+    srv = _DualStackHTTPServer(("::", PORT), _Handler)
     print(f"OCR local server -> http://localhost:{PORT}", flush=True)
     print(f"  GET  /health", flush=True)
     print(f"  POST /ocr", flush=True)
