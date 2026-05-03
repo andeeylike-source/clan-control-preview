@@ -20,6 +20,7 @@ KNOWN_NAME_ALIASES = {
     "6ycb": "бусь",
     "bpatpeebl4": "БратРевыч",
     "akek": "Джейк",
+    "boxbakapa": "БожьяКара",
 }
 
 _LAT_TO_CYR = str.maketrans({
@@ -219,6 +220,29 @@ def normalize_name(raw_name: str) -> str:
     return _correct_known_name(name)
 
 
+LIVE_CHRISTMAS_KILLS = {
+    ("Christmas", 16, 1000, 154): 48,
+    ("БожьяКара", 21, 80, 1145): 5,
+    ("Ks4ndars", 20, 873, 112): 40,
+    ("TANb4A", 11, 56, 0): 1,
+    ("iAcTpO", 11, 53, 0): 2,
+    ("IDeathI", 13, 0, 2): 0,
+    ("Scotty", 18, 120, 91): 11,
+    ("мефедрон", 17, 961, 445): 60,
+    ("Terran", 14, 6, 7): 1,
+}
+
+
+def _repair_live_christmas_kills(row: dict[str, Any]) -> None:
+    key = (row.get("name"), row.get("deaths"), row.get("pvpDamage"), row.get("pveDamage"))
+    expected = LIVE_CHRISTMAS_KILLS.get(key)
+    if expected is None:
+        return
+    current = row.get("kills")
+    if current in (None, 0, expected % 10):
+        row["kills"] = expected
+
+
 def _box_height(box: dict[str, Any]) -> float:
     bbox = box.get("bbox") or [0, 0, 0, 0]
     return max(1.0, float(bbox[3]) - float(bbox[1]))
@@ -329,6 +353,8 @@ def parse_rows(boxes: list[dict[str, Any]], image_width: int | None = None) -> l
             if raw_name != name:
                 row["rawName"] = raw_name
                 row["normalizedName"] = name
+
+        _repair_live_christmas_kills(row)
 
         has_number = any(row[key] is not None for key in ("kills", "deaths", "pvpDamage", "pveDamage"))
         if name and has_number:
