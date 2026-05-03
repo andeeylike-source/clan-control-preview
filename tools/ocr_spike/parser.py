@@ -18,9 +18,6 @@ KNOWN_NAME_ALIASES = {
     "tpaxhyhenga": "ТрахнуНетГлядя",
     "tpaxhyhena": "ТрахнуНетГлядя",
     "6ycb": "бусь",
-    "bpatpeebl4": "БратРевыч",
-    "akek": "Джейк",
-    "boxbakapa": "БожьяКара",
 }
 
 _LAT_TO_CYR = str.maketrans({
@@ -112,14 +109,6 @@ def normalize_number(value: str) -> int | None:
         return None
 
 
-def _apply_visual_confusion(name: str, known_names: list[str]) -> str | None:
-    """Try substituting visually confusable chars between scripts; return match if found and valid."""
-    for candidate in (name.translate(_LAT_TO_CYR), name.translate(_CYR_TO_LAT)):
-        if candidate != name and candidate in known_names and is_valid_name_script(candidate):
-            return candidate
-    return None
-
-
 def _load_known_names() -> list[str]:
     if not KNOWN_NAMES_PATH.exists():
         return []
@@ -132,7 +121,18 @@ def _load_known_names() -> list[str]:
     return [str(item).strip() for item in data if str(item).strip()]
 
 
-def _name_skeleton(value: str) -> str:
+def _clean_name(value: str) -> str:
+    name = re.sub(r"\s+", " ", value or "").strip()
+    return TRAILING_GARBAGE_RE.sub("", name).strip()
+
+
+def _script_normalized(value: str) -> str:
+    return re.sub(r"[-_.\s]+", "", _clean_name(value)).casefold()
+
+
+def normalize_visual_skeleton(value: str) -> str:
+    cleaned = _clean_name(value).casefold()
+    cleaned = cleaned.replace("дж", "ak").replace("ей", "e")
     visual_map = str.maketrans(
         {
             "а": "a",
@@ -170,54 +170,127 @@ def _name_skeleton(value: str) -> str:
             "я": "a",
         }
     )
-    return re.sub(r"[^a-z0-9]+", "", value.lower().translate(visual_map))
+    return re.sub(r"[^a-z0-9]+", "", cleaned.translate(visual_map))
+
+
+def _name_skeleton(value: str) -> str:
+    return normalize_visual_skeleton(value)
+
+
+def _resolution(
+    raw_name: str,
+    normalized_name: str,
+    resolved_name: str,
+    confidence: float,
+    method: str,
+    needs_review: bool,
+    candidates: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    return {
+        "rawName": raw_name,
+        "normalizedName": normalized_name,
+        "resolvedName": resolved_name,
+        "confidence": round(confidence, 3),
+        "method": method,
+        "needsReview": needs_review,
+        "candidates": candidates or [],
+    }
+
+
+def _known_candidates(known_names: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for name in known_names:
+        cleaned = _clean_name(str(name))
+        if cleaned and cleaned not in seen:
+            seen.add(cleaned)
+            result.append(cleaned)
+    return result
+
+
+def _alias_candidates(aliases: dict[str, str]) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for raw, target in aliases.items():
+        resolved = _clean_name(str(target))
+        if not resolved:
+            continue
+        for key in {_script_normalized(str(raw)), normalize_visual_skeleton(str(raw)), str(raw).casefold()}:
+            if key:
+                result[key] = resolved
+    return result
+
+
+def resolve_name(
+    raw_name: str,
+    known_names: list[str] | None = None,
+    aliases: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    normalized = _clean_name(raw_name)
+    if not normalized:
+        return _resolution(raw_name, normalized, normalized, 0.0, "empty", True)
+
+    roster = _known_candidates(known_names if known_names is not None else _load_known_names())
+    alias_map = _alias_candidates(aliases if aliases is not None else KNOWN_NAME_ALIASES)
+    roster_set = set(roster)
+    script_key = _script_normalized(normalized)
+    skeleton = normalize_visual_skeleton(normalized)
+
+    if normalized in roster_set:
+        return _resolution(raw_name, normalized, normalized, 1.0, "exact_roster", False)
+
+    alias = alias_map.get(script_key) or alias_map.get(skeleton) or alias_map.get(normalized.casefold())
+    if alias and (not roster_set or alias in roster_set):
+        return _resolution(raw_name, normalized, alias, 1.0, "exact_alias", False)
+
+    script_matches = [name for name in roster if _script_normalized(name) == script_key]
+    if len(script_matches) == 1:
+        return _resolution(raw_name, normalized, script_matches[0], 0.98, "script_normalized", False)
+    if len(script_matches) > 1:
+        candidates = [{"name": name, "score": 0.98, "method": "script_normalized"} for name in script_matches]
+        return _resolution(raw_name, normalized, normalized, 0.0, "ambiguous_script_normalized", True, candidates)
+
+    skeleton_matches = [name for name in roster if normalize_visual_skeleton(name) == skeleton]
+    if len(skeleton_matches) == 1:
+        return _resolution(raw_name, normalized, skeleton_matches[0], 0.95, "visual_skeleton", False)
+    if len(skeleton_matches) > 1:
+        candidates = [{"name": name, "score": 0.95, "method": "visual_skeleton"} for name in skeleton_matches]
+        return _resolution(raw_name, normalized, normalized, 0.0, "ambiguous_visual_skeleton", True, candidates)
+
+    scored: list[tuple[float, str]] = []
+    for known in roster:
+        known_skeleton = normalize_visual_skeleton(known)
+        if not skeleton or not known_skeleton:
+            continue
+        ratio = SequenceMatcher(None, skeleton, known_skeleton).ratio()
+        scored.append((ratio, known))
+
+    scored.sort(reverse=True, key=lambda item: item[0])
+    candidates = [
+        {"name": name, "score": round(score, 3), "method": "fuzzy_skeleton"}
+        for score, name in scored[:3]
+    ]
+    if scored:
+        best_ratio, best_name = scored[0]
+        second_ratio = scored[1][0] if len(scored) > 1 else 0.0
+        fuzzy_ok = (
+            best_ratio >= 0.86 and best_ratio - second_ratio >= 0.05
+        ) or (
+            len(skeleton) >= 6 and best_ratio >= 0.80 and best_ratio - second_ratio >= 0.15
+        )
+        if fuzzy_ok:
+            return _resolution(raw_name, normalized, best_name, best_ratio, "fuzzy_skeleton", False, candidates)
+
+    return _resolution(raw_name, normalized, normalized, 0.0, "unresolved", True, candidates)
 
 
 def _correct_known_name(name: str) -> str:
-    known_names = _load_known_names()
-    if not known_names:
-        return name
-    if name in known_names:
-        return name
-
-    skeleton = _name_skeleton(name)
-    if not skeleton:
-        return name
-    alias = KNOWN_NAME_ALIASES.get(skeleton)
-    if alias in known_names:
-        return alias
-
-    scored: list[tuple[float, str]] = []
-    for known in known_names:
-        known_skeleton = _name_skeleton(known)
-        if not known_skeleton:
-            continue
-        ratio = SequenceMatcher(None, skeleton, known_skeleton).ratio()
-        if skeleton == known_skeleton:
-            ratio = 1.0
-        scored.append((ratio, known))
-
-    if not scored:
-        return name
-    scored.sort(reverse=True, key=lambda item: item[0])
-    best_ratio, best_name = scored[0]
-    second_ratio = scored[1][0] if len(scored) > 1 else 0.0
-    if best_ratio >= 0.90 and best_ratio - second_ratio >= 0.08:
-        return best_name
-
-    # Step 4: visual OCR confusion mapping (only applied if result passes is_valid_name_script)
-    visual = _apply_visual_confusion(name, known_names)
-    if visual is not None:
-        return visual
-
-    return name
+    resolution = resolve_name(name)
+    return resolution["resolvedName"] if not resolution["needsReview"] else resolution["normalizedName"]
 
 
 def normalize_name(raw_name: str) -> str:
     """Clean obvious OCR garbage from the name field without touching numbers."""
-    name = re.sub(r"\s+", " ", raw_name or "").strip()
-    name = TRAILING_GARBAGE_RE.sub("", name).strip()
-    return _correct_known_name(name)
+    return _correct_known_name(raw_name)
 
 
 LIVE_CHRISTMAS_KILLS = {
@@ -335,17 +408,21 @@ def parse_rows(boxes: list[dict[str, Any]], image_width: int | None = None) -> l
                     cells[col_name].append(str(box.get("text", "")).strip())
 
         raw_name = _name_from_boxes(name_boxes)
-        corrected = normalize_name(raw_name)
+        resolution = resolve_name(raw_name)
+        corrected = resolution["resolvedName"]
         kills = normalize_number(" ".join(cells["kills"]))
         deaths = normalize_number(" ".join(cells["deaths"]))
         pvp = normalize_number(" ".join(cells["pvpDamage"]))
         pve = normalize_number(" ".join(cells["pveDamage"]))
-        if has_mixed_latin_cyrillic(raw_name) and has_mixed_latin_cyrillic(corrected):
-            name = raw_name
+        if resolution["needsReview"]:
+            name = resolution["normalizedName"]
             row: dict[str, Any] = {
                 "name": name, "kills": kills, "deaths": deaths,
                 "pvpDamage": pvp, "pveDamage": pve,
-                "rawName": raw_name, "normalizedName": raw_name, "needsReview": True,
+                "rawName": raw_name,
+                "normalizedName": resolution["normalizedName"],
+                "needsReview": True,
+                "nameResolution": resolution,
             }
         else:
             name = corrected
@@ -353,6 +430,8 @@ def parse_rows(boxes: list[dict[str, Any]], image_width: int | None = None) -> l
             if raw_name != name:
                 row["rawName"] = raw_name
                 row["normalizedName"] = name
+            if resolution["method"] != "exact_roster":
+                row["nameResolution"] = resolution
 
         _repair_live_christmas_kills(row)
 

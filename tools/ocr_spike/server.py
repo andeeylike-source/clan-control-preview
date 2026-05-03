@@ -20,7 +20,7 @@ from ocr_spike import run_paddle
 PORT = int(os.environ.get("OCR_LOCAL_PORT", 5050))
 OUT_DIR = SPIKE_DIR / "out"
 TMP_DIR = SPIKE_DIR / "tmp"
-CACHE_VERSION = "paddle-local-v3-live-christmas"
+CACHE_VERSION = "paddle-local-v4-name-resolver"
 OUT_DIR.mkdir(exist_ok=True)
 TMP_DIR.mkdir(exist_ok=True)
 
