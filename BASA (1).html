@@ -3163,7 +3163,7 @@
     <div class="cc-glass-popover" id="glassDimPopover" aria-hidden="true">
         <label for="glassDimRange">Затемнение стекла</label>
         <div class="cc-glass-row">
-            <input id="glassDimRange" type="range" min="0" max="80" step="1" value="34" aria-label="Интенсивность затемнения стекла">
+            <input id="glassDimRange" type="range" min="0" max="100" step="1" value="34" aria-label="Интенсивность затемнения стекла">
             <span id="glassDimValue">34%</span>
         </div>
         <button id="glassDimReset" type="button">Сброс</button>
@@ -18530,12 +18530,12 @@ window._archRender = function() {
     <style id="v20-targeted-ui-fixes">
       /* Targeted v20 visual fixes only: shell transparency, stats/settings panels, roster role badges. */
       :root {
-        --cc-glass-dim: .34;
-        --cc-card-dim: .44;
-        --cc-panel-dim: .40;
-        --cc-sidebar-dim: .44;
-        --cc-sidebar-deep-dim: .64;
-        --cc-topbar-dim: .68;
+        --cc-glass-dim: .25;
+        --cc-card-dim: .31;
+        --cc-panel-dim: .29;
+        --cc-sidebar-dim: .31;
+        --cc-sidebar-deep-dim: .38;
+        --cc-topbar-dim: .33;
       }
       body:not(.light) .main-content.surface {
         border-color: rgba(255,255,255,.18) !important;
@@ -18614,7 +18614,7 @@ window._archRender = function() {
       body:not(.light) #page-stats table,
       body:not(.light) #page-stats .table-container {
         border-color: rgba(255,255,255,.10) !important;
-        background: rgba(5,7,10,.18) !important;
+        background: rgba(5,7,10,var(--cc-glass-dim)) !important;
       }
       body:not(.light) #page-stats th {
         color: rgba(247,242,232,.46) !important;
@@ -18651,6 +18651,14 @@ window._archRender = function() {
       body:not(.light) #page-settings button {
         border-radius: 12px !important;
         border-color: rgba(255,255,255,.12) !important;
+      }
+      body:not(.light) .table-container,
+      body:not(.light) .modal-content,
+      body:not(.light) .modal .card,
+      body:not(.light) .event-modal-card,
+      body:not(.light) .info-modal-box,
+      body:not(.light) .cc-tab-bg-dialog {
+        background: linear-gradient(180deg, rgba(5,7,10,var(--cc-card-dim)), rgba(5,7,10,var(--cc-panel-dim))) !important;
       }
       body:not(.light) #rosterBody td:first-child {
         white-space: nowrap !important;
@@ -18832,13 +18840,7 @@ window._archRender = function() {
       }
       function backgroundCss(safe) {
         return 'body,body:not(.light){background-image:url("' + safe + '") !important;background-size:cover !important;background-position:center center !important;background-attachment:fixed !important;}'
-          + 'body:not(.light) .cc-v20-bg-layer{background:'
-          + 'linear-gradient(90deg,rgba(0,0,0,.34),rgba(0,0,0,.04),rgba(0,0,0,.46)),'
-          + 'radial-gradient(circle at 48% 12%,rgba(232,190,88,.18),transparent 30%),'
-          + 'radial-gradient(circle at 78% 8%,rgba(95,140,255,.12),transparent 28%),'
-          + 'radial-gradient(circle at 30% 78%,rgba(155,102,255,.10),transparent 34%),'
-          + 'url("' + safe + '") center center/cover no-repeat,'
-          + 'linear-gradient(120deg,#17130e,#07080b 43%,#151114) !important;}';
+          + 'body:not(.light) .cc-v20-bg-layer{background:url("' + safe + '") center center/cover no-repeat !important;filter:none !important;opacity:1 !important;}';
       }
       function ccApplyCurrentBackground(pid) {
         pid = pid || currentPage();
@@ -19046,16 +19048,20 @@ window._archRender = function() {
       function glassValue() {
         var raw = parseInt(localStorage.getItem('cc-glass-dim'), 10);
         if (isNaN(raw)) raw = 34;
-        return Math.max(0, Math.min(80, raw));
+        return Math.max(0, Math.min(100, raw));
       }
       function applyGlassDim(value) {
-        value = Math.max(0, Math.min(80, parseInt(value, 10) || 0));
-        var glass = value / 100;
-        var card = Math.min(0.72, glass + 0.10);
-        var panel = Math.min(0.68, glass + 0.06);
-        var sidebar = Math.min(0.72, glass + 0.10);
-        var sidebarDeep = Math.min(0.86, glass + 0.30);
-        var topbar = Math.min(0.82, glass + 0.34);
+        value = Math.max(0, Math.min(100, parseInt(value, 10) || 0));
+        function mix(low, mid, high) {
+          if (value <= 50) return low + (mid - low) * (value / 50);
+          return mid + (high - mid) * ((value - 50) / 50);
+        }
+        var glass = mix(0.06, 0.34, 0.72);
+        var card = mix(0.08, 0.42, 0.78);
+        var panel = mix(0.10, 0.38, 0.74);
+        var sidebar = mix(0.08, 0.42, 0.76);
+        var sidebarDeep = mix(0.12, 0.50, 0.82);
+        var topbar = mix(0.10, 0.44, 0.78);
         document.documentElement.style.setProperty('--cc-glass-dim', glass.toFixed(2));
         document.documentElement.style.setProperty('--cc-card-dim', card.toFixed(2));
         document.documentElement.style.setProperty('--cc-panel-dim', panel.toFixed(2));
@@ -19409,22 +19415,33 @@ window._archRender = function() {
       body:not(.light) #cc-cursor-glow {
         display: none !important;
       }
+      body:not(.light)::before,
+      body:not(.light)::after,
+      body:not(.light) #appLayout.app::before,
+      body:not(.light) #appLayout.app::after {
+        content: none !important;
+        display: none !important;
+        background: none !important;
+        opacity: 0 !important;
+        box-shadow: none !important;
+        filter: none !important;
+        pointer-events: none !important;
+      }
       body:not(.light) .cc-v20-bg-layer {
         position: fixed;
-        inset: -2%;
+        inset: 0;
         z-index: 0;
         pointer-events: none;
         overflow: hidden;
-        transform: scale(1.02) translate3d(0,0,0);
+        transform: none;
         transform-origin: 50% 50%;
         animation: ccBgCinematicMotion 32s ease-in-out infinite alternate;
         will-change: transform;
-        background:
-          linear-gradient(90deg, rgba(0,0,0,.34), rgba(0,0,0,.04), rgba(0,0,0,.46)),
-          radial-gradient(circle at 48% 12%, rgba(232,190,88,.18), transparent 30%),
-          radial-gradient(circle at 78% 8%, rgba(95,140,255,.12), transparent 28%),
-          radial-gradient(circle at 30% 78%, rgba(155,102,255,.10), transparent 34%),
-          linear-gradient(120deg, #17130e, #07080b 43%, #151114);
+        background: transparent;
+        background-size: cover;
+        background-position: center center;
+        filter: none;
+        opacity: 1;
       }
       @keyframes ccBgCinematicMotion {
         from { transform: scale(1.02) translate3d(-1%, -.6%, 0); }
@@ -19440,25 +19457,22 @@ window._archRender = function() {
         content: "";
         position: absolute;
         inset: -8%;
-        background:
-          linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px),
-          linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px);
-        background-size: 86px 86px;
-        opacity: .18;
-        mask-image: radial-gradient(circle at 50% 42%, #000, transparent 72%);
+        display: none;
+        background: none;
+        opacity: 0;
+        mask-image: none;
       }
       body:not(.light) .cc-v20-bg-layer::after {
         content: "";
         position: absolute;
         inset: 0;
-        background:
-          radial-gradient(circle at 50% 30%, transparent, rgba(0,0,0,.48) 48%, rgba(0,0,0,.86)),
-          linear-gradient(180deg, rgba(0,0,0,.03), rgba(0,0,0,.62));
+        display: none;
+        background: none;
       }
       body:not(.light).df-on .cc-v20-bg-layer::after {
+        display: block;
         background:
-          radial-gradient(circle at 50% 28%, transparent, rgba(0,0,0,.54) 48%, rgba(0,0,0,.90)),
-          linear-gradient(180deg, rgba(32,18,7,.10), rgba(0,0,0,.70)) !important;
+          linear-gradient(180deg, rgba(32,18,7,.08), rgba(0,0,0,.14)) !important;
       }
       body:not(.light) .cc-v20-noise {
         position: fixed;
@@ -19470,10 +19484,11 @@ window._archRender = function() {
         background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='.75'/%3E%3C/svg%3E");
       }
       body:not(.light).fx-on .cc-v20-noise {
-        opacity: .10;
+        opacity: .045;
       }
       body:not(.light).fx-on .cc-v20-bg-layer::before {
-        opacity: .22;
+        display: none;
+        opacity: 0;
       }
       body:not(.light) #dfToggle[aria-pressed="true"],
       body:not(.light) #fxToggle[aria-pressed="true"] {
