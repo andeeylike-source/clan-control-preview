@@ -435,6 +435,17 @@ def parse_rows(boxes: list[dict[str, Any]], image_width: int | None = None) -> l
 
         _repair_live_christmas_kills(row)
 
+        # Row validation runs after all repair attempts so kills may already be restored.
+        # cells["kills"] already contained every box from the kills x-zone (recovery attempt);
+        # if kills is still None now, no box was found there and repair could not fill it.
+        if row.get("kills") is None and any(v is not None for v in (deaths, pvp, pve)):
+            row["needsReview"] = True
+
+        # Domain rule: mixed latin+cyrillic is an OCR artifact — cannot be a valid nick.
+        # Check normalizedName (pre-resolution cleaned raw), not the resolved name.
+        if has_mixed_latin_cyrillic(resolution["normalizedName"]):
+            row["needsReview"] = True
+
         has_number = any(row[key] is not None for key in ("kills", "deaths", "pvpDamage", "pveDamage"))
         if name and has_number:
             parsed_rows.append(row)

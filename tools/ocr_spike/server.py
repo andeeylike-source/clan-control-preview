@@ -87,17 +87,20 @@ def _per_request_names(known_names: list[str] | None, aliases: dict[str, str] | 
 
 
 def _to_parsed(rows: list[dict]) -> list[dict]:
-    """Normalize spike row format to {nick, kills, deaths, pvp, pve}."""
-    return [
-        {
+    """Normalize spike row format to {nick, kills, deaths, pvp, pve[, needsReview]}."""
+    result = []
+    for r in rows:
+        item: dict = {
             "nick": r.get("name", ""),
             "kills": r.get("kills"),
             "deaths": r.get("deaths"),
             "pvp": r.get("pvpDamage"),
             "pve": r.get("pveDamage"),
         }
-        for r in rows
-    ]
+        if r.get("needsReview"):
+            item["needsReview"] = True
+        result.append(item)
+    return result
 
 
 # ---------------------------------------------------------------------------
