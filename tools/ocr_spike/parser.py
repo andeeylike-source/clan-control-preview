@@ -348,8 +348,6 @@ def _cluster_rows(boxes: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
 
 
 def _default_columns(width: float) -> list[Column]:
-    # KM table crop heuristic. The spike intentionally keeps this simple:
-    # tune these ratios after seeing real OCR boxes from the sample set.
     return [
         Column("name", 0.00 * width, 0.40 * width),
         Column("kills", 0.48 * width, 0.60 * width),
@@ -357,6 +355,105 @@ def _default_columns(width: float) -> list[Column]:
         Column("pvpDamage", 0.70 * width, 0.85 * width),
         Column("pveDamage", 0.85 * width, 1.01 * width),
     ]
+
+
+_KILLS_HEADER_RE = re.compile(r"^[×xX✕]$")
+_DEATHS_HEADER_TOKENS = frozenset({"C", "С", "c", "с"})
+
+
+def _zones_to_dict(cols: list[Column]) -> dict[str, list[float]]:
+    return {c.name: [round(c.start, 1), round(c.end, 1)] for c in cols}
+
+
+def _detect_columns_from_header(
+    clusters: list[list[dict[str, Any]]], width: float
+) -> tuple[list[Column], dict[str, Any]]:
+    """Detect column zones from the header row (min cy cluster).
+
+    Returns (columns, meta) where meta contains columns_source, column_centers,
+    and column_zones for debugging / server response.
+    """
+    meta: dict[str, Any] = {}
+
+    kills_cx: float | None = None
+    deaths_cx: float | None = None
+    pvp_cx: float | None = None
+    pve_cx: float | None = None
+
+    if clusters:
+        header = clusters[0]
+        for box in header:
+            text = str(box.get("text", "")).strip()
+            cx = float(box.get("cx", 0))
+            tl = text.lower()
+            if _KILLS_HEADER_RE.match(text):
+                kills_cx = cx
+            elif text in _DEATHS_HEADER_TOKENS and (kills_cx is None or cx > kills_cx):
+                deaths_cx = cx
+            elif "pvp" in tl:
+                pvp_cx = cx
+            elif "pve" in tl:
+                pve_cx = cx
+
+    meta["column_centers"] = {
+        "kills": kills_cx, "deaths": deaths_cx, "pvp": pvp_cx, "pve": pve_cx,
+    }
+
+    if kills_cx is None:
+        cols = _default_columns(width)
+        meta["columns_source"] = "fallback"
+        meta["column_zones"] = _zones_to_dict(cols)
+        return cols, meta
+
+    meta["columns_source"] = "header"
+
+    # --- name zone ---------------------------------------------------------
+    name_end = kills_cx - 20.0
+
+    # --- kills zone --------------------------------------------------------
+    kills_start = kills_cx - 60.0
+
+    # --- deaths zone -------------------------------------------------------
+    if deaths_cx is not None and deaths_cx > kills_cx:
+        mid_kd = (kills_cx + deaths_cx) / 2.0
+        kills_end = mid_kd
+        deaths_start = mid_kd
+        deaths_end_default = deaths_cx + 60.0
+    else:
+        # deaths header absent — infer zone offset from kills_cx
+        kills_end = kills_cx + 60.0
+        deaths_start = kills_end
+        deaths_end_default = deaths_start + 110.0
+
+    # --- pvp zone ----------------------------------------------------------
+    if pvp_cx is not None:
+        deaths_end = (deaths_start + pvp_cx) / 2.0 if deaths_cx is None else (deaths_cx + pvp_cx) / 2.0
+        pvp_start = deaths_end
+    else:
+        deaths_end = deaths_end_default
+        pvp_start = deaths_end
+
+    pvp_end_default = pvp_cx + 80.0 if pvp_cx is not None else width * 0.85
+
+    # --- pve zone ----------------------------------------------------------
+    if pve_cx is not None:
+        pvp_end = (pvp_start + pve_cx) / 2.0 if pvp_cx is None else (pvp_cx + pve_cx) / 2.0
+        pvp_end = max(pvp_end, pvp_start + 20.0)
+    else:
+        pvp_end = pvp_end_default
+
+    pve_start = pvp_end
+    pve_end = width * 1.01
+
+    cols = [
+        Column("name", 0.0, name_end),
+        Column("kills", kills_start, kills_end),
+        Column("deaths", deaths_start, deaths_end),
+        Column("pvpDamage", pvp_start, pvp_end),
+        Column("pveDamage", pve_start, pve_end),
+    ]
+    meta["column_zones"] = _zones_to_dict(cols)
+    return cols, meta
 
 
 def _assign_column(box: dict[str, Any], columns: list[Column]) -> str | None:
@@ -389,14 +486,22 @@ def _name_from_boxes(name_boxes: list[dict[str, Any]]) -> str:
     return " ".join(tokens)
 
 
-def parse_rows(boxes: list[dict[str, Any]], image_width: int | None = None) -> list[dict[str, Any]]:
+def parse_rows(
+    boxes: list[dict[str, Any]],
+    image_width: int | None = None,
+    *,
+    _col_meta: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     if not boxes:
         return []
     width = float(image_width or max(float(b.get("bbox", [0, 0, 0, 0])[2]) for b in boxes) or 1)
-    columns = _default_columns(width)
+    all_clusters = _cluster_rows(boxes)
+    columns, col_meta = _detect_columns_from_header(all_clusters, width)
+    if _col_meta is not None:
+        _col_meta.update(col_meta)
     parsed_rows: list[dict[str, Any]] = []
 
-    for clustered in _cluster_rows(boxes):
+    for clustered in all_clusters:
         cells: dict[str, list[str]] = {col.name: [] for col in columns}
         name_boxes: list[dict[str, Any]] = []
         for box in clustered:

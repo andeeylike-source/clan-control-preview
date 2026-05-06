@@ -140,3 +140,35 @@ def test_ocr_garbled_name_resolves_via_skeleton():
     row = rows[0]
     assert row["name"] == "БожьяКара", f"Expected БожьяКара, got {row['name']!r}"
     assert not row.get("needsReview"), "Resolved name should not have needsReview"
+
+
+def test_deaths_box_at_cx672_width1122_not_in_kills_zone():
+    """Header-calibrated detection: deaths box at cx=672 must land in deaths, not kills.
+
+    Live file 4 (width=1122): X header at cx=572, no C header.
+    Fixed-ratio boundary was 673.2px, putting cx=672 in kills zone by 1px.
+    Header detection infers deaths=[632, 742], kills=[512, 632].
+    """
+    W = 1122
+    # Header row at cy=30, data row at cy=100
+    header_boxes = [
+        _box("4neh rpynnbl", 216, 30),
+        _box("X", 572, 30),
+        _box("PvP ypoH", 834, 30),
+        _box("PvE ypoH", 1000, 30),
+    ]
+    data_boxes = [
+        _box("BloodMather", 146, 100),
+        _box("12", 564, 100),
+        _box("9", 672, 100),
+        _box("203", 809, 100),
+        _box("767", 976, 100),
+    ]
+    rows = parser.parse_rows(header_boxes + data_boxes, image_width=W)
+    blood_rows = [r for r in rows if "Blood" in r.get("name", "")]
+    assert blood_rows, f"BloodMather row not found in {rows}"
+    row = blood_rows[0]
+    assert row["kills"] == 12, f"kills expected 12, got {row['kills']}"
+    assert row["deaths"] == 9, f"deaths expected 9, got {row['deaths']}"
+    assert row["pvpDamage"] == 203
+    assert row["pveDamage"] == 767

@@ -119,18 +119,25 @@ def handle_ocr(
     names_hash = _names_cache_hash(known_names, aliases)
     cache = _cache_path(stem, hx, names_hash)
 
+    roster_empty = not bool(known_names)
+
     if cache.exists():
         data = json.loads(cache.read_text(encoding="utf-8"))
         boxes = data.get("boxes", [])
+        col_meta: dict = {}
         # image_width may be absent in pre-server cache files; pass None → infer from boxes
         with _per_request_names(known_names, aliases):
-            rows = km_parser.parse_rows(boxes, image_width=data.get("image_width"))
-        return {
+            rows = km_parser.parse_rows(boxes, image_width=data.get("image_width"), _col_meta=col_meta)
+        resp: dict = {
             "ok": True, "provider": "paddle_local", "cached": True,
             "hash": hx, "cache_version": CACHE_VERSION, "names_hash": names_hash[:12],
             "timing_ms": data.get("timing_ms", 0),
             "boxes_count": len(boxes), "rows": rows, "parsed": _to_parsed(rows),
         }
+        resp.update(col_meta)
+        if roster_empty:
+            resp["roster_empty_or_default"] = True
+        return resp
 
     # Fresh OCR path
     tmp = TMP_DIR / f"{stem}_{hx[:8]}{suffix}"
@@ -144,8 +151,9 @@ def handle_ocr(
         boxes = run_paddle(tmp)
         timing_ms = round((time.perf_counter() - t0) * 1000)
 
+        col_meta = {}
         with _per_request_names(known_names, aliases):
-            rows = km_parser.parse_rows(boxes, image_width=image_width)
+            rows = km_parser.parse_rows(boxes, image_width=image_width, _col_meta=col_meta)
 
         cache.write_text(
             json.dumps(
@@ -159,12 +167,16 @@ def handle_ocr(
             ),
             encoding="utf-8",
         )
-        return {
+        resp = {
             "ok": True, "provider": "paddle_local", "cached": False,
             "hash": hx, "cache_version": CACHE_VERSION, "names_hash": names_hash[:12],
             "timing_ms": timing_ms,
             "boxes_count": len(boxes), "rows": rows, "parsed": _to_parsed(rows),
         }
+        resp.update(col_meta)
+        if roster_empty:
+            resp["roster_empty_or_default"] = True
+        return resp
     finally:
         try:
             tmp.unlink(missing_ok=True)
