@@ -8470,11 +8470,12 @@ function getClass2IconByClass3(c3) {
             const scale = 3;
             const fname = filename || '?';
 
-            // Relative crop: right "Член группы" panel starts at ~43% width, header at ~5% height.
-            // Replaces old fixed pixels (398,90,375,205) that broke for ~770×460 screenshots.
-            let cropX = Math.floor(W * 0.43);
+            // Relative crop: right "Член группы" panel starts at ~47.5% width, header at ~5% height.
+            // 0.43 was too far left (included left table/refresh button); 0.517 was too far right (cut nicks).
+            // 0.475 lands between the panel border and the nick column for ~770-wide screenshots.
+            let cropX = Math.floor(W * 0.475);
             let cropY = Math.floor(H * 0.05);
-            let cropW = Math.floor(W * 0.55);
+            let cropW = Math.floor(W * 0.55);  // clamped to W-cropX → extends to right edge
             let cropH = Math.floor(H * 0.85);
             let cropMode = 'relative_right_panel';
             let useFullImage = false;
@@ -8499,7 +8500,7 @@ function getClass2IconByClass3(c3) {
             } else {
                 const reason = cropW < minW ? 'too_narrow' : cropX > Math.floor(W * 0.50) ? 'x_too_far_right' : 'bad_aspect';
                 console.log(`[km-crop] validation fail reason=${reason}`);
-                cropX = _ccOcrClamp(Math.floor(W * 0.43), 0, W - 1);
+                cropX = _ccOcrClamp(Math.floor(W * 0.475), 0, W - 1);
                 cropY = _ccOcrClamp(Math.floor(H * 0.05), 0, H - 1);
                 cropW = _ccOcrClamp(Math.floor(W * 0.55), 1, W - cropX);
                 cropH = _ccOcrClamp(Math.floor(H * 0.85), 1, H - cropY);
