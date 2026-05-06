@@ -8463,12 +8463,56 @@ function getClass2IconByClass3(c3) {
             return new ImageData(out, width, height);
         }
 
-        function _ccOcrPreprocessCrop(img) {
-            const cropX = _ccOcrClamp(398, 0, Math.max(0, img.naturalWidth - 1));
-            const cropY = _ccOcrClamp(90, 0, Math.max(0, img.naturalHeight - 1));
-            const cropW = _ccOcrClamp(375, 1, Math.max(1, img.naturalWidth - cropX));
-            const cropH = _ccOcrClamp(205, 1, Math.max(1, img.naturalHeight - cropY));
+        // filename param is used only for [km-crop] logging.
+        function _ccOcrPreprocessCrop(img, filename) {
+            const W = img.naturalWidth;
+            const H = img.naturalHeight;
             const scale = 3;
+            const fname = filename || '?';
+
+            // Relative crop: right "Член группы" panel starts at ~43% width, header at ~5% height.
+            // Replaces old fixed pixels (398,90,375,205) that broke for ~770×460 screenshots.
+            let cropX = Math.floor(W * 0.43);
+            let cropY = Math.floor(H * 0.05);
+            let cropW = Math.floor(W * 0.55);
+            let cropH = Math.floor(H * 0.85);
+            let cropMode = 'relative_right_panel';
+            let useFullImage = false;
+
+            cropX = _ccOcrClamp(cropX, 0, W - 1);
+            cropY = _ccOcrClamp(cropY, 0, H - 1);
+            cropW = _ccOcrClamp(cropW, 1, W - cropX);
+            cropH = _ccOcrClamp(cropH, 1, H - cropY);
+
+            console.log(`[km-crop] file=${fname} natural=${W}x${H} crop=${cropX},${cropY},${cropW},${cropH} mode=${cropMode}`);
+
+            // Validation: crop must not be too narrow, must not start too far right, aspect ratio must be sane.
+            const minW = Math.floor(W * 0.25);
+            const valid = cropW >= minW
+                && cropX <= Math.floor(W * 0.50)
+                && cropH > 0
+                && (cropW / cropH) >= 0.3
+                && (cropW / cropH) <= 5.0;
+
+            if (valid) {
+                console.log('[km-crop] validation ok');
+            } else {
+                const reason = cropW < minW ? 'too_narrow' : cropX > Math.floor(W * 0.50) ? 'x_too_far_right' : 'bad_aspect';
+                console.log(`[km-crop] validation fail reason=${reason}`);
+                cropX = _ccOcrClamp(Math.floor(W * 0.43), 0, W - 1);
+                cropY = _ccOcrClamp(Math.floor(H * 0.05), 0, H - 1);
+                cropW = _ccOcrClamp(Math.floor(W * 0.55), 1, W - cropX);
+                cropH = _ccOcrClamp(Math.floor(H * 0.85), 1, H - cropY);
+                cropMode = 'fallback_wide_right_panel';
+                console.log(`[km-crop] fallback used reason=${reason}`);
+                const fbValid = cropW >= minW && cropH > 0 && (cropW / cropH) >= 0.3 && (cropW / cropH) <= 5.0;
+                if (!fbValid) {
+                    console.log('[km-crop] fallback also suspicious — using full image');
+                    cropX = 0; cropY = 0; cropW = W; cropH = H;
+                    cropMode = 'full_image';
+                    useFullImage = true;
+                }
+            }
 
             const cropCanvas = document.createElement('canvas');
             cropCanvas.width = cropW;
@@ -8499,20 +8543,28 @@ function getClass2IconByClass3(c3) {
             imageData = _ccOcrSharpen(imageData, processedCanvas.width, processedCanvas.height);
             ctx.putImageData(imageData, 0, 0);
 
-            const maskX = _ccOcrClamp(Math.round(152 * scale), 0, Math.max(0, processedCanvas.width - 1));
-            const maskW = _ccOcrClamp(Math.round(32 * scale), 1, Math.max(1, processedCanvas.width - maskX));
-            ctx.fillStyle = '#fff';
-            ctx.fillRect(maskX, 0, maskW, processedCanvas.height);
+            // Column-separator mask: same absolute image position as the original (≈71.4% of width).
+            // Only applied when not using full-image fallback.
+            if (!useFullImage) {
+                const maskAbsX = Math.round(W * 0.714);
+                const maskRelX = Math.max(0, maskAbsX - cropX);
+                const maskXProc = _ccOcrClamp(Math.round(maskRelX * scale), 0, Math.max(0, processedCanvas.width - 1));
+                const maskWProc = _ccOcrClamp(Math.round(32 * scale), 1, Math.max(1, processedCanvas.width - maskXProc));
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(maskXProc, 0, maskWProc, processedCanvas.height);
+            }
+
             return {
                 processedCanvas,
                 cropCanvas,
+                useFullImage,
                 geometry: {
                     x: cropX,
                     y: cropY,
                     w: cropW,
                     h: cropH,
-                    source: 'ocrspace_preset_right_group_table'
-                }
+                    source: cropMode,
+                },
             };
         }
 
@@ -8630,7 +8682,7 @@ function getClass2IconByClass3(c3) {
                         if (pb) pb.style.width = Math.round(((i + 1) / shots.length) * 100) + '%';
 
                         const img = await _ccOcrLoadImage(shot.dataUrl);
-                        const crop = _ccOcrPreprocessCrop(img);
+                        const crop = _ccOcrPreprocessCrop(img, shot.name || shot.id || ('shot' + (i + 1)));
                         console.debug('[ocrspace] crop geometry', crop.geometry);
 
                         // local PaddleOCR — first provider
@@ -8857,8 +8909,11 @@ function getClass2IconByClass3(c3) {
                         if (pb) pb.style.width = Math.round(((i + 1) / shots.length) * 100) + '%';
 
                         const img  = await _ccOcrLoadImage(shot.dataUrl);
-                        const crop = _ccOcrPreprocessCrop(img);
+                        const crop = _ccOcrPreprocessCrop(img, shot.name || shot.id || ('shot' + (i + 1)));
                         const cropDataUrl = crop.cropCanvas.toDataURL('image/png');
+                        const effectivePrompt = crop.useFullImage
+                            ? BAIDU_OCR_PROMPT + '\nThis is a full two-panel screenshot. Extract ONLY the right "Член группы" table.'
+                            : BAIDU_OCR_PROMPT;
                         console.info('[openrouter-ocr] model baidu/qianfan-ocr-fast:free');
 
                         const _baiduReqBody = (key) => JSON.stringify({
@@ -8867,7 +8922,7 @@ function getClass2IconByClass3(c3) {
                             messages: [{
                                 role: 'user',
                                 content: [
-                                    { type: 'text', text: BAIDU_OCR_PROMPT },
+                                    { type: 'text', text: effectivePrompt },
                                     { type: 'image_url', image_url: { url: cropDataUrl } },
                                 ],
                             }],
