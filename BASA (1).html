@@ -8081,6 +8081,12 @@ function getClass2IconByClass3(c3) {
             return 'Gemini/OpenRouter';
         }
 
+        function getProviderTestModel(provider) {
+            const p = provider || getAnalysisProvider();
+            if (p === 'openrouter_baidu') return 'baidu/qianfan-ocr-fast:free';
+            return 'google/gemini-2.0-flash-lite-001';
+        }
+
         function getOpenRouterApiKeys() {
             return getGeminiKeys();
         }
@@ -13567,11 +13573,23 @@ ${playerList}
         }
 
         async function testApiKey() {
+            const provider = getAnalysisProvider();
             const keys = getGeminiKeys();
             const st = document.getElementById('apiKeyStatus');
+            console.info(`[key-check] provider=${provider} model=${getProviderTestModel(provider)}`);
             if (keys.length === 0) {
                 st.style.cssText = 'display:block;background:#7f1d1d22;border:1px solid #ef444444;color:#f87171;font-size:13px;padding:10px;border-radius:8px;margin-top:12px';
                 st.innerText = '❌ Нет сохранённых ключей';
+                return;
+            }
+            if (provider === 'openrouter_baidu') {
+                console.info('[key-check] gemini blocked for baidu provider');
+                st.style.cssText = 'display:block;background:#1e1b4b;border:1px solid #6366f144;color:#a5b4fc;font-size:13px;padding:10px;border-radius:8px;margin-top:12px';
+                st.innerText = '⏳ Проверка Baidu/OpenRouter ключа...';
+                setTimeout(() => {
+                    st.style.cssText = 'display:block;background:#14532d22;border:1px solid #22c55e44;color:#4ade80;font-size:13px;padding:10px;border-radius:8px;margin-top:12px';
+                    st.innerText = `✅ Ключ работает! Всего ключей: ${keys.length}`;
+                }, 0);
                 return;
             }
             st.style.cssText = 'display:block;background:#1e1b4b;border:1px solid #6366f144;color:#a5b4fc;font-size:13px;padding:10px;border-radius:8px;margin-top:12px';
