@@ -8121,6 +8121,47 @@ function getClass2IconByClass3(c3) {
 
         // Храним исчерпанные ключи с датой (сбрасываются на следующий день)
         let exhaustedKeys = {}; // { keyIndex: dateStr }
+        const OPENROUTER_EXHAUSTION_SIG_KEY = 'clanControl_openrouterKeySignature';
+
+        function getOpenRouterKeySignature(keys) {
+            const list = Array.isArray(keys) ? keys : getGeminiKeys();
+            const raw = list.map(k => (k || '').trim()).filter(Boolean).join('\u001f');
+            let hash = 5381;
+            for (let i = 0; i < raw.length; i++) {
+                hash = ((hash << 5) + hash) ^ raw.charCodeAt(i);
+            }
+            return String(hash >>> 0);
+        }
+
+        function getOpenRouterExhaustionSnapshot() {
+            return {
+                sig: localStorage.getItem(OPENROUTER_EXHAUSTION_SIG_KEY) || '',
+                exhausted: { ...exhaustedKeys },
+            };
+        }
+
+        function syncOpenRouterExhaustionState(reason) {
+            const keys = getGeminiKeys();
+            const sig = getOpenRouterKeySignature(keys);
+            const stored = localStorage.getItem(OPENROUTER_EXHAUSTION_SIG_KEY) || '';
+            if (stored !== sig) {
+                exhaustedKeys = {};
+                localStorage.setItem(OPENROUTER_EXHAUSTION_SIG_KEY, sig);
+                console.info('[openrouter-ocr] reset exhaustion state');
+                if (reason) console.info(`[openrouter-ocr] reset exhaustion state reason=${reason}`);
+                saveToStorage();
+            }
+            return { keys, sig };
+        }
+
+        function resetOpenRouterExhaustionState(reason) {
+            exhaustedKeys = {};
+            const sig = getOpenRouterKeySignature();
+            localStorage.setItem(OPENROUTER_EXHAUSTION_SIG_KEY, sig);
+            console.info('[openrouter-ocr] reset exhaustion state');
+            if (reason) console.info(`[openrouter-ocr] reset exhaustion state reason=${reason}`);
+            saveToStorage();
+        }
 
         function getTodayStr() {
             const d = new Date();
@@ -8128,7 +8169,7 @@ function getClass2IconByClass3(c3) {
         }
 
         function getNextApiKey() {
-            const GEMINI_KEYS = getGeminiKeys();
+            const { keys: GEMINI_KEYS } = syncOpenRouterExhaustionState('getNextApiKey');
             const today = getTodayStr();
             Object.keys(exhaustedKeys).forEach(k => {
                 if (exhaustedKeys[k] !== today) delete exhaustedKeys[k];
@@ -8140,7 +8181,7 @@ function getClass2IconByClass3(c3) {
         }
 
         function getCurrentKeyIndex() {
-            const GEMINI_KEYS = getGeminiKeys();
+            const { keys: GEMINI_KEYS } = syncOpenRouterExhaustionState('getCurrentKeyIndex');
             const today = getTodayStr();
             for (let i = 0; i < GEMINI_KEYS.length; i++) {
                 if (!exhaustedKeys[i] || exhaustedKeys[i] !== today) return i;
@@ -8148,11 +8189,13 @@ function getClass2IconByClass3(c3) {
             return -1;
         }
 
-        function markCurrentKeyExhausted() {
-            const idx = getCurrentKeyIndex();
-            if (idx >= 0) {
-                exhaustedKeys[idx] = getTodayStr();
-                console.log(`Ключ ${idx+1} исчерпан, переключаюсь на следующий`);
+        function markCurrentKeyExhausted(idx) {
+            const today = getTodayStr();
+            const keyIndex = Number.isInteger(idx) ? idx : getCurrentKeyIndex();
+            if (keyIndex >= 0) {
+                exhaustedKeys[keyIndex] = today;
+                console.log(`Ключ ${keyIndex+1} исчерпан, переключаюсь на следующий`);
+                saveToStorage();
             }
         }
 
@@ -8767,11 +8810,13 @@ function getClass2IconByClass3(c3) {
             const BAIDU_OCR_PROMPT = `Extract ONLY the visible KM member table from this cropped game screenshot.\nReturn ONLY valid JSON:\n{"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"confidence":0,"notes":""}\nRules:\n- preserve nick spelling exactly as seen\n- kills, deaths, pvp, pve must be integers\n- if a value is unreadable, use null\n- no markdown\n- no code fences`;
 
             const openRouterKeys = getOpenRouterApiKeys();
+            const exhaustionBefore = getOpenRouterExhaustionSnapshot();
             console.info(`[provider] selected=${getAnalysisProvider()}`);
             console.info(`[provider] openrouter keys count=${openRouterKeys.length}`);
-            const apiKey = getNextOpenRouterApiKey();
-            if (!apiKey) {
-                setDayStatus('error', '❌ Нет ключей для OpenRouter OCR / Baidu. Добавь ключ в Настройках → API ключи.');
+            console.info(`[openrouter-ocr] keys count=${openRouterKeys.length}`);
+            console.info(`[openrouter-ocr] exhaustion state before=${JSON.stringify({ sig: exhaustionBefore.sig, exhausted: Object.keys(exhaustionBefore.exhausted), count: Object.keys(exhaustionBefore.exhausted).length })}`);
+            if (openRouterKeys.length === 0) {
+                setDayStatus('error', '❌ Нет API ключей OpenRouter');
                 return;
             }
 
@@ -8816,9 +8861,6 @@ function getClass2IconByClass3(c3) {
                         const cropDataUrl = crop.cropCanvas.toDataURL('image/png');
                         console.info('[openrouter-ocr] model baidu/qianfan-ocr-fast:free');
 
-                        const currentKey = getNextApiKey();
-                        if (!currentKey) throw new Error('Все API ключи исчерпаны');
-
                         const _baiduReqBody = (key) => JSON.stringify({
                             model: 'baidu/qianfan-ocr-fast:free',
                             provider: { order: ['Baidu'], allow_fallbacks: false },
@@ -8838,35 +8880,64 @@ function getClass2IconByClass3(c3) {
                             'HTTP-Referer': location.origin,
                             'X-Title': 'Clan Control OCR',
                         });
-                        // Retry on 429: 2 same-key retries (2s, 4s), then switch key once
-                        const _BAIDU_RETRY_DELAYS = [2000, 4000];
-                        let response;
-                        let fetchKey = currentKey;
-                        for (let att = 0; att <= _BAIDU_RETRY_DELAYS.length + 1; att++) {
-                            if (att > 0 && att <= _BAIDU_RETRY_DELAYS.length) {
-                                console.info(`[openrouter-ocr] retry ${att} after 429`);
-                                await new Promise(r => setTimeout(r, _BAIDU_RETRY_DELAYS[att - 1]));
-                            } else if (att === _BAIDU_RETRY_DELAYS.length + 1) {
-                                markCurrentKeyExhausted();
-                                fetchKey = getNextApiKey();
-                                if (!fetchKey) throw new Error('Baidu OCR временно ограничен. Попробуйте позже или добавьте ещё OpenRouter ключ.');
-                                console.info('[openrouter-ocr] retry with next key after persistent 429');
+                        let response = null;
+                        let saw429 = false;
+                        let lastNon429Error = null;
+                        let attemptCount = 0;
+                        for (let keyIndex = 0; keyIndex < openRouterKeys.length; keyIndex++) {
+                            const fetchKey = openRouterKeys[keyIndex];
+                            attemptCount++;
+                            console.info(`[openrouter-ocr] trying key index ${keyIndex + 1} of ${openRouterKeys.length}`);
+                            console.info('[openrouter-ocr] POST start model=baidu/qianfan-ocr-fast:free');
+                            try {
+                                response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                                    method: 'POST',
+                                    headers: _baiduReqHeaders(fetchKey),
+                                    body: _baiduReqBody(fetchKey),
+                                    signal: AbortSignal.timeout(60000),
+                                });
+                                console.info(`[openrouter-ocr] response status=${response.status}`);
+                            } catch (e) {
+                                response = null;
+                                lastNon429Error = { status: 'NETWORK', message: e?.message || String(e) };
+                                console.info('[openrouter-ocr] response status=network-error');
+                                continue;
                             }
-                            response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                                method: 'POST',
-                                headers: _baiduReqHeaders(fetchKey),
-                                body: _baiduReqBody(fetchKey),
-                                signal: AbortSignal.timeout(60000),
-                            });
-                            if (response.status !== 429) break;
+                            if (response.status === 429) {
+                                saw429 = true;
+                                markCurrentKeyExhausted(keyIndex);
+                                continue;
+                            }
+                            if (!response.ok) {
+                                const errJson = await response.json().catch(() => ({}));
+                                lastNon429Error = {
+                                    status: response.status,
+                                    message: errJson.error?.message || `HTTP ${response.status}`,
+                                };
+                                continue;
+                            }
+                            break;
                         }
-                        if (response.status === 429) {
-                            throw new Error('Baidu OCR временно ограничен. Попробуйте позже или добавьте ещё OpenRouter ключ.');
+                        if (attemptCount === 0) {
+                            throw new Error('Внутренняя ошибка выбора ключа');
                         }
-
+                        if (!response) {
+                            if (lastNon429Error) {
+                                throw new Error(`OpenRouter OCR error: ${lastNon429Error.status} ${lastNon429Error.message}`);
+                            }
+                            if (saw429) {
+                                throw new Error('Все ключи временно ограничены');
+                            }
+                            throw new Error('Внутренняя ошибка выбора ключа');
+                        }
                         if (!response.ok) {
-                            const errJson = await response.json().catch(() => ({}));
-                            throw new Error(errJson.error?.message || `HTTP ${response.status}`);
+                            if (lastNon429Error) {
+                                throw new Error(`OpenRouter OCR error: ${lastNon429Error.status} ${lastNon429Error.message}`);
+                            }
+                            if (saw429) {
+                                throw new Error('Все ключи временно ограничены');
+                            }
+                            throw new Error(`OpenRouter OCR error: HTTP ${response.status}`);
                         }
 
                         const json = await response.json();
@@ -13335,6 +13406,7 @@ ${playerList}
             kmStats            = {};
             nickAliases        = {};
             exhaustedKeys      = {};
+            localStorage.removeItem(OPENROUTER_EXHAUSTION_SIG_KEY);
             appliedStatsByDate = {};
             playerNotes        = {};
             playerProfaByDate  = {};
@@ -13520,7 +13592,7 @@ ${playerList}
         }
 
         function resetExhaustedKeys() {
-            exhaustedKeys = {};
+            resetOpenRouterExhaustionState('reset button');
             saveToStorage();
             updateApiKeyIndicator();
             const st = document.getElementById('apiKeyStatus');
@@ -13556,6 +13628,7 @@ ${playerList}
             const keys = getGeminiKeys();
             keys.splice(idx, 1);
             saveGeminiKeys(keys);
+            resetOpenRouterExhaustionState('removeApiKey');
             renderApiKeys();
         }
 
@@ -13563,6 +13636,7 @@ ${playerList}
             const inputs = document.querySelectorAll('#apiKeysList input');
             const keys = Array.from(inputs).map(i => i.value.trim()).filter(k => k.length > 10);
             saveGeminiKeys(keys);
+            resetOpenRouterExhaustionState('saveApiKeys');
             renderApiKeys();
             const st = document.getElementById('apiKeyStatus');
             st.style.display = 'block';
