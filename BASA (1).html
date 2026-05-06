@@ -10681,6 +10681,30 @@ ${playerList}
             </div>`;
         }
 
+        function _kmPackNameIsFilename(name) {
+            if (!name) return false;
+            return /\.(jpe?g|png|gif|bmp|webp|tiff?|heic|avif)$/i.test(name) || name.length > 50;
+        }
+
+        function _openKmPackShotLightbox(url, label) {
+            if (!url) return;
+            kmHistoryRemoveOverlay('kmHistoryPackLightbox');
+            const overlay = document.createElement('div');
+            overlay.id = 'kmHistoryPackLightbox';
+            overlay.className = 'km-history-lightbox';
+            overlay.onclick = function(e) { if (e.target === overlay) kmHistoryRemoveOverlay('kmHistoryPackLightbox'); };
+            overlay.innerHTML = `<div class="km-history-lightbox-panel" onclick="event.stopPropagation()">
+                <button type="button" class="km-history-modal-close" onclick="kmHistoryRemoveOverlay('kmHistoryPackLightbox')">×</button>
+                <div class="km-history-lightbox-meta">${kmHistoryEsc(label || 'Скрин')}</div>
+                <img src="${url}" alt="${kmHistoryEsc(label || 'Скрин')}" class="km-history-lightbox-img" style="max-width:88vw;max-height:80vh;object-fit:contain;display:block;margin:0 auto;border-radius:8px">
+            </div>`;
+            document.body.appendChild(overlay);
+            const _handler = function(e) {
+                if (e.key === 'Escape') { kmHistoryRemoveOverlay('kmHistoryPackLightbox'); document.removeEventListener('keydown', _handler); }
+            };
+            document.addEventListener('keydown', _handler);
+        }
+
         function renderKmHistoryPackGroups(dateStr, dayData, groups) {
             const packGroups = groups || kmHistoryBuildPackGroups(dateStr, dayData);
             if (!packGroups.length) {
@@ -10691,6 +10715,12 @@ ${playerList}
                 const screenshot = pack.screenshot && (pack.screenshot.thumbDataUrl || pack.screenshot.originalDataUrl || pack.screenshot.cropUrl) ? pack.screenshot : null;
                 const leader = kmHistoryEsc(pack.leader || 'Пак без лидера');
                 const packName = kmHistoryEsc(pack.packName || '');
+                const _isFileName = _kmPackNameIsFilename(pack.packName);
+                const _packBadge = packName && packName !== leader
+                    ? (_isFileName
+                        ? (screenshot ? '<span class="km-history-pack-name">📸 Скрин</span>' : '')
+                        : `<span class="km-history-pack-name">${packName}</span>`)
+                    : '';
                 const leaderProf = (() => {
                     const lr = roster.find(function(r) { return normalizeNick(r.name) === normalizeNick(pack.leader); });
                     const lp = lr ? (lr.profa || '—') : '—';
@@ -10701,7 +10731,7 @@ ${playerList}
                         <div class="km-history-pack-leader">
                             ${leaderProf}
                             <span>${leader}</span>
-                            ${packName && packName !== leader ? `<span class="km-history-pack-name">${packName}</span>` : ''}
+                            ${_packBadge}
                         </div>
                         <span class="km-history-pack-count">${pack.totalPlayers} игроков</span>
                     </div>
@@ -10829,10 +10859,13 @@ ${playerList}
             modal.innerHTML = `<div class="km-history-modal-panel km-history-pack-modal" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
                 <button type="button" class="km-history-modal-close" onclick="kmHistoryRemoveOverlay('kmHistoryPackModal')">×</button>
                 <div class="km-history-modal-title">Пак: ${kmHistoryEsc(pack.leader || 'Пак без лидера')}</div>
-                <div class="km-history-modal-subtitle">${kmHistoryEsc(pack.packName || '')}${pack.totalPlayers ? ` · ${pack.totalPlayers} игроков` : ''}</div>
+                <div class="km-history-modal-subtitle">${!_kmPackNameIsFilename(pack.packName) ? kmHistoryEsc(pack.packName || '') : ''}${pack.totalPlayers ? ` · ${pack.totalPlayers} игроков` : ''}</div>
                 <div class="km-history-pack-modal-body">
                     <div class="km-history-pack-media">
-                        ${screenshotUrl ? `<img src="${screenshotUrl}" alt="${kmHistoryEsc(pack.leader)}">` : '<div class="km-history-empty-state">Скрин не сохранён</div>'}
+                        ${screenshotUrl
+                            ? `<img src="${screenshotUrl}" alt="${kmHistoryEsc(pack.leader)}" data-label="${kmHistoryEsc(pack.leader)}" onclick="event.stopPropagation();_openKmPackShotLightbox(this.src,this.dataset.label)" style="cursor:pointer;border-radius:8px;width:100%" title="Нажмите для просмотра в полный размер">`
+                            : '<div class="km-history-empty-state">Скрин не сохранён</div>'}
+                        ${screenshotUrl ? '<div style="font-size:11px;color:#64748b;text-align:center;margin-top:4px">🔍 Нажмите для просмотра</div>' : ''}
                         <div class="km-history-lightbox-note">${kmHistoryEsc(screenshotNote)}</div>
                     </div>
                     <div class="km-history-pack-table-wrap">
@@ -11138,6 +11171,9 @@ ${playerList}
             const historyShots = collectKmHistoryScreenshotSnapshot(dateStr);
             const packShots = collectKmHistoryPackScreenshotSnapshot();
 
+            const _kmSaveOldCount = Object.keys(appliedStatsByDate).length;
+            console.log(`[km-history-save] oldCount=${_kmSaveOldCount}`);
+
             appliedStatsByDate[dateStr] = {
                 players: mergedPlayers,
                 raidTotal: dayExpectedTotal,
@@ -11148,6 +11184,13 @@ ${playerList}
                 kmPackScreenshots: Object.keys(packShots).length ? packShots : (prevSnap ? (prevSnap.kmPackScreenshots || {}) : {}),
                 appliedAt: new Date().toISOString()
             };
+
+            console.log(`[km-history-save] upsert eventId=${dateStr}`);
+            const _kmSaveNewCount = Object.keys(appliedStatsByDate).length;
+            console.log(`[km-history-save] newCount=${_kmSaveNewCount}`);
+            if (_kmSaveOldCount > 0 && _kmSaveNewCount < _kmSaveOldCount) {
+                console.warn(`[km-history-save] WARN: history count dropped ${_kmSaveOldCount} → ${_kmSaveNewCount} — unexpected data loss!`);
+            }
 
             // Формируем итоговый статус
             const newPlayers = prevSnap ? mergedPlayers
@@ -13030,12 +13073,22 @@ ${playerList}
                 var prevManualSnap = appliedStatsByDate[s.origDate || s.date] || appliedStatsByDate[s.date] || {};
                 if (s.origDate && s.origDate !== s.date) delete appliedStatsByDate[s.origDate];
 
+                var _mkeOldCount = Object.keys(appliedStatsByDate).length;
+                console.log('[km-history-save] oldCount=' + _mkeOldCount);
+
                 appliedStatsByDate[s.date] = {
                     _manual: true, _eventType: s.type||'КМ', _leader: s.leader||'',
                     players: flat, commandChannel: cc, screenPlayersMap: spm, packLeaders: pls, raidTotal: flat.length,
                     kmScreenshots: prevManualSnap.kmScreenshots || [],
                     kmPackScreenshots: prevManualSnap.kmPackScreenshots || {}
                 };
+
+                console.log('[km-history-save] upsert eventId=' + s.date);
+                var _mkeNewCount = Object.keys(appliedStatsByDate).length;
+                console.log('[km-history-save] newCount=' + _mkeNewCount);
+                if (_mkeOldCount > 0 && _mkeNewCount < _mkeOldCount) {
+                    console.warn('[km-history-save] WARN: history count dropped ' + _mkeOldCount + ' → ' + _mkeNewCount + ' — unexpected data loss!');
+                }
 
                 saveToStorage();
                 syncRosterStatsFromSnapshots();
