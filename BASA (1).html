@@ -4493,6 +4493,7 @@
 
             // Инициализируем превью скриншотов для этого дня
             renderDayScreenshotPreviews(dateStr);
+            updateApiKeyIndicator();
 
             // Копируем текущее состояние в pending-буферы для этого дня
             pendingStatuses = Object.assign({}, eventStatuses);
@@ -8023,6 +8024,7 @@ function getClass2IconByClass3(c3) {
             if (!block) return;
             const shots = dayScreenshots[dateStr] || [];
             block.style.display = shots.length > 0 ? '' : 'none';
+            if (shots.length > 0) updateApiKeyIndicator();
             // Сбрасываем результаты если скрины изменились
             if (results) results.style.display = 'none';
         }
@@ -8070,6 +8072,29 @@ function getClass2IconByClass3(c3) {
         function saveAnalysisProvider(provider) {
             const valid = ['gemini', 'ocrspace', 'openrouter_baidu'];
             localStorage.setItem('clanControl_analysisProvider', valid.includes(provider) ? provider : 'gemini');
+        }
+
+        function getAnalysisProviderLabel(provider) {
+            const p = provider || getAnalysisProvider();
+            if (p === 'ocrspace') return 'OCR.space proxy';
+            if (p === 'openrouter_baidu') return 'OpenRouter OCR / Baidu';
+            return 'Gemini/OpenRouter';
+        }
+
+        function getOpenRouterApiKeys() {
+            return getGeminiKeys();
+        }
+
+        function getNextOpenRouterApiKey() {
+            const keys = getOpenRouterApiKeys();
+            return getNextApiKey() || keys[0] || null;
+        }
+
+        function getCurrentOpenRouterKeyIndex() {
+            const keys = getOpenRouterApiKeys();
+            const idx = getCurrentKeyIndex();
+            if (idx >= 0) return idx;
+            return keys.length > 0 ? 0 : -1;
         }
 
         function getOcrSpaceKey() {
@@ -8129,18 +8154,20 @@ function getClass2IconByClass3(c3) {
             const el = document.getElementById('apiKeyIndicator');
             if (!el) return;
             updateAnalysisProviderIndicator();
-            if (getAnalysisProvider() === 'ocrspace') {
+            const provider = getAnalysisProvider();
+            if (provider === 'ocrspace') {
                 el.innerHTML = `OCR.space proxy: ${getOcrSpaceProxyUrl()}`;
                 el.style.color = '#475569';
                 return;
             }
-            if (getAnalysisProvider() === 'openrouter_baidu') {
-                const GEMINI_KEYS = getGeminiKeys();
+            if (provider === 'openrouter_baidu') {
+                const GEMINI_KEYS = getOpenRouterApiKeys();
+                console.info(`[provider] openrouter keys count=${GEMINI_KEYS.length}`);
                 if (GEMINI_KEYS.length === 0) {
                     el.innerHTML = `⚠️ Нет ключей OpenRouter — <span onclick="showPage('settings')" style="color:#6366f1;cursor:pointer;text-decoration:underline">добавить</span>`;
                     el.style.color = '#ef4444';
                 } else {
-                    el.innerHTML = `🤖 Baidu OCR · ключ ${getCurrentKeyIndex()+1} из ${GEMINI_KEYS.length}`;
+                    el.innerHTML = `🤖 Baidu OCR · ключ ${getCurrentOpenRouterKeyIndex()+1} из ${GEMINI_KEYS.length}`;
                     el.style.color = '#475569';
                 }
                 return;
@@ -8164,11 +8191,9 @@ function getClass2IconByClass3(c3) {
             const el = document.getElementById('analysisProviderIndicator');
             if (!el) return;
             const p = getAnalysisProvider();
-            el.innerText = p === 'ocrspace'
-                ? 'Провайдер: OCR.space proxy'
-                : p === 'openrouter_baidu'
-                    ? 'Провайдер: OpenRouter OCR / Baidu'
-                    : 'Провайдер: Gemini/OpenRouter';
+            const label = getAnalysisProviderLabel(p);
+            console.info(`[provider] km modal label=Провайдер: ${label}`);
+            el.innerText = `Провайдер: ${label}`;
         }
 
         // ===== СИСТЕМА АЛИАСОВ =====
@@ -8735,9 +8760,12 @@ function getClass2IconByClass3(c3) {
             console.info('[openrouter-ocr] no paid fallback');
             const BAIDU_OCR_PROMPT = `Extract ONLY the visible KM member table from this cropped game screenshot.\nReturn ONLY valid JSON:\n{"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"confidence":0,"notes":""}\nRules:\n- preserve nick spelling exactly as seen\n- kills, deaths, pvp, pve must be integers\n- if a value is unreadable, use null\n- no markdown\n- no code fences`;
 
-            const apiKey = getNextApiKey();
+            const openRouterKeys = getOpenRouterApiKeys();
+            console.info(`[provider] selected=${getAnalysisProvider()}`);
+            console.info(`[provider] openrouter keys count=${openRouterKeys.length}`);
+            const apiKey = getNextOpenRouterApiKey();
             if (!apiKey) {
-                setDayStatus('error', '❌ Нет API ключей OpenRouter. Добавь ключ в Настройках → API ключи.');
+                setDayStatus('error', '❌ Нет ключей для OpenRouter OCR / Baidu. Добавь ключ в Настройках → API ключи.');
                 return;
             }
 
@@ -8988,6 +9016,8 @@ function getClass2IconByClass3(c3) {
             if (!shots.length) return;
 
             const provider = getAnalysisProvider();
+            console.info(`[provider] selected=${provider}`);
+            console.info(`[provider] km modal label=Провайдер: ${getAnalysisProviderLabel(provider)}`);
             if (provider === 'ocrspace') return analyzeWithOcrSpaceProvider({ dateStr, shots });
             if (provider === 'openrouter_baidu') return analyzeWithOpenRouterBaiduProvider({ dateStr, shots });
 
@@ -13462,6 +13492,7 @@ ${playerList}
             if (providerEl) providerEl.value = getAnalysisProvider();
             if (proxyEl) proxyEl.value = getOcrSpaceProxyUrl();
             if (keyEl) keyEl.value = getOcrSpaceKey();
+            console.info(`[provider] selected=${getAnalysisProvider()}`);
             updateAnalysisProviderIndicator();
         }
 
