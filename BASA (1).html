@@ -3155,6 +3155,7 @@
         </span>
         <button id="ccAdminBtn" class="chip icon-chip" onclick="window._ccTabBg&&window._ccTabBg.open()" title="Фоны вкладок" style="display:none;color:#e8c97a">✏️</button>
         <button id="shellToggleBtn" class="chip" onclick="shellToggle()" title="Убрать оболочку" style="display:none">Оболочка</button>
+        <button id="ccPaletteBtn" type="button" class="chip v20-shell-chip" aria-expanded="false">Палитра</button>
         <button id="glassDimToggle" type="button" class="chip v20-shell-chip" aria-expanded="false" style="display:none">Стекло</button>
         <button id="dfToggle" type="button" class="chip v20-shell-chip" aria-pressed="false">DF</button>
         <button id="fxToggle" type="button" class="chip v20-shell-chip" aria-pressed="false">✦ FX</button>
@@ -20784,6 +20785,684 @@ window._archRender = function() {
         display: none !important;
       }
     </style>
+    <style id="cc-color-theme-system">
+      :root {
+        --cc-accent: #e8be58;
+        --cc-accent-2: #ffd871;
+        --cc-accent-rgb: 232, 190, 88;
+        --cc-accent-soft: rgba(232,190,88,.12);
+        --cc-accent-border: rgba(255,216,113,.32);
+        --cc-accent-glow: rgba(232,190,88,.18);
+        --cc-warm: #b9822e;
+        --cc-warm-2: #f5d18a;
+        --cc-danger-accent: #ff7664;
+        --cc-success-accent: #68ff92;
+        --cc-text-main: #fffdf5;
+        --cc-text-muted: rgba(247,242,232,.66);
+        --cc-title-color: #fffdf5;
+        --cc-chip-bg: rgba(232,190,88,.08);
+        --cc-chip-border: rgba(255,216,113,.22);
+        --cc-chip-text: rgba(247,242,232,.82);
+        --cc-active-bg: rgba(232,190,88,.16);
+        --cc-active-border: rgba(255,216,113,.38);
+        --cc-active-glow: rgba(232,190,88,.16);
+        --cc-button-bg: linear-gradient(135deg, var(--cc-accent-2), var(--cc-warm));
+        --cc-button-text: #241807;
+        --cc-button-border: rgba(255,216,113,.30);
+        --cc-focus-ring: 0 0 0 3px rgba(var(--cc-accent-rgb), .18);
+      }
+      body:not(.light) #topbar .chip,
+      body:not(.light) #topbar.top .chip {
+        background: var(--cc-chip-bg) !important;
+        border-color: var(--cc-chip-border) !important;
+        color: var(--cc-chip-text) !important;
+      }
+      body:not(.light) #topbar .chip:hover,
+      body:not(.light) #topbar.top .chip:hover,
+      body:not(.light) #topbar .chip:focus-visible {
+        outline: none !important;
+        border-color: var(--cc-active-border) !important;
+        color: var(--cc-text-main) !important;
+        box-shadow: var(--cc-focus-ring), 0 0 22px var(--cc-active-glow) !important;
+      }
+      body:not(.light) #topbar .chip.gold,
+      body:not(.light) .surface .actions .btn.gold,
+      body:not(.light) #dashNextEvent.btn.gold,
+      body:not(.light) .btn-primary,
+      body:not(.light) .surface .btn-primary,
+      body:not(.light) #page-settings .btn-primary,
+      body:not(.light) .cc-tab-bg-save-btn,
+      body:not(.light) .cc-tab-bg-apply-all-btn {
+        background: var(--cc-button-bg) !important;
+        border-color: var(--cc-button-border) !important;
+        color: var(--cc-button-text) !important;
+      }
+      body:not(.light) #topbar .chip.dark,
+      body:not(.light) #roleBadge,
+      body:not(.light) #topbarClan {
+        background: rgba(0,0,0,.34) !important;
+        border-color: var(--cc-chip-border) !important;
+        color: var(--cc-text-main) !important;
+      }
+      body:not(.light) #topbarAvatar {
+        background: linear-gradient(135deg, var(--cc-accent-2), var(--cc-success-accent)) !important;
+        color: #07100e !important;
+      }
+      body:not(.light) #ccAdminBtn { color: var(--cc-accent-2) !important; }
+      body:not(.light) #dfToggle[aria-pressed="true"],
+      body:not(.light) #fxToggle[aria-pressed="true"],
+      body:not(.light) #ccPaletteBtn[aria-expanded="true"] {
+        border-color: var(--cc-active-border) !important;
+        color: var(--cc-accent-2) !important;
+        background: var(--cc-active-bg) !important;
+        box-shadow: 0 0 26px var(--cc-active-glow) !important;
+      }
+      body:not(.light) .sidebar.side .logo .mark {
+        border-color: var(--cc-active-border) !important;
+        background: radial-gradient(circle, rgba(var(--cc-accent-rgb),.24), transparent 58%), rgba(255,255,255,.04) !important;
+        box-shadow: 0 0 34px var(--cc-accent-glow) !important;
+      }
+      body:not(.light) .sidebar.side .logo h2,
+      body:not(.light) .sidebar.side .tier b,
+      body:not(.light) .sidebar.side .nav .ico {
+        color: var(--cc-accent-2) !important;
+      }
+      body:not(.light) .sidebar.side .nav p,
+      body:not(.light) .sidebar.side .tier small {
+        color: var(--cc-text-muted) !important;
+      }
+      body:not(.light) .sidebar.side .nav button.nav-item:hover {
+        background: rgba(var(--cc-accent-rgb), .08) !important;
+        color: var(--cc-text-main) !important;
+      }
+      body:not(.light) .sidebar.side .nav button.nav-item.active {
+        background: linear-gradient(90deg, var(--cc-active-bg), rgba(255,255,255,.055)) !important;
+        color: var(--cc-title-color) !important;
+        box-shadow: inset 0 0 0 1px var(--cc-active-border), 0 0 28px var(--cc-active-glow) !important;
+      }
+      body:not(.light) .sidebar.side .tier {
+        border-color: var(--cc-chip-border) !important;
+        background: radial-gradient(circle at 50% 0, rgba(var(--cc-accent-rgb),.14), transparent 54%), rgba(0,0,0,.24) !important;
+      }
+      body:not(.light) .main-content.surface::before {
+        background:
+          radial-gradient(circle at 50% 0%, rgba(var(--cc-accent-rgb),.12), transparent 35%),
+          linear-gradient(90deg, transparent, rgba(255,255,255,.04), transparent) !important;
+      }
+      body:not(.light) .surface .head h1,
+      body:not(.light) .page-section.v20-grafted .v20-page-head h1,
+      body:not(.light) .surface .big,
+      body:not(.light) .surface .rank b,
+      body:not(.light) .surface .score,
+      body:not(.light) .surface .mline b,
+      body:not(.light) .surface .ml b {
+        color: var(--cc-title-color) !important;
+      }
+      body:not(.light) .surface .eyebrow,
+      body:not(.light) #page-settings .pill.gold {
+        border-color: var(--cc-accent-border) !important;
+        background: var(--cc-accent-soft) !important;
+        color: var(--cc-accent-2) !important;
+      }
+      body:not(.light) .surface .card:hover,
+      body:not(.light) #page-stats .card:hover,
+      body:not(.light) #page-settings .card:hover {
+        border-color: var(--cc-accent-border) !important;
+        box-shadow: 0 24px 65px rgba(0,0,0,.42), 0 0 38px var(--cc-accent-glow) !important;
+      }
+      body:not(.light) .surface .card::before,
+      body:not(.light) .card::before {
+        background:
+          radial-gradient(circle at 0 0, rgba(var(--cc-accent-rgb),.11), transparent 35%),
+          radial-gradient(circle at 100% 0, rgba(var(--cc-accent-rgb),.06), transparent 36%) !important;
+      }
+      body:not(.light) .surface .card .ph h3,
+      body:not(.light) .surface .cal-head h3,
+      body:not(.light) .surface .card .link,
+      body:not(.light) .card a {
+        color: var(--cc-warm-2) !important;
+      }
+      body:not(.light) .surface .badge,
+      body:not(.light) .badge,
+      body:not(.light) .surface .num,
+      body:not(.light) .surface .rico,
+      body:not(.light) .surface .ai,
+      body:not(.light) .surface .tico,
+      body:not(.light) .pill {
+        border-color: var(--cc-accent-border) !important;
+        background: var(--cc-accent-soft) !important;
+        color: var(--cc-accent-2) !important;
+      }
+      body:not(.light) .surface .orb {
+        border-color: var(--cc-accent-border) !important;
+        background:
+          radial-gradient(circle at 34% 28%, rgba(255,245,210,.34), transparent 18%),
+          radial-gradient(circle, rgba(var(--cc-accent-rgb),.18), rgba(0,0,0,.44) 66%) !important;
+        box-shadow: inset 0 0 18px rgba(0,0,0,.85), 0 0 22px var(--cc-accent-glow) !important;
+      }
+      body:not(.light) .surface .day.today,
+      body:not(.light) .surface .day.has,
+      body:not(.light) .dp-day.in-range,
+      body:not(.light) tr.selected,
+      body:not(.light) .is-selected {
+        border-color: var(--cc-active-border) !important;
+        background: var(--cc-active-bg) !important;
+        color: var(--cc-title-color) !important;
+      }
+      body:not(.light) .surface .day i,
+      body:not(.light) .surface .bar span {
+        background: linear-gradient(90deg, var(--cc-accent), var(--cc-accent-2), var(--cc-success-accent)) !important;
+      }
+      body:not(.light) .surface .ring {
+        background: conic-gradient(var(--cc-accent) 0 var(--scan,0%), rgba(255,255,255,.06) 0) !important;
+        box-shadow: 0 0 34px var(--cc-accent-glow) !important;
+      }
+      body:not(.light) .surface .up,
+      body:not(.light) #page-settings .pill.green { color: var(--cc-success-accent) !important; }
+      body:not(.light) .surface .down,
+      body:not(.light) .chip.danger { color: var(--cc-danger-accent) !important; }
+      body:not(.light) .surface .warn { color: var(--cc-warm) !important; }
+      body:not(.light) .surface input:focus,
+      body:not(.light) .surface textarea:focus,
+      body:not(.light) .surface select:focus,
+      body:not(.light) .cc-fx-select-btn:focus-visible,
+      body:not(.light) .cc-tab-bg-dialog button:focus-visible,
+      body:not(.light) .cc-palette-popover button:focus-visible {
+        outline: none !important;
+        border-color: var(--cc-active-border) !important;
+        box-shadow: var(--cc-focus-ring) !important;
+      }
+      body:not(.light) input[type="range"],
+      body:not(.light) .cc-fx-row input[type="range"],
+      body:not(.light) .cc-glass-row input[type="range"],
+      body:not(.light) .cb-range input[type=range] {
+        accent-color: var(--cc-accent) !important;
+      }
+      body:not(.light) .cc-fx-row input[type="range"]::-webkit-slider-runnable-track,
+      body:not(.light) .cc-glass-row input[type="range"]::-webkit-slider-runnable-track {
+        background: linear-gradient(90deg, rgba(var(--cc-accent-rgb),.66), rgba(255,255,255,.12)) !important;
+      }
+      body:not(.light) .cc-fx-row input[type="range"]::-webkit-slider-thumb,
+      body:not(.light) .cc-glass-row input[type="range"]::-webkit-slider-thumb {
+        border-color: var(--cc-accent-2) !important;
+        background: var(--cc-accent) !important;
+        box-shadow: 0 0 12px var(--cc-accent-glow) !important;
+      }
+      body:not(.light) .cc-fx-popover,
+      body:not(.light) .cc-glass-popover,
+      body:not(.light) .cc-palette-popover {
+        border-color: var(--cc-chip-border) !important;
+        background: linear-gradient(180deg, rgba(8,10,14,.96), rgba(5,6,8,.91)) !important;
+        box-shadow: 0 20px 70px rgba(0,0,0,.50), 0 0 32px var(--cc-accent-glow), inset 0 1px rgba(255,255,255,.08) !important;
+      }
+      body:not(.light) .cc-fx-select-btn::after {
+        border-right-color: var(--cc-accent-2) !important;
+        border-bottom-color: var(--cc-accent-2) !important;
+      }
+      body:not(.light) .cc-fx-select-btn:hover,
+      body:not(.light) .cc-fx-select-btn[aria-expanded="true"],
+      body:not(.light) .cc-fx-select-list button:hover,
+      body:not(.light) .cc-fx-select-list button:focus-visible,
+      body:not(.light) .cc-fx-select-list button[aria-selected="true"],
+      body:not(.light) #glassDimReset:hover,
+      body:not(.light) .cc-fx-actions button:hover,
+      body:not(.light) .cc-tab-bg-reset-btn:hover,
+      body:not(.light) .cc-tab-bg-row.is-current,
+      body:not(.light) .cc-tab-bg-row.is-selected {
+        border-color: var(--cc-active-border) !important;
+        background: var(--cc-active-bg) !important;
+        color: var(--cc-accent-2) !important;
+      }
+      body:not(.light) .cc-fx-row span,
+      body:not(.light) #glassBlurValue,
+      body:not(.light) #glassTintValue,
+      body:not(.light) .cb-range-value {
+        color: var(--cc-accent-2) !important;
+      }
+      body:not(.light) .cc-palette-popover {
+        position: fixed;
+        top: 58px;
+        right: 224px;
+        z-index: 143;
+        width: min(360px, calc(100vw - 24px));
+        padding: 14px;
+        display: none;
+        border: 1px solid rgba(255,255,255,.14);
+        border-radius: 14px;
+      }
+      body:not(.light) .cc-palette-popover.open { display: block; }
+      body:not(.light) .cc-palette-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      body:not(.light) .cc-palette-head strong {
+        display: block;
+        color: var(--cc-title-color);
+        font-size: 13px;
+        font-weight: 900;
+      }
+      body:not(.light) .cc-palette-head span {
+        display: block;
+        margin-top: 3px;
+        color: var(--cc-text-muted);
+        font-size: 11px;
+        font-weight: 700;
+      }
+      body:not(.light) .cc-palette-reset {
+        height: 28px;
+        padding: 0 10px;
+        border-radius: 9px;
+        border: 1px solid var(--cc-chip-border);
+        background: rgba(255,255,255,.055);
+        color: var(--cc-chip-text);
+        font: inherit;
+        font-size: 11px;
+        font-weight: 850;
+        cursor: pointer;
+      }
+      body:not(.light) .cc-palette-grid {
+        display: grid;
+        gap: 7px;
+      }
+      body:not(.light) .cc-palette-option {
+        width: 100%;
+        min-height: 46px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,.10);
+        background: rgba(255,255,255,.045);
+        color: var(--cc-chip-text);
+        font: inherit;
+        font-size: 12px;
+        font-weight: 850;
+        text-align: left;
+        cursor: pointer;
+      }
+      body:not(.light) .cc-palette-option:hover {
+        border-color: var(--cc-active-border);
+        background: rgba(var(--cc-accent-rgb), .08);
+        color: var(--cc-title-color);
+      }
+      body:not(.light) .cc-palette-option.is-selected {
+        border-color: var(--cc-active-border) !important;
+        background: linear-gradient(90deg, var(--cc-active-bg), rgba(255,255,255,.045)) !important;
+        color: var(--cc-accent-2) !important;
+        box-shadow: inset 0 0 0 1px rgba(var(--cc-accent-rgb),.10), 0 0 20px var(--cc-active-glow) !important;
+      }
+      body:not(.light) .cc-palette-swatches {
+        display: flex;
+        gap: 5px;
+      }
+      body:not(.light) .cc-palette-swatch {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 1px solid rgba(255,255,255,.30);
+        box-shadow: inset 0 1px rgba(255,255,255,.20), 0 4px 12px rgba(0,0,0,.24);
+      }
+    </style>
+    <script id="cc-color-theme-system-script">
+    (function(){
+      'use strict';
+      var STORAGE_KEY = 'cc-color-theme';
+      var DEFAULT_THEME = 'v20-default';
+      var CC_COLOR_THEMES = {
+        'v20-default': {
+          id: 'v20-default',
+          label: 'V20 Gold',
+          swatches: ['#e8be58', '#ffd871', '#b9822e', '#0b0b0c'],
+          vars: {
+            '--cc-accent': '#e8be58',
+            '--cc-accent-2': '#ffd871',
+            '--cc-accent-rgb': '232, 190, 88',
+            '--cc-accent-soft': 'rgba(232,190,88,.12)',
+            '--cc-accent-border': 'rgba(255,216,113,.32)',
+            '--cc-accent-glow': 'rgba(232,190,88,.18)',
+            '--cc-warm': '#b9822e',
+            '--cc-warm-2': '#f5d18a',
+            '--cc-danger-accent': '#ff7664',
+            '--cc-success-accent': '#68ff92',
+            '--cc-text-main': '#fffdf5',
+            '--cc-text-muted': 'rgba(247,242,232,.66)',
+            '--cc-title-color': '#fffdf5',
+            '--cc-chip-bg': 'rgba(232,190,88,.08)',
+            '--cc-chip-border': 'rgba(255,216,113,.22)',
+            '--cc-chip-text': 'rgba(247,242,232,.82)',
+            '--cc-active-bg': 'rgba(232,190,88,.16)',
+            '--cc-active-border': 'rgba(255,216,113,.38)',
+            '--cc-active-glow': 'rgba(232,190,88,.16)',
+            '--cc-button-bg': 'linear-gradient(135deg, #ffd871, #b9822e)',
+            '--cc-button-text': '#241807',
+            '--cc-button-border': 'rgba(255,216,113,.30)',
+            '--cc-focus-ring': '0 0 0 3px rgba(232,190,88,.18)',
+            '--gold': '#e8be58',
+            '--accent': '#c9a84c',
+            '--accent-s': '#f2d18a',
+            '--ink': '#fffdf5',
+            '--muted': 'rgba(247,242,232,.66)',
+            '--green': '#68ff92',
+            '--red': '#ff7664'
+          }
+        },
+        'ivory-slate-terracotta': {
+          id: 'ivory-slate-terracotta',
+          label: 'Ivory Slate Terracotta',
+          swatches: ['#d88b5a', '#f0dfc3', '#2f4145', '#7b4b32'],
+          vars: {
+            '--cc-accent': '#d88b5a',
+            '--cc-accent-2': '#f0dfc3',
+            '--cc-accent-rgb': '216, 139, 90',
+            '--cc-accent-soft': 'rgba(216,139,90,.13)',
+            '--cc-accent-border': 'rgba(240,223,195,.30)',
+            '--cc-accent-glow': 'rgba(216,139,90,.20)',
+            '--cc-warm': '#9d6040',
+            '--cc-warm-2': '#f0dfc3',
+            '--cc-danger-accent': '#d66d5f',
+            '--cc-success-accent': '#9fb78d',
+            '--cc-text-main': '#f6ead7',
+            '--cc-text-muted': 'rgba(246,234,215,.64)',
+            '--cc-title-color': '#fff3df',
+            '--cc-chip-bg': 'rgba(216,139,90,.09)',
+            '--cc-chip-border': 'rgba(240,223,195,.20)',
+            '--cc-chip-text': 'rgba(246,234,215,.82)',
+            '--cc-active-bg': 'rgba(216,139,90,.17)',
+            '--cc-active-border': 'rgba(240,223,195,.36)',
+            '--cc-active-glow': 'rgba(216,139,90,.17)',
+            '--cc-button-bg': 'linear-gradient(135deg, #f0dfc3, #d88b5a)',
+            '--cc-button-text': '#22140e',
+            '--cc-button-border': 'rgba(240,223,195,.34)',
+            '--cc-focus-ring': '0 0 0 3px rgba(216,139,90,.20)',
+            '--gold': '#d88b5a',
+            '--accent': '#d88b5a',
+            '--accent-s': '#f0dfc3',
+            '--ink': '#fff3df',
+            '--muted': 'rgba(246,234,215,.64)',
+            '--green': '#9fb78d',
+            '--red': '#d66d5f'
+          }
+        },
+        'crimson-obsidian': {
+          id: 'crimson-obsidian',
+          label: 'Crimson Obsidian',
+          swatches: ['#b72b3a', '#e0a06d', '#3a1018', '#050505'],
+          vars: {
+            '--cc-accent': '#b72b3a',
+            '--cc-accent-2': '#e0a06d',
+            '--cc-accent-rgb': '183, 43, 58',
+            '--cc-accent-soft': 'rgba(183,43,58,.14)',
+            '--cc-accent-border': 'rgba(224,160,109,.28)',
+            '--cc-accent-glow': 'rgba(183,43,58,.22)',
+            '--cc-warm': '#7c1f2b',
+            '--cc-warm-2': '#e0a06d',
+            '--cc-danger-accent': '#ef5360',
+            '--cc-success-accent': '#b8b06b',
+            '--cc-text-main': '#fff0e6',
+            '--cc-text-muted': 'rgba(255,240,230,.63)',
+            '--cc-title-color': '#fff5ec',
+            '--cc-chip-bg': 'rgba(183,43,58,.10)',
+            '--cc-chip-border': 'rgba(224,160,109,.20)',
+            '--cc-chip-text': 'rgba(255,240,230,.82)',
+            '--cc-active-bg': 'rgba(183,43,58,.18)',
+            '--cc-active-border': 'rgba(224,160,109,.34)',
+            '--cc-active-glow': 'rgba(183,43,58,.20)',
+            '--cc-button-bg': 'linear-gradient(135deg, #e0a06d, #b72b3a)',
+            '--cc-button-text': '#160608',
+            '--cc-button-border': 'rgba(224,160,109,.33)',
+            '--cc-focus-ring': '0 0 0 3px rgba(183,43,58,.22)',
+            '--gold': '#b72b3a',
+            '--accent': '#b72b3a',
+            '--accent-s': '#e0a06d',
+            '--ink': '#fff5ec',
+            '--muted': 'rgba(255,240,230,.63)',
+            '--green': '#b8b06b',
+            '--red': '#ef5360'
+          }
+        },
+        'olive-moss-brass': {
+          id: 'olive-moss-brass',
+          label: 'Olive Moss Brass',
+          swatches: ['#879457', '#c2a85f', '#33402a', '#11140f'],
+          vars: {
+            '--cc-accent': '#879457',
+            '--cc-accent-2': '#c2a85f',
+            '--cc-accent-rgb': '135, 148, 87',
+            '--cc-accent-soft': 'rgba(135,148,87,.14)',
+            '--cc-accent-border': 'rgba(194,168,95,.30)',
+            '--cc-accent-glow': 'rgba(135,148,87,.20)',
+            '--cc-warm': '#7a6839',
+            '--cc-warm-2': '#d7c17b',
+            '--cc-danger-accent': '#c76d57',
+            '--cc-success-accent': '#a9c27a',
+            '--cc-text-main': '#f0efd9',
+            '--cc-text-muted': 'rgba(240,239,217,.64)',
+            '--cc-title-color': '#f8f4dc',
+            '--cc-chip-bg': 'rgba(135,148,87,.10)',
+            '--cc-chip-border': 'rgba(194,168,95,.22)',
+            '--cc-chip-text': 'rgba(240,239,217,.82)',
+            '--cc-active-bg': 'rgba(135,148,87,.18)',
+            '--cc-active-border': 'rgba(194,168,95,.36)',
+            '--cc-active-glow': 'rgba(135,148,87,.18)',
+            '--cc-button-bg': 'linear-gradient(135deg, #c2a85f, #879457)',
+            '--cc-button-text': '#101309',
+            '--cc-button-border': 'rgba(194,168,95,.34)',
+            '--cc-focus-ring': '0 0 0 3px rgba(135,148,87,.21)',
+            '--gold': '#c2a85f',
+            '--accent': '#879457',
+            '--accent-s': '#d7c17b',
+            '--ink': '#f8f4dc',
+            '--muted': 'rgba(240,239,217,.64)',
+            '--green': '#a9c27a',
+            '--red': '#c76d57'
+          }
+        },
+        'teal-graphite': {
+          id: 'teal-graphite',
+          label: 'Teal Graphite',
+          swatches: ['#39a7a4', '#8fd9d2', '#29353a', '#0b1013'],
+          vars: {
+            '--cc-accent': '#39a7a4',
+            '--cc-accent-2': '#8fd9d2',
+            '--cc-accent-rgb': '57, 167, 164',
+            '--cc-accent-soft': 'rgba(57,167,164,.13)',
+            '--cc-accent-border': 'rgba(143,217,210,.30)',
+            '--cc-accent-glow': 'rgba(57,167,164,.20)',
+            '--cc-warm': '#5c7f89',
+            '--cc-warm-2': '#b7e7e1',
+            '--cc-danger-accent': '#d56d71',
+            '--cc-success-accent': '#8ed6a3',
+            '--cc-text-main': '#eef8f6',
+            '--cc-text-muted': 'rgba(238,248,246,.64)',
+            '--cc-title-color': '#f4fffd',
+            '--cc-chip-bg': 'rgba(57,167,164,.09)',
+            '--cc-chip-border': 'rgba(143,217,210,.22)',
+            '--cc-chip-text': 'rgba(238,248,246,.82)',
+            '--cc-active-bg': 'rgba(57,167,164,.17)',
+            '--cc-active-border': 'rgba(143,217,210,.36)',
+            '--cc-active-glow': 'rgba(57,167,164,.18)',
+            '--cc-button-bg': 'linear-gradient(135deg, #8fd9d2, #39a7a4)',
+            '--cc-button-text': '#071314',
+            '--cc-button-border': 'rgba(143,217,210,.34)',
+            '--cc-focus-ring': '0 0 0 3px rgba(57,167,164,.21)',
+            '--gold': '#39a7a4',
+            '--accent': '#39a7a4',
+            '--accent-s': '#8fd9d2',
+            '--ink': '#f4fffd',
+            '--muted': 'rgba(238,248,246,.64)',
+            '--green': '#8ed6a3',
+            '--red': '#d56d71'
+          }
+        }
+        // seasonal palettes can be added here later
+      };
+      function safeGetTheme() {
+        try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+      }
+      function safeSetTheme(themeId) {
+        try { localStorage.setItem(STORAGE_KEY, themeId); } catch(e) {}
+      }
+      function themeOrDefault(themeId) {
+        return CC_COLOR_THEMES[themeId] ? CC_COLOR_THEMES[themeId] : CC_COLOR_THEMES[DEFAULT_THEME];
+      }
+      function updatePaletteSelectedState(themeId) {
+        document.querySelectorAll('[data-cc-palette-id]').forEach(function(btn){
+          var selected = btn.getAttribute('data-cc-palette-id') === themeId;
+          btn.classList.toggle('is-selected', selected);
+          btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        });
+      }
+      function applyColorTheme(themeId) {
+        var theme = themeOrDefault(themeId);
+        var root = document.documentElement;
+        Object.keys(theme.vars).forEach(function(name){
+          root.style.setProperty(name, theme.vars[name]);
+        });
+        if (document.body) document.body.dataset.colorTheme = theme.id;
+        safeSetTheme(theme.id);
+        updatePaletteSelectedState(theme.id);
+        return theme.id;
+      }
+      function closePalettePopover() {
+        var pop = document.getElementById('ccPalettePopover');
+        var btn = document.getElementById('ccPaletteBtn');
+        if (pop) {
+          pop.classList.remove('open');
+          pop.setAttribute('aria-hidden', 'true');
+        }
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+      }
+      function placePalettePopover(pop, btn) {
+        if (!pop || !btn) return;
+        var rect = btn.getBoundingClientRect();
+        var width = Math.min(360, Math.max(280, window.innerWidth - 24));
+        var left = Math.max(12, Math.min(window.innerWidth - width - 12, rect.right - width));
+        pop.style.width = width + 'px';
+        pop.style.left = left + 'px';
+        pop.style.right = 'auto';
+        pop.style.top = Math.max(52, rect.bottom + 8) + 'px';
+      }
+      function togglePalettePopover() {
+        var pop = document.getElementById('ccPalettePopover');
+        var btn = document.getElementById('ccPaletteBtn');
+        if (!pop || !btn) return;
+        var open = !pop.classList.contains('open');
+        if (open) {
+          var fx = document.getElementById('ccFxPopover');
+          var glass = document.getElementById('glassDimPopover');
+          if (fx) { fx.classList.remove('open'); fx.setAttribute('aria-hidden','true'); }
+          if (glass) { glass.classList.remove('open'); glass.setAttribute('aria-hidden','true'); }
+          placePalettePopover(pop, btn);
+        }
+        pop.classList.toggle('open', open);
+        pop.setAttribute('aria-hidden', open ? 'false' : 'true');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+      function paletteOptionHtml(theme) {
+        var swatches = theme.swatches.map(function(color){
+          return '<span class="cc-palette-swatch" style="background:' + color + '"></span>';
+        }).join('');
+        return '<button type="button" class="cc-palette-option" data-cc-palette-id="' + theme.id + '" aria-pressed="false">'
+          + '<span>' + theme.label + '</span>'
+          + '<span class="cc-palette-swatches" aria-hidden="true">' + swatches + '</span>'
+          + '</button>';
+      }
+      function ensurePaletteUi() {
+        var topbar = document.getElementById('topbar');
+        var tools = topbar && topbar.querySelector('.tools');
+        var btn = document.getElementById('ccPaletteBtn');
+        if (!btn && tools) {
+          btn = document.createElement('button');
+          btn.id = 'ccPaletteBtn';
+          btn.type = 'button';
+          btn.className = 'chip v20-shell-chip';
+          btn.textContent = 'Палитра';
+          btn.setAttribute('aria-expanded', 'false');
+          var glass = document.getElementById('glassDimToggle');
+          tools.insertBefore(btn, glass || tools.lastElementChild);
+        }
+        var pop = document.getElementById('ccPalettePopover');
+        if (!pop && topbar) {
+          pop = document.createElement('div');
+          pop.id = 'ccPalettePopover';
+          pop.className = 'cc-palette-popover';
+          pop.setAttribute('aria-hidden', 'true');
+          pop.innerHTML = '<div class="cc-palette-head"><div><strong>Палитра</strong><span>Цветовая гамма интерфейса</span></div><button type="button" class="cc-palette-reset" id="ccPaletteReset">Сброс</button></div>'
+            + '<div class="cc-palette-grid">'
+            + Object.keys(CC_COLOR_THEMES).map(function(id){ return paletteOptionHtml(CC_COLOR_THEMES[id]); }).join('')
+            + '</div>';
+          topbar.appendChild(pop);
+        }
+      }
+      function bindPaletteUi() {
+        var btn = document.getElementById('ccPaletteBtn');
+        var pop = document.getElementById('ccPalettePopover');
+        var reset = document.getElementById('ccPaletteReset');
+        if (btn && btn.dataset.ccPaletteBound !== '1') {
+          btn.dataset.ccPaletteBound = '1';
+          btn.addEventListener('click', function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            togglePalettePopover();
+          });
+        }
+        if (pop && pop.dataset.ccPaletteBound !== '1') {
+          pop.dataset.ccPaletteBound = '1';
+          pop.addEventListener('click', function(e){ e.stopPropagation(); });
+          pop.querySelectorAll('[data-cc-palette-id]').forEach(function(option){
+            option.addEventListener('click', function(e){
+              e.preventDefault();
+              applyColorTheme(option.getAttribute('data-cc-palette-id'));
+            });
+          });
+        }
+        if (reset && reset.dataset.ccPaletteBound !== '1') {
+          reset.dataset.ccPaletteBound = '1';
+          reset.addEventListener('click', function(e){
+            e.preventDefault();
+            applyColorTheme(DEFAULT_THEME);
+          });
+        }
+        if (!document.documentElement.dataset.ccPaletteDocBound) {
+          document.documentElement.dataset.ccPaletteDocBound = '1';
+          document.addEventListener('click', function(e){
+            var currentPop = document.getElementById('ccPalettePopover');
+            var currentBtn = document.getElementById('ccPaletteBtn');
+            if (!currentPop || !currentPop.classList.contains('open')) return;
+            if (currentPop.contains(e.target) || (currentBtn && currentBtn.contains(e.target))) return;
+            closePalettePopover();
+          });
+          document.addEventListener('keydown', function(e){
+            if (e.key === 'Escape') closePalettePopover();
+          });
+          window.addEventListener('resize', function(){
+            var currentPop = document.getElementById('ccPalettePopover');
+            var currentBtn = document.getElementById('ccPaletteBtn');
+            if (currentPop && currentPop.classList.contains('open')) placePalettePopover(currentPop, currentBtn);
+          });
+        }
+      }
+      function initColorThemes() {
+        ensurePaletteUi();
+        bindPaletteUi();
+        applyColorTheme(safeGetTheme() || DEFAULT_THEME);
+      }
+      window.CC_COLOR_THEMES = CC_COLOR_THEMES;
+      window.applyColorTheme = applyColorTheme;
+      window.initColorThemes = initColorThemes;
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initColorThemes);
+      } else {
+        initColorThemes();
+      }
+      setTimeout(initColorThemes, 500);
+    })();
+    </script>
     <script id="v20-shell-completion">
     (function(){
       'use strict';
