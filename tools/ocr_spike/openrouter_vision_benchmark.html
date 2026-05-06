@@ -195,6 +195,7 @@ pre.raw{font:10px/1.4 Consolas,monospace;background:#0a0d12;border:1px solid #1e
   <div class="prompt-row">
     <select id="promptPreset">
       <option value="km">KM table JSON</option>
+      <option value="km_right">KM right member table only</option>
       <option value="raw">raw text</option>
       <option value="custom">custom</option>
     </select>
@@ -239,6 +240,7 @@ let cancelFlag = false;
 
 const PROMPTS = {
   km: `Extract KM table rows from this game screenshot. Return ONLY valid JSON:\n{"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"confidence":0,"notes":""}\nRules:\n- preserve nick spelling exactly\n- numbers must be integers\n- if unsure about a value, put null and mention in notes\n- no markdown, no code fences, raw JSON only`,
+  km_right: `Extract rows from ONLY the right-side table titled "Член группы" / "Member group" in this KM game screenshot.\nIgnore the left-side leader table entirely.\nIgnore any clan summary, leader summary, or headers outside the right table.\nReturn ONLY valid JSON:\n{"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"confidence":0,"notes":""}\nRules:\n- preserve nick spelling exactly as seen\n- numbers must be integers\n- if a cell is unreadable, use null\n- no markdown, no code fences, raw JSON only`,
   raw: `Return the full text content of this image, preserving layout as closely as possible.`,
 };
 
