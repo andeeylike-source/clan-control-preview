@@ -4667,6 +4667,8 @@
             if (activeDayDate && appliedStatsByDate[activeDayDate]) {
                 const historyShots = collectKmHistoryScreenshotSnapshot(activeDayDate);
                 if (historyShots.length) appliedStatsByDate[activeDayDate].kmScreenshots = historyShots;
+                const packShots = collectKmHistoryPackScreenshotSnapshot();
+                if (Object.keys(packShots).length) appliedStatsByDate[activeDayDate].kmPackScreenshots = packShots;
             }
             // 3. Удаляем скрины — при сохранении всегда очищаем
             if (activeDayDate && dayScreenshots[activeDayDate]) {
@@ -10231,16 +10233,41 @@ ${playerList}
 
         function makeKmHistoryShotItem(src, idx, prefix) {
             if (!src) return null;
-            const rawUrl = src.dataUrl || src.thumbDataUrl || src.url || src.shotUrl || '';
-            const rawSize = rawUrl ? rawUrl.length : 0;
+            const rawUrl = src.originalDataUrl || src.fullDataUrl || src.dataUrl || src.thumbDataUrl || src.url || src.shotUrl || src.cropUrl || '';
+            const thumbUrl = src.thumbDataUrl || src.previewUrl || (rawUrl && rawUrl.length <= KM_HISTORY_THUMB_MAX_CHARS ? rawUrl : (src.cropUrl || ''));
+            const originalUrl = src.originalDataUrl || src.fullDataUrl || (rawUrl && rawUrl.length <= KM_HISTORY_THUMB_MAX_CHARS ? rawUrl : '');
             const name = src.name || src.packName || src.label || (prefix + ' ' + (idx + 1));
             return {
                 id: src.id || (prefix + '_' + idx),
                 name: name,
-                thumbDataUrl: rawUrl && rawSize <= KM_HISTORY_THUMB_MAX_CHARS ? rawUrl : '',
-                bytes: rawSize,
-                source: src.source || prefix
+                packName: src.packName || '',
+                thumbDataUrl: thumbUrl,
+                originalDataUrl: originalUrl,
+                bytes: rawUrl ? rawUrl.length : 0,
+                source: src.source || prefix,
+                note: src.note || '',
+                hasOriginal: !!originalUrl
             };
+        }
+
+        function collectKmHistoryPackScreenshotSnapshot() {
+            const map = {};
+            Object.entries(dayScreenShotMap || {}).slice(0, KM_HISTORY_SHOT_LIMIT).forEach(function(entry, i) {
+                const packName = entry[0];
+                const dataUrl = entry[1] || '';
+                const geom = (dayPackGeometry && dayPackGeometry[packName]) || {};
+                map[packName] = makeKmHistoryShotItem({
+                    id: 'pack_' + packName,
+                    packName: packName,
+                    name: packName,
+                    originalDataUrl: dataUrl && dataUrl.length <= KM_HISTORY_THUMB_MAX_CHARS ? dataUrl : '',
+                    thumbDataUrl: geom.cropUrl || (dataUrl && dataUrl.length <= KM_HISTORY_THUMB_MAX_CHARS ? dataUrl : ''),
+                    cropUrl: geom.cropUrl || '',
+                    source: 'pack',
+                    note: geom.cropUrl ? '' : ''
+                }, i, 'pack');
+            });
+            return map;
         }
 
         function collectKmHistoryScreenshotSnapshot(dateStr) {
@@ -10256,9 +10283,6 @@ ${playerList}
             ((dayScreenshots && dayScreenshots[dateStr]) || []).slice(0, KM_HISTORY_SHOT_LIMIT).forEach(function(s, i) {
                 add(makeKmHistoryShotItem(s, i, 'day'));
             });
-            Object.entries(dayScreenShotMap || {}).slice(0, KM_HISTORY_SHOT_LIMIT).forEach(function(entry, i) {
-                add(makeKmHistoryShotItem({ packName: entry[0], dataUrl: entry[1], source: 'pack' }, i, 'pack'));
-            });
             return shots.slice(0, KM_HISTORY_SHOT_LIMIT);
         }
 
@@ -10271,22 +10295,410 @@ ${playerList}
                 .filter(Boolean);
         }
 
+        function getKmHistoryPackShot(dayData, packName, fallbackKey) {
+            const map = dayData && dayData.kmPackScreenshots ? dayData.kmPackScreenshots : null;
+            if (map && packName && map[packName]) return map[packName];
+            if (map && fallbackKey && map[fallbackKey]) return map[fallbackKey];
+            return null;
+        }
+
+        function kmHistoryValueOrEmpty(v, fallback) {
+            return (v == null || v === '' ? (fallback || '—') : v);
+        }
+
+        function kmHistoryPlayerPackKey(p) {
+            return p.packId || p.partyId || p.pack || p.party || p.group || p.leader || p.packLeader || p.sourceLeader || p.groupLeader || 'Пак без лидера';
+        }
+
+        function kmHistoryBuildPlayerRowHtml(p, dateStr, isLeader) {
+            const resolvedN = resolveAlias(p.name);
+            const inRoster = roster.find(r => normalizeNick(r.name) === normalizeNick(resolvedN) || normalizeNick(r.name) === normalizeNick(p.name));
+            const normPKey = normalizeNick(p.name);
+            const savedKmProfa = (playerProfaByDate[normPKey] && playerProfaByDate[normPKey][dateStr]) || null;
+            const memberProfa = savedKmProfa || (inRoster ? (inRoster.profa || '—') : '—');
+            const memberProfaHtml = memberProfa && memberProfa !== '—'
+                ? `<span data-kmprofa-key="${normPKey}" data-kmprofa-date="${dateStr}" style="display:inline-flex;align-items:center">${profaIconHtml(memberProfa, 20)}</span>`
+                : `<span data-kmprofa-key="${normPKey}" data-kmprofa-date="${dateStr}" style="display:inline-flex;align-items:center"></span>`;
+            const rowClass = isLeader ? 'km-history-player-row is-leader' : 'km-history-player-row';
+            return `<div class="${rowClass}">
+                <span style="font-weight:600;display:flex;align-items:center;gap:6px;min-width:0">
+                    ${memberProfaHtml}
+                    <span class="player-nick-link" onclick="openPlayerProfile('${p.name.replace(/'/g,"\\'")}')" style="cursor:pointer">${p.name}</span>
+                    ${isLeader ? '<span class="km-history-leader-chip">Лидер</span>' : ''}
+                </span>
+                <span class="km-history-statline">
+                    <span style="color:#f59e0b">⚔️ ${p.kills||0}</span>
+                    <span style="color:#ef4444">💀 ${p.deaths||0}</span>
+                    <span style="color:#818cf8">🗡️ ${(p.pvp_dmg||0).toLocaleString()}</span>
+                    <span style="color:#22c55e">🐉 ${(p.pve_dmg||0).toLocaleString()}</span>
+                </span>
+            </div>`;
+        }
+
+        function kmHistoryBuildPackGroups(dateStr, dayData) {
+            const dayPlayersRaw = dayData ? (dayData.players || []) : [];
+            let dayPlayers = dayPlayersRaw.map(function(p) { return Object.assign({}, p); });
+            if (dayPlayers.length > 0) {
+                const hasStats = dayPlayers.some(function(p) { return (p.kills||0)+(p.deaths||0)+(p.pvp_dmg||0)+(p.pve_dmg||0) > 0; });
+                if (!hasStats) {
+                    dayPlayers = dayPlayers.map(function(p) {
+                        const r = roster.find(function(r) { return normalizeNick(r.name) === normalizeNick(p.name); });
+                        return r ? Object.assign({}, p, { kills: r.kills||0, deaths: r.deaths||0, pvp_dmg: r.pvp_dmg||0, pve_dmg: r.pve_dmg||0 }) : p;
+                    });
+                }
+            }
+            const cmdChannel = dayData ? (dayData.commandChannel || []) : [];
+            const packLeadersMap = dayData ? (dayData.packLeaders || {}) : {};
+            const screenPlayersMapDay = dayData ? (dayData.screenPlayersMap || {}) : {};
+            const used = {};
+            const groups = [];
+            const pushGroup = function(opts) {
+                const players = (opts.players || []).filter(Boolean);
+                const totalKills = players.reduce(function(s,p){ return s+(p.kills||0); }, 0);
+                const totalDeaths = players.reduce(function(s,p){ return s+(p.deaths||0); }, 0);
+                const totalPvp = players.reduce(function(s,p){ return s+(p.pvp_dmg||0); }, 0);
+                const totalPve = players.reduce(function(s,p){ return s+(p.pve_dmg||0); }, 0);
+                const topPlayers = players.slice().sort(function(a,b){
+                    return (b.kills||0) - (a.kills||0) || (b.pvp_dmg||0) - (a.pvp_dmg||0) || normalizeNick(a.name).localeCompare(normalizeNick(b.name));
+                }).slice(0, 3);
+                const group = {
+                    key: opts.key,
+                    leader: opts.leader || 'Пак без лидера',
+                    packName: opts.packName || '',
+                    players: players,
+                    totalPlayers: players.length || opts.membersHint || 0,
+                    totalKills: totalKills,
+                    totalDeaths: totalDeaths,
+                    totalPvp: totalPvp,
+                    totalPve: totalPve,
+                    topPlayers: topPlayers,
+                    screenshot: opts.screenshot || null,
+                    source: opts.source || 'fallback'
+                };
+                groups.push(group);
+                players.forEach(function(p) { used[normalizeNick(p.name)] = true; });
+            };
+            const resolvePackPlayers = function(packName, leader) {
+                let packPlayers = packName ? (screenPlayersMapDay[packName] || []) : [];
+                if (packPlayers.length === 0 && leader) {
+                    const leaderLower = leader.toLowerCase();
+                    Object.entries(screenPlayersMapDay).forEach(function(entry) {
+                        if (packPlayers.length > 0) return;
+                        const spPlayers = entry[1] || [];
+                        if (spPlayers.length > 0 && spPlayers[0].name && spPlayers[0].name.toLowerCase() === leaderLower) {
+                            packPlayers = spPlayers;
+                        }
+                    });
+                }
+                if (packPlayers.length === 0 && leader) {
+                    Object.entries(screenPlayersMapDay).forEach(function(entry) {
+                        if (packPlayers.length > 0) return;
+                        const spPlayers = entry[1] || [];
+                        if (spPlayers.some(function(p){ return p.name && (p.name.toLowerCase() === leader.toLowerCase() || normalizeNick(p.name) === normalizeNick(leader)); })) {
+                            packPlayers = spPlayers;
+                        }
+                    });
+                }
+                if (packPlayers.length === 0 && packName) {
+                    const packNorm = packName.toLowerCase().replace(/\s+/g,'');
+                    Object.entries(screenPlayersMapDay).forEach(function(entry) {
+                        if (packPlayers.length > 0) return;
+                        const spKey = entry[0];
+                        const spPlayers = entry[1] || [];
+                        if (spKey.toLowerCase().replace(/\s+/g,'') === packNorm) {
+                            packPlayers = spPlayers;
+                        }
+                    });
+                }
+                if (packPlayers.length === 0 && packName) {
+                    packPlayers = dayPlayers.filter(function(p) {
+                        const candidate = kmHistoryPlayerPackKey(p);
+                        return normalizeNick(candidate) === normalizeNick(packName);
+                    });
+                }
+                if (packPlayers.length === 0 && leader) {
+                    packPlayers = dayPlayers.filter(function(p) {
+                        const candidate = p.leader || p.packLeader || p.sourceLeader || p.groupLeader || p.pack || p.party || p.group || '';
+                        return normalizeNick(candidate) === normalizeNick(leader) || normalizeNick(resolveAlias(p.name)) === normalizeNick(leader);
+                    });
+                }
+                return packPlayers;
+            };
+
+            Object.entries(screenPlayersMapDay || {}).forEach(function(entry, idx) {
+                const packName = entry[0];
+                const players = (entry[1] || []).slice();
+                if (!players.length) return;
+                const leader = kmHistoryValueOrEmpty((packLeadersMap && packLeadersMap[packName]) || (players[0] && players[0].name) || packName, 'Пак без лидера');
+                pushGroup({
+                    key: 'screen:' + packName + ':' + idx,
+                    leader: leader,
+                    packName: packName,
+                    players: players,
+                    source: 'screen',
+                    screenshot: getKmHistoryPackShot(dayData, packName, packName) || null
+                });
+            });
+
+            cmdChannel.forEach(function(cc, idx) {
+                const normLeader = normalizeNick(cc.leader || '');
+                const exists = groups.some(function(g) {
+                    return normalizeNick(g.leader) === normLeader || normalizeNick(g.packName) === normalizeNick(cc.leader || '');
+                });
+                if (exists) return;
+                let packName = Object.entries(packLeadersMap || {}).find(function(entry) {
+                    return normalizeNick(entry[1]) === normLeader;
+                })?.[0] || cc.packName || cc.partyName || cc.groupName || '';
+                let packPlayers = resolvePackPlayers(packName, cc.leader || '');
+                if (!packPlayers.length) {
+                    packPlayers = dayPlayers.filter(function(p) {
+                        const candidate = kmHistoryPlayerPackKey(p);
+                        return candidate && normalizeNick(candidate) === normLeader;
+                    });
+                }
+                pushGroup({
+                    key: 'cmd:' + (packName || cc.leader || ('pack_' + idx)) + ':' + idx,
+                    leader: cc.leader || packName || 'Пак без лидера',
+                    packName: packName,
+                    players: packPlayers.length ? packPlayers : [],
+                    source: 'command',
+                    membersHint: cc.members || 0,
+                    screenshot: getKmHistoryPackShot(dayData, packName || cc.leader, packName || cc.leader) || null
+                });
+            });
+
+            const leftover = dayPlayers.filter(function(p) { return !used[normalizeNick(p.name)]; });
+            if (leftover.length) {
+                const buckets = {};
+                leftover.forEach(function(p, idx) {
+                    const bucketKey = kmHistoryPlayerPackKey(p) || ('packless:' + idx);
+                    if (!buckets[bucketKey]) {
+                        const leader = p.leader || p.packLeader || p.sourceLeader || p.groupLeader || p.name || 'Пак без лидера';
+                        const packName = p.packName || p.pack || p.party || p.group || '';
+                        buckets[bucketKey] = { key: bucketKey, leader: leader, packName: packName, players: [], source: 'fallback' };
+                    }
+                    buckets[bucketKey].players.push(p);
+                });
+                Object.values(buckets).forEach(function(bucket, idx) {
+                    pushGroup({
+                        key: 'fallback:' + bucket.key + ':' + idx,
+                        leader: bucket.leader || 'Пак без лидера',
+                        packName: bucket.packName || '',
+                        players: bucket.players,
+                        source: 'fallback',
+                        screenshot: getKmHistoryPackShot(dayData, bucket.packName || bucket.leader, bucket.packName || bucket.leader) || null
+                    });
+                });
+            }
+
+            groups.sort(function(a,b) {
+                return (b.totalKills||0) - (a.totalKills||0) || (b.totalPlayers||0) - (a.totalPlayers||0) || normalizeNick(a.leader).localeCompare(normalizeNick(b.leader));
+            });
+            const totalPlayers = dayPlayers.length;
+            console.log('[km-history] packs grouped count=' + groups.length + ' players=' + totalPlayers);
+            return groups;
+        }
+
+        function kmHistoryPlayerPackChipHtml(pack) {
+            const chips = (pack.topPlayers || []).map(function(p, i) {
+                return `<span class="km-history-pack-chip">${i+1}. ${p.name} · ⚔️${p.kills||0}</span>`;
+            });
+            if (pack.players.length > 3) {
+                chips.push(`<span class="km-history-pack-chip km-history-pack-chip-muted">+${pack.players.length - 3}</span>`);
+            }
+            return chips.join('');
+        }
+
         function renderKmHistoryScreenshots(dateStr, dayData) {
             const shots = getKmHistoryScreenshots(dateStr, dayData);
             const count = shots.length;
-            const body = count ? shots.map(function(s) {
-                const name = kmHistoryEsc(s.name || 'Скриншот');
-                const meta = s.thumbDataUrl ? 'миниатюра' : 'метаданные';
-                return '<div class="km-history-shot">'
-                    + (s.thumbDataUrl ? '<img src="' + s.thumbDataUrl + '" alt="' + name + '">' : '<div class="km-history-shot-empty">IMG</div>')
-                    + '<div><strong>' + name + '</strong><span>' + meta + (s.bytes ? ' · ' + Math.round(s.bytes / 1024) + ' KB' : '') + '</span></div>'
-                    + '</div>';
-            }).join('') : '<div class="km-history-shot-note">Скриншоты для этого КМ не сохранены</div>';
+            const label = count > 0 ? `Скрины ${count}` : 'Скрины';
+            return `<div class="km-history-screenshots-cta">
+                <button type="button" class="km-history-screenshots-btn" onclick="event.stopPropagation();openKmHistoryScreenshotsModal('${dateStr}')">${label}</button>
+            </div>`;
+        }
 
-            return '<div class="km-history-screenshots">'
-                + '<div class="km-history-section-title">Скриншоты КМ</div>'
-                + '<div class="km-history-shot-grid">' + body + '</div>'
-                + '</div>';
+        function renderKmHistoryPackGroups(dateStr, dayData, groups) {
+            const packGroups = groups || kmHistoryBuildPackGroups(dateStr, dayData);
+            if (!packGroups.length) {
+                return '<div class="km-history-shot-note">Паки не распознаны</div>';
+            }
+            return '<div class="km-history-pack-grid">' + packGroups.map(function(pack, idx) {
+                const topChips = kmHistoryPlayerPackChipHtml(pack);
+                const screenshot = pack.screenshot && (pack.screenshot.thumbDataUrl || pack.screenshot.originalDataUrl || pack.screenshot.cropUrl) ? pack.screenshot : null;
+                const leader = kmHistoryEsc(pack.leader || 'Пак без лидера');
+                const packName = kmHistoryEsc(pack.packName || '');
+                const leaderProf = (() => {
+                    const lr = roster.find(function(r) { return normalizeNick(r.name) === normalizeNick(pack.leader); });
+                    const lp = lr ? (lr.profa || '—') : '—';
+                    return lp && lp !== '—' ? profaIconHtml(lp, 20) : '';
+                })();
+                return `<button type="button" class="km-history-pack-card" onclick="event.stopPropagation();openKmHistoryPackModal('${dateStr}','${pack.key.replace(/'/g,"\\'")}')">
+                    <div class="km-history-pack-head">
+                        <div class="km-history-pack-leader">
+                            ${leaderProf}
+                            <span>${leader}</span>
+                            ${packName && packName !== leader ? `<span class="km-history-pack-name">${packName}</span>` : ''}
+                        </div>
+                        <span class="km-history-pack-count">${pack.totalPlayers} игроков</span>
+                    </div>
+                    <div class="km-history-pack-stats">
+                        <span>⚔️ ${pack.totalKills.toLocaleString()}</span>
+                        <span>💀 ${pack.totalDeaths.toLocaleString()}</span>
+                        <span>🗡️ ${pack.totalPvp.toLocaleString()}</span>
+                        <span>🐉 ${pack.totalPve.toLocaleString()}</span>
+                    </div>
+                    <div class="km-history-pack-chips">${topChips}</div>
+                    ${screenshot ? `<div class="km-history-pack-screenshot">${screenshot.thumbDataUrl || screenshot.originalDataUrl || screenshot.cropUrl ? '<img src="' + (screenshot.thumbDataUrl || screenshot.originalDataUrl || screenshot.cropUrl) + '" alt="' + leader + '">' : '<div class="km-history-pack-screenshot-empty">Нет скрина</div>'}</div>` : '<div class="km-history-pack-screenshot-empty">Скрин не сохранён</div>'}
+                </button>`;
+            }).join('') + '</div>';
+        }
+
+        function kmHistoryRemoveOverlay(id) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        }
+
+        function kmHistoryCloseScreenshotsModal() {
+            kmHistoryRemoveOverlay('kmHistoryScreenshotsModal');
+            kmHistoryRemoveOverlay('kmHistoryLightbox');
+        }
+
+        function openKmHistoryScreenshotsModal(dateStr) {
+            const dayData = appliedStatsByDate[dateStr] || {};
+            const shots = getKmHistoryScreenshots(dateStr, dayData);
+            console.log('[km-history] screenshots modal open eventId=' + dateStr + ' count=' + shots.length);
+            kmHistoryCloseScreenshotsModal();
+            const modal = document.createElement('div');
+            modal.id = 'kmHistoryScreenshotsModal';
+            modal.className = 'km-history-modal-overlay';
+            modal.onclick = function(e) { if (e.target === modal) kmHistoryCloseScreenshotsModal(); };
+            modal.innerHTML = `<div class="km-history-modal-panel km-history-gallery-modal" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
+                <button type="button" class="km-history-modal-close" onclick="kmHistoryCloseScreenshotsModal()">×</button>
+                <div class="km-history-modal-title">Скриншоты КМ</div>
+                <div class="km-history-modal-subtitle">${shots.length ? `Дата: ${dateStr}` : 'Скриншоты для этого КМ не сохранены'}</div>
+                <div class="km-history-gallery-grid">
+                    ${shots.length ? shots.map(function(s, i) {
+                        const preview = s.thumbDataUrl || s.originalDataUrl || '';
+                        const caption = 'Скрин ' + (i + 1);
+                        return `<button type="button" class="km-history-gallery-item" onclick="event.stopPropagation();openKmHistoryLightbox('${dateStr}',${i})">
+                            ${preview ? '<img src="' + preview + '" alt="' + caption + '">' : '<div class="km-history-gallery-empty">IMG</div>'}
+                            <span>${caption}</span>
+                        </button>`;
+                    }).join('') : '<div class="km-history-empty-state">Скриншоты для этого КМ не сохранены</div>'}
+                </div>
+            </div>`;
+            document.body.appendChild(modal);
+        }
+
+        function kmHistoryCloseLightbox() {
+            kmHistoryRemoveOverlay('kmHistoryLightbox');
+            window._kmHistoryLightboxState = null;
+            if (window._kmHistoryLightboxKeyHandler) {
+                document.removeEventListener('keydown', window._kmHistoryLightboxKeyHandler);
+                window._kmHistoryLightboxKeyHandler = null;
+            }
+        }
+
+        function openKmHistoryLightbox(dateStr, idx) {
+            const dayData = appliedStatsByDate[dateStr] || {};
+            const shots = getKmHistoryScreenshots(dateStr, dayData);
+            if (!shots.length) return;
+            const nextIdx = Math.max(0, Math.min(idx || 0, shots.length - 1));
+            kmHistoryCloseLightbox();
+            window._kmHistoryLightboxState = { dateStr: dateStr, shots: shots, index: nextIdx };
+            console.log('[km-history] lightbox index=' + nextIdx);
+            const overlay = document.createElement('div');
+            overlay.id = 'kmHistoryLightbox';
+            overlay.className = 'km-history-lightbox';
+            overlay.onclick = function(e) { if (e.target === overlay) kmHistoryCloseLightbox(); };
+            const shot = shots[nextIdx];
+            const displayUrl = shot.originalDataUrl || shot.thumbDataUrl || '';
+            const note = shot.originalDataUrl ? '' : (shot.thumbDataUrl ? 'Оригинал удалён, доступна миниатюра' : 'Изображение недоступно');
+            overlay.innerHTML = `<div class="km-history-lightbox-panel" onclick="event.stopPropagation()">
+                <button type="button" class="km-history-modal-close" onclick="kmHistoryCloseLightbox()">×</button>
+                <button type="button" class="km-history-nav-btn km-prev" onclick="event.stopPropagation();kmHistoryLightboxStep(-1)">‹</button>
+                <button type="button" class="km-history-nav-btn km-next" onclick="event.stopPropagation();kmHistoryLightboxStep(1)">›</button>
+                <div class="km-history-lightbox-meta">${kmHistoryEsc(shot.name || ('Скрин ' + (nextIdx + 1)))}</div>
+                <div class="km-history-lightbox-note">${kmHistoryEsc(note)}</div>
+                ${displayUrl ? `<img id="kmHistoryLightboxImage" src="${displayUrl}" alt="${kmHistoryEsc(shot.name || 'Скрин')}" class="km-history-lightbox-img">` : '<div class="km-history-empty-state">Изображение недоступно</div>'}
+            </div>`;
+            document.body.appendChild(overlay);
+            window._kmHistoryLightboxKeyHandler = function(e) {
+                if (!window._kmHistoryLightboxState) return;
+                if (e.key === 'Escape') kmHistoryCloseLightbox();
+                if (e.key === 'ArrowLeft') { e.preventDefault(); kmHistoryLightboxStep(-1); }
+                if (e.key === 'ArrowRight') { e.preventDefault(); kmHistoryLightboxStep(1); }
+            };
+            document.addEventListener('keydown', window._kmHistoryLightboxKeyHandler);
+        }
+
+        function kmHistoryLightboxStep(delta) {
+            const st = window._kmHistoryLightboxState;
+            if (!st || !st.shots || !st.shots.length) return;
+            const next = (st.index + delta + st.shots.length) % st.shots.length;
+            st.index = next;
+            const shot = st.shots[next];
+            const displayUrl = shot.originalDataUrl || shot.thumbDataUrl || '';
+            const img = document.getElementById('kmHistoryLightboxImage');
+            if (img && displayUrl) img.src = displayUrl;
+            const panel = document.querySelector('#kmHistoryLightbox .km-history-lightbox-meta');
+            if (panel) panel.textContent = shot.name || ('Скрин ' + (next + 1));
+            const note = document.querySelector('#kmHistoryLightbox .km-history-lightbox-note');
+            if (note) note.textContent = shot.originalDataUrl ? '' : (shot.thumbDataUrl ? 'Оригинал удалён, доступна миниатюра' : 'Изображение недоступно');
+            console.log('[km-history] lightbox index=' + next);
+        }
+
+        function openKmHistoryPackModal(dateStr, packKey) {
+            const dayData = appliedStatsByDate[dateStr] || {};
+            const groups = kmHistoryBuildPackGroups(dateStr, dayData);
+            const pack = groups.find(function(g) { return g.key === packKey; }) || groups.find(function(g) { return normalizeNick(g.leader) === normalizeNick(packKey); });
+            if (!pack) return;
+            console.log('[km-history] pack open leader=' + pack.leader + ' players=' + pack.players.length);
+            kmHistoryRemoveOverlay('kmHistoryPackModal');
+            const screenshot = pack.screenshot && (pack.screenshot.originalDataUrl || pack.screenshot.thumbDataUrl || pack.screenshot.cropUrl) ? pack.screenshot : null;
+            const screenshotUrl = screenshot ? (screenshot.originalDataUrl || screenshot.thumbDataUrl || screenshot.cropUrl || '') : '';
+            const screenshotNote = screenshot ? (screenshot.originalDataUrl ? '' : 'Оригинал удалён, доступна миниатюра') : 'Скрин не сохранён';
+            const modal = document.createElement('div');
+            modal.id = 'kmHistoryPackModal';
+            modal.className = 'km-history-modal-overlay';
+            modal.onclick = function(e) { if (e.target === modal) kmHistoryRemoveOverlay('kmHistoryPackModal'); };
+            modal.innerHTML = `<div class="km-history-modal-panel km-history-pack-modal" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
+                <button type="button" class="km-history-modal-close" onclick="kmHistoryRemoveOverlay('kmHistoryPackModal')">×</button>
+                <div class="km-history-modal-title">Пак: ${kmHistoryEsc(pack.leader || 'Пак без лидера')}</div>
+                <div class="km-history-modal-subtitle">${kmHistoryEsc(pack.packName || '')}${pack.totalPlayers ? ` · ${pack.totalPlayers} игроков` : ''}</div>
+                <div class="km-history-pack-modal-body">
+                    <div class="km-history-pack-media">
+                        ${screenshotUrl ? `<img src="${screenshotUrl}" alt="${kmHistoryEsc(pack.leader)}">` : '<div class="km-history-empty-state">Скрин не сохранён</div>'}
+                        <div class="km-history-lightbox-note">${kmHistoryEsc(screenshotNote)}</div>
+                    </div>
+                    <div class="km-history-pack-table-wrap">
+                        <div class="km-history-pack-table-head">
+                            <span>Игрок</span><span>Профа</span><span>⚔️</span><span>💀</span><span>🗡️</span><span>🐉</span>
+                        </div>
+                        <div class="km-history-pack-table">
+                            ${pack.players.map(function(p, idx) {
+                                const resolvedN = resolveAlias(p.name);
+                                const inRoster = roster.find(function(r) { return normalizeNick(r.name) === normalizeNick(resolvedN) || normalizeNick(r.name) === normalizeNick(p.name); });
+                                const normPKey = normalizeNick(p.name);
+                                const savedKmProfa = (playerProfaByDate[normPKey] && playerProfaByDate[normPKey][dateStr]) || null;
+                                const memberProfa = savedKmProfa || (inRoster ? (inRoster.profa || '—') : '—');
+                                const profaCell = memberProfa && memberProfa !== '—' ? profaIconHtml(memberProfa, 20) + '<span class="km-history-profa-label">' + kmHistoryEsc(PROFA_NAMES && PROFA_NAMES[memberProfa] ? PROFA_NAMES[memberProfa] : memberProfa) + '</span>' : '<span class="km-history-profa-label">—</span>';
+                                const isLeaderRow = idx === 0 || normalizeNick(p.name) === normalizeNick(pack.leader);
+                                return `<div class="km-history-pack-row ${isLeaderRow ? 'is-leader' : ''}">
+                                    <span class="km-history-pack-row-name">${isLeaderRow ? '<span class="km-history-leader-chip">Лидер</span>' : ''}<span class="player-nick-link" onclick="openPlayerProfile('${p.name.replace(/'/g,"\\'")}')" style="cursor:pointer">${p.name}</span></span>
+                                    <span class="km-history-pack-row-profa">${profaCell}</span>
+                                    <span>${p.kills||0}</span>
+                                    <span>${p.deaths||0}</span>
+                                    <span>${(p.pvp_dmg||0).toLocaleString()}</span>
+                                    <span>${(p.pve_dmg||0).toLocaleString()}</span>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+            document.body.appendChild(modal);
         }
 
         function toggleKmHistoryEvent(dateStr, forceOpen) {
@@ -10561,6 +10973,7 @@ ${playerList}
             }
             const mergedScreenMap = Object.assign({}, prevSnap ? (prevSnap.screenPlayersMap || {}) : {}, dayScreenPlayersMap || {});
             const historyShots = collectKmHistoryScreenshotSnapshot(dateStr);
+            const packShots = collectKmHistoryPackScreenshotSnapshot();
 
             appliedStatsByDate[dateStr] = {
                 players: mergedPlayers,
@@ -10569,6 +10982,7 @@ ${playerList}
                 packLeaders: Object.assign({}, prevSnap ? (prevSnap.packLeaders || {}) : {}, dayPackLeaders || {}),
                 screenPlayersMap: mergedScreenMap,
                 kmScreenshots: historyShots.length ? historyShots : (prevSnap ? (prevSnap.kmScreenshots || []) : []),
+                kmPackScreenshots: Object.keys(packShots).length ? packShots : (prevSnap ? (prevSnap.kmPackScreenshots || {}) : {}),
                 appliedAt: new Date().toISOString()
             };
 
@@ -11980,7 +12394,8 @@ ${playerList}
                             }).join('')}
                         </div>
                     </div>` : '';
-                const detailsHtml = hasCommandChannel ? leadersHtml : fallbackDetailsHtml;
+                const packGroups = kmHistoryBuildPackGroups(dateStr, dayData);
+                const detailsHtml = renderKmHistoryPackGroups(dateStr, dayData, packGroups);
                 const screenshotsHtml = renderKmHistoryScreenshots(dateStr, dayData);
 
                 // Итоги накоплены выше из dispKills каждого пака
@@ -12052,7 +12467,7 @@ ${playerList}
                     </div>
                     ${detailsHtml || dayData ? `
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                            <div class="km-history-section-title">${hasCommandChannel ? '⚔️ Лидеры паков' : '📋 Детали КМ'}</div>
+                            <div class="km-history-section-title">⚔️ Лидеры паков</div>
                             <button id="${btnId}" onclick="event.stopPropagation();toggleKmHistoryEvent('${dateStr}')"
                             style="background:#1e2530;border:1px solid #2d3748;color:#94a3b8;border-radius:8px;padding:4px 12px;font-size:11px;cursor:pointer">${kmOpenPacksState[containerId]?'▲ Скрыть паки':'▼ Показать паки'}</button>
                         </div>
@@ -12455,7 +12870,8 @@ ${playerList}
                 appliedStatsByDate[s.date] = {
                     _manual: true, _eventType: s.type||'КМ', _leader: s.leader||'',
                     players: flat, commandChannel: cc, screenPlayersMap: spm, packLeaders: pls, raidTotal: flat.length,
-                    kmScreenshots: prevManualSnap.kmScreenshots || []
+                    kmScreenshots: prevManualSnap.kmScreenshots || [],
+                    kmPackScreenshots: prevManualSnap.kmPackScreenshots || {}
                 };
 
                 saveToStorage();
@@ -22045,6 +22461,363 @@ window._archRender = function() {
       }
       body:not(.light) #kmHistoryContent .km-history-shot-note {
         padding: 10px 0 2px;
+      }
+      body:not(.light) #kmHistoryContent .km-history-screenshots-cta {
+        margin-top: 10px;
+        display: flex;
+        justify-content: flex-start;
+      }
+      body:not(.light) #kmHistoryContent .km-history-screenshots-btn {
+        appearance: none;
+        background: linear-gradient(180deg, color-mix(in srgb, var(--cc-theme-accent) 25%, rgba(17,24,39,.72)), rgba(11,14,20,.82));
+        border: 1px solid var(--cc-theme-chip-border);
+        color: var(--cc-theme-chip-text);
+        border-radius: 12px;
+        padding: 8px 14px;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+        box-shadow: 0 0 0 1px rgba(255,255,255,.02), 0 0 22px var(--cc-theme-glow-soft);
+      }
+      body:not(.light) #kmHistoryContent .km-history-screenshots-btn:hover {
+        border-color: var(--cc-theme-active-border);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--cc-theme-accent) 24%, transparent), 0 0 28px var(--cc-theme-glow);
+      }
+      body:not(.light) #kmHistoryContent .km-history-pack-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 10px;
+      }
+      body:not(.light) #kmHistoryContent .km-history-pack-card {
+        appearance: none;
+        text-align: left;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px;
+        border-radius: 14px;
+        border: 1px solid var(--cc-theme-border);
+        background: linear-gradient(180deg, rgba(10,13,19,.9), rgba(8,10,14,.72));
+        color: var(--cc-theme-text-title);
+        cursor: pointer;
+        box-shadow: inset 0 1px rgba(255,255,255,.05);
+      }
+      body:not(.light) #kmHistoryContent .km-history-pack-card:hover {
+        border-color: var(--cc-theme-border-strong);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--cc-theme-accent) 20%, transparent), 0 0 28px var(--cc-theme-glow-soft);
+      }
+      body:not(.light) #kmHistoryContent .km-history-pack-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: flex-start;
+      }
+      body:not(.light) #kmHistoryContent .km-history-pack-leader {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        min-width: 0;
+      }
+      body:not(.light) #kmHistoryContent .km-history-pack-leader > span:first-of-type {
+        font-size: 14px;
+        font-weight: 900;
+        color: var(--cc-theme-text-title);
+      }
+      body:not(.light) #kmHistoryContent .km-history-pack-name,
+      body:not(.light) #kmHistoryContent .km-history-pack-count,
+      body:not(.light) #kmHistoryContent .km-history-leader-chip,
+      body:not(.light) #kmHistoryContent .km-history-pack-chip,
+      body:not(.light) #kmHistoryContent .km-history-pack-chip-muted {
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+        border-radius: 999px;
+        padding: 2px 7px;
+        border: 1px solid var(--cc-theme-chip-border);
+        background: var(--cc-theme-chip-bg);
+        color: var(--cc-theme-chip-text);
+      }
+      body:not(.light) #kmHistoryContent .km-history-pack-count {
+        flex-shrink: 0;
+      }
+      body:not(.light) #kmHistoryContent .km-history-pack-name {
+        color: var(--cc-theme-accent-2);
+      }
+      body:not(.light) #kmHistoryContent .km-history-pack-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        color: var(--cc-theme-text-muted);
+        font-size: 11px;
+        font-weight: 700;
+      }
+      body:not(.light) #kmHistoryContent .km-history-pack-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      body:not(.light) #kmHistoryContent .km-history-pack-chip-muted {
+        opacity: .75;
+      }
+      body:not(.light) #kmHistoryContent .km-history-pack-screenshot,
+      body:not(.light) #kmHistoryContent .km-history-pack-screenshot-empty {
+        border-radius: 12px;
+        border: 1px solid var(--cc-theme-border);
+        background: rgba(9,11,16,.66);
+        overflow: hidden;
+        min-height: 76px;
+      }
+      body:not(.light) #kmHistoryContent .km-history-pack-screenshot img {
+        display: block;
+        width: 100%;
+        height: 76px;
+        object-fit: cover;
+      }
+      body:not(.light) #kmHistoryContent .km-history-pack-screenshot-empty {
+        display: grid;
+        place-items: center;
+        color: var(--cc-theme-text-muted);
+        font-size: 11px;
+        font-weight: 800;
+        padding: 12px;
+      }
+      body:not(.light) .km-history-modal-overlay,
+      body:not(.light) .km-history-lightbox {
+        position: fixed;
+        inset: 0;
+        z-index: 3500;
+        background: rgba(0,0,0,.78);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+      }
+      body:not(.light) .km-history-modal-panel,
+      body:not(.light) .km-history-lightbox-panel {
+        position: relative;
+        width: min(1040px, 100%);
+        max-height: min(88vh, 920px);
+        overflow: auto;
+        border-radius: 18px;
+        border: 1px solid var(--cc-theme-border-strong);
+        background: linear-gradient(180deg, rgba(11,14,20,.98), rgba(7,9,12,.96));
+        box-shadow: 0 30px 90px rgba(0,0,0,.7), 0 0 48px var(--cc-theme-glow-soft);
+        padding: 18px;
+      }
+      body:not(.light) .km-history-gallery-modal {
+        width: min(920px, 100%);
+      }
+      body:not(.light) .km-history-pack-modal {
+        width: min(1100px, 100%);
+      }
+      body:not(.light) .km-history-modal-close {
+        appearance: none;
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        border: 1px solid var(--cc-theme-border-strong);
+        background: rgba(10,12,16,.88);
+        color: var(--cc-theme-text-title);
+        font-size: 18px;
+        font-weight: 900;
+        cursor: pointer;
+      }
+      body:not(.light) .km-history-modal-title {
+        font-size: 18px;
+        font-weight: 900;
+        color: var(--cc-theme-text-title);
+        margin-bottom: 6px;
+      }
+      body:not(.light) .km-history-modal-subtitle,
+      body:not(.light) .km-history-lightbox-note {
+        color: var(--cc-theme-text-muted);
+        font-size: 12px;
+        margin-bottom: 12px;
+      }
+      body:not(.light) .km-history-gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px;
+      }
+      body:not(.light) .km-history-gallery-item {
+        appearance: none;
+        text-align: left;
+        border: 1px solid var(--cc-theme-border);
+        border-radius: 14px;
+        background: rgba(9,12,17,.86);
+        padding: 8px;
+        color: var(--cc-theme-text-title);
+        cursor: pointer;
+      }
+      body:not(.light) .km-history-gallery-item:hover {
+        border-color: var(--cc-theme-border-strong);
+        box-shadow: 0 0 22px var(--cc-theme-glow-soft);
+      }
+      body:not(.light) .km-history-gallery-item img,
+      body:not(.light) .km-history-gallery-empty {
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        object-fit: cover;
+        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,.06);
+        background: rgba(255,255,255,.04);
+      }
+      body:not(.light) .km-history-gallery-item span {
+        display: block;
+        margin-top: 8px;
+        color: var(--cc-theme-text-muted);
+        font-size: 11px;
+        font-weight: 700;
+      }
+      body:not(.light) .km-history-lightbox {
+        background: rgba(0,0,0,.86);
+        z-index: 3600;
+      }
+      body:not(.light) .km-history-lightbox-panel {
+        width: min(1280px, 100%);
+        max-height: min(92vh, 980px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        padding-top: 52px;
+      }
+      body:not(.light) .km-history-lightbox-img {
+        max-width: 100%;
+        max-height: calc(92vh - 140px);
+        object-fit: contain;
+        border-radius: 16px;
+        border: 1px solid var(--cc-theme-border-strong);
+        box-shadow: 0 0 48px rgba(0,0,0,.6);
+      }
+      body:not(.light) .km-history-nav-btn {
+        appearance: none;
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 44px;
+        height: 44px;
+        border-radius: 999px;
+        border: 1px solid var(--cc-theme-border-strong);
+        background: rgba(10,12,16,.88);
+        color: var(--cc-theme-text-title);
+        font-size: 28px;
+        line-height: 1;
+        cursor: pointer;
+      }
+      body:not(.light) .km-history-nav-btn.km-prev { left: 14px; }
+      body:not(.light) .km-history-nav-btn.km-next { right: 14px; }
+      body:not(.light) .km-history-pack-modal-body {
+        display: grid;
+        grid-template-columns: minmax(240px, 360px) minmax(0, 1fr);
+        gap: 16px;
+        align-items: start;
+      }
+      body:not(.light) .km-history-pack-media {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      body:not(.light) .km-history-pack-media img {
+        width: 100%;
+        max-height: 420px;
+        object-fit: cover;
+        border-radius: 14px;
+        border: 1px solid var(--cc-theme-border);
+      }
+      body:not(.light) .km-history-pack-table-wrap {
+        min-width: 0;
+        border: 1px solid var(--cc-theme-border);
+        border-radius: 14px;
+        overflow: hidden;
+        background: rgba(9,12,17,.76);
+      }
+      body:not(.light) .km-history-pack-table-head,
+      body:not(.light) .km-history-pack-row {
+        display: grid;
+        grid-template-columns: minmax(160px, 2fr) minmax(150px, 1.2fr) repeat(4, minmax(72px, .6fr));
+        gap: 10px;
+        align-items: center;
+        padding: 10px 12px;
+      }
+      body:not(.light) .km-history-pack-table-head {
+        background: rgba(255,255,255,.03);
+        color: var(--cc-theme-text-muted);
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+      }
+      body:not(.light) .km-history-pack-row {
+        border-top: 1px solid rgba(255,255,255,.04);
+        color: var(--cc-theme-text-title);
+        font-size: 12px;
+      }
+      body:not(.light) .km-history-pack-row.is-leader {
+        background: linear-gradient(90deg, color-mix(in srgb, var(--cc-theme-accent) 14%, transparent), transparent);
+      }
+      body:not(.light) .km-history-pack-row-name {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+      body:not(.light) .km-history-pack-row-profa {
+        min-width: 0;
+      }
+      body:not(.light) .km-history-profa-label {
+        margin-left: 6px;
+        color: var(--cc-theme-text-muted);
+        font-size: 11px;
+        font-weight: 700;
+      }
+      body:not(.light) .km-history-statline {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+      }
+      body:not(.light) .km-history-empty-state {
+        color: var(--cc-theme-text-muted);
+        font-size: 13px;
+        border: 1px dashed var(--cc-theme-border);
+        border-radius: 14px;
+        padding: 18px;
+        background: rgba(9,12,17,.64);
+        text-align: center;
+      }
+      @media (max-width: 900px) {
+        body:not(.light) .km-history-pack-modal-body {
+          grid-template-columns: 1fr;
+        }
+        body:not(.light) .km-history-pack-table-head,
+        body:not(.light) .km-history-pack-row {
+          grid-template-columns: 1.5fr 1fr 72px 72px 82px 82px;
+        }
+        body:not(.light) .km-history-lightbox-panel {
+          padding-left: 52px;
+          padding-right: 52px;
+        }
+      }
+      @media (max-width: 640px) {
+        body:not(.light) #kmHistoryContent .km-history-pack-grid,
+        body:not(.light) #kmHistoryContent .km-history-shot-grid,
+        body:not(.light) .km-history-gallery-grid {
+          grid-template-columns: 1fr;
+        }
+        body:not(.light) .km-history-pack-table-head,
+        body:not(.light) .km-history-pack-row {
+          grid-template-columns: 1fr;
+        }
+        body:not(.light) .km-history-pack-table-head span:nth-child(n+2),
+        body:not(.light) .km-history-pack-row span:nth-child(n+2) {
+          justify-self: start;
+        }
       }
     </style>
     <script id="cc-color-theme-system-script">
