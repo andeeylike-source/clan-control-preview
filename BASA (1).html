@@ -8654,6 +8654,29 @@ function getClass2IconByClass3(c3) {
             }
         }
 
+        // Confirmed OCR artifacts from Baidu Qianfan that normalizeNick cannot resolve
+        // (semantic substitutions: wrong vowel, missing soft sign, etc.)
+        // Keys are .toLowerCase() of the raw OCR string.
+        const _BAIDU_OCR_ALIASES = {
+            'х-ый':         'Х-уй',
+            'скрехет':      'Скрежет',
+            'юн':           'Юи',
+            'бананвровне':  'БананВговне',
+            'дынки':        'Дыньки',
+            'альча':        'Алыча',
+            'питахая':      'Питахайя',
+        };
+
+        function _resolveBaiduOcrNick(nick) {
+            if (!nick) return nick;
+            const corrected = _BAIDU_OCR_ALIASES[nick.toLowerCase()];
+            if (corrected !== undefined) {
+                console.info('[openrouter-ocr] nick corrected', JSON.stringify(nick), '->', JSON.stringify(corrected));
+                return corrected;
+            }
+            return nick;
+        }
+
         async function analyzeWithOpenRouterBaiduProvider({ dateStr, shots }) {
             const BAIDU_OCR_PROMPT = `Extract ONLY the visible KM member table from this cropped game screenshot.\nReturn ONLY valid JSON:\n{"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"confidence":0,"notes":""}\nRules:\n- preserve nick spelling exactly as seen\n- kills, deaths, pvp, pve must be integers\n- if a value is unreadable, use null\n- no markdown\n- no code fences`;
 
@@ -8754,13 +8777,18 @@ function getClass2IconByClass3(c3) {
 
                         const players = [];
                         rows.forEach(row => {
+                            const rawNick  = row.nick || '';
+                            const corrNick = _resolveBaiduOcrNick(rawNick);
                             const n = _ccOcrNormalizeRow({
-                                name: row.nick, nick: row.nick,
+                                name: corrNick, nick: corrNick,
                                 kills: row.kills, deaths: row.deaths,
                                 pvp: row.pvp, pvp_dmg: row.pvp,
                                 pve: row.pve, pve_dmg: row.pve,
                             });
-                            if (n) players.push(n);
+                            if (n) {
+                                if (rawNick !== corrNick) n._rawNick = rawNick;
+                                players.push(n);
+                            }
                         });
 
                         if (!players.length) {
