@@ -4664,6 +4664,10 @@
             eventStatuses = Object.assign({}, pendingStatuses);
             // 2. Применяем переопределения из pending
             eventOverrides = Object.assign({}, pendingOverrides);
+            if (activeDayDate && appliedStatsByDate[activeDayDate]) {
+                const historyShots = collectKmHistoryScreenshotSnapshot(activeDayDate);
+                if (historyShots.length) appliedStatsByDate[activeDayDate].kmScreenshots = historyShots;
+            }
             // 3. Удаляем скрины — при сохранении всегда очищаем
             if (activeDayDate && dayScreenshots[activeDayDate]) {
                 delete dayScreenshots[activeDayDate];
@@ -10213,9 +10217,95 @@ ${playerList}
         let playerProfaByDate = {};
         // Состояние раскрытых паков в Истории КМ { containerId: bool }
         let kmOpenPacksState = {};
+        const KM_HISTORY_SHOT_LIMIT = 8;
+        const KM_HISTORY_THUMB_MAX_CHARS = 180000;
         // kmProfaOverrides: { [dateStr]: { [normName]: profaName } }
         // Хранит ручную профу игрока на конкретный КМ
         let kmProfaOverrides = {};
+
+        function kmHistoryEsc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
+
+        function makeKmHistoryShotItem(src, idx, prefix) {
+            if (!src) return null;
+            const rawUrl = src.dataUrl || src.thumbDataUrl || src.url || src.shotUrl || '';
+            const rawSize = rawUrl ? rawUrl.length : 0;
+            const name = src.name || src.packName || src.label || (prefix + ' ' + (idx + 1));
+            return {
+                id: src.id || (prefix + '_' + idx),
+                name: name,
+                thumbDataUrl: rawUrl && rawSize <= KM_HISTORY_THUMB_MAX_CHARS ? rawUrl : '',
+                bytes: rawSize,
+                source: src.source || prefix
+            };
+        }
+
+        function collectKmHistoryScreenshotSnapshot(dateStr) {
+            const shots = [];
+            const seen = {};
+            function add(item) {
+                if (!item) return;
+                const key = (item.name || '') + '|' + (item.bytes || 0);
+                if (seen[key]) return;
+                seen[key] = 1;
+                shots.push(item);
+            }
+            ((dayScreenshots && dayScreenshots[dateStr]) || []).slice(0, KM_HISTORY_SHOT_LIMIT).forEach(function(s, i) {
+                add(makeKmHistoryShotItem(s, i, 'day'));
+            });
+            Object.entries(dayScreenShotMap || {}).slice(0, KM_HISTORY_SHOT_LIMIT).forEach(function(entry, i) {
+                add(makeKmHistoryShotItem({ packName: entry[0], dataUrl: entry[1], source: 'pack' }, i, 'pack'));
+            });
+            return shots.slice(0, KM_HISTORY_SHOT_LIMIT);
+        }
+
+        function getKmHistoryScreenshots(dateStr, dayData) {
+            const saved = dayData && Array.isArray(dayData.kmScreenshots) ? dayData.kmScreenshots : [];
+            if (saved.length) return saved;
+            return ((dayScreenshots && dayScreenshots[dateStr]) || [])
+                .slice(0, KM_HISTORY_SHOT_LIMIT)
+                .map(function(s, i) { return makeKmHistoryShotItem(s, i, 'day'); })
+                .filter(Boolean);
+        }
+
+        function renderKmHistoryScreenshots(dateStr, dayData) {
+            const shots = getKmHistoryScreenshots(dateStr, dayData);
+            const count = shots.length;
+            const body = count ? shots.map(function(s) {
+                const name = kmHistoryEsc(s.name || 'Скриншот');
+                const meta = s.thumbDataUrl ? 'миниатюра' : 'метаданные';
+                return '<div class="km-history-shot">'
+                    + (s.thumbDataUrl ? '<img src="' + s.thumbDataUrl + '" alt="' + name + '">' : '<div class="km-history-shot-empty">IMG</div>')
+                    + '<div><strong>' + name + '</strong><span>' + meta + (s.bytes ? ' · ' + Math.round(s.bytes / 1024) + ' KB' : '') + '</span></div>'
+                    + '</div>';
+            }).join('') : '<div class="km-history-shot-note">Скриншоты для этого КМ не сохранены</div>';
+
+            return '<div class="km-history-screenshots">'
+                + '<div class="km-history-section-title">Скриншоты КМ</div>'
+                + '<div class="km-history-shot-grid">' + body + '</div>'
+                + '</div>';
+        }
+
+        function toggleKmHistoryEvent(dateStr, forceOpen) {
+            const safe = String(dateStr || '').replace(/-/g, '');
+            const cid = 'lc_' + safe;
+            const nextOpen = typeof forceOpen === 'boolean' ? forceOpen : !kmOpenPacksState[cid];
+            kmOpenPacksState[cid] = nextOpen;
+            console.log('[km-history] toggle event expanded id=' + dateStr);
+            console.log('[km-history] screenshots count=' + getKmHistoryScreenshots(dateStr, appliedStatsByDate[dateStr]).length);
+
+            const c = document.getElementById(cid);
+            const tp = document.getElementById('tp_' + safe);
+            const btn = document.getElementById('lb_' + safe);
+            const card = document.querySelector('[data-km-date="' + dateStr + '"]');
+            if (c) c.style.display = nextOpen ? 'block' : 'none';
+            if (tp) tp.style.display = nextOpen ? 'none' : 'flex';
+            if (btn) btn.textContent = nextOpen ? '▲ Скрыть паки' : '▼ Показать паки';
+            if (card) card.dataset.expanded = nextOpen ? '1' : '0';
+        }
 
         function switchProfileProfa(playerName, profa, btn) {
             const nk = normalizeNick(playerName);
@@ -10470,6 +10560,7 @@ ${playerList}
                 });
             }
             const mergedScreenMap = Object.assign({}, prevSnap ? (prevSnap.screenPlayersMap || {}) : {}, dayScreenPlayersMap || {});
+            const historyShots = collectKmHistoryScreenshotSnapshot(dateStr);
 
             appliedStatsByDate[dateStr] = {
                 players: mergedPlayers,
@@ -10477,6 +10568,7 @@ ${playerList}
                 commandChannel: dayCommandChannel || [],
                 packLeaders: Object.assign({}, prevSnap ? (prevSnap.packLeaders || {}) : {}, dayPackLeaders || {}),
                 screenPlayersMap: mergedScreenMap,
+                kmScreenshots: historyShots.length ? historyShots : (prevSnap ? (prevSnap.kmScreenshots || []) : []),
                 appliedAt: new Date().toISOString()
             };
 
@@ -11856,6 +11948,41 @@ ${playerList}
                     </div>`;
                 }).join('') : '';
 
+                const fallbackDetailsHtml = !hasCommandChannel && dayPlayers.length > 0 ? `
+                    <div style="border:1px solid #1e2530;border-radius:10px;margin-bottom:6px;overflow:hidden">
+                        <div onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='block'?'none':'block';this.querySelector('.arr').textContent=b.style.display==='block'?'▲':'▼'"
+                             style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#1a1f29;cursor:pointer">
+                            <div style="display:flex;align-items:center;gap:10px">
+                                <span style="font-weight:800;font-size:13px">КМ игроки</span>
+                                <span style="font-size:10px;color:#64748b">👥 ${dayPlayers.length}</span>
+                            </div>
+                            <span class="arr" style="color:#475569;font-size:10px;margin-left:4px">▼</span>
+                        </div>
+                        <div style="display:none;padding:8px">
+                            ${dayPlayers.map(p => {
+                                const resolvedN = resolveAlias(p.name);
+                                const inRoster = roster.find(r => normalizeNick(r.name) === normalizeNick(resolvedN) || normalizeNick(r.name) === normalizeNick(p.name));
+                                const normPKey = normalizeNick(p.name);
+                                const savedKmProfa = (playerProfaByDate[normPKey] && playerProfaByDate[normPKey][dateStr]) || null;
+                                const memberProfa = savedKmProfa || (inRoster ? (inRoster.profa || '—') : '—');
+                                const memberProfaHtml = memberProfa && memberProfa !== '—'
+                                    ? `<span data-kmprofa-key="${normPKey}" data-kmprofa-date="${dateStr}" style="display:inline-flex;align-items:center">${profaIconHtml(memberProfa, 20)}</span>`
+                                    : `<span data-kmprofa-key="${normPKey}" data-kmprofa-date="${dateStr}" style="display:inline-flex;align-items:center"></span>`;
+                                return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:#0b0e14;border-radius:6px;margin-bottom:4px;font-size:12px">
+                                    <span style="font-weight:600;display:flex;align-items:center;gap:6px">${memberProfaHtml}<span class="player-nick-link" onclick="openPlayerProfile('${p.name.replace(/'/g,"\\'")}')" style="cursor:pointer">${p.name}</span></span>
+                                    <span style="display:flex;gap:12px">
+                                        <span style="color:#f59e0b">⚔️ ${p.kills||0}</span>
+                                        <span style="color:#ef4444">💀 ${p.deaths||0}</span>
+                                        <span style="color:#818cf8">🗡️ ${(p.pvp_dmg||0).toLocaleString()}</span>
+                                        <span style="color:#22c55e">🐉 ${(p.pve_dmg||0).toLocaleString()}</span>
+                                    </span>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </div>` : '';
+                const detailsHtml = hasCommandChannel ? leadersHtml : fallbackDetailsHtml;
+                const screenshotsHtml = renderKmHistoryScreenshots(dateStr, dayData);
+
                 // Итоги накоплены выше из dispKills каждого пака
                 const hasTotals   = totalKills+totalDeaths+totalPvp+totalPve > 0;
 
@@ -11901,9 +12028,9 @@ ${playerList}
                     }
                 }
 
-                return `<div class="card mb-6" data-km-date="${dateStr}">
+                return `<div class="card mb-6 km-history-card" data-km-date="${dateStr}" data-expanded="${kmOpenPacksState[containerId]?'1':'0'}" onclick="toggleKmHistoryEvent('${dateStr}')">
                     ${searchHighlightHtml}
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                    <div class="km-history-head" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                         <div>
                             <div style="font-size:18px;font-weight:800">${dateFormatted}</div>
                             <div style="font-size:12px;color:#f59e0b;font-weight:700;text-transform:uppercase;margin-top:2px">⚔️ ${eventLabel}</div>
@@ -11917,29 +12044,22 @@ ${playerList}
                         </div>
                         <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
                             ${dayData && dayData._manual
-                                ? `<button onclick="openManualKmEditor('${dateStr}')" title="Редактировать ручную запись КМ" style="background:none;border:1px solid rgba(34,197,94,0.35);color:#4ade80;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#22c55e';this.style.color='#86efac'" onmouseout="this.style.borderColor='rgba(34,197,94,0.35)';this.style.color='#4ade80'">✏️ Редактировать</button>`
-                                : `<button onclick="openCalendarDay('${dateStr}')" title="Открыть день в календаре — загрузить скриншоты или переанализировать" style="background:none;border:1px solid #2d3748;color:#94a3b8;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#94a3b8'">📅 Загрузить скриншоты</button>`
+                                ? `<button onclick="event.stopPropagation();openManualKmEditor('${dateStr}')" title="Редактировать ручную запись КМ" style="background:none;border:1px solid rgba(34,197,94,0.35);color:#4ade80;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#22c55e';this.style.color='#86efac'" onmouseout="this.style.borderColor='rgba(34,197,94,0.35)';this.style.color='#4ade80'">✏️ Редактировать</button>`
+                                : `<button onclick="event.stopPropagation();openCalendarDay('${dateStr}')" title="Открыть день в календаре — загрузить скриншоты или переанализировать" style="background:none;border:1px solid #2d3748;color:#94a3b8;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#94a3b8'">📅 Загрузить скриншоты</button>`
                             }
-                            <button onclick="deleteKmEvent('${dateStr}')" title="Удалить запись КМ" style="background:none;border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#ef4444';this.style.color='#fca5a5'" onmouseout="this.style.borderColor='rgba(239,68,68,0.3)';this.style.color='#f87171'">🗑</button>
+                            <button onclick="event.stopPropagation();deleteKmEvent('${dateStr}')" title="Удалить запись КМ" style="background:none;border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#ef4444';this.style.color='#fca5a5'" onmouseout="this.style.borderColor='rgba(239,68,68,0.3)';this.style.color='#f87171'">🗑</button>
                         </div>
                     </div>
-                    ${hasCommandChannel ? `
+                    ${detailsHtml || dayData ? `
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                            <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700">⚔️ Лидеры паков</div>
-                            <button id="${btnId}" onclick="(function(btn){
-                                var c=document.getElementById('${containerId}');
-                                var tp=document.getElementById('${topPreviewId}');
-                                var open=c.style.display!=='none';
-                                c.style.display=open?'none':'block';
-                                if(tp) tp.style.display=open?'flex':'none';
-                                btn.textContent=open?'▼ Показать паки':'▲ Скрыть паки';
-                                kmOpenPacksState['${containerId}']=!open;
-                            })(this)"
+                            <div class="km-history-section-title">${hasCommandChannel ? '⚔️ Лидеры паков' : '📋 Детали КМ'}</div>
+                            <button id="${btnId}" onclick="event.stopPropagation();toggleKmHistoryEvent('${dateStr}')"
                             style="background:#1e2530;border:1px solid #2d3748;color:#94a3b8;border-radius:8px;padding:4px 12px;font-size:11px;cursor:pointer">${kmOpenPacksState[containerId]?'▲ Скрыть паки':'▼ Показать паки'}</button>
                         </div>
                         ${topPreviewHtml}
-                        <div id="${containerId}" style="display:${kmOpenPacksState[containerId]?'block':'none'}">
-                        ${leadersHtml}
+                        <div id="${containerId}" class="km-history-expanded" onclick="event.stopPropagation()" style="display:${kmOpenPacksState[containerId]?'block':'none'}">
+                            ${detailsHtml}
+                            ${screenshotsHtml}
                         </div>
                     ` : topKills.length > 0 ? `
                         <div style="font-size:11px;color:#64748b;margin-bottom:8px;text-transform:uppercase;font-weight:700">🏆 Топ убийств</div>
@@ -12329,11 +12449,13 @@ ${playerList}
                 });
 
                 if (!flat.length) { alert('Добавь хотя бы одного игрока'); return; }
+                var prevManualSnap = appliedStatsByDate[s.origDate || s.date] || appliedStatsByDate[s.date] || {};
                 if (s.origDate && s.origDate !== s.date) delete appliedStatsByDate[s.origDate];
 
                 appliedStatsByDate[s.date] = {
                     _manual: true, _eventType: s.type||'КМ', _leader: s.leader||'',
-                    players: flat, commandChannel: cc, screenPlayersMap: spm, packLeaders: pls, raidTotal: flat.length
+                    players: flat, commandChannel: cc, screenPlayersMap: spm, packLeaders: pls, raidTotal: flat.length,
+                    kmScreenshots: prevManualSnap.kmScreenshots || []
                 };
 
                 saveToStorage();
@@ -13625,6 +13747,8 @@ ${playerList}
             if (tp) tp.style.display = 'none';
             const btn = document.getElementById('lb_' + dateStr.replace(/-/g, ''));
             if (btn) btn.textContent = '▲ Скрыть паки';
+            const card = document.querySelector('[data-km-date="' + dateStr + '"]');
+            if (card) card.dataset.expanded = '1';
             kmOpenPacksState[cid] = true;
 
             // Find the pack section containing the player, open only that one
@@ -21834,6 +21958,93 @@ window._archRender = function() {
       body[data-color-theme="teal-graphite"]:not(.light) #topbar,
       body[data-color-theme="teal-graphite"]:not(.light) .sidebar.side {
         background: linear-gradient(180deg, rgba(7,20,22,.88), rgba(5,8,10,.62)) !important;
+      }
+      body:not(.light) #kmHistoryContent .km-history-card {
+        padding: 20px 18px 16px !important;
+        margin-top: 10px !important;
+        overflow: visible !important;
+        cursor: pointer;
+      }
+      body:not(.light) #kmHistoryContent .km-history-card::before,
+      body:not(.light) #kmHistoryContent .km-history-card::after {
+        pointer-events: none;
+      }
+      body:not(.light) #kmHistoryContent .km-history-card[data-expanded="1"] {
+        border-color: var(--cc-theme-border-strong) !important;
+        box-shadow: 0 18px 52px rgba(0,0,0,.4), 0 0 28px var(--cc-theme-glow-soft) !important;
+      }
+      body:not(.light) #kmHistoryContent .km-history-head {
+        position: relative;
+        z-index: 2;
+      }
+      body:not(.light) #kmHistoryContent .km-history-section-title {
+        color: var(--cc-theme-accent-2);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        text-shadow: 0 0 14px var(--cc-theme-glow-soft);
+      }
+      body:not(.light) #kmHistoryContent .km-history-expanded {
+        border-top: 1px solid var(--cc-theme-border);
+        margin-top: 10px;
+        padding-top: 10px;
+      }
+      body:not(.light) #kmHistoryContent .km-history-screenshots {
+        margin-top: 12px;
+        padding: 12px;
+        border: 1px solid var(--cc-theme-border);
+        border-radius: 12px;
+        background: linear-gradient(135deg, var(--cc-theme-card-wash), rgba(7,10,14,.62));
+      }
+      body:not(.light) #kmHistoryContent .km-history-shot-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+      }
+      body:not(.light) #kmHistoryContent .km-history-shot {
+        display: flex;
+        gap: 9px;
+        align-items: center;
+        min-width: 0;
+        border: 1px solid color-mix(in srgb, var(--cc-theme-border-strong) 70%, transparent);
+        border-radius: 10px;
+        background: rgba(8,11,16,.68);
+        padding: 8px;
+      }
+      body:not(.light) #kmHistoryContent .km-history-shot img,
+      body:not(.light) #kmHistoryContent .km-history-shot-empty {
+        width: 48px;
+        height: 36px;
+        border-radius: 8px;
+        object-fit: cover;
+        flex: 0 0 auto;
+        border: 1px solid var(--cc-theme-border);
+        background: rgba(255,255,255,.05);
+      }
+      body:not(.light) #kmHistoryContent .km-history-shot-empty {
+        display: grid;
+        place-items: center;
+        color: var(--cc-theme-text-muted);
+        font-size: 10px;
+        font-weight: 800;
+      }
+      body:not(.light) #kmHistoryContent .km-history-shot strong {
+        display: block;
+        color: var(--cc-theme-text-title);
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      body:not(.light) #kmHistoryContent .km-history-shot span,
+      body:not(.light) #kmHistoryContent .km-history-shot-note {
+        color: var(--cc-theme-text-muted);
+        font-size: 11px;
+      }
+      body:not(.light) #kmHistoryContent .km-history-shot-note {
+        padding: 10px 0 2px;
       }
     </style>
     <script id="cc-color-theme-system-script">
