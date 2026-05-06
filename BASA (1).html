@@ -3684,6 +3684,7 @@
                             <option value="openrouter_baidu">OpenRouter OCR / Baidu Qianfan (free)</option>
                             <option value="ocrspace">OCR.space proxy</option>
                         </select>
+                        <div style="font-size:10px;color:#475569;margin-top:5px">Baidu free mode: без платного fallback. При лимите попробует другой ключ или остановится.</div>
                     </label>
                     <label style="display:block">
                         <div style="font-size:11px;color:#64748b;margin-bottom:6px;text-transform:uppercase;font-weight:700">OCR.space proxy URL</div>
@@ -8678,6 +8679,8 @@ function getClass2IconByClass3(c3) {
         }
 
         async function analyzeWithOpenRouterBaiduProvider({ dateStr, shots }) {
+            console.info('[openrouter-ocr] provider=baidu-only');
+            console.info('[openrouter-ocr] no paid fallback');
             const BAIDU_OCR_PROMPT = `Extract ONLY the visible KM member table from this cropped game screenshot.\nReturn ONLY valid JSON:\n{"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"confidence":0,"notes":""}\nRules:\n- preserve nick spelling exactly as seen\n- kills, deaths, pvp, pve must be integers\n- if a value is unreadable, use null\n- no markdown\n- no code fences`;
 
             const apiKey = getNextApiKey();
@@ -8730,28 +8733,50 @@ function getClass2IconByClass3(c3) {
                         const currentKey = getNextApiKey();
                         if (!currentKey) throw new Error('Все API ключи исчерпаны');
 
-                        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${currentKey}`,
-                                'Content-Type': 'application/json',
-                                'HTTP-Referer': location.origin,
-                                'X-Title': 'Clan Control OCR',
-                            },
-                            body: JSON.stringify({
-                                model: 'baidu/qianfan-ocr-fast:free',
-                                messages: [{
-                                    role: 'user',
-                                    content: [
-                                        { type: 'text', text: BAIDU_OCR_PROMPT },
-                                        { type: 'image_url', image_url: { url: cropDataUrl } },
-                                    ],
-                                }],
-                                temperature: 0,
-                                max_tokens: 1200,
-                            }),
-                            signal: AbortSignal.timeout(60000),
+                        const _baiduReqBody = (key) => JSON.stringify({
+                            model: 'baidu/qianfan-ocr-fast:free',
+                            provider: { order: ['Baidu'], allow_fallbacks: false },
+                            messages: [{
+                                role: 'user',
+                                content: [
+                                    { type: 'text', text: BAIDU_OCR_PROMPT },
+                                    { type: 'image_url', image_url: { url: cropDataUrl } },
+                                ],
+                            }],
+                            temperature: 0,
+                            max_tokens: 1200,
                         });
+                        const _baiduReqHeaders = (key) => ({
+                            'Authorization': `Bearer ${key}`,
+                            'Content-Type': 'application/json',
+                            'HTTP-Referer': location.origin,
+                            'X-Title': 'Clan Control OCR',
+                        });
+                        // Retry on 429: 2 same-key retries (2s, 4s), then switch key once
+                        const _BAIDU_RETRY_DELAYS = [2000, 4000];
+                        let response;
+                        let fetchKey = currentKey;
+                        for (let att = 0; att <= _BAIDU_RETRY_DELAYS.length + 1; att++) {
+                            if (att > 0 && att <= _BAIDU_RETRY_DELAYS.length) {
+                                console.info(`[openrouter-ocr] retry ${att} after 429`);
+                                await new Promise(r => setTimeout(r, _BAIDU_RETRY_DELAYS[att - 1]));
+                            } else if (att === _BAIDU_RETRY_DELAYS.length + 1) {
+                                markCurrentKeyExhausted();
+                                fetchKey = getNextApiKey();
+                                if (!fetchKey) throw new Error('Baidu OCR временно ограничен. Попробуйте позже или добавьте ещё OpenRouter ключ.');
+                                console.info('[openrouter-ocr] retry with next key after persistent 429');
+                            }
+                            response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                                method: 'POST',
+                                headers: _baiduReqHeaders(fetchKey),
+                                body: _baiduReqBody(fetchKey),
+                                signal: AbortSignal.timeout(60000),
+                            });
+                            if (response.status !== 429) break;
+                        }
+                        if (response.status === 429) {
+                            throw new Error('Baidu OCR временно ограничен. Попробуйте позже или добавьте ещё OpenRouter ключ.');
+                        }
 
                         if (!response.ok) {
                             const errJson = await response.json().catch(() => ({}));
