@@ -3681,6 +3681,7 @@
                         <div style="font-size:11px;color:#64748b;margin-bottom:6px;text-transform:uppercase;font-weight:700">Провайдер</div>
                         <select id="analysisProviderSelect" class="input-dark" style="width:100%">
                             <option value="gemini">Gemini/OpenRouter</option>
+                            <option value="openrouter_baidu">OpenRouter OCR / Baidu Qianfan (free)</option>
                             <option value="ocrspace">OCR.space proxy</option>
                         </select>
                     </label>
@@ -8008,11 +8009,14 @@ function getClass2IconByClass3(c3) {
 
         function getAnalysisProvider() {
             const provider = localStorage.getItem('clanControl_analysisProvider') || 'gemini';
-            return provider === 'ocrspace' ? 'ocrspace' : 'gemini';
+            if (provider === 'ocrspace') return 'ocrspace';
+            if (provider === 'openrouter_baidu') return 'openrouter_baidu';
+            return 'gemini';
         }
 
         function saveAnalysisProvider(provider) {
-            localStorage.setItem('clanControl_analysisProvider', provider === 'ocrspace' ? 'ocrspace' : 'gemini');
+            const valid = ['gemini', 'ocrspace', 'openrouter_baidu'];
+            localStorage.setItem('clanControl_analysisProvider', valid.includes(provider) ? provider : 'gemini');
         }
 
         function getOcrSpaceKey() {
@@ -8077,6 +8081,17 @@ function getClass2IconByClass3(c3) {
                 el.style.color = '#475569';
                 return;
             }
+            if (getAnalysisProvider() === 'openrouter_baidu') {
+                const GEMINI_KEYS = getGeminiKeys();
+                if (GEMINI_KEYS.length === 0) {
+                    el.innerHTML = `⚠️ Нет ключей OpenRouter — <span onclick="showPage('settings')" style="color:#6366f1;cursor:pointer;text-decoration:underline">добавить</span>`;
+                    el.style.color = '#ef4444';
+                } else {
+                    el.innerHTML = `🤖 Baidu OCR · ключ ${getCurrentKeyIndex()+1} из ${GEMINI_KEYS.length}`;
+                    el.style.color = '#475569';
+                }
+                return;
+            }
             const GEMINI_KEYS = getGeminiKeys();
             if (GEMINI_KEYS.length === 0) {
                 el.innerHTML = `⚠️ API ключи не настроены — <span onclick="showPage('settings')" style="color:#6366f1;cursor:pointer;text-decoration:underline">добавить</span>`;
@@ -8095,9 +8110,12 @@ function getClass2IconByClass3(c3) {
         function updateAnalysisProviderIndicator() {
             const el = document.getElementById('analysisProviderIndicator');
             if (!el) return;
-            el.innerText = getAnalysisProvider() === 'ocrspace'
+            const p = getAnalysisProvider();
+            el.innerText = p === 'ocrspace'
                 ? 'Провайдер: OCR.space proxy'
-                : 'Провайдер: Gemini/OpenRouter';
+                : p === 'openrouter_baidu'
+                    ? 'Провайдер: OpenRouter OCR / Baidu'
+                    : 'Провайдер: Gemini/OpenRouter';
         }
 
         // ===== СИСТЕМА АЛИАСОВ =====
@@ -8636,6 +8654,223 @@ function getClass2IconByClass3(c3) {
             }
         }
 
+        async function analyzeWithOpenRouterBaiduProvider({ dateStr, shots }) {
+            const BAIDU_OCR_PROMPT = `Extract ONLY the visible KM member table from this cropped game screenshot.\nReturn ONLY valid JSON:\n{"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"confidence":0,"notes":""}\nRules:\n- preserve nick spelling exactly as seen\n- kills, deaths, pvp, pve must be integers\n- if a value is unreadable, use null\n- no markdown\n- no code fences`;
+
+            const apiKey = getNextApiKey();
+            if (!apiKey) {
+                setDayStatus('error', '❌ Нет API ключей OpenRouter. Добавь ключ в Настройках → API ключи.');
+                return;
+            }
+
+            const btn = document.getElementById('analyzeBtn');
+            if (btn) { btn.disabled = true; btn.innerText = 'Baidu OCR...'; }
+            document.getElementById('dayAnalyzeResults').style.display = 'none';
+            setDayStatus('loading', `OpenRouter OCR: обрабатываю ${shots.length} скриншотов...`);
+
+            let progBar = document.getElementById('analyzeProgressWrap');
+            if (!progBar && btn) {
+                progBar = document.createElement('div');
+                progBar.id = 'analyzeProgressWrap';
+                progBar.style.cssText = 'margin-top:10px;background:#1e2530;border-radius:6px;overflow:hidden;height:6px';
+                progBar.innerHTML = '<div id="analyzeProgressBar" style="height:100%;background:#6366f1;border-radius:6px;width:0%;transition:width .4s"></div>';
+                btn.parentNode.insertBefore(progBar, btn.nextSibling);
+            }
+            const pb = document.getElementById('analyzeProgressBar');
+            if (pb) pb.style.width = '0%';
+            if (progBar) progBar.style.display = 'block';
+            const minibarText = document.getElementById('minibarText');
+            const minibarSub  = document.getElementById('minibarSub');
+            if (minibarText) minibarText.innerText = `OpenRouter OCR: 0 из ${shots.length}...`;
+            if (minibarSub)  minibarSub.innerText  = 'Нажми чтобы развернуть';
+
+            const allPlayers = {};
+            const screenPlayersMap = {};
+            const screenShotDataMap = {};
+            const geometryMap = {};
+            const skippedScreenshots = [];
+            let firstError = null;
+
+            try {
+                for (let i = 0; i < shots.length; i++) {
+                    const shot = shots[i];
+                    try {
+                        setDayStatus('loading', `OpenRouter OCR: скриншот ${i + 1} из ${shots.length}...`);
+                        if (minibarText) minibarText.innerText = `OpenRouter OCR: ${i + 1} из ${shots.length}...`;
+                        if (pb) pb.style.width = Math.round(((i + 1) / shots.length) * 100) + '%';
+
+                        const img  = await _ccOcrLoadImage(shot.dataUrl);
+                        const crop = _ccOcrPreprocessCrop(img);
+                        const cropDataUrl = crop.cropCanvas.toDataURL('image/png');
+                        console.info('[openrouter-ocr] model baidu/qianfan-ocr-fast:free');
+
+                        const currentKey = getNextApiKey();
+                        if (!currentKey) throw new Error('Все API ключи исчерпаны');
+
+                        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${currentKey}`,
+                                'Content-Type': 'application/json',
+                                'HTTP-Referer': location.origin,
+                                'X-Title': 'Clan Control OCR',
+                            },
+                            body: JSON.stringify({
+                                model: 'baidu/qianfan-ocr-fast:free',
+                                messages: [{
+                                    role: 'user',
+                                    content: [
+                                        { type: 'text', text: BAIDU_OCR_PROMPT },
+                                        { type: 'image_url', image_url: { url: cropDataUrl } },
+                                    ],
+                                }],
+                                temperature: 0,
+                                max_tokens: 1200,
+                            }),
+                            signal: AbortSignal.timeout(60000),
+                        });
+
+                        if (!response.ok) {
+                            const errJson = await response.json().catch(() => ({}));
+                            throw new Error(errJson.error?.message || `HTTP ${response.status}`);
+                        }
+
+                        const json = await response.json();
+                        const text = json.choices?.[0]?.message?.content || '';
+                        console.info('[openrouter-ocr] raw:', text.slice(0, 200));
+
+                        let parsed;
+                        try {
+                            const cleaned = text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+                            parsed = JSON.parse(cleaned);
+                        } catch(_) {
+                            const m = text.match(/\{[\s\S]*\}/);
+                            if (m) parsed = JSON.parse(m[0]);
+                            else throw new Error('Ответ не содержит JSON: ' + text.slice(0, 100));
+                        }
+
+                        const rows = Array.isArray(parsed.rows) ? parsed.rows : [];
+                        console.info('[openrouter-ocr] rows:', rows.length);
+
+                        const players = [];
+                        rows.forEach(row => {
+                            const n = _ccOcrNormalizeRow({
+                                name: row.nick, nick: row.nick,
+                                kills: row.kills, deaths: row.deaths,
+                                pvp: row.pvp, pvp_dmg: row.pvp,
+                                pve: row.pve, pve_dmg: row.pve,
+                            });
+                            if (n) players.push(n);
+                        });
+
+                        if (!players.length) {
+                            skippedScreenshots.push({ num: i + 1, reason: 'OpenRouter OCR не вернул игроков' });
+                            continue;
+                        }
+
+                        const packName = shot.packName || shot.name || 'OCR ' + (i + 1);
+                        screenPlayersMap[packName]  = players.map(p => ({...p}));
+                        screenShotDataMap[packName] = shot.dataUrl;
+                        geometryMap[packName] = {
+                            ...crop.geometry,
+                            cropUrl: crop.cropCanvas.toDataURL('image/png'),
+                        };
+                        players.forEach(p => {
+                            const key = normalizeNick(p.name);
+                            if (!key) return;
+                            if (allPlayers[key]) {
+                                allPlayers[key].kills   = Math.max(allPlayers[key].kills   || 0, p.kills   || 0);
+                                allPlayers[key].deaths  = Math.max(allPlayers[key].deaths  || 0, p.deaths  || 0);
+                                allPlayers[key].pvp_dmg = Math.max(allPlayers[key].pvp_dmg || 0, p.pvp_dmg || 0);
+                                allPlayers[key].pve_dmg = Math.max(allPlayers[key].pve_dmg || 0, p.pve_dmg || 0);
+                            } else {
+                                allPlayers[key] = {...p};
+                            }
+                        });
+
+                    } catch(e) {
+                        const msg = e?.name === 'AbortError' ? 'timeout' : (e.message || String(e));
+                        console.warn(`[openrouter-ocr] screenshot ${i + 1}:`, msg);
+                        skippedScreenshots.push({ num: i + 1, reason: msg });
+                        if (!firstError) firstError = msg;
+                    }
+                }
+
+                dayLastParsed      = Object.values(allPlayers);
+                dayExpectedTotal   = null;
+                dayCommandChannel  = [];
+                dayPackLeaders     = {};
+                dayScreenPlayersMap = screenPlayersMap;
+                dayScreenShotMap   = screenShotDataMap;
+                Object.assign(dayPackGeometry, geometryMap);
+
+                if (firstError && dayLastParsed.length === 0) {
+                    setDayStatus('error', `OpenRouter OCR error: ${firstError}`);
+                    return;
+                }
+                if (dayLastParsed.length === 0) {
+                    setDayStatus('error', 'OpenRouter OCR не распознал игроков. Проверь API ключ и скриншоты.');
+                    return;
+                }
+
+                dayLastParsed = dayLastParsed.map(p => ({ ...p, _rawName: p.name, name: resolveAlias(p.name) }));
+                dayLastParsed = dayLastParsed.map(p => {
+                    const normP = normalizeNick(p.name);
+                    const rosterMatch = roster.find(r => normalizeNick(r.name) === normP && r.name !== p.name);
+                    if (rosterMatch) {
+                        if (p._rawName) nickAliases[p._rawName.toLowerCase()] = rosterMatch.name;
+                        nickAliases[p.name.toLowerCase()] = rosterMatch.name;
+                        return { ...p, name: rosterMatch.name };
+                    }
+                    return p;
+                });
+                const merged = {};
+                dayLastParsed.forEach(p => {
+                    const k = normalizeNick(p.name);
+                    if (merged[k]) {
+                        merged[k].kills   += p.kills;
+                        merged[k].deaths  += p.deaths;
+                        merged[k].pvp_dmg += p.pvp_dmg;
+                        merged[k].pve_dmg += p.pve_dmg;
+                    } else {
+                        merged[k] = {...p};
+                    }
+                });
+                dayLastParsed = Object.values(merged);
+
+                await runLocalIconMatcher(dateStr);
+                Object.assign(dayPackGeometry, geometryMap);
+
+                setDayStatus('loading', `OpenRouter OCR: ${dayLastParsed.length} игроков. Проверяю похожие ники...`);
+                checkSimilarNicks(dayLastParsed, () => {
+                    renderDayAnalyzedPlayers(dayLastParsed);
+                    document.getElementById('dayAnalyzeResults').style.display = '';
+                    let statusMsg = `OpenRouter OCR готово: ${dayLastParsed.length} уникальных игроков из ${shots.length} скриншотов`;
+                    if (skippedScreenshots.length > 0) {
+                        statusMsg += ` | Пропущено: ${skippedScreenshots.length} — №${skippedScreenshots.map(s => s.num + ' (' + s.reason + ')').join(', №')}`;
+                    }
+                    setDayStatus(skippedScreenshots.length > 0 ? 'warning' : 'success', statusMsg);
+                    expandDayModal();
+                    if (minibarText) minibarText.innerText = `OpenRouter OCR: ${dayLastParsed.length} игроков`;
+                    notifyAnalysisComplete(dayLastParsed.length);
+                    if (typeof openKMReviewWizard === 'function' && dayScreenPlayersMap && Object.keys(dayScreenPlayersMap).length > 0) {
+                        setTimeout(() => openKMReviewWizard(), 300);
+                    }
+                });
+            } catch(e) {
+                setDayStatus('error', 'OpenRouter OCR error: ' + (e.message || String(e)));
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerText = '🔍 Анализировать скриншоты (AI)'; }
+                const pbWrap = document.getElementById('analyzeProgressWrap');
+                if (pbWrap) {
+                    const pbEl = document.getElementById('analyzeProgressBar');
+                    if (pbEl) pbEl.style.width = '100%';
+                    setTimeout(() => { pbWrap.style.display = 'none'; }, 600);
+                }
+                updateApiKeyIndicator();
+            }
+        }
+
         async function analyzeDayScreenshots() {
             if (typeof window._cc === 'function' && !window._cc().canAutoAnalyze) {
                 setDayStatus('error', '❌ AI-анализ доступен только на плане Pro.');
@@ -8649,6 +8884,7 @@ function getClass2IconByClass3(c3) {
 
             const provider = getAnalysisProvider();
             if (provider === 'ocrspace') return analyzeWithOcrSpaceProvider({ dateStr, shots });
+            if (provider === 'openrouter_baidu') return analyzeWithOpenRouterBaiduProvider({ dateStr, shots });
 
             const apiKey = getNextApiKey();
             if (!apiKey) {
