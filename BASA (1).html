@@ -7673,11 +7673,38 @@ function getClass2IconByClass3(c3) {
                 return true;
             });
 
-            // Фильтр по уровню: берём максимальный, все кто ниже на 7+ не добавляем
-            const maxLevel = Math.max(...unique.map(p => p.level || 0));
-            const minLevel = maxLevel - 7;
-            const lowLevel = unique.filter(p => (p.level || 0) < minLevel);
-            const filtered2 = unique.filter(p => (p.level || 0) >= minLevel);
+            // Фильтр по уровню для clan screenshot import: max detected - 10.
+            const levelOf = p => {
+                if (!p || p.level == null || p.level === '') return null;
+                const n = Number(p && p.level);
+                return Number.isFinite(n) ? n : null;
+            };
+            const sortByLevelDesc = (a, b) => {
+                const la = levelOf(a);
+                const lb = levelOf(b);
+                if (la == null && lb == null) return String(a.name || '').localeCompare(String(b.name || ''), 'ru');
+                if (la == null) return 1;
+                if (lb == null) return -1;
+                return lb - la || String(a.name || '').localeCompare(String(b.name || ''), 'ru');
+            };
+            const sortedUnique = unique.slice().sort(sortByLevelDesc);
+            const detectedLevels = sortedUnique.map(levelOf).filter(v => v != null);
+            const maxDetectedLevel = detectedLevels.length ? Math.max(...detectedLevels) : null;
+            const minAllowedLevel = maxDetectedLevel == null ? null : maxDetectedLevel - 10;
+            const skippedLowLevel = minAllowedLevel == null ? [] : sortedUnique.filter(p => {
+                const lvl = levelOf(p);
+                return lvl != null && lvl < minAllowedLevel;
+            }).sort(sortByLevelDesc);
+            const filtered2 = sortedUnique.filter(p => {
+                const lvl = levelOf(p);
+                if (lvl == null) {
+                    p.needsReview = true;
+                    p.ambig = true;
+                    return true;
+                }
+                return minAllowedLevel == null || lvl >= minAllowedLevel;
+            }).sort(sortByLevelDesc);
+            const unknownLevelCount = filtered2.filter(p => levelOf(p) == null).length;
 
             // Разделяем на новых и существующих
             const newPlayers = [];
@@ -7689,9 +7716,12 @@ function getClass2IconByClass3(c3) {
                 if (inRoster) existing.push(entry);
                 else newPlayers.push(entry);
             });
+            newPlayers.sort(sortByLevelDesc);
+            existing.sort(sortByLevelDesc);
+            console.log('[clan-import] dynamic level filter max=' + (maxDetectedLevel == null ? 'null' : maxDetectedLevel) + ' min=' + (minAllowedLevel == null ? 'null' : minAllowedLevel) + ' accepted=' + filtered2.length + ' skipped=' + skippedLowLevel.length + ' unknown=' + unknownLevelCount);
 
             statusEl.style.cssText = 'display:block;background:#14532d22;border:1px solid #22c55e44;color:#4ade80;font-size:12px;padding:10px 14px;border-radius:8px;margin-top:10px';
-            statusEl.textContent = '✅ Распознано: ' + unique.length + ' игроков. Новых: ' + newPlayers.length + '. Уже в ростере: ' + existing.length + (lowLevel.length > 0 ? '. Отсеяно по уровню (<' + minLevel + '): ' + lowLevel.length : '');
+            statusEl.textContent = '✅ Распознано: ' + unique.length + ' игроков. Новых: ' + newPlayers.length + '. Уже в ростере: ' + existing.length + (skippedLowLevel.length > 0 ? '. Отсечено по уровню (<' + minAllowedLevel + ', max=' + maxDetectedLevel + '): ' + skippedLowLevel.length : '');
 
             // Показываем результаты
             resultsEl.style.display = 'block';
@@ -7703,12 +7733,14 @@ function getClass2IconByClass3(c3) {
                 html2 += newPlayers.map((p, i) => {
                     const profaDisplay = p.enProfa ? (PROFA_NAMES && PROFA_NAMES[p.enProfa] ? p.enProfa.split(' (')[0] + ' (' + PROFA_NAMES[p.enProfa] + ')' : p.enProfa) : p.prof_ru + ' ❓';
                     const statusIcon = p.online ? '🟢' : '🔴';
+                    const levelReview = p.needsReview ? '<span style="font-size:10px;color:#f59e0b;border:1px solid #f59e0b55;border-radius:6px;padding:2px 6px">needs review</span>' : '';
                     return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #1e2530;font-size:13px">' +
                         '<input type="checkbox" checked data-clan-import-idx="' + i + '" style="width:16px;height:16px;cursor:pointer">' +
                         '<span>' + statusIcon + '</span>' +
                         '<input value="' + p.name.replace(/"/g,'&quot;') + '" onchange="window._clanImportNew[' + i + '].name=this.value" style="font-weight:700;color:#e2e8f0;flex:1;background:#0b0e14;border:1px solid #2d3748;border-radius:6px;padding:3px 8px;font-size:13px;outline:none" title="Нажми чтобы исправить ник">' +
                         '<span style="font-size:11px;color:#a5b4fc">' + profaDisplay + '</span>' +
-                        '<span style="font-size:11px;color:#64748b">Lv.' + (p.level||'?') + '</span>' +
+                        '<span style="font-size:11px;color:#64748b">Lv.' + (levelOf(p) == null ? '?' : levelOf(p)) + '</span>' +
+                        levelReview +
                     '</div>';
                 }).join('');
                 html2 += '</div>';
@@ -7727,6 +7759,20 @@ function getClass2IconByClass3(c3) {
                     }).join('');
                     html2 += '</div>';
                 }
+            }
+
+            if (skippedLowLevel.length > 0) {
+                html2 += '<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#f97316;margin-bottom:8px">⚠️ Отсечено по уровню (<' + minAllowedLevel + ', max=' + maxDetectedLevel + '): ' + skippedLowLevel.length + '</div>';
+                html2 += '<div style="max-height:180px;overflow-y:auto;border:1px solid #7c2d1244;border-radius:10px;background:#7c2d120d">';
+                html2 += skippedLowLevel.map(p => {
+                    const statusIcon = p.online ? '🟢' : '🔴';
+                    return '<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid #7c2d1233;font-size:12px;color:#fed7aa">' +
+                        '<span>' + statusIcon + '</span>' +
+                        '<span style="font-weight:700;flex:1">' + String(p.name || '').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span>' +
+                        '<span style="color:#fb923c">Lv.' + levelOf(p) + '</span>' +
+                    '</div>';
+                }).join('');
+                html2 += '</div></div>';
             }
 
             // Store parsed data globally for confirm
@@ -10492,12 +10538,12 @@ ${playerList}
                     : [];
                 const withoutProfa = snapOrder
                     .map(normName => roster.find(p => normalizeNick(p.name) === normName))
-                    .filter(p => p && (!p.profa || p.profa === '—'))
+                    .filter(p => p && !hasAssignedProfa(p))
                     .map(p => {
                         const s = statsMap[normalizeNick(p.name)];
                         return { player: p, kills: s ? (s.kills || 0) : 0 };
                     });
-                if (withoutProfa.length > 0) openProfaAssign(withoutProfa);
+                openProfaAssign(withoutProfa);
             }, 400);
 
             // Проверяем ростер на похожие ники — показываем если нашли
@@ -13156,12 +13202,23 @@ ${playerList}
         let profaAssignQueue = []; // [{player, kills}]
         let profaAssignSelected = {}; // playerId -> profa
 
+        function hasAssignedProfa(player) {
+            if (!player) return false;
+            if (player.profa && player.profa !== '—') return true;
+            return Array.isArray(player.profas) && player.profas.some(pf => pf && pf !== '—');
+        }
+
         function openProfaAssign(playersWithoutProfa) {
-            if (!playersWithoutProfa.length) return;
-            profaAssignQueue = playersWithoutProfa;
+            const unresolved = (playersWithoutProfa || []).filter(item => item && item.player && !hasAssignedProfa(item.player));
+            if (!unresolved.length) {
+                console.log('[profa-assign] skipped modal: all profiles resolved');
+                return;
+            }
+            profaAssignQueue = unresolved;
             profaAssignSelected = {};
             renderProfaAssignList();
             document.getElementById('profaAssignModal').style.display = 'flex';
+            console.log('[profa-assign] opened unresolved=' + unresolved.length);
         }
 
         function closeProfaAssign() {
