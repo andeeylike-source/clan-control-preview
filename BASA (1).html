@@ -4669,7 +4669,13 @@
                 const historyShots = collectKmHistoryScreenshotSnapshot(activeDayDate);
                 if (historyShots.length) appliedStatsByDate[activeDayDate].kmScreenshots = historyShots;
                 const packShots = collectKmHistoryPackScreenshotSnapshot();
-                if (Object.keys(packShots).length) appliedStatsByDate[activeDayDate].kmPackScreenshots = packShots;
+                if (Object.keys(packShots).length) {
+                    appliedStatsByDate[activeDayDate].kmPackScreenshots = Object.assign(
+                        {},
+                        appliedStatsByDate[activeDayDate].kmPackScreenshots || {},
+                        packShots
+                    );
+                }
             }
             // 3. Удаляем скрины — при сохранении всегда очищаем
             if (activeDayDate && dayScreenshots[activeDayDate]) {
@@ -5228,6 +5234,7 @@
                 () => {
                     appliedStatsByDate = {};
                     roster = roster.map(p => ({ ...p, kills: 0, deaths: 0, pvp_dmg: 0, pve_dmg: 0 }));
+                    _kmHistoryExplicitDelete = true;
                     saveToStorage();
                     renderRoster();
                     if (document.getElementById('page-stats').classList.contains('active')) renderStats();
@@ -5644,12 +5651,26 @@ function getClass2IconByClass3(c3) {
         // ===== ПРОФИЛЬ ИГРОКА =====
         let currentProfileName = null;
         let profileReturnPage = "roster"; // куда возвращаться из профиля
+        let _profilePackModalReturn = null;
 
         function openPlayerProfile(playerName) {
             // Запоминаем откуда открыли профиль
             const activePage = document.querySelector('.page-section.active');
             if (activePage && activePage.id !== 'page-profile') {
                 profileReturnPage = activePage.id.replace('page-', '');
+            }
+            if (_kmPackViewer) {
+                const pack = _kmPackViewer.groups[_kmPackViewer.idx] || {};
+                _profilePackModalReturn = {
+                    dateStr: _kmPackViewer.dateStr,
+                    packKey: pack.key || pack.packName || pack.leader || '',
+                    idx: _kmPackViewer.idx,
+                    playerName: playerName
+                };
+                profileReturnPage = 'screenshots';
+                _kmPackViewerClose();
+            } else {
+                _profilePackModalReturn = null;
             }
             currentProfileName = playerName;
             const navProfile = document.getElementById('nav-profile');
@@ -6707,8 +6728,22 @@ function getClass2IconByClass3(c3) {
         }
 
         function goBackFromProfile() {
+            const packReturn = _profilePackModalReturn;
+            _profilePackModalReturn = null;
             document.getElementById('nav-profile').style.display = 'none';
             currentProfileName = null;
+            if (packReturn && packReturn.dateStr) {
+                showPage('screenshots');
+                toggleKmHistoryEvent(packReturn.dateStr, true);
+                setTimeout(function() {
+                    const dayData = appliedStatsByDate[packReturn.dateStr] || {};
+                    const groups = kmHistoryBuildPackGroups(packReturn.dateStr, dayData);
+                    let group = groups.find(function(g) { return g.key === packReturn.packKey; });
+                    if (!group && groups[packReturn.idx]) group = groups[packReturn.idx];
+                    openKmHistoryPackModal(packReturn.dateStr, group ? group.key : packReturn.packKey);
+                }, 80);
+                return;
+            }
             showPage(profileReturnPage || 'roster');
         }
 
@@ -10425,7 +10460,7 @@ ${playerList}
                     id: 'pack_' + packName,
                     packName: packName,
                     name: packName,
-                    originalDataUrl: dataUrl && dataUrl.length <= KM_HISTORY_THUMB_MAX_CHARS ? dataUrl : '',
+                    originalDataUrl: dataUrl || '',
                     thumbDataUrl: geom.cropUrl || (dataUrl && dataUrl.length <= KM_HISTORY_THUMB_MAX_CHARS ? dataUrl : ''),
                     cropUrl: geom.cropUrl || '',
                     source: 'pack',
@@ -10862,6 +10897,59 @@ ${playerList}
             return shot.originalDataUrl || shot.thumbDataUrl || shot.cropUrl || '';
         }
 
+        function _kmPackViewerShotKey(pack) {
+            if (!pack) return '';
+            return pack.packName || pack.leader || pack.key || '';
+        }
+
+        function _kmPackViewerUploadScreenshot() {
+            if (!_kmPackViewer) return;
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.style.display = 'none';
+            input.onchange = function(e) {
+                const file = e.target.files && e.target.files[0];
+                input.remove();
+                if (!file || !_kmPackViewer) return;
+                const reader = new FileReader();
+                reader.onload = function(ev) {
+                    if (!_kmPackViewer) return;
+                    const dataUrl = ev.target && ev.target.result ? String(ev.target.result) : '';
+                    if (!dataUrl) return;
+                    const dateStr = _kmPackViewer.dateStr;
+                    const pack = _kmPackViewer.groups[_kmPackViewer.idx] || {};
+                    const key = _kmPackViewerShotKey(pack);
+                    if (!dateStr || !key || !appliedStatsByDate[dateStr]) return;
+                    const dayData = appliedStatsByDate[dateStr];
+                    if (!dayData.kmPackScreenshots) dayData.kmPackScreenshots = {};
+                    const item = makeKmHistoryShotItem({
+                        id: 'pack_upload_' + key,
+                        packName: key,
+                        name: pack.leader || key,
+                        originalDataUrl: dataUrl,
+                        thumbDataUrl: dataUrl,
+                        source: 'pack-upload',
+                        note: 'Дозагружено вручную'
+                    }, _kmPackViewer.idx, 'pack');
+                    dayData.kmPackScreenshots[key] = item;
+                    if (pack.packName && pack.packName !== key) dayData.kmPackScreenshots[pack.packName] = item;
+                    if (pack.leader && pack.leader !== key) dayData.kmPackScreenshots[pack.leader] = item;
+                    saveToStorage();
+                    _kmPackViewer.groups = kmHistoryBuildPackGroups(dateStr, dayData);
+                    let idx = _kmPackViewer.groups.findIndex(function(g) { return g.key === pack.key; });
+                    if (idx < 0) idx = _kmPackViewer.groups.findIndex(function(g) { return normalizeNick(_kmPackViewerShotKey(g)) === normalizeNick(key); });
+                    _kmPackViewer.idx = idx >= 0 ? idx : Math.min(_kmPackViewer.idx, _kmPackViewer.groups.length - 1);
+                    _kmPackViewerUpdateContent();
+                    renderKmHistory();
+                    setTimeout(function() { toggleKmHistoryEvent(dateStr, true); }, 40);
+                };
+                reader.readAsDataURL(file);
+            };
+            document.body.appendChild(input);
+            input.click();
+        }
+
         function _kmFullCCClose() {
             if (_kmFullCCViewer) {
                 if (_kmFullCCViewer.keyHandler) document.removeEventListener('keydown', _kmFullCCViewer.keyHandler);
@@ -10960,7 +11048,7 @@ ${playerList}
                 const profaCell = memberProfa && memberProfa !== '—' ? profaIconHtml(memberProfa, 20) + '<span class="km-history-profa-label">' + kmHistoryEsc(PROFA_NAMES && PROFA_NAMES[memberProfa] ? PROFA_NAMES[memberProfa] : memberProfa) + '</span>' : '<span class="km-history-profa-label">—</span>';
                 const isLeaderRow = idx === 0 || normalizeNick(p.name) === normalizeNick(pack.leader);
                 return `<div class="km-history-pack-row ${isLeaderRow ? 'is-leader' : ''}">
-                    <span class="km-history-pack-row-name">${isLeaderRow ? '<span class="km-pack-leader-crown">♛</span>' : ''}<span class="player-nick-link" onclick="openPlayerProfile('${p.name.replace(/'/g,"\\'")}')" style="cursor:pointer">${p.name}</span></span>
+                    <span class="km-history-pack-row-name">${isLeaderRow ? '<span class="km-pack-leader-crown">♛</span>' : ''}<span class="player-nick-link" onclick="event.stopPropagation();openPlayerProfile('${p.name.replace(/'/g,"\\'")}')" style="cursor:pointer">${p.name}</span></span>
                     <span class="km-history-pack-row-profa">${profaCell}</span>
                     <span>${p.kills||0}</span>
                     <span>${p.deaths||0}</span>
@@ -10989,7 +11077,7 @@ ${playerList}
                 if (previewUrl) {
                     mediaEl.innerHTML = `<img src="${previewUrl}" alt="${kmHistoryEsc(pack.leader)}" style="width:100%;height:100%;display:block">`;
                 } else {
-                    mediaEl.innerHTML = '<div class="km-history-empty-state">Скрин не сохранён</div>';
+                    mediaEl.innerHTML = '<div class="km-history-empty-state">Скрин не сохранён<br><button type="button" class="km-pack-upload-shot-btn" onclick="event.stopPropagation();_kmPackViewerUploadScreenshot()">Загрузить скриншот повторно</button></div>';
                 }
             }
 
@@ -11038,7 +11126,7 @@ ${playerList}
             modal.onclick = function(e) { if (e.target === modal) _kmPackViewerClose(); };
 
             modal.innerHTML = `<div class="km-history-modal-panel km-history-pack-modal" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
-                <button type="button" class="km-history-modal-close" onclick="_kmPackViewerClose()">×</button>
+                <button type="button" class="km-history-modal-close" onclick="event.stopPropagation();_kmPackViewerClose()">×</button>
                 <div class="km-pack-viewer-header">
                     <div class="km-pack-viewer-titles">
                         <div class="km-history-modal-title" id="kmPackViewerTitle">Пак: ${kmHistoryEsc(pack.leader || 'Пак без лидера')}</div>
@@ -11055,7 +11143,7 @@ ${playerList}
                         <div id="kmPackViewerMedia">
                             ${previewUrl
                                 ? `<img src="${previewUrl}" alt="${kmHistoryEsc(pack.leader)}" style="width:100%;height:100%;display:block">`
-                                : '<div class="km-history-empty-state">Скрин не сохранён</div>'}
+                                : '<div class="km-history-empty-state">Скрин не сохранён<br><button type="button" class="km-pack-upload-shot-btn" onclick="event.stopPropagation();_kmPackViewerUploadScreenshot()">Загрузить скриншот повторно</button></div>'}
                         </div>
                         <button type="button" id="kmPackViewerFullBtn" class="km-pack-full-cc-btn" onclick="event.stopPropagation();_kmPackViewerOpenFullCC()" ${fullUrl ? '' : 'style="display:none"'}>🔍 Открыть фул ЦЦ</button>
                     </div>
@@ -11379,7 +11467,7 @@ ${playerList}
                 packLeaders: Object.assign({}, prevSnap ? (prevSnap.packLeaders || {}) : {}, dayPackLeaders || {}),
                 screenPlayersMap: mergedScreenMap,
                 kmScreenshots: historyShots.length ? historyShots : (prevSnap ? (prevSnap.kmScreenshots || []) : []),
-                kmPackScreenshots: Object.keys(packShots).length ? packShots : (prevSnap ? (prevSnap.kmPackScreenshots || {}) : {}),
+                kmPackScreenshots: Object.assign({}, prevSnap ? (prevSnap.kmPackScreenshots || {}) : {}, packShots),
                 appliedAt: new Date().toISOString()
             };
 
@@ -12471,6 +12559,7 @@ ${playerList}
                 var snap = appliedStatsByDate[dateStr] || null;
                 delete appliedStatsByDate[dateStr];
                 kmArchive.push({ dateStr: dateStr, archivedAt: new Date().toISOString(), snap: snap, statuses: archivedStatuses, overrides: archivedOverrides });
+                _kmHistoryExplicitDelete = true;
                 saveToStorage();
                 renderKmHistory();
                 renderCalendar();
@@ -12494,6 +12583,7 @@ ${playerList}
 
         function deleteKmFromArchive(dateStr) {
             kmArchive = kmArchive.filter(function(e) { return e.dateStr !== dateStr; });
+            _kmHistoryExplicitDelete = true;
             saveToStorage();
             renderArchive();
         }
@@ -13269,7 +13359,10 @@ ${playerList}
 
                 if (!flat.length) { alert('Добавь хотя бы одного игрока'); return; }
                 var prevManualSnap = appliedStatsByDate[s.origDate || s.date] || appliedStatsByDate[s.date] || {};
-                if (s.origDate && s.origDate !== s.date) delete appliedStatsByDate[s.origDate];
+                if (s.origDate && s.origDate !== s.date) {
+                    _kmHistorySkipMergeDates[s.origDate] = true;
+                    delete appliedStatsByDate[s.origDate];
+                }
 
                 var _mkeOldCount = Object.keys(appliedStatsByDate).length;
                 console.log('[km-history-save] oldCount=' + _mkeOldCount);
@@ -13614,6 +13707,37 @@ ${playerList}
 
         // ===== LOCAL STORAGE =====
         const LS_KEY = 'clanControl_v1';
+        let _kmHistoryExplicitDelete = false;
+        let _kmHistorySkipMergeDates = {};
+
+        function _kmHistoryReadStoredSnapshots() {
+            try {
+                const raw = localStorage.getItem(LS_KEY);
+                if (!raw) return null;
+                const data = JSON.parse(raw);
+                return data && data.appliedStatsByDate ? data.appliedStatsByDate : null;
+            } catch(e) {
+                console.warn('[km-history-save] stored history read failed:', e);
+                return null;
+            }
+        }
+
+        function _kmHistoryPreserveStoredSnapshots(data) {
+            if (!data || !data.appliedStatsByDate || _kmHistoryExplicitDelete) return data;
+            const stored = _kmHistoryReadStoredSnapshots();
+            if (!stored) return data;
+            const current = data.appliedStatsByDate;
+            const oldCount = Object.keys(stored).length;
+            const newCount = Object.keys(current).length;
+            if (oldCount > 0 && newCount < oldCount) {
+                console.warn('[km-history-save] WARN: history count would drop ' + oldCount + ' → ' + newCount + ' without delete; preserving missing events.');
+            }
+            Object.keys(stored).forEach(function(dateStr) {
+                if (_kmHistorySkipMergeDates && _kmHistorySkipMergeDates[dateStr]) return;
+                if (!current[dateStr]) current[dateStr] = stored[dateStr];
+            });
+            return data;
+        }
 
         function saveToStorage() {
             // Показываем индикатор сохранения
@@ -13626,7 +13750,7 @@ ${playerList}
                 window._saveIndTimer = setTimeout(() => { ind.style.opacity = '0'; }, 2000);
             }
             try {
-                const data = {
+                let data = {
                     roster,
                     archive,
                     kmArchive,
@@ -13642,6 +13766,8 @@ ${playerList}
                     playerProfaByDate,
                     valueWeights
                 };
+                data = _kmHistoryPreserveStoredSnapshots(data);
+                appliedStatsByDate = data.appliedStatsByDate || appliedStatsByDate;
                 localStorage.setItem(LS_KEY, JSON.stringify(data));
                 if (window._currentUserId && window._supabase) {
                     window._supabase.from('user_app_data').upsert(
@@ -13651,6 +13777,9 @@ ${playerList}
                 }
             } catch(e) {
                 console.warn('localStorage save failed:', e);
+            } finally {
+                _kmHistoryExplicitDelete = false;
+                _kmHistorySkipMergeDates = {};
             }
         }
 
@@ -17488,8 +17617,6 @@ window._archRender = function() {
   function onClick(e){
     var t = e.target;
     if (t === toggleBtn || panel.contains(t)) return;
-    e.preventDefault();
-    e.stopPropagation();
     clearPinned();
     t.classList.add('dev-inspect-pinned');
     pinnedEl = t;
@@ -23061,6 +23188,8 @@ window._archRender = function() {
         font-size: 18px;
         font-weight: 900;
         cursor: pointer;
+        z-index: 5;
+        pointer-events: auto;
       }
       body:not(.light) .km-history-modal-title {
         font-size: 18px;
@@ -23361,6 +23490,21 @@ window._archRender = function() {
       body:not(.light) .km-pack-nav-btn:disabled {
         opacity: .32;
         cursor: default;
+      }
+      body:not(.light) .km-pack-upload-shot-btn {
+        appearance: none;
+        margin-top: 10px;
+        border: 1px solid var(--cc-theme-accent);
+        border-radius: 8px;
+        background: rgba(var(--cc-theme-accent-rgb),.12);
+        color: var(--cc-theme-text-title);
+        font-size: 12px;
+        font-weight: 800;
+        padding: 7px 12px;
+        cursor: pointer;
+      }
+      body:not(.light) .km-pack-upload-shot-btn:hover {
+        background: rgba(var(--cc-theme-accent-rgb),.22);
       }
       body:not(.light) .km-pack-viewer-counter {
         color: var(--cc-theme-text-muted);
