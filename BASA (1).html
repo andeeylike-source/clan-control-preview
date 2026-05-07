@@ -10382,6 +10382,7 @@ ${playerList}
         let playerProfaByDate = {};
         // Состояние раскрытых паков в Истории КМ { containerId: bool }
         let kmOpenPacksState = {};
+        let _kmPackViewer = null;
         const KM_HISTORY_SHOT_LIMIT = 8;
         const KM_HISTORY_THUMB_MAX_CHARS = 180000;
         // kmProfaOverrides: { [dateStr]: { [normName]: profaName } }
@@ -10842,59 +10843,176 @@ ${playerList}
             console.log('[km-history] lightbox index=' + next);
         }
 
+        function _kmPackViewerClose() {
+            if (_kmPackViewer) {
+                if (_kmPackViewer.keyHandler) document.removeEventListener('keydown', _kmPackViewer.keyHandler);
+                _kmPackViewer = null;
+            }
+            kmHistoryRemoveOverlay('kmHistoryPackModal');
+        }
+
+        function _kmPackViewerGetPreviewUrl(shot) {
+            if (!shot) return '';
+            return shot.cropUrl || shot.thumbDataUrl || shot.originalDataUrl || '';
+        }
+
+        function _kmPackViewerGetFullUrl(shot) {
+            if (!shot) return '';
+            return shot.originalDataUrl || shot.thumbDataUrl || shot.cropUrl || '';
+        }
+
+        function _kmPackViewerOpenFullCC() {
+            if (!_kmPackViewer) return;
+            const pack = _kmPackViewer.groups[_kmPackViewer.idx];
+            const shot = pack.screenshot && (pack.screenshot.originalDataUrl || pack.screenshot.thumbDataUrl || pack.screenshot.cropUrl) ? pack.screenshot : null;
+            const url = _kmPackViewerGetFullUrl(shot);
+            if (!url) return;
+            _openKmPackShotLightbox(url, pack.leader || 'Пак без лидера');
+        }
+
+        function _kmPackViewerBuildTableRows(pack, dateStr) {
+            return pack.players.map(function(p, idx) {
+                const resolvedN = resolveAlias(p.name);
+                const inRoster = roster.find(function(r) { return normalizeNick(r.name) === normalizeNick(resolvedN) || normalizeNick(r.name) === normalizeNick(p.name); });
+                const normPKey = normalizeNick(p.name);
+                const savedKmProfa = (playerProfaByDate[normPKey] && playerProfaByDate[normPKey][dateStr]) || null;
+                const memberProfa = savedKmProfa || (inRoster ? (inRoster.profa || '—') : '—');
+                const profaCell = memberProfa && memberProfa !== '—' ? profaIconHtml(memberProfa, 20) + '<span class="km-history-profa-label">' + kmHistoryEsc(PROFA_NAMES && PROFA_NAMES[memberProfa] ? PROFA_NAMES[memberProfa] : memberProfa) + '</span>' : '<span class="km-history-profa-label">—</span>';
+                const isLeaderRow = idx === 0 || normalizeNick(p.name) === normalizeNick(pack.leader);
+                return `<div class="km-history-pack-row ${isLeaderRow ? 'is-leader' : ''}">
+                    <span class="km-history-pack-row-name">${isLeaderRow ? '<span class="km-history-leader-chip">Лидер</span>' : ''}<span class="player-nick-link" onclick="openPlayerProfile('${p.name.replace(/'/g,"\\'")}')" style="cursor:pointer">${p.name}</span></span>
+                    <span class="km-history-pack-row-profa">${profaCell}</span>
+                    <span>${p.kills||0}</span>
+                    <span>${p.deaths||0}</span>
+                    <span>${(p.pvp_dmg||0).toLocaleString()}</span>
+                    <span>${(p.pve_dmg||0).toLocaleString()}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function _kmPackViewerUpdateContent() {
+            if (!_kmPackViewer) return;
+            const pack = _kmPackViewer.groups[_kmPackViewer.idx];
+            const dateStr = _kmPackViewer.dateStr;
+            const shot = pack.screenshot && (pack.screenshot.originalDataUrl || pack.screenshot.thumbDataUrl || pack.screenshot.cropUrl) ? pack.screenshot : null;
+            const previewUrl = _kmPackViewerGetPreviewUrl(shot);
+            const fullUrl = _kmPackViewerGetFullUrl(shot);
+            const subtitleText = ((!_kmPackNameIsFilename(pack.packName) && pack.packName) ? pack.packName : '') + (pack.totalPlayers ? ' · ' + pack.totalPlayers + ' игроков' : '');
+
+            const titleEl = document.getElementById('kmPackViewerTitle');
+            if (titleEl) titleEl.textContent = 'Пак: ' + (pack.leader || 'Пак без лидера');
+            const subtitleEl = document.getElementById('kmPackViewerSubtitle');
+            if (subtitleEl) subtitleEl.textContent = subtitleText;
+
+            const mediaEl = document.getElementById('kmPackViewerMedia');
+            if (mediaEl) {
+                if (previewUrl) {
+                    mediaEl.innerHTML = `<img src="${previewUrl}" alt="${kmHistoryEsc(pack.leader)}" style="width:100%;border-radius:12px;object-fit:cover;max-height:400px;border:1px solid var(--cc-theme-border)">`;
+                } else {
+                    mediaEl.innerHTML = '<div class="km-history-empty-state">Скрин не сохранён</div>';
+                }
+            }
+
+            const fullBtn = document.getElementById('kmPackViewerFullBtn');
+            if (fullBtn) fullBtn.style.display = fullUrl ? '' : 'none';
+
+            const tableEl = document.getElementById('kmPackViewerTable');
+            if (tableEl) tableEl.innerHTML = _kmPackViewerBuildTableRows(pack, dateStr);
+
+            const prevBtn = document.getElementById('kmPackViewerPrev');
+            const nextBtn = document.getElementById('kmPackViewerNext');
+            const counterEl = document.getElementById('kmPackViewerCounter');
+            if (prevBtn) prevBtn.disabled = _kmPackViewer.idx <= 0;
+            if (nextBtn) nextBtn.disabled = _kmPackViewer.idx >= _kmPackViewer.groups.length - 1;
+            if (counterEl) counterEl.textContent = (_kmPackViewer.idx + 1) + ' / ' + _kmPackViewer.groups.length;
+            console.log('[km-history] pack viewer nav idx=' + _kmPackViewer.idx + '/' + _kmPackViewer.groups.length);
+        }
+
+        function _kmPackViewerStep(delta) {
+            if (!_kmPackViewer) return;
+            const next = _kmPackViewer.idx + delta;
+            if (next < 0 || next >= _kmPackViewer.groups.length) return;
+            _kmPackViewer.idx = next;
+            _kmPackViewerUpdateContent();
+        }
+
         function openKmHistoryPackModal(dateStr, packKey) {
             const dayData = appliedStatsByDate[dateStr] || {};
             const groups = kmHistoryBuildPackGroups(dateStr, dayData);
-            const pack = groups.find(function(g) { return g.key === packKey; }) || groups.find(function(g) { return normalizeNick(g.leader) === normalizeNick(packKey); });
-            if (!pack) return;
-            console.log('[km-history] pack open leader=' + pack.leader + ' players=' + pack.players.length);
-            kmHistoryRemoveOverlay('kmHistoryPackModal');
-            const screenshot = pack.screenshot && (pack.screenshot.originalDataUrl || pack.screenshot.thumbDataUrl || pack.screenshot.cropUrl) ? pack.screenshot : null;
-            const screenshotUrl = screenshot ? (screenshot.originalDataUrl || screenshot.thumbDataUrl || screenshot.cropUrl || '') : '';
-            const screenshotNote = screenshot ? (screenshot.originalDataUrl ? '' : 'Оригинал удалён, доступна миниатюра') : 'Скрин не сохранён';
+            let idx = groups.findIndex(function(g) { return g.key === packKey; });
+            if (idx < 0) idx = groups.findIndex(function(g) { return normalizeNick(g.leader) === normalizeNick(packKey); });
+            if (idx < 0 || !groups.length) return;
+
+            _kmPackViewerClose();
+            _kmPackViewer = { dateStr: dateStr, groups: groups, idx: idx, keyHandler: null };
+
+            const pack = groups[idx];
+            const shot = pack.screenshot && (pack.screenshot.originalDataUrl || pack.screenshot.thumbDataUrl || pack.screenshot.cropUrl) ? pack.screenshot : null;
+            const previewUrl = _kmPackViewerGetPreviewUrl(shot);
+            const fullUrl = _kmPackViewerGetFullUrl(shot);
+            const subtitleText = ((!_kmPackNameIsFilename(pack.packName) && pack.packName) ? pack.packName : '') + (pack.totalPlayers ? ' · ' + pack.totalPlayers + ' игроков' : '');
+
             const modal = document.createElement('div');
             modal.id = 'kmHistoryPackModal';
             modal.className = 'km-history-modal-overlay';
-            modal.onclick = function(e) { if (e.target === modal) kmHistoryRemoveOverlay('kmHistoryPackModal'); };
+            modal.onclick = function(e) { if (e.target === modal) _kmPackViewerClose(); };
+
             modal.innerHTML = `<div class="km-history-modal-panel km-history-pack-modal" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
-                <button type="button" class="km-history-modal-close" onclick="kmHistoryRemoveOverlay('kmHistoryPackModal')">×</button>
-                <div class="km-history-modal-title">Пак: ${kmHistoryEsc(pack.leader || 'Пак без лидера')}</div>
-                <div class="km-history-modal-subtitle">${!_kmPackNameIsFilename(pack.packName) ? kmHistoryEsc(pack.packName || '') : ''}${pack.totalPlayers ? ` · ${pack.totalPlayers} игроков` : ''}</div>
+                <button type="button" class="km-history-modal-close" onclick="_kmPackViewerClose()">×</button>
+                <div class="km-pack-viewer-header">
+                    <div class="km-pack-viewer-titles">
+                        <div class="km-history-modal-title" id="kmPackViewerTitle">Пак: ${kmHistoryEsc(pack.leader || 'Пак без лидера')}</div>
+                        <div class="km-history-modal-subtitle" id="kmPackViewerSubtitle">${kmHistoryEsc(subtitleText)}</div>
+                    </div>
+                    <div class="km-pack-viewer-nav">
+                        <button type="button" id="kmPackViewerPrev" class="km-pack-nav-btn" onclick="event.stopPropagation();_kmPackViewerStep(-1)" ${idx <= 0 ? 'disabled' : ''}>← Пред</button>
+                        <span id="kmPackViewerCounter" class="km-pack-viewer-counter">${idx + 1} / ${groups.length}</span>
+                        <button type="button" id="kmPackViewerNext" class="km-pack-nav-btn" onclick="event.stopPropagation();_kmPackViewerStep(1)" ${idx >= groups.length - 1 ? 'disabled' : ''}>След →</button>
+                    </div>
+                </div>
                 <div class="km-history-pack-modal-body">
                     <div class="km-history-pack-media">
-                        ${screenshotUrl
-                            ? `<img src="${screenshotUrl}" alt="${kmHistoryEsc(pack.leader)}" data-label="${kmHistoryEsc(pack.leader)}" onclick="event.stopPropagation();_openKmPackShotLightbox(this.src,this.dataset.label)" style="cursor:pointer;border-radius:8px;width:100%" title="Нажмите для просмотра в полный размер">`
-                            : '<div class="km-history-empty-state">Скрин не сохранён</div>'}
-                        ${screenshotUrl ? '<div style="font-size:11px;color:#64748b;text-align:center;margin-top:4px">🔍 Нажмите для просмотра</div>' : ''}
-                        <div class="km-history-lightbox-note">${kmHistoryEsc(screenshotNote)}</div>
+                        <div id="kmPackViewerMedia">
+                            ${previewUrl
+                                ? `<img src="${previewUrl}" alt="${kmHistoryEsc(pack.leader)}" style="width:100%;border-radius:12px;object-fit:cover;max-height:400px;border:1px solid var(--cc-theme-border)">`
+                                : '<div class="km-history-empty-state">Скрин не сохранён</div>'}
+                        </div>
+                        <button type="button" id="kmPackViewerFullBtn" class="km-pack-full-cc-btn" onclick="event.stopPropagation();_kmPackViewerOpenFullCC()" ${fullUrl ? '' : 'style="display:none"'}>🔍 Открыть фул ЦЦ</button>
                     </div>
                     <div class="km-history-pack-table-wrap">
                         <div class="km-history-pack-table-head">
                             <span>Игрок</span><span>Профа</span><span>⚔️</span><span>💀</span><span>🗡️</span><span>🐉</span>
                         </div>
-                        <div class="km-history-pack-table">
-                            ${pack.players.map(function(p, idx) {
-                                const resolvedN = resolveAlias(p.name);
-                                const inRoster = roster.find(function(r) { return normalizeNick(r.name) === normalizeNick(resolvedN) || normalizeNick(r.name) === normalizeNick(p.name); });
-                                const normPKey = normalizeNick(p.name);
-                                const savedKmProfa = (playerProfaByDate[normPKey] && playerProfaByDate[normPKey][dateStr]) || null;
-                                const memberProfa = savedKmProfa || (inRoster ? (inRoster.profa || '—') : '—');
-                                const profaCell = memberProfa && memberProfa !== '—' ? profaIconHtml(memberProfa, 20) + '<span class="km-history-profa-label">' + kmHistoryEsc(PROFA_NAMES && PROFA_NAMES[memberProfa] ? PROFA_NAMES[memberProfa] : memberProfa) + '</span>' : '<span class="km-history-profa-label">—</span>';
-                                const isLeaderRow = idx === 0 || normalizeNick(p.name) === normalizeNick(pack.leader);
-                                return `<div class="km-history-pack-row ${isLeaderRow ? 'is-leader' : ''}">
-                                    <span class="km-history-pack-row-name">${isLeaderRow ? '<span class="km-history-leader-chip">Лидер</span>' : ''}<span class="player-nick-link" onclick="openPlayerProfile('${p.name.replace(/'/g,"\\'")}')" style="cursor:pointer">${p.name}</span></span>
-                                    <span class="km-history-pack-row-profa">${profaCell}</span>
-                                    <span>${p.kills||0}</span>
-                                    <span>${p.deaths||0}</span>
-                                    <span>${(p.pvp_dmg||0).toLocaleString()}</span>
-                                    <span>${(p.pve_dmg||0).toLocaleString()}</span>
-                                </div>`;
-                            }).join('')}
+                        <div class="km-history-pack-table" id="kmPackViewerTable">
+                            ${_kmPackViewerBuildTableRows(pack, dateStr)}
                         </div>
                     </div>
                 </div>
             </div>`;
+
             document.body.appendChild(modal);
+
+            _kmPackViewer.keyHandler = function(e) {
+                if (!_kmPackViewer) return;
+                if (e.key === 'Escape') { _kmPackViewerClose(); return; }
+                if (e.key === 'ArrowLeft') { e.preventDefault(); _kmPackViewerStep(-1); }
+                if (e.key === 'ArrowRight') { e.preventDefault(); _kmPackViewerStep(1); }
+            };
+            document.addEventListener('keydown', _kmPackViewer.keyHandler);
+
+            let _wheelTs = 0;
+            const panel = modal.querySelector('.km-history-pack-modal');
+            if (panel) {
+                panel.addEventListener('wheel', function(e) {
+                    const now = Date.now();
+                    if (now - _wheelTs < 400) return;
+                    _wheelTs = now;
+                    e.preventDefault();
+                    _kmPackViewerStep((e.deltaY > 0 || e.deltaX > 0) ? 1 : -1);
+                }, { passive: false });
+            }
+
+            console.log('[km-history] pack viewer open dateStr=' + dateStr + ' idx=' + idx + '/' + groups.length);
         }
 
         function toggleKmHistoryEvent(dateStr, forceOpen) {
@@ -23050,6 +23168,72 @@ window._archRender = function() {
         body:not(.light) .km-history-pack-row span:nth-child(n+2) {
           justify-self: start;
         }
+      }
+      body:not(.light) .km-pack-viewer-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+      }
+      body:not(.light) .km-pack-viewer-titles {
+        flex: 1;
+        min-width: 0;
+      }
+      body:not(.light) .km-pack-viewer-nav {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+        padding-top: 2px;
+      }
+      body:not(.light) .km-pack-nav-btn {
+        appearance: none;
+        border: 1px solid var(--cc-theme-border-strong);
+        border-radius: 8px;
+        background: rgba(10,12,16,.88);
+        color: var(--cc-theme-text-title);
+        font-size: 12px;
+        font-weight: 700;
+        padding: 6px 14px;
+        cursor: pointer;
+        transition: background .15s, border-color .15s;
+      }
+      body:not(.light) .km-pack-nav-btn:hover:not(:disabled) {
+        background: rgba(var(--cc-theme-accent-rgb),.14);
+        border-color: var(--cc-theme-accent);
+      }
+      body:not(.light) .km-pack-nav-btn:disabled {
+        opacity: .32;
+        cursor: default;
+      }
+      body:not(.light) .km-pack-viewer-counter {
+        color: var(--cc-theme-text-muted);
+        font-size: 12px;
+        font-weight: 700;
+        min-width: 44px;
+        text-align: center;
+      }
+      body:not(.light) .km-pack-full-cc-btn {
+        appearance: none;
+        display: block;
+        width: 100%;
+        margin-top: 10px;
+        padding: 9px 16px;
+        border: 1px solid var(--cc-theme-border-strong);
+        border-radius: 10px;
+        background: rgba(var(--cc-theme-accent-rgb),.08);
+        color: var(--cc-theme-accent);
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        text-align: center;
+        transition: background .15s, border-color .15s;
+      }
+      body:not(.light) .km-pack-full-cc-btn:hover {
+        background: rgba(var(--cc-theme-accent-rgb),.18);
+        border-color: var(--cc-theme-accent);
       }
     </style>
     <script id="cc-color-theme-system-script">
