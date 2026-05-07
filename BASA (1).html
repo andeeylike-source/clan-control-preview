@@ -10997,7 +10997,7 @@ ${playerList}
             if (fullBtn) fullBtn.style.display = fullUrl ? '' : 'none';
 
             const tableEl = document.getElementById('kmPackViewerTable');
-            if (tableEl) tableEl.innerHTML = _kmPackViewerBuildTableRows(pack, dateStr);
+            if (tableEl) tableEl.innerHTML = '<div class="km-history-pack-table-head"><span>Игрок</span><span>Профа</span><span>⚔️</span><span>💀</span><span>🗡️</span><span>🐉</span></div>' + _kmPackViewerBuildTableRows(pack, dateStr);
 
             const prevBtn = document.getElementById('kmPackViewerPrev');
             const nextBtn = document.getElementById('kmPackViewerNext');
@@ -11060,10 +11060,10 @@ ${playerList}
                         <button type="button" id="kmPackViewerFullBtn" class="km-pack-full-cc-btn" onclick="event.stopPropagation();_kmPackViewerOpenFullCC()" ${fullUrl ? '' : 'style="display:none"'}>🔍 Открыть фул ЦЦ</button>
                     </div>
                     <div class="km-history-pack-table-wrap">
-                        <div class="km-history-pack-table-head">
-                            <span>Игрок</span><span>Профа</span><span>⚔️</span><span>💀</span><span>🗡️</span><span>🐉</span>
-                        </div>
                         <div class="km-history-pack-table" id="kmPackViewerTable">
+                            <div class="km-history-pack-table-head">
+                                <span>Игрок</span><span>Профа</span><span>⚔️</span><span>💀</span><span>🗡️</span><span>🐉</span>
+                            </div>
                             ${_kmPackViewerBuildTableRows(pack, dateStr)}
                         </div>
                     </div>
@@ -23186,14 +23186,11 @@ window._archRender = function() {
         border-radius: 14px;
         overflow: hidden;
         background: rgba(9,12,17,.76);
-        display: flex;
-        flex-direction: column;
         min-height: 0;
       }
       body:not(.light) .km-history-pack-table {
+        height: 100%;
         overflow-y: auto;
-        flex: 1;
-        min-height: 0;
       }
       body:not(.light) .km-history-pack-table-head,
       body:not(.light) .km-history-pack-row {
@@ -23201,16 +23198,18 @@ window._archRender = function() {
         grid-template-columns: minmax(160px, 2fr) minmax(150px, 1.2fr) repeat(4, minmax(72px, .6fr));
         gap: 10px;
         align-items: center;
-        padding: 10px 12px;
+        padding: 7px 12px;
       }
       body:not(.light) .km-history-pack-table-head {
-        background: rgba(255,255,255,.03);
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: rgb(9,12,17);
         color: var(--cc-theme-text-muted);
         font-size: 11px;
         font-weight: 800;
         text-transform: uppercase;
         letter-spacing: .04em;
-        flex-shrink: 0;
       }
       body:not(.light) .km-history-pack-row {
         border-top: 1px solid rgba(255,255,255,.04);
@@ -23265,11 +23264,8 @@ window._archRender = function() {
           flex: none;
           height: 260px;
         }
-        body:not(.light) .km-history-pack-table-wrap {
-          overflow-y: visible;
-        }
         body:not(.light) .km-history-pack-table {
-          overflow-y: visible;
+          height: auto;
         }
         body:not(.light) .km-history-pack-table-head,
         body:not(.light) .km-history-pack-row {
