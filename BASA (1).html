@@ -10383,6 +10383,7 @@ ${playerList}
         // Состояние раскрытых паков в Истории КМ { containerId: bool }
         let kmOpenPacksState = {};
         let _kmPackViewer = null;
+        let _kmFullCCViewer = null;
         const KM_HISTORY_SHOT_LIMIT = 8;
         const KM_HISTORY_THUMB_MAX_CHARS = 180000;
         // kmProfaOverrides: { [dateStr]: { [normName]: profaName } }
@@ -10861,13 +10862,92 @@ ${playerList}
             return shot.originalDataUrl || shot.thumbDataUrl || shot.cropUrl || '';
         }
 
-        function _kmPackViewerOpenFullCC() {
-            if (!_kmPackViewer) return;
-            const pack = _kmPackViewer.groups[_kmPackViewer.idx];
+        function _kmFullCCClose() {
+            if (_kmFullCCViewer) {
+                if (_kmFullCCViewer.keyHandler) document.removeEventListener('keydown', _kmFullCCViewer.keyHandler);
+                _kmFullCCViewer = null;
+            }
+            kmHistoryRemoveOverlay('kmHistoryPackLightbox');
+        }
+
+        function _kmFullCCUpdateContent() {
+            if (!_kmFullCCViewer) return;
+            const pack = _kmFullCCViewer.groups[_kmFullCCViewer.idx];
             const shot = pack.screenshot && (pack.screenshot.originalDataUrl || pack.screenshot.thumbDataUrl || pack.screenshot.cropUrl) ? pack.screenshot : null;
             const url = _kmPackViewerGetFullUrl(shot);
-            if (!url) return;
-            _openKmPackShotLightbox(url, pack.leader || 'Пак без лидера');
+            const imgEl = document.getElementById('kmFullCCImage');
+            const noImgEl = document.getElementById('kmFullCCNoImg');
+            const metaEl = document.getElementById('kmFullCCMeta');
+            const counterEl = document.getElementById('kmFullCCCounter');
+            const prevBtn = document.getElementById('kmFullCCPrev');
+            const nextBtn = document.getElementById('kmFullCCNext');
+            if (imgEl) { imgEl.src = url || ''; imgEl.style.display = url ? '' : 'none'; }
+            if (noImgEl) noImgEl.style.display = url ? 'none' : '';
+            if (metaEl) metaEl.textContent = pack.leader || 'Пак без лидера';
+            if (counterEl) counterEl.textContent = (_kmFullCCViewer.idx + 1) + ' / ' + _kmFullCCViewer.groups.length;
+            if (prevBtn) prevBtn.disabled = _kmFullCCViewer.idx <= 0;
+            if (nextBtn) nextBtn.disabled = _kmFullCCViewer.idx >= _kmFullCCViewer.groups.length - 1;
+            if (_kmPackViewer && _kmPackViewer.groups === _kmFullCCViewer.groups) {
+                _kmPackViewer.idx = _kmFullCCViewer.idx;
+                _kmPackViewerUpdateContent();
+            }
+            console.log('[km-history] full-cc nav idx=' + _kmFullCCViewer.idx + '/' + _kmFullCCViewer.groups.length);
+        }
+
+        function _kmFullCCStep(delta) {
+            if (!_kmFullCCViewer) return;
+            const next = _kmFullCCViewer.idx + delta;
+            if (next < 0 || next >= _kmFullCCViewer.groups.length) return;
+            _kmFullCCViewer.idx = next;
+            _kmFullCCUpdateContent();
+        }
+
+        function _kmPackViewerOpenFullCC() {
+            if (!_kmPackViewer) return;
+            _kmFullCCClose();
+            const groups = _kmPackViewer.groups;
+            const idx = _kmPackViewer.idx;
+            const pack = groups[idx];
+            const shot = pack.screenshot && (pack.screenshot.originalDataUrl || pack.screenshot.thumbDataUrl || pack.screenshot.cropUrl) ? pack.screenshot : null;
+            const url = _kmPackViewerGetFullUrl(shot);
+            _kmFullCCViewer = { groups: groups, idx: idx, keyHandler: null };
+            const overlay = document.createElement('div');
+            overlay.id = 'kmHistoryPackLightbox';
+            overlay.className = 'km-history-lightbox';
+            overlay.onclick = function(e) { if (e.target === overlay) _kmFullCCClose(); };
+            overlay.innerHTML = `<div class="km-history-lightbox-panel km-full-cc-panel" onclick="event.stopPropagation()">
+                <button type="button" class="km-history-modal-close" onclick="_kmFullCCClose()">×</button>
+                <div class="km-full-cc-header">
+                    <div class="km-full-cc-meta" id="kmFullCCMeta">${kmHistoryEsc(pack.leader || 'Пак без лидера')}</div>
+                    <div class="km-full-cc-nav">
+                        <button type="button" id="kmFullCCPrev" class="km-pack-nav-btn" onclick="event.stopPropagation();_kmFullCCStep(-1)" ${idx <= 0 ? 'disabled' : ''}>← Пред</button>
+                        <span id="kmFullCCCounter" class="km-pack-viewer-counter">${idx + 1} / ${groups.length}</span>
+                        <button type="button" id="kmFullCCNext" class="km-pack-nav-btn" onclick="event.stopPropagation();_kmFullCCStep(1)" ${idx >= groups.length - 1 ? 'disabled' : ''}>След →</button>
+                    </div>
+                </div>
+                <img id="kmFullCCImage" src="${url || ''}" alt="${kmHistoryEsc(pack.leader || '')}" class="km-history-lightbox-img" ${!url ? 'style="display:none"' : ''}>
+                <div id="kmFullCCNoImg" class="km-history-empty-state" ${url ? 'style="display:none"' : ''}>Скрин не сохранён для этого пака</div>
+            </div>`;
+            document.body.appendChild(overlay);
+            _kmFullCCViewer.keyHandler = function(e) {
+                if (!_kmFullCCViewer) return;
+                if (e.key === 'Escape') { _kmFullCCClose(); return; }
+                if (e.key === 'ArrowLeft') { e.preventDefault(); _kmFullCCStep(-1); }
+                if (e.key === 'ArrowRight') { e.preventDefault(); _kmFullCCStep(1); }
+            };
+            document.addEventListener('keydown', _kmFullCCViewer.keyHandler);
+            let _wheelTs = 0;
+            const panel = overlay.querySelector('.km-full-cc-panel');
+            if (panel) {
+                panel.addEventListener('wheel', function(e) {
+                    const now = Date.now();
+                    if (now - _wheelTs < 400) return;
+                    _wheelTs = now;
+                    e.preventDefault();
+                    _kmFullCCStep((e.deltaY > 0 || e.deltaX > 0) ? 1 : -1);
+                }, { passive: false });
+            }
+            console.log('[km-history] full-cc open idx=' + idx + '/' + groups.length);
         }
 
         function _kmPackViewerBuildTableRows(pack, dateStr) {
@@ -10880,7 +10960,7 @@ ${playerList}
                 const profaCell = memberProfa && memberProfa !== '—' ? profaIconHtml(memberProfa, 20) + '<span class="km-history-profa-label">' + kmHistoryEsc(PROFA_NAMES && PROFA_NAMES[memberProfa] ? PROFA_NAMES[memberProfa] : memberProfa) + '</span>' : '<span class="km-history-profa-label">—</span>';
                 const isLeaderRow = idx === 0 || normalizeNick(p.name) === normalizeNick(pack.leader);
                 return `<div class="km-history-pack-row ${isLeaderRow ? 'is-leader' : ''}">
-                    <span class="km-history-pack-row-name">${isLeaderRow ? '<span class="km-history-leader-chip">Лидер</span>' : ''}<span class="player-nick-link" onclick="openPlayerProfile('${p.name.replace(/'/g,"\\'")}')" style="cursor:pointer">${p.name}</span></span>
+                    <span class="km-history-pack-row-name">${isLeaderRow ? '<span class="km-pack-leader-crown">♛</span>' : ''}<span class="player-nick-link" onclick="openPlayerProfile('${p.name.replace(/'/g,"\\'")}')" style="cursor:pointer">${p.name}</span></span>
                     <span class="km-history-pack-row-profa">${profaCell}</span>
                     <span>${p.kills||0}</span>
                     <span>${p.deaths||0}</span>
@@ -22961,8 +23041,8 @@ window._archRender = function() {
       }
       body:not(.light) .km-history-pack-modal {
         width: min(1100px, 100%);
-        height: min(640px, 84vh);
-        max-height: min(640px, 84vh);
+        height: min(720px, 88vh);
+        max-height: min(720px, 88vh);
         overflow: hidden;
         display: flex;
         flex-direction: column;
@@ -23070,6 +23150,7 @@ window._archRender = function() {
       body:not(.light) .km-history-pack-modal-body {
         display: grid;
         grid-template-columns: minmax(240px, 360px) minmax(0, 1fr);
+        grid-template-rows: 1fr;
         gap: 16px;
         align-items: stretch;
         flex: 1;
@@ -23221,6 +23302,37 @@ window._archRender = function() {
         gap: 12px;
         margin-bottom: 14px;
         flex-wrap: wrap;
+        flex-shrink: 0;
+      }
+      body:not(.light) .km-pack-leader-crown {
+        font-size: 13px;
+        color: var(--cc-theme-accent);
+        line-height: 1;
+        flex-shrink: 0;
+      }
+      body:not(.light) .km-full-cc-panel {
+        align-items: stretch;
+      }
+      body:not(.light) .km-full-cc-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-shrink: 0;
+      }
+      body:not(.light) .km-full-cc-meta {
+        font-size: 15px;
+        font-weight: 800;
+        color: var(--cc-theme-text-title);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+      }
+      body:not(.light) .km-full-cc-nav {
+        display: flex;
+        align-items: center;
+        gap: 8px;
         flex-shrink: 0;
       }
       body:not(.light) .km-pack-viewer-titles {
