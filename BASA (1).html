@@ -7933,6 +7933,7 @@ function getClass2IconByClass3(c3) {
             modal.innerHTML = '<div class="info-modal-bg" onclick="document.getElementById(\'profaInfoModal\').classList.remove(\'open\')"></div><div class="info-modal-box"><button class="info-modal-close" onclick="this.closest(\'.info-modal-overlay\').classList.remove(\'open\')">✕</button><div class="info-modal-icon">🎭</div><div class="info-modal-title">' + (info.short || profa) + '</div><div class="info-modal-sub">' + profa + ' · ' + info.role + '</div><div class="info-modal-body">' + bodyHtml + '</div></div>';
             modal.classList.add('open');
         }
+        window.showProfaInfo = showProfaInfo;
 
 
         function sortStats(field) {
@@ -10917,37 +10918,105 @@ ${playerList}
                     if (!_kmPackViewer) return;
                     const dataUrl = ev.target && ev.target.result ? String(ev.target.result) : '';
                     if (!dataUrl) return;
-                    const dateStr = _kmPackViewer.dateStr;
-                    const pack = _kmPackViewer.groups[_kmPackViewer.idx] || {};
-                    const key = _kmPackViewerShotKey(pack);
-                    if (!dateStr || !key || !appliedStatsByDate[dateStr]) return;
-                    const dayData = appliedStatsByDate[dateStr];
-                    if (!dayData.kmPackScreenshots) dayData.kmPackScreenshots = {};
-                    const item = makeKmHistoryShotItem({
-                        id: 'pack_upload_' + key,
-                        packName: key,
-                        name: pack.leader || key,
-                        originalDataUrl: dataUrl,
-                        thumbDataUrl: dataUrl,
-                        source: 'pack-upload',
-                        note: 'Дозагружено вручную'
-                    }, _kmPackViewer.idx, 'pack');
-                    dayData.kmPackScreenshots[key] = item;
-                    if (pack.packName && pack.packName !== key) dayData.kmPackScreenshots[pack.packName] = item;
-                    if (pack.leader && pack.leader !== key) dayData.kmPackScreenshots[pack.leader] = item;
-                    saveToStorage();
-                    _kmPackViewer.groups = kmHistoryBuildPackGroups(dateStr, dayData);
-                    let idx = _kmPackViewer.groups.findIndex(function(g) { return g.key === pack.key; });
-                    if (idx < 0) idx = _kmPackViewer.groups.findIndex(function(g) { return normalizeNick(_kmPackViewerShotKey(g)) === normalizeNick(key); });
-                    _kmPackViewer.idx = idx >= 0 ? idx : Math.min(_kmPackViewer.idx, _kmPackViewer.groups.length - 1);
-                    _kmPackViewerUpdateContent();
-                    renderKmHistory();
-                    setTimeout(function() { toggleKmHistoryEvent(dateStr, true); }, 40);
+                    const img = new Image();
+                    img.onload = function() {
+                        let cropDataUrl = '';
+                        try {
+                            const crop = _ccOcrPreprocessCrop(img, 'pack-upload');
+                            cropDataUrl = crop.cropCanvas.toDataURL('image/png');
+                        } catch (e2) {
+                            console.warn('[pack-upload] crop failed:', e2);
+                            cropDataUrl = dataUrl;
+                        }
+                        _kmPackViewerShowUploadConfirm(dataUrl, cropDataUrl);
+                    };
+                    img.onerror = function() {
+                        console.warn('[pack-upload] image load failed');
+                        _kmPackViewerShowUploadConfirm(dataUrl, dataUrl);
+                    };
+                    img.src = dataUrl;
                 };
                 reader.readAsDataURL(file);
             };
             document.body.appendChild(input);
             input.click();
+        }
+
+        function _kmPackViewerShowUploadConfirm(fullDataUrl, cropDataUrl) {
+            if (!_kmPackViewer) return;
+            var existing = document.getElementById('kmPackUploadConfirm');
+            if (existing) existing.remove();
+            const overlay = document.createElement('div');
+            overlay.id = 'kmPackUploadConfirm';
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9100;display:flex;align-items:center;justify-content:center';
+            overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+            overlay.innerHTML = '<div style="background:#0f1520;border:1px solid #1e2530;border-radius:12px;padding:20px 24px;max-width:480px;width:92vw;display:flex;flex-direction:column;gap:14px" onclick="event.stopPropagation()">'
+                + '<div style="font-size:14px;font-weight:700;color:#e2e8f0">Проверьте скриншот</div>'
+                + '<img src="' + cropDataUrl + '" style="width:100%;border-radius:6px;border:1px solid #1e2530;max-height:220px;object-fit:contain;background:#000">'
+                + '<div style="background:#1a1206;border:1px solid rgba(234,88,12,.4);border-radius:8px;padding:10px 12px;font-size:12px;color:#fdba74">'
+                + '⚠ Не удалось проверить соответствие автоматически — убедитесь, что скрин соответствует таблице справа'
+                + '</div>'
+                + '<div style="display:flex;gap:10px;justify-content:flex-end">'
+                + '<button type="button" onclick="document.getElementById(\'kmPackUploadConfirm\').remove()" style="background:none;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:7px 16px;font-size:12px;cursor:pointer">Отмена</button>'
+                + '<button type="button" id="kmPackUploadSaveBtn" style="background:rgba(99,102,241,.18);border:1px solid #6366f1;color:#a5b4fc;border-radius:8px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer">Сохранить</button>'
+                + '</div></div>';
+            document.body.appendChild(overlay);
+            document.getElementById('kmPackUploadSaveBtn').onclick = function() {
+                overlay.remove();
+                _kmPackViewerSaveUpload(fullDataUrl, cropDataUrl);
+            };
+        }
+
+        function _kmPackViewerSaveUpload(fullDataUrl, cropDataUrl) {
+            if (!_kmPackViewer) return;
+            const dateStr = _kmPackViewer.dateStr;
+            const pack = _kmPackViewer.groups[_kmPackViewer.idx] || {};
+            const key = _kmPackViewerShotKey(pack);
+            if (!dateStr || !key || !appliedStatsByDate[dateStr]) return;
+            const dayData = appliedStatsByDate[dateStr];
+            if (!dayData.kmPackScreenshots) dayData.kmPackScreenshots = {};
+            const item = makeKmHistoryShotItem({
+                id: 'pack_upload_' + key,
+                packName: key,
+                name: pack.leader || key,
+                originalDataUrl: fullDataUrl,
+                thumbDataUrl: cropDataUrl,
+                cropUrl: cropDataUrl,
+                source: 'pack-upload',
+                note: 'Дозагружено вручную'
+            }, _kmPackViewer.idx, 'pack');
+            dayData.kmPackScreenshots[key] = item;
+            if (pack.packName && pack.packName !== key) dayData.kmPackScreenshots[pack.packName] = item;
+            if (pack.leader && pack.leader !== key) dayData.kmPackScreenshots[pack.leader] = item;
+            saveToStorage();
+            _kmPackViewer.groups = kmHistoryBuildPackGroups(dateStr, dayData);
+            let idx = _kmPackViewer.groups.findIndex(function(g) { return g.key === pack.key; });
+            if (idx < 0) idx = _kmPackViewer.groups.findIndex(function(g) { return normalizeNick(_kmPackViewerShotKey(g)) === normalizeNick(key); });
+            _kmPackViewer.idx = idx >= 0 ? idx : Math.min(_kmPackViewer.idx, _kmPackViewer.groups.length - 1);
+            _kmPackViewerUpdateContent();
+            renderKmHistory();
+            setTimeout(function() { toggleKmHistoryEvent(dateStr, true); }, 40);
+        }
+
+        function _kmPackViewerDeleteScreenshot() {
+            if (!_kmPackViewer) return;
+            const pack = _kmPackViewer.groups[_kmPackViewer.idx] || {};
+            const key = _kmPackViewerShotKey(pack);
+            const dateStr = _kmPackViewer.dateStr;
+            if (!dateStr || !key) return;
+            const dayData = appliedStatsByDate[dateStr];
+            if (!dayData || !dayData.kmPackScreenshots) return;
+            delete dayData.kmPackScreenshots[key];
+            if (pack.packName && pack.packName !== key) delete dayData.kmPackScreenshots[pack.packName];
+            if (pack.leader && pack.leader !== key) delete dayData.kmPackScreenshots[pack.leader];
+            saveToStorage();
+            _kmPackViewer.groups = kmHistoryBuildPackGroups(dateStr, dayData);
+            let idx = _kmPackViewer.groups.findIndex(function(g) { return g.key === pack.key; });
+            if (idx < 0) idx = _kmPackViewer.groups.findIndex(function(g) { return normalizeNick(_kmPackViewerShotKey(g)) === normalizeNick(key); });
+            _kmPackViewer.idx = idx >= 0 ? idx : Math.min(_kmPackViewer.idx, _kmPackViewer.groups.length - 1);
+            _kmPackViewerUpdateContent();
+            renderKmHistory();
+            setTimeout(function() { toggleKmHistoryEvent(dateStr, true); }, 40);
         }
 
         function _kmFullCCClose() {
@@ -11084,6 +11153,16 @@ ${playerList}
             const fullBtn = document.getElementById('kmPackViewerFullBtn');
             if (fullBtn) fullBtn.style.display = fullUrl ? '' : 'none';
 
+            const actionsEl = document.getElementById('kmPackViewerShotActions');
+            if (actionsEl) {
+                if (shot) {
+                    actionsEl.innerHTML = '<button type="button" class="km-pack-shot-action-btn" onclick="event.stopPropagation();_kmPackViewerUploadScreenshot()">✏️ Изменить скриншот</button>'
+                        + '<button type="button" class="km-pack-shot-action-btn km-pack-shot-delete-btn" onclick="event.stopPropagation();_kmPackViewerDeleteScreenshot()">🗑 Удалить скриншот</button>';
+                } else {
+                    actionsEl.innerHTML = '';
+                }
+            }
+
             const tableEl = document.getElementById('kmPackViewerTable');
             if (tableEl) tableEl.innerHTML = '<div class="km-history-pack-table-head"><span>Игрок</span><span>Профа</span><span>⚔️</span><span>💀</span><span>🗡️</span><span>🐉</span></div>' + _kmPackViewerBuildTableRows(pack, dateStr);
 
@@ -11146,6 +11225,9 @@ ${playerList}
                                 : '<div class="km-history-empty-state">Скрин не сохранён<br><button type="button" class="km-pack-upload-shot-btn" onclick="event.stopPropagation();_kmPackViewerUploadScreenshot()">Загрузить скриншот повторно</button></div>'}
                         </div>
                         <button type="button" id="kmPackViewerFullBtn" class="km-pack-full-cc-btn" onclick="event.stopPropagation();_kmPackViewerOpenFullCC()" ${fullUrl ? '' : 'style="display:none"'}>🔍 Открыть фул ЦЦ</button>
+                        <div id="kmPackViewerShotActions" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+                            ${shot ? '<button type="button" class="km-pack-shot-action-btn" onclick="event.stopPropagation();_kmPackViewerUploadScreenshot()">✏️ Изменить скриншот</button><button type="button" class="km-pack-shot-action-btn km-pack-shot-delete-btn" onclick="event.stopPropagation();_kmPackViewerDeleteScreenshot()">🗑 Удалить скриншот</button>' : ''}
+                        </div>
                     </div>
                     <div class="km-history-pack-table-wrap">
                         <div class="km-history-pack-table" id="kmPackViewerTable">
@@ -23505,6 +23587,32 @@ window._archRender = function() {
       }
       body:not(.light) .km-pack-upload-shot-btn:hover {
         background: rgba(var(--cc-theme-accent-rgb),.22);
+      }
+      body:not(.light) .km-pack-shot-action-btn {
+        appearance: none;
+        border: 1px solid #334155;
+        border-radius: 7px;
+        background: rgba(255,255,255,.04);
+        color: #94a3b8;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 5px 11px;
+        cursor: pointer;
+        transition: background .15s, border-color .15s;
+      }
+      body:not(.light) .km-pack-shot-action-btn:hover {
+        background: rgba(255,255,255,.09);
+        border-color: #475569;
+        color: #e2e8f0;
+      }
+      body:not(.light) .km-pack-shot-delete-btn {
+        border-color: rgba(239,68,68,.35);
+        color: #f87171;
+      }
+      body:not(.light) .km-pack-shot-delete-btn:hover {
+        background: rgba(239,68,68,.12);
+        border-color: #ef4444;
+        color: #fca5a5;
       }
       body:not(.light) .km-pack-viewer-counter {
         color: var(--cc-theme-text-muted);
