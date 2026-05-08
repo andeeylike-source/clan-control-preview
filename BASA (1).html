@@ -10961,6 +10961,197 @@ ${playerList}
             return pack.packName || pack.leader || pack.key || '';
         }
 
+        function _kmPackViewerVerifyText(value) {
+            return String(value || '')
+                .toLowerCase()
+                .replace(/ё/g, 'е')
+                .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function _kmPackViewerVerifyNum(value) {
+            if (value === null || value === undefined || value === '') return null;
+            const n = Number(String(value).replace(/[^\d-]/g, ''));
+            return Number.isFinite(n) ? n : null;
+        }
+
+        function _kmPackViewerExpectedUploadRows(pack, dateStr) {
+            return ((pack && pack.players) || []).map(function(p) {
+                const resolvedN = resolveAlias(p.name || p.nick || '');
+                const normPKey = normalizeNick(p.name || p.nick || '');
+                const inRoster = roster.find(function(r) {
+                    return normalizeNick(r.name) === normalizeNick(resolvedN) || normalizeNick(r.name) === normalizeNick(p.name || p.nick || '');
+                });
+                const savedKmProfa = (playerProfaByDate[normPKey] && playerProfaByDate[normPKey][dateStr]) || null;
+                return {
+                    name: p.name || p.nick || '',
+                    nameKey: _kmPackViewerVerifyText(resolvedN || p.name || p.nick || ''),
+                    profa: savedKmProfa || p.profa || p.class || p.class2 || (inRoster ? inRoster.profa : '') || '',
+                    kills: _kmPackViewerVerifyNum(p.kills),
+                    deaths: _kmPackViewerVerifyNum(p.deaths),
+                    pvp_dmg: _kmPackViewerVerifyNum(p.pvp_dmg ?? p.pvp),
+                    pve_dmg: _kmPackViewerVerifyNum(p.pve_dmg ?? p.pve)
+                };
+            }).filter(function(row) { return row.nameKey; });
+        }
+
+        function _kmPackViewerParseUploadOcrText(text) {
+            const raw = String(text || '').trim();
+            if (!raw) return [];
+            let parsed = null;
+            try {
+                parsed = JSON.parse(raw.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim());
+            } catch (_) {
+                const m = raw.match(/\{[\s\S]*\}/);
+                if (m) {
+                    try { parsed = JSON.parse(m[0]); } catch (_) { parsed = null; }
+                }
+            }
+            if (parsed) return _kmPackViewerExtractUploadRows(parsed);
+            return [];
+        }
+
+        function _kmPackViewerExtractUploadRows(payload) {
+            if (!payload) return [];
+            if (typeof payload === 'string') return _kmPackViewerParseUploadOcrText(payload);
+            const sourceRows = Array.isArray(payload.rows) ? payload.rows
+                : Array.isArray(payload.finalParsed) ? payload.finalParsed
+                : Array.isArray(payload.parsed) ? payload.parsed
+                : Array.isArray(payload.players) ? payload.players
+                : [];
+            return sourceRows.map(function(row) {
+                const normalized = _ccOcrNormalizeRow(row);
+                const rawName = (normalized && (normalized.name || normalized.nick)) || row.nick || row.name || '';
+                const name = typeof _resolveBaiduOcrNick === 'function' ? _resolveBaiduOcrNick(rawName) : rawName;
+                return {
+                    name: name,
+                    nameKey: _kmPackViewerVerifyText(name),
+                    profa: row.profa || row.class || row.class2 || row.spec || row.role || '',
+                    kills: _kmPackViewerVerifyNum(normalized ? normalized.kills : row.kills),
+                    deaths: _kmPackViewerVerifyNum(normalized ? normalized.deaths : row.deaths),
+                    pvp_dmg: _kmPackViewerVerifyNum(normalized ? normalized.pvp_dmg : (row.pvp_dmg ?? row.pvp)),
+                    pve_dmg: _kmPackViewerVerifyNum(normalized ? normalized.pve_dmg : (row.pve_dmg ?? row.pve))
+                };
+            }).filter(function(row) { return row.nameKey; });
+        }
+
+        function _kmPackViewerStatMismatch(expectedValue, actualValue, field) {
+            if (expectedValue === null || actualValue === null) return false;
+            if (field === 'kills' || field === 'deaths') return expectedValue !== actualValue;
+            const tolerance = Math.max(1000, Math.round(Math.abs(expectedValue) * 0.05));
+            return Math.abs(expectedValue - actualValue) > tolerance;
+        }
+
+        function _kmPackViewerCompareUploadRows(expectedRows, extractedRows) {
+            if (!expectedRows.length) return { status: 'unknown', reason: 'no expected party rows' };
+            if (!extractedRows.length) return { status: 'unknown', reason: 'no OCR rows' };
+            const extractedByName = {};
+            extractedRows.forEach(function(row) { if (row.nameKey) extractedByName[row.nameKey] = row; });
+            let matched = 0;
+            let statConflicts = 0;
+            expectedRows.forEach(function(exp) {
+                const got = extractedByName[exp.nameKey];
+                if (!got) return;
+                matched++;
+                ['kills', 'deaths', 'pvp_dmg', 'pve_dmg'].forEach(function(field) {
+                    if (_kmPackViewerStatMismatch(exp[field], got[field], field)) statConflicts++;
+                });
+            });
+            const required = expectedRows.length <= 2 ? expectedRows.length : Math.max(3, Math.ceil(expectedRows.length * 0.6));
+            if (matched >= required && statConflicts === 0) {
+                return { status: 'match', reason: 'matched ' + matched + ' of ' + expectedRows.length + ' rows' };
+            }
+            return { status: 'mismatch', reason: 'matched ' + matched + ' of ' + expectedRows.length + ' rows, conflicts=' + statConflicts };
+        }
+
+        async function _kmPackViewerRunUploadOcr(imageDataUrl) {
+            if (typeof window._kmPackViewerUploadOcrOverride === 'function') {
+                return window._kmPackViewerUploadOcrOverride(imageDataUrl);
+            }
+            const provider = getAnalysisProvider();
+            if (provider === 'ocrspace') {
+                const apiUrl = _ccOcrValidateProxyUrl();
+                const blob = await fetch(imageDataUrl).then(function(r) { return r.blob(); });
+                const form = new FormData();
+                form.append('file', blob, 'clan_control_pack_upload.png');
+                const response = await fetch(apiUrl, { method: 'POST', body: form, signal: AbortSignal.timeout(60000) });
+                const text = await response.text();
+                let json;
+                try { json = JSON.parse(text); } catch (_) { throw new Error('OCR.space proxy returned non-JSON response'); }
+                if (!response.ok || json.error || json.ok === false) throw new Error(json.error || ('HTTP ' + response.status));
+                return { rows: _kmPackViewerExtractUploadRows(json), provider: 'ocrspace' };
+            }
+
+            const model = 'baidu/qianfan-ocr-fast:free';
+            if (_ccGuardModel(model, 'pack-upload-verify')) throw new Error('blocked OCR model');
+            const keys = getOpenRouterApiKeys();
+            if (!keys.length) throw new Error('Нет API ключей OpenRouter');
+            const prompt = 'Extract ONLY the visible KM party/member table from this screenshot. Return ONLY valid JSON: {"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0,"profa":""}],"confidence":0,"notes":""}. Preserve nick spelling exactly. Use integers or null. No markdown.';
+            let lastError = null;
+            for (let keyIndex = 0; keyIndex < keys.length; keyIndex++) {
+                try {
+                    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer ' + keys[keyIndex],
+                            'Content-Type': 'application/json',
+                            'HTTP-Referer': location.origin,
+                            'X-Title': 'Clan Control OCR'
+                        },
+                        body: JSON.stringify({
+                            model: model,
+                            provider: { order: ['Baidu'], allow_fallbacks: false },
+                            messages: [{
+                                role: 'user',
+                                content: [
+                                    { type: 'text', text: prompt },
+                                    { type: 'image_url', image_url: { url: imageDataUrl } }
+                                ]
+                            }],
+                            temperature: 0,
+                            max_tokens: 1200
+                        }),
+                        signal: AbortSignal.timeout(60000)
+                    });
+                    if (response.status === 429) {
+                        markCurrentKeyExhausted(keyIndex);
+                        lastError = new Error('OpenRouter key rate-limited');
+                        continue;
+                    }
+                    if (!response.ok) {
+                        const errJson = await response.json().catch(function() { return {}; });
+                        lastError = new Error(errJson.error?.message || ('HTTP ' + response.status));
+                        continue;
+                    }
+                    const json = await response.json();
+                    const text = json.choices?.[0]?.message?.content || '';
+                    return { rows: _kmPackViewerParseUploadOcrText(text), provider: 'openrouter_baidu' };
+                } catch (e) {
+                    lastError = e;
+                }
+            }
+            throw lastError || new Error('OpenRouter OCR failed');
+        }
+
+        async function _kmPackViewerVerifyUploadedScreenshot(fullDataUrl, cropDataUrl, pack, dateStr) {
+            try {
+                const expectedRows = _kmPackViewerExpectedUploadRows(pack, dateStr);
+                const ocr = await _kmPackViewerRunUploadOcr(cropDataUrl || fullDataUrl);
+                const extractedRows = _kmPackViewerExtractUploadRows(ocr);
+                return Object.assign(_kmPackViewerCompareUploadRows(expectedRows, extractedRows), {
+                    expectedCount: expectedRows.length,
+                    extractedCount: extractedRows.length,
+                    provider: ocr && ocr.provider
+                });
+            } catch (e) {
+                console.warn('[pack-upload-verify] OCR failed:', e);
+                return { status: 'unknown', reason: e && e.message ? e.message : String(e || 'OCR failed') };
+            }
+        }
+        window._kmPackViewerVerifyUploadedScreenshot = _kmPackViewerVerifyUploadedScreenshot;
+        window._kmPackViewerCompareUploadRows = _kmPackViewerCompareUploadRows;
+
         function _kmPackViewerUploadScreenshot() {
             if (!_kmPackViewer) return;
             const input = document.createElement('input');
@@ -11002,6 +11193,8 @@ ${playerList}
 
         function _kmPackViewerShowUploadConfirm(fullDataUrl, cropDataUrl) {
             if (!_kmPackViewer) return;
+            const pack = _kmPackViewer.groups[_kmPackViewer.idx] || {};
+            const dateStr = _kmPackViewer.dateStr;
             var existing = document.getElementById('kmPackUploadConfirm');
             if (existing) existing.remove();
             const overlay = document.createElement('div');
@@ -11011,18 +11204,58 @@ ${playerList}
             overlay.innerHTML = '<div style="background:#0f1520;border:1px solid #1e2530;border-radius:12px;padding:20px 24px;max-width:480px;width:92vw;display:flex;flex-direction:column;gap:14px" onclick="event.stopPropagation()">'
                 + '<div style="font-size:14px;font-weight:700;color:#e2e8f0">Проверьте скриншот</div>'
                 + '<img src="' + cropDataUrl + '" style="width:100%;border-radius:6px;border:1px solid #1e2530;max-height:220px;object-fit:contain;background:#000">'
-                + '<div style="background:#1a1206;border:1px solid rgba(234,88,12,.4);border-radius:8px;padding:10px 12px;font-size:12px;color:#fdba74">'
-                + '⚠ Не удалось проверить соответствие автоматически — убедитесь, что скрин соответствует таблице справа'
+                + '<div id="kmPackUploadVerifyStatus" style="background:#111827;border:1px solid rgba(148,163,184,.35);border-radius:8px;padding:10px 12px;font-size:12px;color:#cbd5e1">'
+                + 'Проверяю соответствие скриншота таблице...'
                 + '</div>'
                 + '<div style="display:flex;gap:10px;justify-content:flex-end">'
                 + '<button type="button" onclick="document.getElementById(\'kmPackUploadConfirm\').remove()" style="background:none;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:7px 16px;font-size:12px;cursor:pointer">Отмена</button>'
-                + '<button type="button" id="kmPackUploadSaveBtn" style="background:rgba(99,102,241,.18);border:1px solid #6366f1;color:#a5b4fc;border-radius:8px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer">Сохранить</button>'
+                + '<button type="button" id="kmPackUploadSaveBtn" disabled style="background:rgba(99,102,241,.18);border:1px solid #6366f1;color:#a5b4fc;border-radius:8px;padding:7px 16px;font-size:12px;font-weight:700;cursor:not-allowed;opacity:.55">Проверка...</button>'
                 + '</div></div>';
             document.body.appendChild(overlay);
-            document.getElementById('kmPackUploadSaveBtn').onclick = function() {
+            const saveBtn = document.getElementById('kmPackUploadSaveBtn');
+            const statusEl = document.getElementById('kmPackUploadVerifyStatus');
+            const setVerifyUi = function(status) {
+                if (!statusEl || !saveBtn) return;
+                if (status === 'match') {
+                    statusEl.style.cssText = 'background:#052e1a;border:1px solid rgba(34,197,94,.45);border-radius:8px;padding:10px 12px;font-size:12px;color:#86efac';
+                    statusEl.textContent = '✅ Скриншот соответствует таблице. Можно прикрепить.';
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Прикрепить';
+                    saveBtn.style.cursor = 'pointer';
+                    saveBtn.style.opacity = '1';
+                    return;
+                }
+                if (status === 'mismatch') {
+                    statusEl.style.cssText = 'background:#3b0a0a;border:1px solid rgba(239,68,68,.5);border-radius:8px;padding:10px 12px;font-size:12px;color:#fca5a5';
+                    statusEl.textContent = '❌ Скриншот не соответствует таблице справа. Проверьте выбранное пати или загрузите другой скрин.';
+                    saveBtn.disabled = true;
+                    saveBtn.textContent = 'Прикрепить';
+                    saveBtn.style.cursor = 'not-allowed';
+                    saveBtn.style.opacity = '.55';
+                    return;
+                }
+                statusEl.style.cssText = 'background:#1a1206;border:1px solid rgba(234,88,12,.4);border-radius:8px;padding:10px 12px;font-size:12px;color:#fdba74';
+                statusEl.textContent = '⚠ Не удалось проверить соответствие автоматически — убедитесь, что скрин соответствует таблице справа';
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Прикрепить вручную';
+                saveBtn.style.cursor = 'pointer';
+                saveBtn.style.opacity = '1';
+            };
+            saveBtn.onclick = function() {
+                if (saveBtn.disabled) return;
                 overlay.remove();
                 _kmPackViewerSaveUpload(fullDataUrl, cropDataUrl);
             };
+            _kmPackViewerVerifyUploadedScreenshot(fullDataUrl, cropDataUrl, pack, dateStr).then(function(result) {
+                if (!document.getElementById('kmPackUploadConfirm')) return;
+                if (!result || !['match', 'mismatch', 'unknown'].includes(result.status)) {
+                    console.warn('[pack-upload-verify] invalid result:', result);
+                    setVerifyUi('unknown');
+                    return;
+                }
+                console.info('[pack-upload-verify]', result.status, result.reason || '', 'expected=', result.expectedCount, 'extracted=', result.extractedCount);
+                setVerifyUi(result.status);
+            });
         }
 
         function _kmPackViewerSaveUpload(fullDataUrl, cropDataUrl) {
