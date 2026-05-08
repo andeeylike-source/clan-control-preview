@@ -7909,10 +7909,24 @@ function getClass2IconByClass3(c3) {
         };
 
         function showProfaInfo(profa) {
-            const info = PROFA_INFO[profa] || PROFA_INFO[profa.split(' (')[0]];
-            if (!info) return;
+            let info = PROFA_INFO[profa] || PROFA_INFO[profa.split(' (')[0]];
+            let resolvedProfa = profa;
+            if (!info) {
+                // fallback: search by en2, ru2, or ru field
+                const fbKey = Object.keys(PROFA_INFO).find(function(k) {
+                    const v = PROFA_INFO[k];
+                    return v.en2 === profa || v.ru2 === profa || v.ru === profa ||
+                           (typeof PROFA_NAMES !== 'undefined' && PROFA_NAMES[k] === profa);
+                });
+                if (fbKey) {
+                    info = PROFA_INFO[fbKey];
+                    resolvedProfa = fbKey;
+                }
+                console.warn('[showProfaInfo] profa not in PROFA_INFO:', profa, '→ fallback:', fbKey || 'none');
+                if (!info) return;
+            }
             const rows = [
-                ['3-я профа (англ)', profa],
+                ['3-я профа (англ)', resolvedProfa],
                 ['Русское название', info.ru],
                 ['Сокращение', info.short],
                 ['Роль', info.role],
@@ -7930,7 +7944,7 @@ function getClass2IconByClass3(c3) {
                 
                 document.body.appendChild(modal);
             }
-            modal.innerHTML = '<div class="info-modal-bg" onclick="document.getElementById(\'profaInfoModal\').classList.remove(\'open\')"></div><div class="info-modal-box"><button class="info-modal-close" onclick="this.closest(\'.info-modal-overlay\').classList.remove(\'open\')">✕</button><div class="info-modal-icon">🎭</div><div class="info-modal-title">' + (info.short || profa) + '</div><div class="info-modal-sub">' + profa + ' · ' + info.role + '</div><div class="info-modal-body">' + bodyHtml + '</div></div>';
+            modal.innerHTML = '<div class="info-modal-bg" onclick="document.getElementById(\'profaInfoModal\').classList.remove(\'open\')"></div><div class="info-modal-box"><button class="info-modal-close" onclick="this.closest(\'.info-modal-overlay\').classList.remove(\'open\')">✕</button><div class="info-modal-icon">🎭</div><div class="info-modal-title">' + (info.short || resolvedProfa) + '</div><div class="info-modal-sub">' + resolvedProfa + ' · ' + info.role + '</div><div class="info-modal-body">' + bodyHtml + '</div></div>';
             modal.classList.add('open');
         }
         window.showProfaInfo = showProfaInfo;
