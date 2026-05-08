@@ -4805,7 +4805,7 @@
                     </td>
                     <td>${p.isNew ? '<span class="text-[9px] bg-emerald-500 text-black font-black px-1.5 py-0.5 rounded uppercase">NEW</span>' : '<span style="color:#475569;font-size:11px">—</span>'}</td>
                     <td onclick="event.stopPropagation();toggleVerified(${p.id})" style="cursor:pointer;text-align:center;font-size:16px" title="Нажми чтобы отметить как проверенный">${p.verified ? '✅' : '<span style="color:#2d3748;font-size:14px">○</span>'}</td>
-                    <td onclick="event.stopPropagation();editPlayer(${p.id})" style="cursor:pointer" title="Нажми чтобы изменить профу" class="text-slate-400 text-xs">${(p.profas && p.profas.length > 0 ? p.profas : (p.profa && p.profa !== '—' ? [p.profa] : [])).map((pf,i) => `<span style="display:inline-flex;align-items:center;gap:5px;background:#1e2530;border-radius:6px;padding:4px 9px;margin-right:4px;${i===0?'color:#a5b4fc':'color:#64748b'}">${profaIconHtml(pf, 22)}<span onclick="event.stopPropagation();window.showProfaInfo(this.dataset.pf)" data-pf="${pf}" data-profa-info-btn="1" style="cursor:help;color:#475569;font-size:9px;margin-left:8px;padding:2px 4px">?</span></span>`).join('') || '<span style="color:#6366f155;font-size:11px;border:1px dashed #2d3748;padding:3px 8px;border-radius:6px">+ профа</span>'}</td>
+                    <td onclick="event.stopPropagation();editPlayer(${p.id})" style="cursor:pointer" title="Нажми чтобы изменить профу" class="text-slate-400 text-xs">${(p.profas && p.profas.length > 0 ? p.profas : (p.profa && p.profa !== '—' ? [p.profa] : [])).map((pf,i) => `<span style="display:inline-flex;align-items:center;gap:5px;background:#1e2530;border-radius:6px;padding:4px 9px;margin-right:4px;${i===0?'color:#a5b4fc':'color:#64748b'}">${profaIconHtml(pf, 22)}<span class="roster-profa-info-btn" data-profa-info-btn="1" data-pf="${pf}" style="cursor:help;color:#475569;font-size:9px;margin-left:8px;padding:2px 4px">?</span></span>`).join('') || '<span style="color:#6366f155;font-size:11px;border:1px dashed #2d3748;padding:3px 8px;border-radius:6px">+ профа</span>'}</td>
                     <td onclick="event.stopPropagation()"><span class="pac-tag" onclick="event.stopPropagation();openPackFromRoster('${p.id}')" title="Нажми чтобы изменить пак" style="cursor:pointer" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='';this.style.color=''">${p.pac}</span></td>
                     <td class="${p.attendance < 50 ? 'text-red-400' : p.attendance < 70 ? 'text-yellow-400' : 'text-emerald-400'} font-bold">${totalDates > 0 ? p.attendance + '%' : '—'}</td>
                     <td onclick="event.stopPropagation()">
@@ -7906,22 +7906,40 @@ function getClass2IconByClass3(c3) {
             'АВ/ПВ': { ru:'АВ или ПВ', short:'АВ/ПВ', ru2:'Ассасин/Разбойник', en2:'Abyss Walker / Plains Walker', role:'Кинжал' },
         };
 
+        function showProfaInfoMissing(profa) {
+            const label = profa || 'неизвестная профа';
+            console.warn('[showProfaInfo] profa not in PROFA_INFO:', label);
+            const toast = document.createElement('div');
+            toast.textContent = 'Нет справки по профе: ' + label;
+            toast.style.cssText = 'position:fixed;bottom:30px;right:24px;background:#7f1d1d;color:#fecaca;padding:12px 16px;border:1px solid #ef4444;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.5)';
+            document.body.appendChild(toast);
+            setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity .25s'; setTimeout(function() { toast.remove(); }, 300); }, 2600);
+        }
+
         function showProfaInfo(profa) {
-            let info = PROFA_INFO[profa] || PROFA_INFO[profa.split(' (')[0]];
-            let resolvedProfa = profa;
+            const requestedProfa = String(profa || '').trim();
+            if (!requestedProfa) {
+                showProfaInfoMissing(requestedProfa);
+                return;
+            }
+            let info = PROFA_INFO[requestedProfa] || PROFA_INFO[requestedProfa.split(' (')[0]];
+            let resolvedProfa = requestedProfa;
             if (!info) {
                 // fallback: search by en2, ru2, or ru field
                 const fbKey = Object.keys(PROFA_INFO).find(function(k) {
                     const v = PROFA_INFO[k];
-                    return v.en2 === profa || v.ru2 === profa || v.ru === profa ||
-                           (typeof PROFA_NAMES !== 'undefined' && PROFA_NAMES[k] === profa);
+                    return v.en2 === requestedProfa || v.ru2 === requestedProfa || v.ru === requestedProfa ||
+                           (typeof PROFA_NAMES !== 'undefined' && PROFA_NAMES[k] === requestedProfa);
                 });
                 if (fbKey) {
                     info = PROFA_INFO[fbKey];
                     resolvedProfa = fbKey;
                 }
-                console.warn('[showProfaInfo] profa not in PROFA_INFO:', profa, '→ fallback:', fbKey || 'none');
-                if (!info) return;
+                console.warn('[showProfaInfo] profa not in PROFA_INFO:', requestedProfa, '→ fallback:', fbKey || 'none');
+                if (!info) {
+                    showProfaInfoMissing(requestedProfa);
+                    return;
+                }
             }
             const rows = [
                 ['3-я профа (англ)', resolvedProfa],
@@ -7948,9 +7966,13 @@ function getClass2IconByClass3(c3) {
         window.showProfaInfo = showProfaInfo;
 
         document.addEventListener('click', function(e) {
-            const btn = e.target.closest('[data-profa-info-btn][data-pf]');
+            const target = e.target && e.target.nodeType === 1 ? e.target : e.target && e.target.parentElement;
+            const btn = target && target.closest ? target.closest('[data-profa-info-btn]') : null;
             if (!btn || !document.getElementById('page-roster')?.contains(btn)) return;
-            window.showProfaInfo(btn.dataset.pf);
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+            window.showProfaInfo(btn.dataset.pf || '');
         }, true);
 
 
@@ -18629,6 +18651,18 @@ window._archRender = function() {
       display: none !important;
     }
     body:not(.light) > *:not(script):not(style) { position: relative; z-index: 1; }
+    body > .info-modal-overlay,
+    body:not(.light) > .info-modal-overlay {
+      position: fixed !important;
+      inset: 0 !important;
+      z-index: 10000 !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+    body > .info-modal-overlay.open,
+    body:not(.light) > .info-modal-overlay.open {
+      display: flex !important;
+    }
 
     /* ── Body / typography ──────────────────────────────────── */
     body:not(.light) {
