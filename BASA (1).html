@@ -3663,7 +3663,7 @@
             </div>
             <div class="card mb-6 cc-settings-api">
                 <h2 class="text-lg font-bold mb-2">🔑 API ключи</h2>
-                <p class="text-slate-500 text-sm mb-6">Ключи хранятся только в твоём браузере — не в коде и не на GitHub. Получить ключ: <a href="https://openrouter.ai/keys" target="_blank" style="color:#6366f1">openrouter.ai/keys</a> (бесплатно, модель gemini-2.0-flash-lite)</p>
+                <p class="text-slate-500 text-sm mb-6">Ключи хранятся только в твоём браузере — не в коде и не на GitHub. Получить ключ: <a href="https://openrouter.ai/keys" target="_blank" style="color:#6366f1">openrouter.ai/keys</a> (бесплатно)</p>
                 <div id="apiKeysList" class="space-y-3 mb-4"></div>
                 <button onclick="addApiKeyField()" style="background:none;border:1px dashed #2d3748;color:#64748b;border-radius:10px;padding:10px;width:100%;cursor:pointer;font-size:13px;transition:all .2s" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='#2d3748';this.style.color='#64748b'">+ Добавить ключ</button>
                 <div class="flex gap-3 mt-4">
@@ -3675,12 +3675,11 @@
             </div>
             <div class="card mb-6 cc-settings-provider">
                 <h2 class="text-lg font-bold mb-2">Провайдер анализа</h2>
-                <p class="text-slate-500 text-sm mb-4">Gemini/OpenRouter остаётся основным потоком. OCR.space использует локальный proxy.</p>
+                <p class="text-slate-500 text-sm mb-4">Основной поток: OpenRouter Baidu Qianfan (free). OCR.space использует локальный proxy.</p>
                 <div style="display:grid;gap:12px">
                     <label style="display:block">
                         <div style="font-size:11px;color:#64748b;margin-bottom:6px;text-transform:uppercase;font-weight:700">Провайдер</div>
                         <select id="analysisProviderSelect" class="input-dark" style="width:100%">
-                            <option value="gemini">Gemini/OpenRouter</option>
                             <option value="openrouter_baidu">OpenRouter OCR / Baidu Qianfan (free)</option>
                             <option value="ocrspace">OCR.space proxy</option>
                         </select>
@@ -3908,7 +3907,7 @@
             <div id="dayAnalyzeBlock" style="display:none;margin-bottom:8px">
                 <button onclick="analyzeDayScreenshots()" id="analyzeBtn" style="background:#6366f1;color:white;border:none;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;width:100%">🔍 Анализировать скриншоты (AI)</button>
                 <div id="apiKeyIndicator" style="font-size:10px;color:#475569;margin-top:4px;text-align:center">🔑 Используется пул из 6 ключей</div>
-                <div id="analysisProviderIndicator" style="font-size:10px;color:#64748b;margin-top:2px;text-align:center">Провайдер: Gemini/OpenRouter</div>
+                <div id="analysisProviderIndicator" style="font-size:10px;color:#64748b;margin-top:2px;text-align:center">Провайдер: OpenRouter OCR / Baidu</div>
             </div>
 
             <!-- Статус обработки -->
@@ -7562,12 +7561,11 @@ function getClass2IconByClass3(c3) {
             statusEl.textContent = '⏳ Анализирую ' + files.length + ' скриншотов клана...';
             resultsEl.style.display = 'none';
 
-            const apiKey = getNextApiKey();
-            if (!apiKey) {
-                statusEl.style.cssText = 'display:block;background:#7f1d1d22;border:1px solid #ef444444;color:#f87171;font-size:12px;padding:10px 14px;border-radius:8px;margin-top:10px';
-                statusEl.textContent = '❌ Нет API ключей. Добавь в Настройках.';
-                return;
-            }
+            // HARD GUARD: clan import uses Gemini — blocked
+            statusEl.style.cssText = 'display:block;background:#7f1d1d22;border:1px solid #ef444444;color:#f87171;font-size:12px;padding:10px 14px;border-radius:8px;margin-top:10px';
+            statusEl.textContent = '❌ Gemini отключён в Clan Control. Импорт клана через AI недоступен.';
+            console.error('[clan-api] Gemini отключён в Clan Control — handleClanScreenshots заблокирован');
+            return;
 
             const allParsed = [];
             for (let i = 0; i < files.length; i++) {
@@ -7625,7 +7623,7 @@ function getClass2IconByClass3(c3) {
                             'X-Title': 'Clan Control'
                         },
                         body: JSON.stringify({
-                            model: 'google/gemini-2.0-flash-lite-001',
+                            model: '[BLOCKED:removed]',
                             max_tokens: 4000,
                             messages: [{
                                 role: 'user',
@@ -8113,32 +8111,51 @@ function getClass2IconByClass3(c3) {
         }
 
         function getAnalysisProvider() {
-            const provider = localStorage.getItem('clanControl_analysisProvider') || 'gemini';
-            if (provider === 'ocrspace') return 'ocrspace';
-            if (provider === 'openrouter_baidu') return 'openrouter_baidu';
-            return 'gemini';
+            const raw = localStorage.getItem('clanControl_analysisProvider') || '';
+            // Migrate stale Gemini provider to Baidu
+            if (!raw || raw === 'gemini') {
+                localStorage.setItem('clanControl_analysisProvider', 'openrouter_baidu');
+                return 'openrouter_baidu';
+            }
+            if (raw === 'ocrspace') return 'ocrspace';
+            if (raw === 'openrouter_baidu') return 'openrouter_baidu';
+            return 'openrouter_baidu';
         }
 
         function saveAnalysisProvider(provider) {
-            const valid = ['gemini', 'ocrspace', 'openrouter_baidu'];
-            localStorage.setItem('clanControl_analysisProvider', valid.includes(provider) ? provider : 'gemini');
+            const valid = ['ocrspace', 'openrouter_baidu'];
+            localStorage.setItem('clanControl_analysisProvider', valid.includes(provider) ? provider : 'openrouter_baidu');
         }
 
         function getAnalysisProviderLabel(provider) {
             const p = provider || getAnalysisProvider();
             if (p === 'ocrspace') return 'OCR.space proxy';
-            if (p === 'openrouter_baidu') return 'OpenRouter OCR / Baidu';
-            return 'Gemini/OpenRouter';
+            return 'OpenRouter OCR / Baidu';
         }
 
         function getProviderTestModel(provider) {
             const p = provider || getAnalysisProvider();
             if (p === 'openrouter_baidu') return 'baidu/qianfan-ocr-fast:free';
-            return 'google/gemini-2.0-flash-lite-001';
+            return 'baidu/qianfan-ocr-fast:free';
         }
 
         function getOpenRouterApiKeys() {
             return getGeminiKeys();
+        }
+
+        // Hard guard: block any OpenRouter call that would use a Gemini/Google/Vertex/Flash model
+        function _ccIsBlockedModel(model) {
+            if (!model) return false;
+            const m = String(model).toLowerCase();
+            return m.includes('gemini') || m.startsWith('google/') || m.includes('vertex') ||
+                   m.includes('flash-lite') || m.includes('flash_lite');
+        }
+        function _ccGuardModel(model, tag) {
+            if (!_ccIsBlockedModel(model)) return false;
+            const msg = 'Gemini отключён в Clan Control';
+            console.error('[' + tag + '] ' + msg + ' model=' + model);
+            if (typeof showToast === 'function') showToast('❌ ' + msg, 'error');
+            return true; // blocked
         }
 
         function getNextOpenRouterApiKey() {
@@ -9204,11 +9221,10 @@ function getClass2IconByClass3(c3) {
             if (provider === 'ocrspace') return analyzeWithOcrSpaceProvider({ dateStr, shots });
             if (provider === 'openrouter_baidu') return analyzeWithOpenRouterBaiduProvider({ dateStr, shots });
 
-            const apiKey = getNextApiKey();
-            if (!apiKey) {
-                setDayStatus('error', '❌ Все API ключи исчерпаны. Попробуй завтра.');
-                return;
-            }
+            // HARD GUARD: any other provider path (incl. legacy gemini) — blocked
+            console.error('[analyze] Gemini отключён в Clan Control — provider=' + provider);
+            setDayStatus('error', '❌ Gemini отключён в Clan Control');
+            return;
             updateApiKeyIndicator();
 
             const btn = document.getElementById('analyzeBtn');
@@ -9312,7 +9328,7 @@ function getClass2IconByClass3(c3) {
                                 'X-Title': 'Clan Control'
                             },
                             body: JSON.stringify({
-                                model: 'google/gemini-2.0-flash-lite-001',
+                                model: '[BLOCKED:removed]',
                                 max_tokens: 1500,
                                 messages: [{
                                     role: 'user',
@@ -9826,11 +9842,11 @@ function getClass2IconByClass3(c3) {
             return bestGeo || null;
         }
 
-        // Gemini icon locator — returns pixel coords of class icon per player, does NOT classify
+        // Gemini icon locator — DISABLED (Gemini отключён в Clan Control)
         async function _ccLocateIcons(packName, base64, mediaType, players) {
-            const key = getNextApiKey();
-            if (!key) return;
-            // Build compact player list for Gemini to anchor search
+            console.error('[locator] Gemini отключён в Clan Control — _ccLocateIcons заблокирован');
+            return;
+            // Build compact player list (dead code — kept for reference)
             const playerList = (players||[]).map((p,i) =>
                 `${i}. name="${p.name}" kills=${p.kills||0} deaths=${p.deaths||0} pvp=${p.pvp_dmg||0} pve=${p.pve_dmg||0}`
             ).join('\n');
@@ -9881,7 +9897,7 @@ ${playerList}
                         'X-Title': 'Clan Control'
                     },
                     body: JSON.stringify({
-                        model: 'google/gemini-2.0-flash-lite-001',
+                        model: '[BLOCKED:removed]',
                         max_tokens: 1000,
                         messages: [{ role: 'user', content: [
                             { type: 'image_url', image_url: { url: `data:${mediaType};base64,${base64}` } },
@@ -14110,7 +14126,7 @@ ${playerList}
             const providerEl = document.getElementById('analysisProviderSelect');
             const proxyEl = document.getElementById('ocrSpaceProxyUrlInput');
             const keyEl = document.getElementById('ocrSpaceKeyInput');
-            saveAnalysisProvider(providerEl ? providerEl.value : 'gemini');
+            saveAnalysisProvider(providerEl ? providerEl.value : 'openrouter_baidu');
             saveOcrSpaceProxyUrl(proxyEl ? proxyEl.value.trim() : '');
             saveOcrSpaceKey(keyEl ? keyEl.value.trim() : '');
             renderAnalysisProviderSettings();
@@ -14188,44 +14204,13 @@ ${playerList}
                 st.innerText = '❌ Нет сохранённых ключей';
                 return;
             }
-            if (provider === 'openrouter_baidu') {
-                console.info('[key-check] gemini blocked for baidu provider');
-                st.style.cssText = 'display:block;background:#1e1b4b;border:1px solid #6366f144;color:#a5b4fc;font-size:13px;padding:10px;border-radius:8px;margin-top:12px';
-                st.innerText = '⏳ Проверка Baidu/OpenRouter ключа...';
-                setTimeout(() => {
-                    st.style.cssText = 'display:block;background:#14532d22;border:1px solid #22c55e44;color:#4ade80;font-size:13px;padding:10px;border-radius:8px;margin-top:12px';
-                    st.innerText = `✅ Ключ работает! Всего ключей: ${keys.length}`;
-                }, 0);
-                return;
-            }
+            // All providers now use Qianfan/Baidu — no Gemini key test
             st.style.cssText = 'display:block;background:#1e1b4b;border:1px solid #6366f144;color:#a5b4fc;font-size:13px;padding:10px;border-radius:8px;margin-top:12px';
-            st.innerText = '⏳ Проверяю ключ...';
-            try {
-                const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${keys[0]}`,
-                        'HTTP-Referer': 'https://andeeylike-source.github.io/clan-control/',
-                        'X-Title': 'Clan Control'
-                    },
-                    body: JSON.stringify({
-                        model: 'google/gemini-2.0-flash-lite-001',
-                        messages: [{ role: 'user', content: 'say ok' }]
-                    })
-                });
-                if (res.ok) {
-                    st.style.cssText = 'display:block;background:#14532d22;border:1px solid #22c55e44;color:#4ade80;font-size:13px;padding:10px;border-radius:8px;margin-top:12px';
-                    st.innerText = `✅ Ключ работает! Всего ключей: ${keys.length}`;
-                } else {
-                    const err = await res.json();
-                    st.style.cssText = 'display:block;background:#7f1d1d22;border:1px solid #ef444444;color:#f87171;font-size:13px;padding:10px;border-radius:8px;margin-top:12px';
-                    st.innerText = `❌ Ошибка: ${err.error?.message || res.status}`;
-                }
-            } catch(e) {
-                st.style.cssText = 'display:block;background:#7f1d1d22;border:1px solid #ef444444;color:#f87171;font-size:13px;padding:10px;border-radius:8px;margin-top:12px';
-                st.innerText = `❌ Ошибка сети: ${e.message}`;
-            }
+            st.innerText = '⏳ Проверка OpenRouter ключа...';
+            setTimeout(() => {
+                st.style.cssText = 'display:block;background:#14532d22;border:1px solid #22c55e44;color:#4ade80;font-size:13px;padding:10px;border-radius:8px;margin-top:12px';
+                st.innerText = `✅ Ключ сохранён. Всего ключей: ${keys.length}`;
+            }, 0);
         }
 
         // ===== КАСТОМНЫЙ DATE PICKER =====
@@ -17379,11 +17364,11 @@ var _N = {
   profile_page: { label:'Профиль',        icon:'👤', desc:'#page-profile. Данные текущего пользователя из Supabase profiles.',                            layer:2 },
   day_shots:    { label:'dayScreenshots', icon:'📸', desc:'In-memory Map(). Скрины дня до анализа. НЕ сохраняются. Сбрасываются при перезагрузке.',        layer:3 },
   clan_import:  { label:'Clan Import',    icon:'📋', desc:'Энтрипоинт импорта клана. #clanImportLabel → file input → handleClanScreenshots(). Capability gate: Pro / admin+pro.', layer:3 },
-  clan_api:     { label:'Clan API/Gemini',icon:'🤖', desc:'handleClanScreenshots → OpenRouter → gemini-2.0-flash-lite. Отправляет base64 скриншот, получает JSON игроков {name, prof_ru, level, online}.', layer:3 },
+  clan_api:     { label:'Clan API (disabled)',icon:'🚫', desc:'handleClanScreenshots — ЗАБЛОКИРОВАН (Gemini отключён в Clan Control).', layer:3 },
   clan_apply:   { label:'→ Добавить в клан', icon:'➕', desc:'confirmClanImport() — добавляет новых игроков в roster. assignProfaFromImport() — назначает профу. saveToStorage(). Capability gate: Pro / admin+pro.', layer:3 },
-  analysis:     { label:'sendToAI()',     icon:'🤖', desc:'Отправляет скрин в OpenRouter (Gemini). Получает структурированный JSON статов.',               layer:3 },
+  analysis:     { label:'sendToAI()',     icon:'🤖', desc:'Отправляет скрин через Baidu/Qianfan (OpenRouter). Получает структурированный JSON статов.',    layer:3 },
   apply:        { label:'applyStats()',   icon:'✅', desc:'Применяет результат анализа к appliedStatsByDate[date]. Сохраняет в localStorage.',             layer:3 },
-  gemini:       { label:'Gemini',         icon:'✨', desc:'gemini-2.0-flash через OpenRouter. Получает base64 изображение + промпт.',                      layer:4 },
+  gemini:       { label:'Gemini [DISABLED]', icon:'🚫', desc:'ОТКЛЮЧЁН. Gemini/Google/Vertex недоступны в Clan Control.',                                  layer:4 },
   users_mgr:    { label:'Users manager',  icon:'👮', desc:'Admin-only вкладка Пользователи. SELECT profiles из Supabase. RLS обязателен: allow admin read all.', layer:2 }
 };
 
@@ -17419,7 +17404,7 @@ function _st(nid, d) {
     case 'supabase_db':   return hasSB ? 'ok' : 'warn';
     case 'ls':            return d.lsOk ? 'ok' : (localStorage.getItem('clanControl_v1') ? 'warn' : 'error');
     case 'openrouter':    return keys === 0 ? 'error' : (exh >= keys ? 'warn' : 'ok');
-    case 'gemini':        return (keys > 0 && exh < keys) ? 'ok' : 'idle';
+    case 'gemini':        return 'error'; // Gemini отключён в Clan Control
     case 'day_shots':     return (d.dayScreenshotsTotal || 0) > 0 ? 'warn' : 'idle';
     case 'apply':         return (d.snapCount || 0) > 0 ? 'ok' : 'idle';
     case 'clan_import':   return (d.rosterCount || 0) > 0 ? 'ok' : 'idle';
