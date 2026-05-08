@@ -10938,7 +10938,17 @@ ${playerList}
             console.log('[km-history] lightbox index=' + next);
         }
 
+        function _kmPackViewerHasUnsavedEdits() {
+            return !!(_kmPackViewer && _kmPackViewer.editDirty);
+        }
+
+        function _kmPackViewerConfirmDiscardEdits() {
+            if (!_kmPackViewerHasUnsavedEdits()) return true;
+            return confirm('Есть несохранённые изменения в составе пака. Отменить их?');
+        }
+
         function _kmPackViewerClose() {
+            if (!_kmPackViewerConfirmDiscardEdits()) return;
             if (_kmPackViewer) {
                 if (_kmPackViewer.keyHandler) document.removeEventListener('keydown', _kmPackViewer.keyHandler);
                 _kmPackViewer = null;
@@ -10960,6 +10970,80 @@ ${playerList}
             if (!pack) return '';
             return pack.packName || pack.leader || pack.key || '';
         }
+
+        function _kmPackViewerEffectiveProfa(p, dateStr) {
+            const resolvedN = resolveAlias(p.name || p.nick || '');
+            const inRoster = roster.find(function(r) {
+                return normalizeNick(r.name) === normalizeNick(resolvedN) || normalizeNick(r.name) === normalizeNick(p.name || p.nick || '');
+            });
+            const normPKey = normalizeNick(p.name || p.nick || '');
+            const savedKmProfa = (playerProfaByDate[normPKey] && playerProfaByDate[normPKey][dateStr]) || null;
+            return savedKmProfa || p.profa || p.class || p.class2 || (inRoster ? inRoster.profa : '') || '';
+        }
+
+        function _kmPackViewerCloneEditRows(pack, dateStr) {
+            return ((pack && pack.players) || []).map(function(p) {
+                return Object.assign({}, p, {
+                    name: p.name || p.nick || '',
+                    profa: _kmPackViewerEffectiveProfa(p, dateStr),
+                    kills: _kmPackViewerVerifyNum(p.kills) || 0,
+                    deaths: _kmPackViewerVerifyNum(p.deaths) || 0,
+                    pvp_dmg: _kmPackViewerVerifyNum(p.pvp_dmg ?? p.pvp) || 0,
+                    pve_dmg: _kmPackViewerVerifyNum(p.pve_dmg ?? p.pve) || 0
+                });
+            });
+        }
+
+        function _kmPackViewerEditKey(pack) {
+            return (pack && pack.key ? pack.key : '') + '|' + _kmPackViewerShotKey(pack);
+        }
+
+        function _kmPackViewerEnsureEditRows(pack, dateStr) {
+            if (!_kmPackViewer) return [];
+            const key = _kmPackViewerEditKey(pack);
+            if (_kmPackViewer.editKey !== key || !Array.isArray(_kmPackViewer.editRows)) {
+                _kmPackViewer.editKey = key;
+                _kmPackViewer.editRows = _kmPackViewerCloneEditRows(pack, dateStr);
+                _kmPackViewer.editOriginalRows = _kmPackViewerCloneEditRows(pack, dateStr);
+                _kmPackViewer.editDirty = false;
+            }
+            return _kmPackViewer.editRows;
+        }
+
+        function _kmPackViewerProfaOptions(selected) {
+            const keys = Object.keys(PROFA_NAMES || PROFA_ICONS || {}).sort(function(a, b) {
+                const al = (PROFA_NAMES && PROFA_NAMES[a] ? PROFA_NAMES[a] : a).localeCompare(PROFA_NAMES && PROFA_NAMES[b] ? PROFA_NAMES[b] : b);
+                return al || a.localeCompare(b);
+            });
+            const current = selected && selected !== '—' ? selected : '';
+            if (current && !keys.includes(current)) keys.unshift(current);
+            return '<option value="">—</option>' + keys.map(function(pf) {
+                const label = (PROFA_NAMES && PROFA_NAMES[pf]) ? (PROFA_NAMES[pf] + ' · ' + pf) : pf;
+                return '<option value="' + kmHistoryEsc(pf) + '"' + (pf === current ? ' selected' : '') + '>' + kmHistoryEsc(label) + '</option>';
+            }).join('');
+        }
+
+        function _kmPackViewerUpdateDraftField(idx, field, value) {
+            if (!_kmPackViewer || !Array.isArray(_kmPackViewer.editRows) || !_kmPackViewer.editRows[idx]) return;
+            if (['kills', 'deaths', 'pvp_dmg', 'pve_dmg'].includes(field)) {
+                _kmPackViewer.editRows[idx][field] = Math.max(0, _kmPackViewerVerifyNum(value) || 0);
+            } else if (field === 'name') {
+                _kmPackViewer.editRows[idx].name = String(value || '').trim();
+            } else if (field === 'profa') {
+                _kmPackViewer.editRows[idx].profa = String(value || '');
+            }
+            _kmPackViewer.editDirty = true;
+            const stateEl = document.getElementById('kmPackViewerEditState');
+            if (stateEl) stateEl.textContent = 'Есть несохранённые изменения';
+        }
+        window._kmPackViewerUpdateDraftField = _kmPackViewerUpdateDraftField;
+
+        function _kmPackViewerOpenProfileFromRow(idx) {
+            if (!_kmPackViewer || !Array.isArray(_kmPackViewer.editRows) || !_kmPackViewer.editRows[idx]) return;
+            const name = String(_kmPackViewer.editRows[idx].name || '').trim();
+            if (name) openPlayerProfile(name);
+        }
+        window._kmPackViewerOpenProfileFromRow = _kmPackViewerOpenProfileFromRow;
 
         function _kmPackViewerVerifyText(value) {
             return String(value || '')
@@ -11152,6 +11236,132 @@ ${playerList}
         window._kmPackViewerVerifyUploadedScreenshot = _kmPackViewerVerifyUploadedScreenshot;
         window._kmPackViewerCompareUploadRows = _kmPackViewerCompareUploadRows;
 
+        function _kmPackViewerFindScreenMapKey(dayData, pack) {
+            if (!dayData || !dayData.screenPlayersMap || !pack) return '';
+            if (pack.packName && dayData.screenPlayersMap[pack.packName]) return pack.packName;
+            const leaderKey = normalizeNick(pack.leader || '');
+            const packNames = Object.keys(dayData.screenPlayersMap || {});
+            for (let i = 0; i < packNames.length; i++) {
+                const pk = packNames[i];
+                const rows = dayData.screenPlayersMap[pk] || [];
+                const mappedLeader = dayData.packLeaders && dayData.packLeaders[pk] ? dayData.packLeaders[pk] : '';
+                if (leaderKey && normalizeNick(mappedLeader) === leaderKey) return pk;
+                if (rows.length && leaderKey && normalizeNick(rows[0].name || rows[0].nick || '') === leaderKey) return pk;
+            }
+            const expected = ((pack.players || []).map(function(p) { return normalizeNick(p.name || p.nick || ''); })).filter(Boolean);
+            if (!expected.length) return '';
+            for (let i = 0; i < packNames.length; i++) {
+                const pk = packNames[i];
+                const rows = dayData.screenPlayersMap[pk] || [];
+                const got = rows.map(function(p) { return normalizeNick(p.name || p.nick || ''); }).filter(Boolean);
+                const overlap = expected.filter(function(n) { return got.includes(n); }).length;
+                if (overlap >= Math.max(1, Math.ceil(expected.length * 0.6))) return pk;
+            }
+            return '';
+        }
+
+        function _kmPackViewerNormalizedEditRows(rows) {
+            return (rows || []).map(function(p) {
+                const name = String(p.name || p.nick || '').trim();
+                return Object.assign({}, p, {
+                    name: name,
+                    nick: name,
+                    profa: p.profa || '',
+                    kills: _kmPackViewerVerifyNum(p.kills) || 0,
+                    deaths: _kmPackViewerVerifyNum(p.deaths) || 0,
+                    pvp_dmg: _kmPackViewerVerifyNum(p.pvp_dmg ?? p.pvp) || 0,
+                    pve_dmg: _kmPackViewerVerifyNum(p.pve_dmg ?? p.pve) || 0
+                });
+            }).filter(function(p) { return p.name; });
+        }
+
+        function _kmPackViewerApplyRowsToDayData(dayData, pack, rows, dateStr) {
+            if (!dayData || !pack) return { ok: false, key: '' };
+            const editedRows = _kmPackViewerNormalizedEditRows(rows);
+            if (!editedRows.length) return { ok: false, key: '' };
+            const oldRows = (pack.players || []).map(function(p) { return Object.assign({}, p); });
+            const screenKey = _kmPackViewerFindScreenMapKey(dayData, pack);
+            if (screenKey) {
+                if (!dayData.screenPlayersMap) dayData.screenPlayersMap = {};
+                dayData.screenPlayersMap[screenKey] = editedRows.map(function(p) { return Object.assign({}, p); });
+                if (!dayData.packLeaders) dayData.packLeaders = {};
+                dayData.packLeaders[screenKey] = editedRows[0].name || dayData.packLeaders[screenKey] || pack.leader;
+            }
+            if (dayData.kmPackScreenshots) {
+                const oldShotKeys = [screenKey, pack.packName, pack.leader, _kmPackViewerShotKey(pack)].filter(Boolean);
+                const newShotKeys = [screenKey, pack.packName, editedRows[0] && editedRows[0].name].filter(Boolean);
+                const shot = oldShotKeys.map(function(k) { return dayData.kmPackScreenshots[k]; }).find(Boolean);
+                if (shot) {
+                    newShotKeys.forEach(function(k) {
+                        if (!dayData.kmPackScreenshots[k]) dayData.kmPackScreenshots[k] = shot;
+                    });
+                }
+            }
+            if (!Array.isArray(dayData.players)) dayData.players = [];
+            const usedNewNames = {};
+            editedRows.forEach(function(row, idx) {
+                const oldName = oldRows[idx] ? (oldRows[idx].name || oldRows[idx].nick || '') : '';
+                const oldKey = normalizeNick(oldName);
+                let target = dayData.players.find(function(p) { return oldKey && normalizeNick(p.name || p.nick || '') === oldKey; });
+                if (!target) {
+                    const newKey = normalizeNick(row.name);
+                    target = dayData.players.find(function(p) { return newKey && normalizeNick(p.name || p.nick || '') === newKey; });
+                }
+                if (target) {
+                    Object.assign(target, row);
+                } else {
+                    dayData.players.push(Object.assign({}, row));
+                }
+                usedNewNames[normalizeNick(row.name)] = true;
+                if (row.profa) {
+                    const nk = normalizeNick(row.name);
+                    if (!playerProfaByDate[nk]) playerProfaByDate[nk] = {};
+                    playerProfaByDate[nk][dateStr] = row.profa;
+                }
+            });
+            if (Array.isArray(dayData.commandChannel) && editedRows[0]) {
+                const oldLeader = normalizeNick(pack.leader || (oldRows[0] && oldRows[0].name) || '');
+                dayData.commandChannel.forEach(function(cc) {
+                    if (oldLeader && normalizeNick(cc.leader || '') === oldLeader) cc.leader = editedRows[0].name;
+                });
+            }
+            return { ok: true, key: screenKey || pack.key || editedRows[0].name };
+        }
+
+        function _kmPackViewerSaveEdits() {
+            if (!_kmPackViewer) return;
+            const dateStr = _kmPackViewer.dateStr;
+            const dayData = appliedStatsByDate[dateStr];
+            const pack = _kmPackViewer.groups[_kmPackViewer.idx] || {};
+            if (!dayData) return;
+            const result = _kmPackViewerApplyRowsToDayData(dayData, pack, _kmPackViewer.editRows || [], dateStr);
+            if (!result.ok) {
+                if (typeof showToast === 'function') showToast('❌ Не удалось сохранить состав пака', 'error');
+                return;
+            }
+            saveToStorage();
+            _kmPackViewer.editDirty = false;
+            const oldKey = pack.key;
+            _kmPackViewer.groups = kmHistoryBuildPackGroups(dateStr, dayData);
+            let idx = _kmPackViewer.groups.findIndex(function(g) { return g.key === oldKey; });
+            if (idx < 0 && result.key) idx = _kmPackViewer.groups.findIndex(function(g) { return g.packName === result.key || normalizeNick(g.leader) === normalizeNick(result.key); });
+            _kmPackViewer.idx = idx >= 0 ? idx : Math.min(_kmPackViewer.idx, _kmPackViewer.groups.length - 1);
+            _kmPackViewer.editKey = null;
+            _kmPackViewerUpdateContent();
+            renderKmHistory();
+            setTimeout(function() { toggleKmHistoryEvent(dateStr, true); }, 40);
+            if (typeof showToast === 'function') showToast('✅ Изменения пака сохранены', 'success');
+        }
+        window._kmPackViewerSaveEdits = _kmPackViewerSaveEdits;
+
+        function _kmPackViewerCancelEdits() {
+            if (!_kmPackViewer) return;
+            _kmPackViewer.editRows = (_kmPackViewer.editOriginalRows || []).map(function(p) { return Object.assign({}, p); });
+            _kmPackViewer.editDirty = false;
+            _kmPackViewerUpdateContent();
+        }
+        window._kmPackViewerCancelEdits = _kmPackViewerCancelEdits;
+
         function _kmPackViewerUploadScreenshot() {
             if (!_kmPackViewer) return;
             const input = document.createElement('input');
@@ -11335,7 +11545,7 @@ ${playerList}
             if (counterEl) counterEl.textContent = (_kmFullCCViewer.idx + 1) + ' / ' + _kmFullCCViewer.groups.length;
             if (prevBtn) prevBtn.disabled = _kmFullCCViewer.idx <= 0;
             if (nextBtn) nextBtn.disabled = _kmFullCCViewer.idx >= _kmFullCCViewer.groups.length - 1;
-            if (_kmPackViewer && _kmPackViewer.groups === _kmFullCCViewer.groups) {
+            if (_kmPackViewer && _kmPackViewer.groups === _kmFullCCViewer.groups && !_kmPackViewerHasUnsavedEdits()) {
                 _kmPackViewer.idx = _kmFullCCViewer.idx;
                 _kmPackViewerUpdateContent();
             }
@@ -11352,6 +11562,11 @@ ${playerList}
 
         function _kmPackViewerOpenFullCC() {
             if (!_kmPackViewer) return;
+            if (!_kmPackViewerConfirmDiscardEdits()) return;
+            _kmPackViewer.editKey = null;
+            _kmPackViewer.editRows = null;
+            _kmPackViewer.editOriginalRows = null;
+            _kmPackViewer.editDirty = false;
             _kmFullCCClose();
             const groups = _kmPackViewer.groups;
             const idx = _kmPackViewer.idx;
@@ -11399,21 +11614,20 @@ ${playerList}
         }
 
         function _kmPackViewerBuildTableRows(pack, dateStr) {
-            return pack.players.map(function(p, idx) {
-                const resolvedN = resolveAlias(p.name);
-                const inRoster = roster.find(function(r) { return normalizeNick(r.name) === normalizeNick(resolvedN) || normalizeNick(r.name) === normalizeNick(p.name); });
-                const normPKey = normalizeNick(p.name);
-                const savedKmProfa = (playerProfaByDate[normPKey] && playerProfaByDate[normPKey][dateStr]) || null;
-                const memberProfa = savedKmProfa || (inRoster ? (inRoster.profa || '—') : '—');
-                const profaCell = memberProfa && memberProfa !== '—' ? profaIconHtml(memberProfa, 20) + '<span class="km-history-profa-label">' + kmHistoryEsc(PROFA_NAMES && PROFA_NAMES[memberProfa] ? PROFA_NAMES[memberProfa] : memberProfa) + '</span>' : '<span class="km-history-profa-label">—</span>';
+            const rows = _kmPackViewerEnsureEditRows(pack, dateStr);
+            return rows.map(function(p, idx) {
+                const memberProfa = p.profa || '';
+                const profaCell = '<select class="km-pack-edit-input km-pack-edit-profa" onchange="event.stopPropagation();_kmPackViewerUpdateDraftField(' + idx + ',\'profa\',this.value)">'
+                    + _kmPackViewerProfaOptions(memberProfa)
+                    + '</select>';
                 const isLeaderRow = idx === 0 || normalizeNick(p.name) === normalizeNick(pack.leader);
                 return `<div class="km-history-pack-row ${isLeaderRow ? 'is-leader' : ''}">
-                    <span class="km-history-pack-row-name">${isLeaderRow ? '<span class="km-pack-leader-crown">♛</span>' : ''}<span class="player-nick-link" onclick="event.stopPropagation();openPlayerProfile('${p.name.replace(/'/g,"\\'")}')" style="cursor:pointer">${p.name}</span></span>
+                    <span class="km-history-pack-row-name">${isLeaderRow ? '<span class="km-pack-leader-crown">♛</span>' : ''}<input type="text" class="km-pack-edit-input km-pack-edit-name" value="${kmHistoryEsc(p.name || '')}" onchange="event.stopPropagation();_kmPackViewerUpdateDraftField(${idx},'name',this.value)" oninput="event.stopPropagation();_kmPackViewerUpdateDraftField(${idx},'name',this.value)"><button type="button" class="km-pack-profile-btn" title="Открыть профиль" onclick="event.stopPropagation();_kmPackViewerOpenProfileFromRow(${idx})">↗</button></span>
                     <span class="km-history-pack-row-profa">${profaCell}</span>
-                    <span>${p.kills||0}</span>
-                    <span>${p.deaths||0}</span>
-                    <span>${(p.pvp_dmg||0).toLocaleString()}</span>
-                    <span>${(p.pve_dmg||0).toLocaleString()}</span>
+                    <span><input type="number" min="0" class="km-pack-edit-input km-pack-edit-num" value="${p.kills||0}" onchange="event.stopPropagation();_kmPackViewerUpdateDraftField(${idx},'kills',this.value)" oninput="event.stopPropagation();_kmPackViewerUpdateDraftField(${idx},'kills',this.value)"></span>
+                    <span><input type="number" min="0" class="km-pack-edit-input km-pack-edit-num" value="${p.deaths||0}" onchange="event.stopPropagation();_kmPackViewerUpdateDraftField(${idx},'deaths',this.value)" oninput="event.stopPropagation();_kmPackViewerUpdateDraftField(${idx},'deaths',this.value)"></span>
+                    <span><input type="number" min="0" class="km-pack-edit-input km-pack-edit-dmg" value="${p.pvp_dmg||0}" onchange="event.stopPropagation();_kmPackViewerUpdateDraftField(${idx},'pvp_dmg',this.value)" oninput="event.stopPropagation();_kmPackViewerUpdateDraftField(${idx},'pvp_dmg',this.value)"></span>
+                    <span><input type="number" min="0" class="km-pack-edit-input km-pack-edit-dmg" value="${p.pve_dmg||0}" onchange="event.stopPropagation();_kmPackViewerUpdateDraftField(${idx},'pve_dmg',this.value)" oninput="event.stopPropagation();_kmPackViewerUpdateDraftField(${idx},'pve_dmg',this.value)"></span>
                 </div>`;
             }).join('');
         }
@@ -11455,7 +11669,14 @@ ${playerList}
             }
 
             const tableEl = document.getElementById('kmPackViewerTable');
-            if (tableEl) tableEl.innerHTML = '<div class="km-history-pack-table-head"><span>Игрок</span><span>Профа</span><span>⚔️</span><span>💀</span><span>🗡️</span><span>🐉</span></div>' + _kmPackViewerBuildTableRows(pack, dateStr);
+            if (tableEl) tableEl.innerHTML = '<div class="km-pack-edit-actions">'
+                + '<span id="kmPackViewerEditState">' + (_kmPackViewer.editDirty ? 'Есть несохранённые изменения' : 'Редактирование состава пака') + '</span>'
+                + '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">'
+                + '<button type="button" class="km-pack-edit-btn km-pack-edit-save" onclick="event.stopPropagation();_kmPackViewerSaveEdits()">Сохранить изменения</button>'
+                + '<button type="button" class="km-pack-edit-btn" onclick="event.stopPropagation();_kmPackViewerCancelEdits()">Отменить</button>'
+                + '</div></div>'
+                + '<div class="km-history-pack-table-head"><span>Игрок</span><span>Профа</span><span>⚔️</span><span>💀</span><span>🗡️</span><span>🐉</span></div>'
+                + _kmPackViewerBuildTableRows(pack, dateStr);
 
             const prevBtn = document.getElementById('kmPackViewerPrev');
             const nextBtn = document.getElementById('kmPackViewerNext');
@@ -11468,8 +11689,13 @@ ${playerList}
 
         function _kmPackViewerStep(delta) {
             if (!_kmPackViewer) return;
+            if (!_kmPackViewerConfirmDiscardEdits()) return;
             const next = _kmPackViewer.idx + delta;
             if (next < 0 || next >= _kmPackViewer.groups.length) return;
+            _kmPackViewer.editKey = null;
+            _kmPackViewer.editRows = null;
+            _kmPackViewer.editOriginalRows = null;
+            _kmPackViewer.editDirty = false;
             _kmPackViewer.idx = next;
             _kmPackViewerUpdateContent();
         }
@@ -11482,7 +11708,7 @@ ${playerList}
             if (idx < 0 || !groups.length) return;
 
             _kmPackViewerClose();
-            _kmPackViewer = { dateStr: dateStr, groups: groups, idx: idx, keyHandler: null };
+            _kmPackViewer = { dateStr: dateStr, groups: groups, idx: idx, keyHandler: null, editKey: null, editRows: null, editOriginalRows: null, editDirty: false };
 
             const pack = groups[idx];
             const shot = pack.screenshot && (pack.screenshot.originalDataUrl || pack.screenshot.thumbDataUrl || pack.screenshot.cropUrl) ? pack.screenshot : null;
@@ -11522,6 +11748,13 @@ ${playerList}
                     </div>
                     <div class="km-history-pack-table-wrap">
                         <div class="km-history-pack-table" id="kmPackViewerTable">
+                            <div class="km-pack-edit-actions">
+                                <span id="kmPackViewerEditState">Редактирование состава пака</span>
+                                <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+                                    <button type="button" class="km-pack-edit-btn km-pack-edit-save" onclick="event.stopPropagation();_kmPackViewerSaveEdits()">Сохранить изменения</button>
+                                    <button type="button" class="km-pack-edit-btn" onclick="event.stopPropagation();_kmPackViewerCancelEdits()">Отменить</button>
+                                </div>
+                            </div>
                             <div class="km-history-pack-table-head">
                                 <span>Игрок</span><span>Профа</span><span>⚔️</span><span>💀</span><span>🗡️</span><span>🐉</span>
                             </div>
@@ -23675,6 +23908,79 @@ window._archRender = function() {
         height: 100%;
         overflow-y: auto;
       }
+      body:not(.light) .km-pack-edit-actions {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 12px;
+        background: rgba(9,12,17,.96);
+        border-bottom: 1px solid rgba(255,255,255,.06);
+        color: var(--cc-theme-text-muted);
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+      body:not(.light) .km-pack-edit-btn {
+        border: 1px solid var(--cc-theme-border);
+        border-radius: 8px;
+        padding: 6px 10px;
+        background: rgba(15,23,42,.86);
+        color: var(--cc-theme-text-muted);
+        font-size: 11px;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      body:not(.light) .km-pack-edit-save {
+        border-color: color-mix(in srgb, var(--cc-theme-accent) 60%, transparent);
+        background: color-mix(in srgb, var(--cc-theme-accent) 18%, transparent);
+        color: var(--cc-theme-text-title);
+      }
+      body:not(.light) .km-pack-edit-input {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid rgba(148,163,184,.22);
+        border-radius: 7px;
+        background: rgba(2,6,23,.76);
+        color: var(--cc-theme-text-title);
+        padding: 5px 7px;
+        font-size: 12px;
+        line-height: 1.2;
+        outline: none;
+      }
+      body:not(.light) .km-pack-edit-input:focus {
+        border-color: color-mix(in srgb, var(--cc-theme-accent) 72%, transparent);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--cc-theme-accent) 20%, transparent);
+      }
+      body:not(.light) .km-pack-edit-name {
+        font-weight: 700;
+      }
+      body:not(.light) .km-pack-profile-btn {
+        flex: 0 0 28px;
+        width: 28px;
+        height: 28px;
+        border: 1px solid rgba(148,163,184,.22);
+        border-radius: 7px;
+        background: rgba(15,23,42,.72);
+        color: var(--cc-theme-text-muted);
+        cursor: pointer;
+        line-height: 1;
+      }
+      body:not(.light) .km-pack-profile-btn:hover {
+        border-color: color-mix(in srgb, var(--cc-theme-accent) 56%, transparent);
+        color: var(--cc-theme-text-title);
+      }
+      body:not(.light) .km-pack-edit-num,
+      body:not(.light) .km-pack-edit-dmg {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      body:not(.light) .km-pack-edit-profa {
+        cursor: pointer;
+      }
       body:not(.light) .km-history-pack-table-head,
       body:not(.light) .km-history-pack-row {
         display: grid;
@@ -23685,7 +23991,7 @@ window._archRender = function() {
       }
       body:not(.light) .km-history-pack-table-head {
         position: sticky;
-        top: 0;
+        top: 47px;
         z-index: 1;
         background: rgb(9,12,17);
         color: var(--cc-theme-text-muted);
