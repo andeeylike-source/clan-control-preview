@@ -11045,6 +11045,20 @@ ${playerList}
         }
         window._kmPackViewerOpenProfileFromRow = _kmPackViewerOpenProfileFromRow;
 
+        function _kmPackViewerStartEdit() {
+            if (!_kmPackViewer) return;
+            const pack = _kmPackViewer.groups[_kmPackViewer.idx] || {};
+            _kmPackViewer.editKey = null;
+            _kmPackViewer.editRows = null;
+            _kmPackViewer.editOriginalRows = null;
+            _kmPackViewer.editDirty = false;
+            _kmPackViewer.editMode = true;
+            _kmPackViewer.editFlash = '';
+            _kmPackViewerEnsureEditRows(pack, _kmPackViewer.dateStr);
+            _kmPackViewerUpdateContent();
+        }
+        window._kmPackViewerStartEdit = _kmPackViewerStartEdit;
+
         function _kmPackViewerVerifyText(value) {
             return String(value || '')
                 .toLowerCase()
@@ -11347,6 +11361,8 @@ ${playerList}
             if (idx < 0 && result.key) idx = _kmPackViewer.groups.findIndex(function(g) { return g.packName === result.key || normalizeNick(g.leader) === normalizeNick(result.key); });
             _kmPackViewer.idx = idx >= 0 ? idx : Math.min(_kmPackViewer.idx, _kmPackViewer.groups.length - 1);
             _kmPackViewer.editKey = null;
+            _kmPackViewer.editMode = false;
+            _kmPackViewer.editFlash = 'Сохранено';
             _kmPackViewerUpdateContent();
             renderKmHistory();
             setTimeout(function() { toggleKmHistoryEvent(dateStr, true); }, 40);
@@ -11358,6 +11374,8 @@ ${playerList}
             if (!_kmPackViewer) return;
             _kmPackViewer.editRows = (_kmPackViewer.editOriginalRows || []).map(function(p) { return Object.assign({}, p); });
             _kmPackViewer.editDirty = false;
+            _kmPackViewer.editMode = false;
+            _kmPackViewer.editFlash = '';
             _kmPackViewerUpdateContent();
         }
         window._kmPackViewerCancelEdits = _kmPackViewerCancelEdits;
@@ -11567,6 +11585,8 @@ ${playerList}
             _kmPackViewer.editRows = null;
             _kmPackViewer.editOriginalRows = null;
             _kmPackViewer.editDirty = false;
+            _kmPackViewer.editMode = false;
+            _kmPackViewer.editFlash = '';
             _kmFullCCClose();
             const groups = _kmPackViewer.groups;
             const idx = _kmPackViewer.idx;
@@ -11613,7 +11633,23 @@ ${playerList}
             console.log('[km-history] full-cc open idx=' + idx + '/' + groups.length);
         }
 
-        function _kmPackViewerBuildTableRows(pack, dateStr) {
+        function _kmPackViewerBuildViewTableRows(pack, dateStr) {
+            return (pack.players || []).map(function(p, idx) {
+                const memberProfa = _kmPackViewerEffectiveProfa(p, dateStr);
+                const profaCell = memberProfa && memberProfa !== '—' ? profaIconHtml(memberProfa, 20) + '<span class="km-history-profa-label">' + kmHistoryEsc(PROFA_NAMES && PROFA_NAMES[memberProfa] ? PROFA_NAMES[memberProfa] : memberProfa) + '</span>' : '<span class="km-history-profa-label">—</span>';
+                const isLeaderRow = idx === 0 || normalizeNick(p.name) === normalizeNick(pack.leader);
+                return `<div class="km-history-pack-row ${isLeaderRow ? 'is-leader' : ''}">
+                    <span class="km-history-pack-row-name">${isLeaderRow ? '<span class="km-pack-leader-crown">♛</span>' : ''}<span class="player-nick-link" onclick="event.stopPropagation();openPlayerProfile('${String(p.name || '').replace(/'/g,"\\'")}')" style="cursor:pointer">${kmHistoryEsc(p.name || '')}</span></span>
+                    <span class="km-history-pack-row-profa">${profaCell}</span>
+                    <span>${p.kills||0}</span>
+                    <span>${p.deaths||0}</span>
+                    <span>${(p.pvp_dmg||0).toLocaleString()}</span>
+                    <span>${(p.pve_dmg||0).toLocaleString()}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function _kmPackViewerBuildEditTableRows(pack, dateStr) {
             const rows = _kmPackViewerEnsureEditRows(pack, dateStr);
             return rows.map(function(p, idx) {
                 const memberProfa = p.profa || '';
@@ -11630,6 +11666,25 @@ ${playerList}
                     <span><input type="number" min="0" class="km-pack-edit-input km-pack-edit-dmg" value="${p.pve_dmg||0}" onchange="event.stopPropagation();_kmPackViewerUpdateDraftField(${idx},'pve_dmg',this.value)" oninput="event.stopPropagation();_kmPackViewerUpdateDraftField(${idx},'pve_dmg',this.value)"></span>
                 </div>`;
             }).join('');
+        }
+
+        function _kmPackViewerBuildTableHtml(pack, dateStr) {
+            const isEdit = !!(_kmPackViewer && _kmPackViewer.editMode);
+            const flash = _kmPackViewer && _kmPackViewer.editFlash ? '<span class="km-pack-edit-success">✅ ' + kmHistoryEsc(_kmPackViewer.editFlash) + '</span>' : '';
+            const actionHtml = isEdit
+                ? '<div class="km-pack-edit-actions">'
+                    + '<span id="kmPackViewerEditState">' + (_kmPackViewer.editDirty ? 'Есть несохранённые изменения' : 'Редактирование состава пака') + '</span>'
+                    + '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">'
+                    + '<button type="button" class="km-pack-edit-btn km-pack-edit-save" onclick="event.stopPropagation();_kmPackViewerSaveEdits()">Сохранить изменения</button>'
+                    + '<button type="button" class="km-pack-edit-btn" onclick="event.stopPropagation();_kmPackViewerCancelEdits()">Отменить</button>'
+                    + '</div></div>'
+                : '<div class="km-pack-view-actions">'
+                    + '<span>' + flash + '</span>'
+                    + '<button type="button" class="km-pack-edit-btn" onclick="event.stopPropagation();_kmPackViewerStartEdit()">✏️ Изменить</button>'
+                    + '</div>';
+            return actionHtml
+                + '<div class="km-history-pack-table-head"><span>Игрок</span><span>Профа</span><span>⚔️</span><span>💀</span><span>🗡️</span><span>🐉</span></div>'
+                + (isEdit ? _kmPackViewerBuildEditTableRows(pack, dateStr) : _kmPackViewerBuildViewTableRows(pack, dateStr));
         }
 
         function _kmPackViewerUpdateContent() {
@@ -11669,14 +11724,7 @@ ${playerList}
             }
 
             const tableEl = document.getElementById('kmPackViewerTable');
-            if (tableEl) tableEl.innerHTML = '<div class="km-pack-edit-actions">'
-                + '<span id="kmPackViewerEditState">' + (_kmPackViewer.editDirty ? 'Есть несохранённые изменения' : 'Редактирование состава пака') + '</span>'
-                + '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">'
-                + '<button type="button" class="km-pack-edit-btn km-pack-edit-save" onclick="event.stopPropagation();_kmPackViewerSaveEdits()">Сохранить изменения</button>'
-                + '<button type="button" class="km-pack-edit-btn" onclick="event.stopPropagation();_kmPackViewerCancelEdits()">Отменить</button>'
-                + '</div></div>'
-                + '<div class="km-history-pack-table-head"><span>Игрок</span><span>Профа</span><span>⚔️</span><span>💀</span><span>🗡️</span><span>🐉</span></div>'
-                + _kmPackViewerBuildTableRows(pack, dateStr);
+            if (tableEl) tableEl.innerHTML = _kmPackViewerBuildTableHtml(pack, dateStr);
 
             const prevBtn = document.getElementById('kmPackViewerPrev');
             const nextBtn = document.getElementById('kmPackViewerNext');
@@ -11696,6 +11744,8 @@ ${playerList}
             _kmPackViewer.editRows = null;
             _kmPackViewer.editOriginalRows = null;
             _kmPackViewer.editDirty = false;
+            _kmPackViewer.editMode = false;
+            _kmPackViewer.editFlash = '';
             _kmPackViewer.idx = next;
             _kmPackViewerUpdateContent();
         }
@@ -11708,7 +11758,7 @@ ${playerList}
             if (idx < 0 || !groups.length) return;
 
             _kmPackViewerClose();
-            _kmPackViewer = { dateStr: dateStr, groups: groups, idx: idx, keyHandler: null, editKey: null, editRows: null, editOriginalRows: null, editDirty: false };
+            _kmPackViewer = { dateStr: dateStr, groups: groups, idx: idx, keyHandler: null, editKey: null, editRows: null, editOriginalRows: null, editDirty: false, editMode: false, editFlash: '' };
 
             const pack = groups[idx];
             const shot = pack.screenshot && (pack.screenshot.originalDataUrl || pack.screenshot.thumbDataUrl || pack.screenshot.cropUrl) ? pack.screenshot : null;
@@ -11748,17 +11798,7 @@ ${playerList}
                     </div>
                     <div class="km-history-pack-table-wrap">
                         <div class="km-history-pack-table" id="kmPackViewerTable">
-                            <div class="km-pack-edit-actions">
-                                <span id="kmPackViewerEditState">Редактирование состава пака</span>
-                                <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-                                    <button type="button" class="km-pack-edit-btn km-pack-edit-save" onclick="event.stopPropagation();_kmPackViewerSaveEdits()">Сохранить изменения</button>
-                                    <button type="button" class="km-pack-edit-btn" onclick="event.stopPropagation();_kmPackViewerCancelEdits()">Отменить</button>
-                                </div>
-                            </div>
-                            <div class="km-history-pack-table-head">
-                                <span>Игрок</span><span>Профа</span><span>⚔️</span><span>💀</span><span>🗡️</span><span>🐉</span>
-                            </div>
-                            ${_kmPackViewerBuildTableRows(pack, dateStr)}
+                            ${_kmPackViewerBuildTableHtml(pack, dateStr)}
                         </div>
                     </div>
                 </div>
@@ -23908,7 +23948,8 @@ window._archRender = function() {
         height: 100%;
         overflow-y: auto;
       }
-      body:not(.light) .km-pack-edit-actions {
+      body:not(.light) .km-pack-edit-actions,
+      body:not(.light) .km-pack-view-actions {
         position: sticky;
         top: 0;
         z-index: 2;
@@ -23923,6 +23964,15 @@ window._archRender = function() {
         font-size: 11px;
         font-weight: 800;
         text-transform: uppercase;
+      }
+      body:not(.light) .km-pack-view-actions {
+        justify-content: flex-end;
+        min-height: 49px;
+      }
+      body:not(.light) .km-pack-edit-success {
+        color: #86efac;
+        text-transform: none;
+        font-weight: 800;
       }
       body:not(.light) .km-pack-edit-btn {
         border: 1px solid var(--cc-theme-border);
