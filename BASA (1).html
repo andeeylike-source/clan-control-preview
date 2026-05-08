@@ -4805,7 +4805,7 @@
                     </td>
                     <td>${p.isNew ? '<span class="text-[9px] bg-emerald-500 text-black font-black px-1.5 py-0.5 rounded uppercase">NEW</span>' : '<span style="color:#475569;font-size:11px">—</span>'}</td>
                     <td onclick="event.stopPropagation();toggleVerified(${p.id})" style="cursor:pointer;text-align:center;font-size:16px" title="Нажми чтобы отметить как проверенный">${p.verified ? '✅' : '<span style="color:#2d3748;font-size:14px">○</span>'}</td>
-                    <td onclick="event.stopPropagation();editPlayer(${p.id})" style="cursor:pointer" title="Нажми чтобы изменить профу" class="text-slate-400 text-xs">${(p.profas && p.profas.length > 0 ? p.profas : (p.profa && p.profa !== '—' ? [p.profa] : [])).map((pf,i) => `<span style="display:inline-flex;align-items:center;gap:5px;background:#1e2530;border-radius:6px;padding:4px 9px;margin-right:4px;${i===0?'color:#a5b4fc':'color:#64748b'}">${profaIconHtml(pf, 22)}<span onclick="event.stopPropagation();showProfaInfo(this.dataset.pf)" data-pf="${pf}" style="cursor:help;color:#475569;font-size:9px;margin-left:8px;padding:2px 4px">?</span></span>`).join('') || '<span style="color:#6366f155;font-size:11px;border:1px dashed #2d3748;padding:3px 8px;border-radius:6px">+ профа</span>'}</td>
+                    <td onclick="event.stopPropagation();editPlayer(${p.id})" style="cursor:pointer" title="Нажми чтобы изменить профу" class="text-slate-400 text-xs">${(p.profas && p.profas.length > 0 ? p.profas : (p.profa && p.profa !== '—' ? [p.profa] : [])).map((pf,i) => `<span style="display:inline-flex;align-items:center;gap:5px;background:#1e2530;border-radius:6px;padding:4px 9px;margin-right:4px;${i===0?'color:#a5b4fc':'color:#64748b'}">${profaIconHtml(pf, 22)}<span onclick="event.stopPropagation();window.showProfaInfo(this.dataset.pf)" data-pf="${pf}" data-profa-info-btn="1" style="cursor:help;color:#475569;font-size:9px;margin-left:8px;padding:2px 4px">?</span></span>`).join('') || '<span style="color:#6366f155;font-size:11px;border:1px dashed #2d3748;padding:3px 8px;border-radius:6px">+ профа</span>'}</td>
                     <td onclick="event.stopPropagation()"><span class="pac-tag" onclick="event.stopPropagation();openPackFromRoster('${p.id}')" title="Нажми чтобы изменить пак" style="cursor:pointer" onmouseover="this.style.borderColor='#6366f1';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='';this.style.color=''">${p.pac}</span></td>
                     <td class="${p.attendance < 50 ? 'text-red-400' : p.attendance < 70 ? 'text-yellow-400' : 'text-emerald-400'} font-bold">${totalDates > 0 ? p.attendance + '%' : '—'}</td>
                     <td onclick="event.stopPropagation()">
@@ -7946,6 +7946,12 @@ function getClass2IconByClass3(c3) {
             modal.classList.add('open');
         }
         window.showProfaInfo = showProfaInfo;
+
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('[data-profa-info-btn][data-pf]');
+            if (!btn || !document.getElementById('page-roster')?.contains(btn)) return;
+            window.showProfaInfo(btn.dataset.pf);
+        }, true);
 
 
         function sortStats(field) {
