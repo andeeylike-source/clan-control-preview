@@ -10056,12 +10056,27 @@ ${playerList}
             window._gtDebug.matcherSkipReason = null;
             window._gtDebug.matcherProcessed = 0;
             window._gtDebug.matcherError = null;
+            window._gtDebug.rows = []; // per-row diagnostic dump (read-only; UI behaviour unchanged)
             try {
                 await _ccEnsureGTFeatures();
                 if (!_ccGTExemplars || _ccGTExemplars.length === 0) {
                     window._gtDebug.matcherSkipReason = 'exemplars_empty (loaded=' + (_ccGTExemplars ? _ccGTExemplars.length : 'null') + ')';
                     return;
                 }
+                // Coverage snapshot — which class2 names are present in exemplar catalog vs CLASS2_TO_CLASS3.
+                // Helps the user spot missing / mislabelled exemplars without affecting matcher behaviour.
+                try {
+                    const _covered = new Set(_ccGTExemplars.map(e => e.class2));
+                    const _allKnown = (typeof CLASS2_TO_CLASS3 === 'object' && CLASS2_TO_CLASS3) ? Object.keys(CLASS2_TO_CLASS3) : [];
+                    const _missing = _allKnown.filter(c => !_covered.has(c));
+                    const _extraneous = [..._covered].filter(c => !_allKnown.includes(c));
+                    window._gtDebug.classCoverage = {
+                        coveredCount: _covered.size,
+                        knownCount: _allKnown.length,
+                        missing: _missing,
+                        extraneous: _extraneous
+                    };
+                } catch(e) { /* ignore */ }
                 const SWEEP_OFF = [-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6];
                 const SWEEP_SZ  = [16,18,20,22,24];
                 // GT_EXEMPLAR calibrated thresholds (LOO: 0 FP @ 32.7% coverage)
@@ -10080,10 +10095,19 @@ ${playerList}
                     sc.getContext('2d', { willReadFrequently:true }).drawImage(img, 0, 0);
                     const geo = _ccSelectBestGeometry(sc, packPlayers.length);
                     if (!geo) {
-                        for (const pp of packPlayers) {
+                        for (let _ri = 0; _ri < packPlayers.length; _ri++) {
+                            const pp = packPlayers[_ri];
                             if (!pp || !pp.name) continue;
                             const t = dayLastParsed.find(p => normalizeNick(p.name) === normalizeNick(pp.name));
                             if (t) { t.matcher_geoPreset = 'LOC_BAD_GEOMETRY'; t.matcher_locInvalid = true; t.matcher_pack = packName; }
+                            try {
+                                window._gtDebug.rows.push({
+                                    pack: packName, row: _ri, name: pp.name,
+                                    geoPreset: 'LOC_BAD_GEOMETRY', status: 'BAD_GEOMETRY',
+                                    top1: null, sim: 0, margin: 0, top3: [],
+                                    trigger: false, wroteAuto: false, wroteProfa: false
+                                });
+                            } catch(e) { /* ignore */ }
                         }
                         continue;
                     }
@@ -10124,6 +10148,15 @@ ${playerList}
                             target.matcher_pack        = packName;
                             target.matcher_row         = rowIdx;
                             target.matcher_geoPreset   = geo.preset;
+                            try {
+                                window._gtDebug.rows.push({
+                                    pack: packName, row: rowIdx, name: pp.name, geoPreset: geo.preset,
+                                    cx, cy: expectedCY, expectedCY,
+                                    cropQuality: _cq, status: 'BAD_CROP', reason: _cq.reason,
+                                    top1: null, sim: 0, margin: 0, top3: [],
+                                    trigger: false, wroteAuto: false, wroteProfa: false
+                                });
+                            } catch(e) { /* ignore */ }
                             continue;
                         }
 
@@ -10204,6 +10237,28 @@ ${playerList}
                             const _c3opts = resolveClass2ToClass3(best.class2);
                             if (_c3opts.length === 1) target.profa = _c3opts[0];
                         }
+                        // Per-row diagnostic dump (does not affect matcher behaviour)
+                        try {
+                            const _c3opts = resolveClass2ToClass3(best.class2);
+                            window._gtDebug.rows.push({
+                                pack: packName,
+                                row: rowIdx,
+                                name: pp.name,
+                                geoPreset: geo.preset,
+                                cx, cy, expectedCY,
+                                cropBox: bestCropRect,
+                                cropQuality: _cq,
+                                top1: best.class2,
+                                sim: +(best.similarity || 0).toFixed(3),
+                                margin: +(best.margin || 0).toFixed(3),
+                                top3: (best.top3 || []).map(x => ({ name: x.name || x.class2, sim: +(x.sim||x.similarity||0).toFixed(3) })),
+                                trigger: !!target.matcher_trigger,
+                                wroteAuto: !!(target.matcher_trigger && !_rowUnstable),
+                                wroteProfa: !!(target.matcher_trigger && !_rowUnstable && _c3opts.length === 1),
+                                class3opts: _c3opts,
+                                cropUrl: cropUrl
+                            });
+                        } catch(e) { /* ignore */ }
                         window._gtDebug.matcherProcessed = (window._gtDebug.matcherProcessed || 0) + 1;
                     }
                 }
@@ -10212,6 +10267,46 @@ ${playerList}
                 console.warn('[icon-matcher]', e);
             }
         }
+
+        // Console helper: print compact per-row table for icon matcher diagnostics.
+        // Usage:
+        //   dumpMatcherRows()                — all rows, compact
+        //   dumpMatcherRows({pack:'NAME'})   — only one pack
+        //   dumpMatcherRows({status:'low'})  — only sub-trigger rows
+        //   dumpMatcherRows({class3:'Cardinal'}) — only rows whose top1 maps to that class3
+        window.dumpMatcherRows = function(opts) {
+            opts = opts || {};
+            const rows = (window._gtDebug && Array.isArray(window._gtDebug.rows)) ? window._gtDebug.rows : [];
+            let view = rows.slice();
+            if (opts.pack) view = view.filter(r => (r.pack||'').toLowerCase().includes(String(opts.pack).toLowerCase()));
+            if (opts.name) view = view.filter(r => (r.name||'').toLowerCase().includes(String(opts.name).toLowerCase()));
+            if (opts.status) {
+                const s = String(opts.status).toLowerCase();
+                view = view.filter(r => {
+                    if (s === 'low')  return !r.trigger && r.top1;
+                    if (s === 'auto') return r.wroteAuto;
+                    if (s === 'bad')  return r.status === 'BAD_CROP' || r.status === 'BAD_GEOMETRY';
+                    return (r.status||'').toLowerCase().includes(s);
+                });
+            }
+            if (opts.class3) {
+                const want = String(opts.class3).toLowerCase();
+                view = view.filter(r => (r.class3opts||[]).some(c => String(c).toLowerCase() === want));
+            }
+            const compact = view.map(r => ({
+                pack: r.pack, row: r.row, name: r.name,
+                top1: r.top1, sim: r.sim, Δ: r.margin,
+                trigger: r.trigger, wroteAuto: r.wroteAuto, wroteProfa: r.wroteProfa,
+                status: r.status || (r.trigger ? 'AUTO' : (r.top1 ? 'LOW' : 'NONE')),
+                top3: (r.top3||[]).map(x => x.name + ' ' + Math.round((x.sim||0)*100) + '%').join(' / '),
+                geo: r.geoPreset
+            }));
+            if (typeof console.table === 'function') console.table(compact);
+            else console.log(compact);
+            console.log('[matcher] processed:', window._gtDebug.matcherProcessed,
+                ' | classCoverage:', window._gtDebug.classCoverage);
+            return compact;
+        };
         // ── END LOCAL ICON MATCHER ──
 
         // Алиасы для поиска проф (рус + сокращения + англ варианты)
