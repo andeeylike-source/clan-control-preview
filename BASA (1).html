@@ -7106,6 +7106,25 @@ function getClass2IconByClass3(c3) {
                     </table>
                 </div>`;
 
+            const personalStatsKey = [
+                statsDateFrom || '',
+                statsDateTo || '',
+                activePacFilter || '',
+                players.length,
+                totalKills,
+                totalDeaths,
+                totalPvp,
+                totalPve,
+                Object.keys(appliedStatsByDate).length,
+                roster.length
+            ].join('|');
+            if (statsPersonalDataKey !== personalStatsKey) {
+                statsPersonalDataKey = personalStatsKey;
+                statsPersonalCacheKey = '';
+                statsPersonalCacheHtml = '';
+            }
+            statsPersonalPlayers = players;
+
             el.innerHTML = `
                 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">
                     ${[['⚔️ Убийства (клан)', totalKills, '#f59e0b'],['💀 Смерти (клан)', totalDeaths, '#ef4444'],['🗡️ PvP урон', totalPvp.toLocaleString(), '#6366f1'],['🐉 PvE урон', totalPve.toLocaleString(), '#22c55e']].map(([label,val,color])=>`
@@ -7121,9 +7140,16 @@ function getClass2IconByClass3(c3) {
                     ${topCard('🗡️ Топ PvP урон', '#6366f1', topPvp, 'pvp_dmg', true)}
                     ${topCard('💀 Топ смертей', '#ef4444', topDeaths, 'deaths', false)}
                 </div>
-                <div style="background:#12171f;border:1px solid #1e2530;border-radius:12px;padding:20px">
-                    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#64748b;margin-bottom:14px">📋 Личная статистика</div>
-                    <div style="overflow-x:auto">
+                <div id="personalStatsBlock" style="background:#12171f;border:1px solid #1e2530;border-radius:12px;padding:20px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap">
+                        <div>
+                            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#64748b;margin-bottom:6px">📋 Личная статистика</div>
+                            <div style="font-size:12px;color:#64748b">${players.length} игроков · список строится при раскрытии</div>
+                        </div>
+                        <button type="button" onclick="togglePersonalStats()" style="background:#1e2530;border:1px solid #334155;color:#cbd5e1;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer">${statsPersonalExpanded ? 'Свернуть' : 'Развернуть'}</button>
+                    </div>
+                    <div id="personalStatsBody" style="${statsPersonalExpanded ? 'display:block;margin-top:16px;overflow-x:auto' : 'display:none'}">
+                    ${statsPersonalExpanded ? `
                     <table style="width:100%;border-collapse:collapse">
                         <thead><tr>
                             <th style="color:#64748b;font-size:11px;text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid #1e2530;cursor:pointer" onclick="sortStats('name')">Ник</th>
@@ -7137,12 +7163,23 @@ function getClass2IconByClass3(c3) {
                         </tr></thead>
                         <tbody id="statsTableBody"></tbody>
                     </table>
+                    ` : ''}
                     </div>
                 </div>`;
-            renderStatsTable(statsSort.field, statsSort.dir, players);
+            if (statsPersonalExpanded) renderStatsTable(statsSort.field, statsSort.dir, players);
         }
 
         let statsSort = { field: 'kills', dir: 'desc' };
+        let statsPersonalExpanded = false;
+        let statsPersonalPlayers = [];
+        let statsPersonalDataKey = '';
+        let statsPersonalCacheKey = '';
+        let statsPersonalCacheHtml = '';
+
+        function togglePersonalStats() {
+            statsPersonalExpanded = !statsPersonalExpanded;
+            renderStats();
+        }
 
         // ===== ПЕРИОД ФИЛЬТРАЦИИ =====
         let statsDateFrom = '';
@@ -7986,8 +8023,16 @@ function getClass2IconByClass3(c3) {
         function renderStatsTable(field, dir, players) {
             const tbody = document.getElementById('statsTableBody');
             if (!tbody) return;
+            const cacheKey = [statsPersonalDataKey, field, dir].join('|');
+            if (statsPersonalCacheKey === cacheKey && statsPersonalCacheHtml) {
+                tbody.innerHTML = statsPersonalCacheHtml;
+                return;
+            }
             // Если players не передан — считаем заново
             if (!players) {
+                players = statsPersonalPlayers;
+            }
+            if (!players || !players.length) {
                 const statsMap = calcStatsForPeriod(statsDateFrom, statsDateTo);
                 players = Object.values(statsMap).map(s => {
                     const rp = roster.find(r => normalizeNick(r.name) === normalizeNick(s.name));
@@ -8007,7 +8052,7 @@ function getClass2IconByClass3(c3) {
                 if (field === 'name') return dir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
                 return dir === 'desc' ? vb-va : va-vb;
             });
-            tbody.innerHTML = sorted.map(p => {
+            const rowsHtml = sorted.map(p => {
                 const rp2 = roster.find(r => normalizeNick(r.name) === normalizeNick(p.name));
                 const statProfa = rp2 ? (rp2.profa || '—') : '—';
                 const statProfaHtml = statProfa && statProfa !== '—'
@@ -8025,6 +8070,9 @@ function getClass2IconByClass3(c3) {
                     <td style="padding:10px 14px;text-align:center;color:#22c55e">${(p.pve_dmg||0).toLocaleString()}</td>
                 </tr>`;
             }).join('');
+            statsPersonalCacheKey = cacheKey;
+            statsPersonalCacheHtml = rowsHtml;
+            tbody.innerHTML = rowsHtml;
         }
 
         // ===== СКРИНШОТЫ В МОДАЛКЕ ДНЯ =====
