@@ -3136,6 +3136,7 @@
         <span id="roleBadge" style="display:none"></span>
         <span class="chip dark" id="topbarClan" style="display:none" title="Изменить название клана"></span>
         <button id="adminModeToggle" class="chip" onclick="window._toggleAdminMode&&window._toggleAdminMode()" style="display:none" title="Тест-режим для admin">▸ TEST</button>
+        <button id="perfPanelBtn" class="chip" onclick="window._perfPanel&&window._perfPanel.open()" style="display:none" title="Замер скорости сайта">⚡ Замер</button>
         <button class="flip-toggle" id="themeToggle" type="button" onclick="toggleTheme()" aria-label="Theme" data-state="left">
             <span class="flip-toggle-track"></span>
             <span class="flip-toggle-thumb"></span>
@@ -25149,5 +25150,251 @@ window._archRender = function() {
       }
     })();
     </script>
+
+<!-- =============================================
+     PERF PANEL — preview-only performance meter
+============================================= -->
+<div id="perfPanelOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9998;align-items:flex-start;justify-content:center;padding-top:48px">
+  <div id="perfPanelBox" style="background:#0d1117;border:1px solid #1e2530;border-radius:16px;width:700px;max-width:97vw;max-height:86vh;display:flex;flex-direction:column;overflow:hidden;font-family:system-ui,sans-serif;box-shadow:0 24px 64px rgba(0,0,0,.7)">
+    <!-- header -->
+    <div style="padding:14px 18px 12px;border-bottom:1px solid #1e2530;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;gap:8px;flex-wrap:wrap">
+      <div style="font-size:14px;font-weight:700;color:#e2e8f0;white-space:nowrap">⚡ Замер скорости</div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <button onclick="window._perfPanel.measure()" style="background:#6366f1;border:none;color:#fff;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">Измерить сейчас</button>
+        <button onclick="window._perfPanel.reloadTest()" style="background:#1e2530;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:6px 13px;font-size:12px;font-weight:600;cursor:pointer">Reload-тест</button>
+        <button onclick="window._perfPanel.measureRoutes()" style="background:#1e2530;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:6px 13px;font-size:12px;font-weight:600;cursor:pointer">Замер вкладок</button>
+        <button onclick="window._perfPanel.copy()" style="background:#1e2530;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:6px 13px;font-size:12px;font-weight:600;cursor:pointer">Скопировать</button>
+        <button onclick="window._perfPanel.close()" style="background:#1e2530;border:none;color:#64748b;border-radius:8px;width:32px;height:32px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+      </div>
+    </div>
+    <!-- summary bar -->
+    <div id="perfPanelSummary" style="display:none;padding:10px 18px;border-bottom:1px solid #181f2a;background:#070b10;flex-shrink:0;font-size:12px;color:#94a3b8;line-height:1.8;word-break:break-all"></div>
+    <!-- body -->
+    <div style="flex:1;overflow-y:auto;padding:12px 18px 14px">
+      <div id="perfPanelStatus" style="color:#475569;font-size:13px;padding:28px 0;text-align:center">Нажми «Измерить сейчас» для сбора данных</div>
+      <textarea id="perfPanelJson" style="display:none;width:100%;box-sizing:border-box;background:#050810;border:1px solid #1e2530;border-radius:8px;color:#7dd3fc;font-size:11px;font-family:monospace;resize:vertical;padding:10px 12px;min-height:260px;outline:none" readonly spellcheck="false"></textarea>
+    </div>
+    <div id="perfPanelCopyFallback" style="display:none;padding:6px 18px 10px;font-size:11px;color:#fbbf24">↑ Clipboard API недоступен — выдели текст и нажми Ctrl+C</div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// ── visibility ────────────────────────────────────────────────
+function _shouldShow(){
+  return window._userRole==='admin'||location.search.indexOf('perf=1')!==-1||localStorage.getItem('clanControl_perfPanel')==='1';
+}
+function _initVis(){
+  var btn=document.getElementById('perfPanelBtn');
+  if(btn&&_shouldShow()) btn.style.display='';
+}
+
+// ── long task observer ────────────────────────────────────────
+var _ltTasks=[];
+var _ltObs=null;
+var _ltSupported=false;
+function _startLT(){
+  _ltTasks=[];
+  if(typeof PerformanceObserver==='undefined') return;
+  try{
+    _ltObs=new PerformanceObserver(function(l){ l.getEntries().forEach(function(e){ _ltTasks.push({dur:Math.round(e.duration),t0:Math.round(e.startTime)}); }); });
+    _ltObs.observe({entryTypes:['longtask']});
+    _ltSupported=true;
+  }catch(e){}
+}
+function _stopLT(){ if(_ltObs){try{_ltObs.disconnect();}catch(e){} _ltObs=null;} }
+
+// ── measure ───────────────────────────────────────────────────
+function _measure(label){
+  var r={label:label||'measure',ts:new Date().toISOString(),url:location.href};
+  r.ua=navigator.userAgent.replace(/^Mozilla\/5\.0\s/,'').substring(0,80);
+  r.build=(window._basaBuild||window._ccBuild||document.title||'').substring(0,40);
+  r.readyState=document.readyState;
+
+  try{
+    var nav=performance.getEntriesByType('navigation')[0];
+    if(nav) r.nav={domInteractive:Math.round(nav.domInteractive),domContentLoaded:Math.round(nav.domContentLoadedEventEnd),load:Math.round(nav.loadEventEnd),transferSize:nav.transferSize,encodedBodySize:nav.encodedBodySize,decodedBodySize:nav.decodedBodySize};
+  }catch(e){}
+
+  try{
+    var paints={};
+    performance.getEntriesByType('paint').forEach(function(e){ paints[e.name]=Math.round(e.startTime); });
+    r.paint=paints;
+  }catch(e){}
+
+  try{
+    r.resources_top10=performance.getEntriesByType('resource')
+      .map(function(x){
+        var host=(x.name.match(/^https?:\/\/([^/]+)/)||[])[1]||'';
+        var path=x.name.replace(/^https?:\/\/[^/]+/,'').substring(0,55);
+        return{host:host,path:path,dur:Math.round(x.duration),tx:x.transferSize,dec:x.decodedBodySize};
+      })
+      .sort(function(a,b){return b.dur-a.dur;}).slice(0,10);
+  }catch(e){}
+
+  r.dom_nodes=document.querySelectorAll('*').length;
+  r.scripts=document.querySelectorAll('script').length;
+  r.styles=document.querySelectorAll('style').length;
+
+  try{
+    var tot=0,keys={},b64=0;
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i);
+      var v=localStorage.getItem(k)||'';
+      tot+=v.length; keys[k]=v.length;
+      if(v.indexOf('data:image')!==-1) b64++;
+    }
+    var top5=Object.entries(keys).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+    r.ls={total_kb:Math.round(tot/1024*10)/10,top5:top5,base64_keys:b64};
+  }catch(e){}
+
+  r.long_tasks=_ltSupported
+    ?{count:_ltTasks.length,top:_ltTasks.sort(function(a,b){return b.dur-a.dur;}).slice(0,5)}
+    :'unsupported';
+
+  return r;
+}
+
+// ── route smoke timing ────────────────────────────────────────
+function _measureRoutes(cb){
+  var routes=['dashboard','roster','history'];
+  var timings={};
+  var origPage=null;
+  try{
+    var act=document.querySelector('.page-section.active');
+    if(act) origPage=act.id.replace('page-','');
+  }catch(e){}
+  function _next(i){
+    if(i>=routes.length){
+      if(origPage&&typeof showPage==='function') try{showPage(origPage);}catch(e){}
+      cb(timings); return;
+    }
+    var pid=routes[i];
+    try{
+      var fn=pid==='history'?(window.renderKmHistory||null):null;
+      var t0=performance.now();
+      if(typeof showPage==='function') showPage(pid);
+      else if(fn) fn();
+      timings[pid]=Math.round(performance.now()-t0);
+    }catch(e){timings[pid]='err:'+String(e).substring(0,40);}
+    setTimeout(function(){_next(i+1);},100);
+  }
+  _next(0);
+}
+
+// ── render result ─────────────────────────────────────────────
+function _render(data,isReload){
+  var sumEl=document.getElementById('perfPanelSummary');
+  var jsonEl=document.getElementById('perfPanelJson');
+  var stEl=document.getElementById('perfPanelStatus');
+  var nav=data.nav||{};
+  var ls=data.ls||{};
+  var lt=data.long_tasks&&typeof data.long_tasks==='object'&&data.long_tasks.count!=null?data.long_tasks.count:'?';
+  var slowRes=data.resources_top10&&data.resources_top10[0]?data.resources_top10[0].host+(data.resources_top10[0].path||'')+' '+data.resources_top10[0].dur+'ms':'—';
+  sumEl.style.display='';
+  sumEl.innerHTML=(isReload?'🔄 <b style="color:#e2e8f0">Reload-тест</b>':'⚡ <b style="color:#e2e8f0">Замер</b>')
+    +' &nbsp;<span style="color:#7dd3fc">DCL</span> <b style="color:#e2e8f0">'+(nav.domContentLoaded||'—')+'ms</b>'
+    +' &nbsp;<span style="color:#7dd3fc">Load</span> <b style="color:#e2e8f0">'+(nav.load||'—')+'ms</b>'
+    +' &nbsp;<span style="color:#7dd3fc">DOM</span> <b style="color:#e2e8f0">'+(data.dom_nodes||'—')+'</b>'
+    +' &nbsp;<span style="color:#7dd3fc">LS</span> <b style="color:#e2e8f0">'+(ls.total_kb||0)+'KB</b>'
+    +' &nbsp;<span style="color:#7dd3fc">LT</span> <b style="color:#e2e8f0">'+lt+'</b>'
+    +' &nbsp;<span style="color:#475569;font-size:11px">slow: '+slowRes+'</span>';
+  stEl.style.display='none';
+  jsonEl.style.display='';
+  jsonEl.value=JSON.stringify(data,null,2);
+  window._perfLastReport=data;
+}
+
+// ── public API ────────────────────────────────────────────────
+window._perfPanel={
+  open:function(){
+    var el=document.getElementById('perfPanelOverlay');
+    if(el){el.style.display='flex'; _startLT();}
+  },
+  close:function(){
+    var el=document.getElementById('perfPanelOverlay');
+    if(el) el.style.display='none';
+    _stopLT();
+    var fb=document.getElementById('perfPanelCopyFallback');
+    if(fb) fb.style.display='none';
+  },
+  measure:function(){
+    var st=document.getElementById('perfPanelStatus');
+    var jj=document.getElementById('perfPanelJson');
+    var sm=document.getElementById('perfPanelSummary');
+    if(st){st.style.display='';st.textContent='⏳ Собираю данные... (жду 3с для long tasks)';}
+    if(jj) jj.style.display='none';
+    if(sm) sm.style.display='none';
+    _stopLT(); _startLT();
+    setTimeout(function(){
+      _stopLT();
+      _render(_measure('measure'),false);
+    },3000);
+  },
+  reloadTest:function(){
+    try{sessionStorage.setItem('clanControlPerfReloadRun','1');}catch(e){}
+    location.reload();
+  },
+  measureRoutes:function(){
+    var st=document.getElementById('perfPanelStatus');
+    var jj=document.getElementById('perfPanelJson');
+    var sm=document.getElementById('perfPanelSummary');
+    if(st){st.style.display='';st.textContent='⏳ Замер вкладок (dashboard → roster → history)...';}
+    if(jj) jj.style.display='none';
+    if(sm) sm.style.display='none';
+    _measureRoutes(function(timings){
+      var d=_measure('route_timings');
+      d.route_timings_ms=timings;
+      _render(d,false);
+    });
+  },
+  copy:function(){
+    var jj=document.getElementById('perfPanelJson');
+    var fb=document.getElementById('perfPanelCopyFallback');
+    if(!jj||!jj.value) return;
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(jj.value).then(function(){
+        var old=jj.style.borderColor; jj.style.borderColor='#22c55e';
+        setTimeout(function(){jj.style.borderColor=old;},900);
+        if(fb) fb.style.display='none';
+      }).catch(function(){if(fb)fb.style.display=''; jj.select();});
+    }else{if(fb)fb.style.display=''; jj.select();}
+  }
+};
+
+// close on backdrop click
+(function(){
+  var ov=document.getElementById('perfPanelOverlay');
+  if(ov) ov.addEventListener('click',function(e){if(e.target===ov)window._perfPanel.close();});
+})();
+
+// ── init ─────────────────────────────────────────────────────
+function _init(){
+  _initVis();
+  // reload-test auto-trigger
+  if(sessionStorage.getItem('clanControlPerfReloadRun')==='1'){
+    sessionStorage.removeItem('clanControlPerfReloadRun');
+    setTimeout(function(){
+      window._perfPanel.open();
+      _render(_measure('reload_test'),true);
+    },900);
+  }
+}
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',_init,{once:true});
+}else{
+  _init();
+}
+
+// poll until userRole is set (auth async), then reveal button
+var _vc=setInterval(function(){
+  if(_shouldShow()){_initVis();clearInterval(_vc);}
+},500);
+setTimeout(function(){clearInterval(_vc);},16000);
+
+})();
+</script>
 </body>
 </html>
