@@ -22294,6 +22294,8 @@ window._archRender = function() {
       }
 
       function init() {
+        if (window._v20FinalInitDone) return;
+        window._v20FinalInitDone = true;
         patchFunctions();
         replaceModalApi();
         ccApplyCurrentBackground(currentPage());
@@ -22308,7 +22310,6 @@ window._archRender = function() {
       } else {
         setTimeout(init, 80);
       }
-      setTimeout(init, 500);
     })();
     </script>
     <style id="v20-shell-completion">
