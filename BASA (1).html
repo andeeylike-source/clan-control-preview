@@ -10211,6 +10211,57 @@ ${playerList}
                 window._gtDebug.matcherError = String(e).slice(0, 120);
                 console.warn('[icon-matcher]', e);
             }
+            // ── ROSTER FALLBACK pass — runs after icon matcher, never overwrites AUTO/manual ──
+            try { applyRosterProfaFallback(); }
+            catch(e) { console.warn('[roster-fallback]', e); }
+        }
+
+        // Подставляет профу из ростера для строк, где icon matcher не дал уверенного AUTO.
+        // Источник: profaSource = 'roster_fallback'. Не трогает manual/AUTO. Конфликт icon vs roster
+        // помечается matcher_rosterConflict (без записи profa, чтобы пользователь выбрал руками).
+        function applyRosterProfaFallback() {
+            if (!Array.isArray(dayLastParsed) || !Array.isArray(roster)) return;
+            const _MEANINGFUL_SIM = 0.40;
+            let _nFallback = 0, _nConflict = 0, _nConfirmed = 0;
+            dayLastParsed.forEach(target => {
+                if (!target || !target.name) return;
+                if (target.profaSource === 'manual_review') return;
+                if (target.profaSource === 'gt_exemplar_matcher') return; // AUTO уже сработал
+                const rkey  = normalizeNick(target.name);
+                const aliasName = (typeof resolveAlias === 'function') ? resolveAlias(target.name) : target.name;
+                const rkey2 = normalizeNick(aliasName || '');
+                const rosterEntry = roster.find(r => {
+                    const rn = normalizeNick(r.name || '');
+                    return rn && (rn === rkey || (rkey2 && rn === rkey2));
+                });
+                if (!rosterEntry) return;
+                const rosterProfa = rosterEntry.profa && rosterEntry.profa !== '—' ? rosterEntry.profa : null;
+                if (!rosterProfa) return;
+                const matcherTop1 = target.matcher_top1 || null;
+                const matcherSim  = target.matcher_sim  || 0;
+                const class3opts  = matcherTop1 ? resolveClass2ToClass3(matcherTop1) : [];
+                const matcherAgrees = class3opts.includes(rosterProfa);
+                const matcherIsMeaningful = !!matcherTop1 && matcherSim >= _MEANINGFUL_SIM && class3opts.length > 0;
+                if (matcherIsMeaningful && !matcherAgrees) {
+                    target.matcher_rosterConflict       = true;
+                    target.matcher_rosterProfa          = rosterProfa;
+                    target.matcher_resolvedFromRoster   = rosterEntry.name;
+                    _nConflict++;
+                    return;
+                }
+                target.profa                          = rosterProfa;
+                if (matcherAgrees && matcherTop1) target.class2 = matcherTop1;
+                target.profaSource                    = 'roster_fallback';
+                target.matcher_rosterFallback         = true;
+                target.matcher_rosterProfa            = rosterProfa;
+                target.matcher_rosterConfirmedByIcon  = matcherAgrees && !!matcherTop1;
+                target.matcher_resolvedFromRoster     = rosterEntry.name;
+                if (target.matcher_rosterConfirmedByIcon) _nConfirmed++;
+                _nFallback++;
+            });
+            if (window._gtDebug) {
+                window._gtDebug.rosterFallback = { applied: _nFallback, conflicts: _nConflict, confirmedByIcon: _nConfirmed };
+            }
         }
         // ── END LOCAL ICON MATCHER ──
 
@@ -10455,17 +10506,25 @@ ${playerList}
                     ? `<img src="${p.matcher_cropUrl}" width="24" height="24" title="${_mbDebug}" style="image-rendering:pixelated;border:1px solid #334155;border-radius:2px;flex-shrink:0;vertical-align:middle">`
                     : '';
                 const _mbIsGT = p.matcher_source === 'gt_exemplar_matcher';
-                const matcherBadge = p.matcher_locInvalid
-                    ? (p.matcher_geoPreset === 'LOC_BAD_GEOMETRY'
-                        ? `<span title="${_mbDebug}" style="font-size:9px;color:#ef4444;background:#1c0000;border-radius:3px;padding:1px 5px;flex-shrink:0">LOC BAD_GEOMETRY</span>`
-                        : `<span title="${_mbDebug}" style="font-size:9px;color:#f97316;background:#1c0a00;border-radius:3px;padding:1px 5px;flex-shrink:0">LOC BAD_CROP ${_mbLocStr}</span>`)
-                    : (p.matcher_rowUnstable && p.matcher_top1
-                        ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#fb923c;background:#1a0800;border:1px solid #7c2d12;border-radius:3px;padding:1px 5px;flex-shrink:0">ROW_UNSTABLE ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
-                        : (p.matcher_top1
-                            ? (p.matcher_trigger
-                                ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 5px;flex-shrink:0">${_mbIsGT?'AUTO GT_EX':''}✓ ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
-                                : `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#78716c;background:#0f172a;border-radius:3px;padding:1px 5px;flex-shrink:0">${_mbIsGT?'GT_EX ':''}${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}% Δ${(p.matcher_margin*100).toFixed(0)}%</span>`)
-                            : ''));
+                const _mbIsManual = p.profaSource === 'manual_review';
+                const _mbRosterTag = p.matcher_rosterConfirmedByIcon ? 'ROSTER+ICON' : 'ROSTER';
+                const _mbRosterTitle = p.matcher_resolvedFromRoster ? `roster=${p.matcher_resolvedFromRoster}` : 'roster fallback';
+                const _mbConflictTitle = `icon=${p.matcher_top1||'?'} ${p.matcher_sim?Math.round(p.matcher_sim*100)+'%':''} vs roster=${p.matcher_rosterProfa||'?'}`;
+                const matcherBadge = (p.matcher_rosterConflict && !_mbIsManual)
+                    ? `${_mbCropImg}<span title="${_mbConflictTitle}" style="font-size:9px;color:#fbbf24;background:#1c1300;border:1px solid #b45309;border-radius:3px;padding:1px 5px;flex-shrink:0">CONFLICT icon ${p.matcher_top1||'?'} vs ${p.matcher_rosterProfa||'?'}</span>`
+                    : (p.profaSource === 'roster_fallback'
+                        ? `<span title="${_mbRosterTitle}" style="font-size:9px;color:#a5b4fc;background:#0f1937;border:1px solid #3b5998;border-radius:3px;padding:1px 5px;flex-shrink:0">${_mbRosterTag}</span>`
+                        : (p.matcher_locInvalid
+                            ? (p.matcher_geoPreset === 'LOC_BAD_GEOMETRY'
+                                ? `<span title="${_mbDebug}" style="font-size:9px;color:#ef4444;background:#1c0000;border-radius:3px;padding:1px 5px;flex-shrink:0">LOC BAD_GEOMETRY</span>`
+                                : `<span title="${_mbDebug}" style="font-size:9px;color:#f97316;background:#1c0a00;border-radius:3px;padding:1px 5px;flex-shrink:0">LOC BAD_CROP ${_mbLocStr}</span>`)
+                            : (p.matcher_rowUnstable && p.matcher_top1
+                                ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#fb923c;background:#1a0800;border:1px solid #7c2d12;border-radius:3px;padding:1px 5px;flex-shrink:0">ROW_UNSTABLE ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
+                                : (p.matcher_top1
+                                    ? (p.matcher_trigger
+                                        ? `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 5px;flex-shrink:0">${_mbIsGT?'AUTO GT_EX':''}✓ ${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}%</span>`
+                                        : `${_mbCropImg}<span title="${_mbDebug}" style="font-size:9px;color:#78716c;background:#0f172a;border-radius:3px;padding:1px 5px;flex-shrink:0">${_mbIsGT?'GT_EX ':''}${p.matcher_top1} ${(p.matcher_sim*100).toFixed(0)}% Δ${(p.matcher_margin*100).toFixed(0)}%</span>`)
+                                    : ''))));
                 return `<div style="background:#1a1f29;border-radius:8px;padding:8px 10px;border:1px solid #1e2530">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
                         <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
@@ -10501,6 +10560,7 @@ ${playerList}
                 reviewListEl.innerHTML = suspectPlayers.map(({p, idx}) => {
                     // Classify reasons
                     const _reasons = [];
+                    if (p.matcher_rosterConflict) _reasons.push('CONFLICT_ICON_ROSTER');
                     if (p.matcher_locInvalid) _reasons.push('BAD_CROP');
                     else if (p.matcher_rowUnstable) _reasons.push('ROW_UNSTABLE');
                     else if (!p.matcher_top1) _reasons.push('UNCOVERED_CLASS');
@@ -12393,6 +12453,17 @@ ${playerList}
             if (isAuto) {
                 const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
                 return '<span title="Авто · ' + _kmRwEsc(top3Title) + '" style="font-size:8.5px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">AUTO ' + sim + '</span>';
+            }
+            if (parsed.matcher_rosterConflict) {
+                const rp = parsed.matcher_rosterProfa || '?';
+                const t1 = parsed.matcher_top1 || '?';
+                const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
+                return '<span title="Конфликт: иконка → ' + _kmRwEsc(t1) + ' ' + sim + ', ростер → ' + _kmRwEsc(rp) + '. Выбери вручную." style="font-size:8.5px;color:#fbbf24;background:#1c1300;border:1px solid #b45309;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">CONFLICT</span>';
+            }
+            if (profaSrc === 'roster_fallback') {
+                const tag = parsed.matcher_rosterConfirmedByIcon ? 'ROSTER+ICON' : 'ROSTER';
+                const titleSrc = parsed.matcher_resolvedFromRoster || parsed.name || '?';
+                return '<span title="Профа взята из ростера игрока: ' + _kmRwEsc(titleSrc) + (parsed.matcher_rosterConfirmedByIcon ? ' (подтверждено иконкой)' : '') + '" style="font-size:8.5px;color:#a5b4fc;background:#0f1937;border:1px solid #3b5998;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">' + tag + '</span>';
             }
             if (parsed.matcher_locInvalid) {
                 return '<span title="Плохой кроп иконки — выбери профу вручную" style="font-size:8.5px;color:#f97316;background:#1c0a00;border:1px solid #7c2d12;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">BAD CROP</span>';
