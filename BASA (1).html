@@ -3981,7 +3981,10 @@
             </div>
             <!-- footer -->
             <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-top:1px solid #1e2530;background:#12171f;gap:8px;flex-wrap:wrap">
-                <div id="kmRwSaveStatus" style="font-size:11px;color:#64748b">Правки записываются сразу при изменении полей.</div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0">
+                    <button onclick="kmRwCopyDebug()" title="Скопировать JSON-диагностику icon matcher (текущий пак + summary)" style="background:#1a1f29;color:#a5b4fc;border:1px solid #2d3748;border-radius:7px;padding:5px 9px;font-size:10.5px;font-weight:700;cursor:pointer;white-space:nowrap">🐞 Debug проф</button>
+                    <div id="kmRwSaveStatus" style="font-size:11px;color:#64748b">Правки записываются сразу при изменении полей.</div>
+                </div>
                 <div style="display:flex;gap:7px;flex-wrap:wrap">
                     <button onclick="kmRwSave()" style="background:#6366f1;color:white;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer">💾 Сохранить · далее</button>
                     <button onclick="kmRwApply()" style="background:#22c55e;color:white;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer">✅ Применить в ростер</button>
@@ -12874,6 +12877,140 @@ ${playerList}
                 el.textContent = 'Правки записываются сразу при изменении полей.';
                 el.style.color = '#64748b';
             }, 1800);
+        }
+
+        // Build a JSON snapshot of icon-matcher diagnostics for the user to share.
+        // Reads only window._gtDebug.* (no roster lookup, no history). Pure read.
+        function _kmRwBuildDebugPayload() {
+            const dbg = window._gtDebug || {};
+            const allRows = Array.isArray(dbg.rows) ? dbg.rows : [];
+            const currentPack = (_kmRw && _kmRw.parties && _kmRw.parties[_kmRw.idx]) ? _kmRw.parties[_kmRw.idx].packName : null;
+            const _CROP_LIMIT = 220; // chars; longer base64 omitted to keep payload pasteable
+            const sanitiseRow = (r) => {
+                const cropUrl = r.cropUrl || '';
+                const cropOk = !!cropUrl;
+                const out = {
+                    pack: r.pack, row: r.row, name: r.name,
+                    geoPreset: r.geoPreset || null,
+                    cx: r.cx, cy: r.cy, expectedCY: r.expectedCY,
+                    cropBox: r.cropBox || null,
+                    cropQuality: r.cropQuality || null,
+                    top1: r.top1 || null,
+                    sim:    typeof r.sim === 'number'    ? +r.sim.toFixed(3)    : r.sim,
+                    margin: typeof r.margin === 'number' ? +r.margin.toFixed(3) : r.margin,
+                    top3: (r.top3 || []).map(x => ({
+                        name: x.name || x.class2 || null,
+                        sim: typeof x.sim === 'number' ? +x.sim.toFixed(3) : (x.sim || x.similarity || null)
+                    })),
+                    trigger:    !!r.trigger,
+                    wroteAuto:  !!r.wroteAuto,
+                    wroteProfa: !!r.wroteProfa,
+                    class3opts: Array.isArray(r.class3opts) ? r.class3opts : null,
+                    status: r.status || (r.trigger ? 'AUTO' : (r.top1 ? 'LOW' : 'NONE')),
+                    reason: r.reason || null,
+                    cropUrl_available: cropOk
+                };
+                if (cropOk && cropUrl.length <= _CROP_LIMIT) out.cropUrl = cropUrl;
+                else if (cropOk) out.cropUrl = '[data-url omitted: ' + cropUrl.length + ' chars]';
+                return out;
+            };
+            const all = allRows.map(sanitiseRow);
+            const ofPack = currentPack ? all.filter(r => r.pack === currentPack) : [];
+            const lows  = all.filter(r => !r.trigger && r.top1);
+            const bads  = all.filter(r => r.status === 'BAD_CROP' || r.status === 'BAD_GEOMETRY');
+            const noAuto = all.filter(r => !r.wroteAuto);
+            const cardinals = all.filter(r => Array.isArray(r.class3opts) && r.class3opts.includes('Cardinal'));
+            const summary = {
+                totalRows:       all.length,
+                autoCount:       all.filter(r => r.wroteAuto).length,
+                profaWriteCount: all.filter(r => r.wroteProfa).length,
+                lowCount:        lows.length,
+                badCount:        bads.length,
+                emptyProfaCount: all.filter(r => !r.wroteProfa).length,
+                topMissingClasses: (dbg.classCoverage && Array.isArray(dbg.classCoverage.missing))
+                    ? dbg.classCoverage.missing.slice(0, 12) : []
+            };
+            return {
+                timestamp: new Date().toISOString(),
+                ua: (navigator && navigator.userAgent) || null,
+                currentPack: currentPack,
+                currentIdx: _kmRw ? (_kmRw.idx + 1) + ' / ' + ((_kmRw.parties || []).length) : null,
+                classCoverage: dbg.classCoverage || null,
+                matcherRun: dbg.matcherRun || null,
+                matcherSkipReason: dbg.matcherSkipReason || null,
+                matcherProcessed: dbg.matcherProcessed || 0,
+                matcherError: dbg.matcherError || null,
+                summary: summary,
+                rowsCurrentPack: ofPack,
+                rowsLow: lows,
+                rowsBad: bads,
+                rowsNotAuto: noAuto,
+                rowsCardinal: cardinals,
+                rowsAll: all
+            };
+        }
+
+        function _kmRwShowDebugTextarea(jsonStr) {
+            // Fallback when clipboard API is denied / unavailable: open a small modal
+            // with a textarea so the user can copy manually.
+            let ov = document.getElementById('kmRwDebugOverlay');
+            if (ov) ov.remove();
+            ov = document.createElement('div');
+            ov.id = 'kmRwDebugOverlay';
+            ov.style.cssText = 'position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.78);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box';
+            ov.innerHTML =
+                '<div style="background:#0f141d;border:1px solid #2d3748;border-radius:12px;width:100%;max-width:780px;max-height:84vh;display:flex;flex-direction:column;overflow:hidden">' +
+                    '<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid #1e2530;background:#12171f">' +
+                        '<div style="font-size:13px;font-weight:800;color:#e2e8f0">🐞 Debug проф · скопируй вручную</div>' +
+                        '<button id="kmRwDebugClose" style="background:none;border:none;color:#64748b;font-size:17px;cursor:pointer;padding:3px 7px;line-height:1">✕</button>' +
+                    '</div>' +
+                    '<div style="padding:10px 12px;flex:1;display:flex;flex-direction:column;gap:7px;overflow:hidden">' +
+                        '<div style="font-size:11px;color:#94a3b8">Clipboard API недоступен. Выдели весь текст (Ctrl+A) и скопируй (Ctrl+C):</div>' +
+                        '<textarea id="kmRwDebugTA" readonly style="flex:1;min-height:380px;background:#0a0d12;border:1px solid #1e2530;border-radius:8px;color:#e2e8f0;font-family:ui-monospace,Consolas,monospace;font-size:11px;padding:8px;resize:none;white-space:pre"></textarea>' +
+                    '</div>' +
+                '</div>';
+            document.body.appendChild(ov);
+            const ta = document.getElementById('kmRwDebugTA');
+            if (ta) {
+                ta.value = jsonStr;
+                try { ta.focus(); ta.select(); } catch(e) {}
+            }
+            const closeBtn = document.getElementById('kmRwDebugClose');
+            if (closeBtn) closeBtn.onclick = () => ov.remove();
+            ov.addEventListener('click', (e) => { if (e.target === ov) ov.remove(); });
+        }
+
+        function kmRwCopyDebug() {
+            const dbg = window._gtDebug || {};
+            const hasRows = Array.isArray(dbg.rows) && dbg.rows.length > 0;
+            if (!hasRows) {
+                _kmRwToast('нет debug данных — сначала запусти распознавание скрина');
+                return;
+            }
+            const payload = _kmRwBuildDebugPayload();
+            let jsonStr;
+            try { jsonStr = JSON.stringify(payload, null, 2); }
+            catch(e) { jsonStr = '[serialise error] ' + String(e); }
+            const okToast = () => _kmRwToast('debug проф скопирован (' + (payload.summary.totalRows) + ' строк)');
+            // Try modern Clipboard API first
+            if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                navigator.clipboard.writeText(jsonStr)
+                    .then(okToast)
+                    .catch(() => _kmRwShowDebugTextarea(jsonStr));
+                return;
+            }
+            // Legacy execCommand fallback
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = jsonStr;
+                ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.focus(); ta.select();
+                const ok = document.execCommand && document.execCommand('copy');
+                ta.remove();
+                if (ok) { okToast(); return; }
+            } catch(e) { /* fall through */ }
+            _kmRwShowDebugTextarea(jsonStr);
         }
         // ===== END KM PARTY REVIEW WIZARD =====
 
