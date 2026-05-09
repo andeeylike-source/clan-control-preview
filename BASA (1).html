@@ -17208,6 +17208,7 @@ function _idbLoadHero(cb){
 // ── Supabase remote storage (shared across all browsers) ─────
 var CVE_REMOTE_CFG_KEY='cve_config';
 var CVE_REMOTE_IMG_KEY='cve_hero_image';
+window._cveHeroPerf=window._cveHeroPerf||{heroDeferred:false,heroCacheHit:false,heroLoadMs:null};
 
 function _svRemote(cfg){
   var sb=window._supabase;if(!sb)return;
@@ -17224,18 +17225,39 @@ function _svRemote(cfg){
   }catch(e){}
 }
 
+function _cveDefer(fn){
+  var run=function(){try{fn();}catch(e){}};
+  if(typeof requestIdleCallback==='function')requestIdleCallback(run,{timeout:1200});
+  else setTimeout(run,900);
+}
+function _ldRemoteHero(cb){
+  var sb=window._supabase;if(!sb){if(cb)cb('');return;}
+  var t0=performance.now();
+  window._cveHeroPerf.heroDeferred=true;
+  try{
+    sb.from('app_settings').select('value_json').eq('key',CVE_REMOTE_IMG_KEY).maybeSingle()
+      .then(function(imgR){
+        window._cveHeroPerf.heroLoadMs=Math.round(performance.now()-t0);
+        var heroImage=(imgR&&imgR.data&&imgR.data.value_json&&imgR.data.value_json.dataUrl)||'';
+        if(cb)cb(heroImage);
+      })
+      .catch(function(){
+        window._cveHeroPerf.heroLoadMs=Math.round(performance.now()-t0);
+        if(cb)cb('');
+      });
+  }catch(e){
+    window._cveHeroPerf.heroLoadMs=Math.round(performance.now()-t0);
+    if(cb)cb('');
+  }
+}
 function _ldRemote(cb){
   var sb=window._supabase;if(!sb){cb(null);return;}
   try{
-    Promise.all([
-      sb.from('app_settings').select('value_json').eq('key',CVE_REMOTE_CFG_KEY).maybeSingle(),
-      sb.from('app_settings').select('value_json').eq('key',CVE_REMOTE_IMG_KEY).maybeSingle()
-    ]).then(function(results){
-      var cfgR=results[0],imgR=results[1];
+    sb.from('app_settings').select('value_json').eq('key',CVE_REMOTE_CFG_KEY).maybeSingle().then(function(cfgR){
       if(cfgR.error||!cfgR.data||!cfgR.data.value_json){cb(null);return;}
       var cfg=JSON.parse(JSON.stringify(cfgR.data.value_json));
-      var heroImage=(imgR.data&&imgR.data.value_json&&imgR.data.value_json.dataUrl)||'';
-      cfg.heroImage=heroImage;
+      var cachedHero=(_cfg&&/^data:image\//.test(_cfg.heroImage||''))?_cfg.heroImage:'';
+      cfg.heroImage=cachedHero;
       cb(cfg);
     }).catch(function(){cb(null);});
   }catch(e){cb(null);}
@@ -17773,8 +17795,9 @@ function _updBtn(){
     var saved=_ld();if(!saved)return;
     _cfg=_mg(CVE_DEF,saved);
     if(_cfg.heroImage==='__IDB__'){
-      _idbLoadHero(function(data){_cfg.heroImage=data||'';_tryApply(20);});
+      _idbLoadHero(function(data){window._cveHeroPerf.heroCacheHit=!!data;_cfg.heroImage=data||'';_tryApply(20);});
     } else {
+      window._cveHeroPerf.heroCacheHit=!!_cfg.heroImage;
       _tryApply(20);
     }
   }
@@ -17788,12 +17811,25 @@ function _updBtn(){
       // Cache locally so fallback and synchronous _cveGetTexts work on next load
       try{
         var clone=JSON.parse(JSON.stringify(remoteCfg));
-        var hasHero=!!clone.heroImage;
+        var hasHero=/^data:image\//.test(clone.heroImage||'');
         clone.heroImage=hasHero?'__IDB__':'';
         localStorage.setItem(CVE_KEY,JSON.stringify(clone));
         if(hasHero)_idbSaveHero(remoteCfg.heroImage);
       }catch(e){}
       _tryApply(20);
+      _cveDefer(function(){
+        _ldRemoteHero(function(heroImage){
+          if(!heroImage)return;
+          _cfg.heroImage=heroImage;
+          try{
+            var clone=JSON.parse(JSON.stringify(_cfg));
+            clone.heroImage='__IDB__';
+            localStorage.setItem(CVE_KEY,JSON.stringify(clone));
+            _idbSaveHero(heroImage);
+          }catch(e){}
+          _tryApply(20);
+        });
+      });
     });
   }
   if(document.readyState==='loading'){
@@ -25253,6 +25289,11 @@ function _measure(label){
   r.long_tasks=_ltSupported
     ?{count:_ltTasks.length,top:_ltTasks.sort(function(a,b){return b.dur-a.dur;}).slice(0,5)}
     :'unsupported';
+  if(window._cveHeroPerf){
+    r.heroDeferred=!!window._cveHeroPerf.heroDeferred;
+    r.heroCacheHit=!!window._cveHeroPerf.heroCacheHit;
+    r.heroLoadMs=window._cveHeroPerf.heroLoadMs;
+  }
 
   return r;
 }
