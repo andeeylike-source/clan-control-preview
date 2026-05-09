@@ -5321,6 +5321,8 @@
             const navId = pageId === 'pack-detail' ? 'nav-packs' : 'nav-' + pageId;
             const nav = document.getElementById(navId);
             if(nav) nav.classList.add('active');
+            window._ccRenderedPages = window._ccRenderedPages || {};
+            window._ccRenderedPages[pageId] = true;
             if(pageId === 'dashboard') renderDashboard();
             if(pageId === 'roster') renderRoster();
             if(pageId === 'packs') renderPacks();
@@ -5804,7 +5806,7 @@ function getClass2IconByClass3(c3) {
             }
 
             // Место в клане по убийствам
-            const statsMap = calcStatsForPeriod('', '');
+            const statsMap = calcStatsForPeriodCached('', '');
             const allPlayersSorted = Object.values(statsMap).sort((a,b)=>(b.kills||0)-(a.kills||0));
             const rankIdx = allPlayersSorted.findIndex(p => normalizeNick(p.name) === normKey);
             const rankNum = rankIdx >= 0 ? rankIdx + 1 : null;
@@ -7252,10 +7254,29 @@ function getClass2IconByClass3(c3) {
             return Math.round((presentDates.length / allDates.length) * 100);
         }
 
+        let _statsCalcVersion = 0;
+        let _statsAllCacheKey = '';
+        let _statsAllCacheValue = null;
+        function invalidateStatsCalcCache() {
+            _statsCalcVersion++;
+            _statsAllCacheKey = '';
+            _statsAllCacheValue = null;
+            try { _valueCacheKey = ''; _valueCache = {}; } catch(e) {}
+        }
+        function calcStatsForPeriodCached(dateFrom, dateTo) {
+            if (dateFrom || dateTo) return calcStatsForPeriod(dateFrom, dateTo);
+            const dates = Object.keys(appliedStatsByDate).sort();
+            const key = [_statsCalcVersion, dates.length, dates[dates.length - 1] || '', roster.length].join('|');
+            if (_statsAllCacheKey === key && _statsAllCacheValue) return _statsAllCacheValue;
+            _statsAllCacheKey = key;
+            _statsAllCacheValue = calcStatsForPeriod('', '');
+            return _statsAllCacheValue;
+        }
+
         // Синхронизируем статистику ростера из снапшотов (вызывается после любого изменения снапшотов)
         function syncRosterStatsFromSnapshots() {
             roster.forEach(p => { p.kills = 0; p.deaths = 0; p.pvp_dmg = 0; p.pve_dmg = 0; });
-            const stats = calcStatsForPeriod('', '');
+            const stats = calcStatsForPeriodCached('', '');
             Object.values(stats).forEach(s => {
                 const rp = roster.find(r => normalizeNick(r.name) === normalizeNick(s.name));
                 if (rp) {
@@ -12219,7 +12240,7 @@ ${playerList}
 
             // Открываем попап назначения проф — только игроки из последнего анализа без профы
             setTimeout(() => {
-                const statsMap = calcStatsForPeriod('', '');
+                const statsMap = calcStatsForPeriodCached('', '');
                 // Берём только тех кто был в последнем анализе (dayLastParsed уже очищен, используем снапшот)
                 const lastSnap = appliedStatsByDate[dateStr];
                 const lastNames = lastSnap && lastSnap.players
@@ -14435,6 +14456,7 @@ ${playerList}
         }
 
         function saveToStorage() {
+            if (typeof invalidateStatsCalcCache === 'function') invalidateStatsCalcCache();
             // Показываем индикатор сохранения
             const ind = document.getElementById('autoSaveIndicator');
             const txt = document.getElementById('autoSaveText');
@@ -14498,6 +14520,7 @@ ${playerList}
                 if (data.playerNotes)  playerNotes   = data.playerNotes;
                 if (data.playerProfaByDate) playerProfaByDate = data.playerProfaByDate;
                 if (data.valueWeights)       valueWeights       = data.valueWeights;
+                if (typeof invalidateStatsCalcCache === 'function') invalidateStatsCalcCache();
                 return true;
             } catch(e) {
                 console.warn('localStorage load failed:', e);
@@ -14522,6 +14545,7 @@ ${playerList}
             if (data.playerNotes)        playerNotes        = data.playerNotes;
             if (data.playerProfaByDate)  playerProfaByDate  = data.playerProfaByDate;
             if (data.valueWeights)       valueWeights       = data.valueWeights;
+            if (typeof invalidateStatsCalcCache === 'function') invalidateStatsCalcCache();
             return true;
         }
 
@@ -15522,7 +15546,7 @@ ${playerList}
             // Recalculate data
             const allDates = Object.keys(appliedStatsByDate).sort();
             const totalDates = allDates.length;
-            const statsMap = calcStatsForPeriod('', '');
+            const statsMap = calcStatsForPeriodCached('', '');
             const tanks=['Phoenix Knight','Hell Knight','Eva\'s Templar','Shillien Templar'];
             const healers=['Cardinal','Eva\'s Saint','Shillien Saint','Dominator','Doomcryer','Hierophant','Sword Muse','Spectral Dancer'];
             function isSup(pf) { return pf&&pf!=='—'&&[...tanks,...healers].some(x=>pf.includes(x.split(' ')[0])); }
@@ -15589,7 +15613,7 @@ ${playerList}
             if (!el) return;
             const allDates = Object.keys(appliedStatsByDate).sort();
             const totalDates = allDates.length;
-            const statsMap = calcStatsForPeriod('', '');
+            const statsMap = calcStatsForPeriodCached('', '');
             const items = [];
             if (totalDates === 0) { el.innerHTML = '<div style="color:#475569;font-size:12px;padding:8px 0">Загрузи скриншоты КМ</div>'; return; }
 
@@ -15642,7 +15666,7 @@ ${playerList}
         function renderDashAlerts() {
             const alerts = [];
             const allDates = Object.keys(appliedStatsByDate).sort();
-            const statsMap = calcStatsForPeriod('', '');
+            const statsMap = calcStatsForPeriodCached('', '');
             const totalDates = allDates.length;
 
             if (totalDates === 0) {
@@ -15766,7 +15790,7 @@ ${playerList}
             const gemsEl = document.getElementById('dashRareGems');
             if (gemsEl && allDates.length >= 2) {
                 const allValues = calcAllPlayerValues();
-                const statsMap = calcStatsForPeriod('', '');
+                const statsMap = calcStatsForPeriodCached('', '');
                 const gems = roster.map(p => {
                     const nk = normalizeNick(p.name);
                     const vd = allValues[nk];
@@ -16040,9 +16064,7 @@ ${playerList}
                 return true;
             });
 
-            renderCalendar();
-            renderPacks();
-            renderRoster();
+            window._ccRenderedPages = {};
             // Defer roster stats sync so browser can paint the UI first
             setTimeout(syncRosterStatsFromSnapshots, 0);
 
@@ -24980,7 +25002,10 @@ window._archRender = function() {
       function alias(name){ return typeof resolveAlias === 'function' ? resolveAlias(name || '') : (name || ''); }
       function lds(d){ return typeof localDateStr === 'function' ? localDateStr(d) : d.toISOString().slice(0,10); }
       function today(){ return typeof todayStr === 'function' ? todayStr() : lds(new Date()); }
-      function statMap(){ return typeof calcStatsForPeriod === 'function' ? (calcStatsForPeriod('', '') || {}) : {}; }
+      function statMap(){
+        if (typeof calcStatsForPeriodCached === 'function') return calcStatsForPeriodCached('', '') || {};
+        return typeof calcStatsForPeriod === 'function' ? (calcStatsForPeriod('', '') || {}) : {};
+      }
       function valuesMap(){ return typeof calcAllPlayerValues === 'function' ? (calcAllPlayerValues() || {}) : {}; }
       function seenInSnap(snap, playerNk){
         return !!(snap && snap.players && snap.players.some(function(sp){
@@ -25348,7 +25373,7 @@ function _measure(label){
 
 // ── route smoke timing ────────────────────────────────────────
 function _measureRoutes(cb){
-  var routes=['dashboard','roster','history'];
+  var routes=['dashboard','roster','screenshots'];
   var timings={};
   var origPage=null;
   try{
@@ -25362,7 +25387,7 @@ function _measureRoutes(cb){
     }
     var pid=routes[i];
     try{
-      var fn=pid==='history'?(window.renderKmHistory||null):null;
+      var fn=pid==='screenshots'?(window.renderKmHistory||null):null;
       var t0=performance.now();
       if(typeof showPage==='function') showPage(pid);
       else if(fn) fn();
@@ -25430,7 +25455,7 @@ window._perfPanel={
     var st=document.getElementById('perfPanelStatus');
     var jj=document.getElementById('perfPanelJson');
     var sm=document.getElementById('perfPanelSummary');
-    if(st){st.style.display='';st.textContent='⏳ Замер вкладок (dashboard → roster → history)...';}
+    if(st){st.style.display='';st.textContent='⏳ Замер вкладок (dashboard → roster → screenshots)...';}
     if(jj) jj.style.display='none';
     if(sm) sm.style.display='none';
     _measureRoutes(function(timings){
