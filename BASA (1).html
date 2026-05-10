@@ -9953,9 +9953,12 @@ function getClass2IconByClass3(c3) {
                 const limited = Object.values(byClass).flat();
 
                 if (!window._gtDebug) window._gtDebug = {};
-                window._gtDebug.seedTrainingCount  = limited.filter(t => t._src !== 'local').length;
-                window._gtDebug.localTrainingCount = limited.filter(t => t._src === 'local').length;
-                console.info('[training] seed=' + window._gtDebug.seedTrainingCount + ' local=' + window._gtDebug.localTrainingCount + ' total=' + limited.length);
+                window._gtDebug.seedRawCount         = seedItems.length;
+                window._gtDebug.localRawCount        = localItems.length;
+                window._gtDebug.effectiveTrainingCount = limited.length;
+                window._gtDebug.seedTrainingCount    = limited.filter(t => t._src !== 'local').length;
+                window._gtDebug.localTrainingCount   = limited.filter(t => t._src === 'local').length;
+                console.info('[training] seedRaw=' + seedItems.length + ' localRaw=' + localItems.length + ' seed=' + window._gtDebug.seedTrainingCount + ' local=' + window._gtDebug.localTrainingCount + ' total=' + limited.length);
 
                 if (!limited.length) return [];
                 const vecs = [];
@@ -10156,6 +10159,8 @@ ${playerList}
                 }
                 window._gtDebug.trainedHitCount = 0;
                 window._gtDebug.baseHitCount = 0;
+                window._gtDebug.trainedStrongHitCount = 0;
+                window._gtDebug.autoTrainedCount = 0;
                 _ccTrainedVecs = await _ccLoadAndPrepareTrainedVecs();
                 window._gtDebug.trainedExemplarCount = _ccTrainedVecs.length;
                 window._gtDebug.trainedClassCount = new Set(_ccTrainedVecs.map(e => e.class2)).size;
@@ -10166,11 +10171,17 @@ ${playerList}
                     const _allKnown = (typeof CLASS2_TO_CLASS3 === 'object' && CLASS2_TO_CLASS3) ? Object.keys(CLASS2_TO_CLASS3) : [];
                     const _missing = _allKnown.filter(c => !_covered.has(c));
                     const _extraneous = [..._covered].filter(c => !_allKnown.includes(c));
+                    const _trainedClasses = new Set((_ccTrainedVecs || []).map(e => e.class2));
+                    const _effectiveCovered = new Set([..._covered, ..._trainedClasses]);
                     window._gtDebug.classCoverage = {
                         coveredCount: _covered.size,
                         knownCount: _allKnown.length,
                         missing: _missing,
-                        extraneous: _extraneous
+                        extraneous: _extraneous,
+                        baseCoveredCount: _covered.size,
+                        trainedCoveredCount: _trainedClasses.size,
+                        effectiveCoveredCount: _effectiveCovered.size,
+                        effectiveMissing: _allKnown.filter(c => !_effectiveCovered.has(c))
                     };
                 } catch(e) { /* ignore */ }
                 const SWEEP_OFF = [-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6];
@@ -10362,8 +10373,11 @@ ${playerList}
                         writeTarget.matcher_margin      = best.margin;
                         writeTarget.matcher_top3        = best.top3;
                         writeTarget.matcher_source      = 'gt_exemplar_matcher';
-                        // trigger = score passes threshold (ROW_UNSTABLE is debug-only)
-                        writeTarget.matcher_trigger     = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
+                        // Trained-strong path: high-confidence trained exemplar bypasses margin gate
+                        const _trainedStrong = best.matchedFrom === 'trained' && best.similarity >= 0.95 && !!best.trainedExemplarId;
+                        if (_trainedStrong) window._gtDebug.trainedStrongHitCount = (window._gtDebug.trainedStrongHitCount || 0) + 1;
+                        writeTarget.matcher_trigger     = _trainedStrong || (best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR);
+                        writeTarget.matcher_autoTrained = _trainedStrong;
                         writeTarget.matcher_rowUnstable    = _rowUnstable;
                         writeTarget.matcher_unstableReason = _unstableReason;
                         writeTarget.matcher_yDrift         = _yDrift;
@@ -10386,6 +10400,7 @@ ${playerList}
 
                         // AUTO-WRITE: safe GT_EX only (trigger + not rowUnstable + not locInvalid)
                         if (writeTarget.matcher_trigger && !_rowUnstable) {
+                            if (_trainedStrong) window._gtDebug.autoTrainedCount = (window._gtDebug.autoTrainedCount || 0) + 1;
                             writeTarget.class2     = best.class2;
                             writeTarget.profaSource = 'gt_exemplar_matcher';
                             const _c3opts = resolveClass2ToClass3(best.class2);
@@ -10425,6 +10440,7 @@ ${playerList}
                                 margin: +(best.margin || 0).toFixed(3),
                                 top3: (best.top3 || []).map(x => ({ name: x.name || x.class2, sim: +(x.sim||x.similarity||0).toFixed(3) })),
                                 trigger: !!writeTarget.matcher_trigger,
+                                autoTrained: !!writeTarget.matcher_autoTrained,
                                 wroteAuto: !!(writeTarget.matcher_trigger && !_rowUnstable),
                                 wroteProfa: !!(writeTarget.profa),
                                 class3opts: _c3opts,
@@ -12666,12 +12682,17 @@ ${playerList}
         function _kmRwBadge(parsed) {
             const profaSrc = parsed.profaSource || '';
             const isAuto = parsed.matcher_source === 'gt_exemplar_matcher' && parsed.matcher_trigger && !parsed.matcher_rowUnstable && !parsed.matcher_locInvalid;
+            const isAutoTrained = isAuto && !!parsed.matcher_autoTrained;
             const isManual = profaSrc === 'manual_review';
             const top3Title = parsed.matcher_top3 && parsed.matcher_top3.length
                 ? 'top3: ' + parsed.matcher_top3.slice(0,3).map(x => (x.name||x.class2||'?') + ' ' + Math.round((x.sim||x.similarity||0)*100) + '%').join(', ')
                 : '';
             if (isManual) {
                 return '<span title="Ручная правка" style="font-size:8.5px;color:#a5b4fc;background:#1e1b4b;border:1px solid #4338ca;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">MANUAL</span>';
+            }
+            if (isAutoTrained) {
+                const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
+                return '<span title="Trained exemplar match · ' + _kmRwEsc(top3Title) + '" style="font-size:8.5px;color:#a7f3d0;background:#022c22;border:1px solid #059669;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">TRAINED ' + sim + '</span>';
             }
             if (isAuto) {
                 const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
@@ -13134,14 +13155,21 @@ ${playerList}
                 ambigCount:       all.filter(r => r.profaWarning && r.originalStatus === 'AMBIG').length,
                 profaWarningCount: all.filter(r => r.profaWarning).length,
                 trainingEnabled:   _ccTrainedVecs.length > 0,
+                seedRawCount:         dbg.seedRawCount         || 0,
+                localRawCount:        dbg.localRawCount         || 0,
+                effectiveTrainingCount: dbg.effectiveTrainingCount || 0,
                 seedTrainingCount:  dbg.seedTrainingCount  || 0,
                 localTrainingCount: dbg.localTrainingCount || 0,
                 trainedClassCount: dbg.trainedClassCount || 0,
                 trainedExemplarCount: dbg.trainedExemplarCount || 0,
                 trainedHitCount:   dbg.trainedHitCount || 0,
+                trainedStrongHitCount: dbg.trainedStrongHitCount || 0,
+                autoTrainedCount:  dbg.autoTrainedCount  || 0,
                 baseHitCount:      dbg.baseHitCount || 0,
                 topMissingClasses: (dbg.classCoverage && Array.isArray(dbg.classCoverage.missing))
-                    ? dbg.classCoverage.missing.slice(0, 12) : []
+                    ? dbg.classCoverage.missing.slice(0, 12) : [],
+                effectiveMissingClasses: (dbg.classCoverage && Array.isArray(dbg.classCoverage.effectiveMissing))
+                    ? dbg.classCoverage.effectiveMissing.slice(0, 12) : []
             };
             return {
                 timestamp: new Date().toISOString(),
