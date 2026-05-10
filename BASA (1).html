@@ -10391,6 +10391,7 @@ ${playerList}
 
                         let rescueRan = false, rescueAccepted = false, rescueRejectReason = null;
                         let _rescueSnapshot = null, _rescueEval = null, _swpRescue = null;
+                        let _rescueBest = null, _rescueCropRect = null;
                         let _appliedSource = 'normal';
                         if (_runRescue) {
                             rescueRan = true;
@@ -10404,6 +10405,8 @@ ${playerList}
                                 rescueRejectReason = 'rescue_sweep_empty';
                             } else {
                                 _rescueEval = _assess(rBest, _swpRescue);
+                                _rescueBest = rBest;
+                                _rescueCropRect = rRect;
                                 _rescueSnapshot = {
                                     class2: rBest.class2,
                                     sim: +(rBest.similarity || 0).toFixed(3),
@@ -10439,9 +10442,8 @@ ${playerList}
                                 if (rescueAuto || rescueAutoLow) {
                                     rescueAccepted = true;
                                     _appliedSource = rescueAuto ? 'rescue_auto' : 'rescue_auto_low';
-                                    best = rBest;
-                                    bestCropRect = rRect;
-                                    _swp = _swpRescue;
+                                    // best/cropRect/swp NOT mutated here — final swap deferred
+                                    // until after anti-FP gates run.
                                 } else {
                                     if (_rowUnstable) rescueRejectReason = 'row_unstable';
                                     else if (_rescueEval.avPwAmbig) rescueRejectReason = 'avpw_ambig';
@@ -10457,27 +10459,130 @@ ${playerList}
                             }
                         }
 
-                        const _finalEval = (rescueAccepted && _rescueEval) ? _rescueEval : _normalEval;
-                        const _trigger = _finalEval.trigger;
-                        const _safeLowAuto = _finalEval.safeLowAuto;
-                        const _avPwAmbig = _finalEval.avPwAmbig;
-                        const _classMapAmbig = _finalEval.classMapAmbig;
-                        const _c3opts = _finalEval.c3opts;
-                        const _autoOk = _finalEval.autoOk;
-                        const _consensus = _finalEval.consensus;
+                        // ── ANTI-FP STAGE 1: rescue row-leak ──
+                        // |dy|>6 means rescue locked onto a neighbor row's portrait. Reject.
+                        if (rescueAccepted && _rescueCropRect && Math.abs(_rescueCropRect.dy) > 6) {
+                            rescueAccepted = false;
+                            rescueRejectReason = 'rescue_row_leak';
+                            _appliedSource = 'normal';
+                        }
+
+                        // ── ANTI-FP STAGE 2: normal/rescue class conflict ──
+                        // If normal already produced a confident AUTO and rescue picked a
+                        // different class, only keep normal when its crop is dead-center and
+                        // the score is overwhelming. Otherwise block both writes.
+                        let _conflictBlock = null;
+                        if (rescueAccepted && _rescueBest && _normalEval.autoOk
+                            && best.class2 !== _rescueBest.class2) {
+                            const nC = bestCropRect || {};
+                            const nCons = _normalEval.consensus || {};
+                            const normalCentralStrong =
+                                Math.abs(nC.dy || 0) <= 5 && Math.abs(nC.dx || 0) <= 5
+                                && best.similarity >= 0.85 && best.margin >= 0.25
+                                && nCons.class2 === best.class2 && (nCons.ratio || 0) >= 0.8;
+                            rescueAccepted = false;
+                            if (normalCentralStrong) {
+                                rescueRejectReason = 'normal_rescue_conflict_kept_normal';
+                                _appliedSource = 'normal';
+                                _conflictBlock = 'kept_normal';
+                            } else {
+                                rescueRejectReason = 'normal_rescue_conflict_no_write';
+                                _appliedSource = 'normal_blocked';
+                                _conflictBlock = 'no_write';
+                            }
+                        }
+
+                        // ── Pick final best/cropRect/swp/eval after rescue stages ──
+                        const _finalBest     = rescueAccepted ? _rescueBest     : best;
+                        const _finalCropRect = rescueAccepted ? _rescueCropRect : bestCropRect;
+                        const _finalSwp      = rescueAccepted ? _swpRescue      : _swp;
+                        const _finalEval     = rescueAccepted ? _rescueEval     : _normalEval;
+
+                        const _trigger        = _finalEval.trigger;
+                        const _safeLowAuto    = _finalEval.safeLowAuto;
+                        const _avPwAmbig      = _finalEval.avPwAmbig;
+                        const _classMapAmbig  = _finalEval.classMapAmbig;
+                        const _c3opts         = _finalEval.c3opts;
+                        const _consensus      = _finalEval.consensus;
+                        const _autoOkBase     = _finalEval.autoOk;
+
+                        // ── ANTI-FP STAGE 3: final-write gates ──
+                        // Anti-FP gates may strip wroteProfa even when first-pass said autoOk.
+                        const _gateReasons = [];
+                        let _profaWriteAllowed = _autoOkBase && _c3opts.length === 1;
+
+                        // Gate: conflict-block — both writes vetoed
+                        if (_conflictBlock === 'no_write') {
+                            _profaWriteAllowed = false;
+                            _gateReasons.push('normal_rescue_conflict_no_write');
+                        }
+
+                        // Gate: AUTO_LOW (and RESCUE_AUTO_LOW) never writes profa
+                        const _isAutoLowFinal = (_appliedSource === 'rescue_auto_low')
+                            || (!rescueAccepted && _safeLowAuto);
+                        if (_isAutoLowFinal && _profaWriteAllowed) {
+                            _profaWriteAllowed = false;
+                            _gateReasons.push('auto_low_no_write');
+                        }
+
+                        // Gate: normal row-leak down — dy>=6 on the normal pass leaks into the
+                        // row below. Block auto-write even at high sim. dy=-6 is left allowed
+                        // (top-row crops are valid).
+                        const _finalFromNormal = !rescueAccepted;
+                        if (_finalFromNormal && _finalCropRect && _finalCropRect.dy >= 6 && _profaWriteAllowed) {
+                            _profaWriteAllowed = false;
+                            _gateReasons.push('normal_row_leak_down');
+                        }
+
+                        // Gate: small-crop (sz<=18) requires ultra-strong signal to autowrite.
+                        if (_finalCropRect && _finalCropRect.sz <= 18 && _profaWriteAllowed) {
+                            const cons = _consensus || {};
+                            const ultra =
+                                _finalBest.similarity >= 0.80
+                                && _finalBest.margin >= 0.15
+                                && cons.class2 === _finalBest.class2
+                                && (cons.ratio || 0) >= 0.8
+                                && _c3opts.length === 1
+                                && !_rowUnstable
+                                && !_avPwAmbig;
+                            if (!ultra) {
+                                _profaWriteAllowed = false;
+                                _gateReasons.push('crop_small_auto_block');
+                            }
+                        }
+
+                        // Gate: consensus disagrees with best — needs ultra-strong sim/margin
+                        // and a centered, large crop to autowrite.
+                        if (_consensus && _consensus.class2 !== _finalBest.class2 && _profaWriteAllowed) {
+                            const ultraDisagree =
+                                _finalBest.similarity >= 0.88
+                                && _finalBest.margin >= 0.30
+                                && _c3opts.length === 1
+                                && !_rowUnstable
+                                && _finalCropRect && _finalCropRect.sz >= 22
+                                && _finalCropRect && Math.abs(_finalCropRect.dy) <= 5;
+                            if (!ultraDisagree) {
+                                _profaWriteAllowed = false;
+                                _gateReasons.push('consensus_disagrees_auto_block');
+                            }
+                        }
+
+                        const _wroteProfa = _profaWriteAllowed;
+                        const _wroteAuto  = _wroteProfa; // auto-write tied to profa-write
+                        const _autoLowSeen = _isAutoLowFinal; // for summary even when blocked
 
                         // Generate 48×48 data URL of the winning crop for debug preview
                         let cropUrl = '';
-                        if (bestCropRect) {
+                        if (_finalCropRect) {
                             const dc = document.createElement('canvas'); dc.width = 48; dc.height = 48;
-                            dc.getContext('2d').drawImage(sc, bestCropRect.sx, bestCropRect.sy, bestCropRect.sw, bestCropRect.sh, 0, 0, 48, 48);
+                            dc.getContext('2d').drawImage(sc, _finalCropRect.sx, _finalCropRect.sy, _finalCropRect.sw, _finalCropRect.sh, 0, 0, 48, 48);
                             cropUrl = dc.toDataURL();
                         }
 
-                        writeTarget.matcher_top1        = best.class2;
-                        writeTarget.matcher_sim         = best.similarity;
-                        writeTarget.matcher_margin      = best.margin;
-                        writeTarget.matcher_top3        = best.top3;
+                        writeTarget.matcher_top1        = _finalBest.class2;
+                        writeTarget.matcher_sim         = _finalBest.similarity;
+                        writeTarget.matcher_margin      = _finalBest.margin;
+                        writeTarget.matcher_top3        = _finalBest.top3;
                         writeTarget.matcher_source      = 'gt_exemplar_matcher';
                         writeTarget.matcher_trigger     = _trigger;
                         writeTarget.matcher_safeLowAuto = _safeLowAuto;
@@ -10486,6 +10591,7 @@ ${playerList}
                         writeTarget.matcher_class3opts  = _c3opts;
                         writeTarget.matcher_consensus   = _consensus;
                         writeTarget.matcher_rescue      = { ran: rescueRan, accepted: rescueAccepted, applied: _appliedSource, reject: rescueRejectReason };
+                        writeTarget.matcher_antiFpGates = _gateReasons.slice();
                         writeTarget.matcher_rowUnstable    = _rowUnstable;
                         writeTarget.matcher_unstableReason = _unstableReason;
                         writeTarget.matcher_yDrift         = _yDrift;
@@ -10498,7 +10604,7 @@ ${playerList}
                         writeTarget.matcher_expectedCY     = expectedCY;
                         writeTarget.matcher_prevRowCY      = prevRowCY;
                         writeTarget.matcher_nextRowCY      = nextRowCY;
-                        writeTarget.matcher_crop        = bestCropRect;
+                        writeTarget.matcher_crop        = _finalCropRect;
                         writeTarget.matcher_cropUrl     = cropUrl;
                         writeTarget.matcher_locHit      = false;
                         writeTarget.matcher_locConf     = null;
@@ -10506,37 +10612,33 @@ ${playerList}
                         writeTarget.matcher_cropQuality = _cq;
                         writeTarget.matcher_geoPreset   = geo.preset;
 
-                        // AUTO-WRITE: regular AUTO, SAFE_LOW_AUTO, RESCUE_AUTO, or RESCUE_AUTO_LOW.
-                        // All require a unique class3 mapping to write profa; AUTO with multi-option
-                        // mapping leaves profa empty but flags matcher_classMapAmbig so the UI
-                        // surfaces a picker.
-                        if (_autoOk) {
-                            writeTarget.class2     = best.class2;
+                        // AUTO-WRITE: only when anti-FP gates all pass.
+                        if (_wroteProfa) {
+                            writeTarget.class2     = _finalBest.class2;
                             writeTarget.profaSource = 'gt_exemplar_matcher';
-                            if (_c3opts.length === 1) writeTarget.profa = _c3opts[0];
+                            writeTarget.profa = _c3opts[0];
                         }
                         // Per-row diagnostic dump (does not affect matcher behaviour)
                         try {
-                            const _wroteAuto = !!_autoOk;
-                            const _wroteProfa = _wroteAuto && _c3opts.length === 1;
                             let _status;
-                            if (rescueAccepted && _appliedSource === 'rescue_auto')      _status = 'RESCUE_AUTO';
+                            if (_conflictBlock === 'no_write') _status = 'NORMAL_RESCUE_CONFLICT';
+                            else if (rescueAccepted && _appliedSource === 'rescue_auto')      _status = 'RESCUE_AUTO';
                             else if (rescueAccepted && _appliedSource === 'rescue_auto_low') _status = 'RESCUE_AUTO_LOW';
-                            else if (_trigger && !_rowUnstable && !_avPwAmbig && _c3opts.length === 1) _status = 'AUTO';
+                            else if (_finalFromNormal && _trigger && !_rowUnstable && !_avPwAmbig && _c3opts.length === 1 && _wroteProfa) _status = 'AUTO';
+                            else if (_finalFromNormal && _trigger && !_rowUnstable && !_avPwAmbig && _c3opts.length === 1 && !_wroteProfa) _status = 'AUTO_BLOCKED';
                             else if (_safeLowAuto) _status = 'AUTO_LOW';
                             else if (_avPwAmbig) _status = 'AVPW_AMBIG';
                             else if (_trigger && !_rowUnstable && _c3opts.length > 1) _status = 'CLASS_MAP_AMBIG';
-                            else if (_rowUnstable && best.class2) _status = 'ROW_UNSTABLE';
-                            else if (best.class2 && !_trigger) {
+                            else if (_rowUnstable && _finalBest.class2) _status = 'ROW_UNSTABLE';
+                            else if (_finalBest.class2 && !_trigger) {
                                 const _reasons = [];
-                                if (best.similarity < TRIG_SIM) _reasons.push('LOW_SIM');
-                                if (best.margin     < TRIG_MAR) _reasons.push('AMBIG');
+                                if (_finalBest.similarity < TRIG_SIM) _reasons.push('LOW_SIM');
+                                if (_finalBest.margin     < TRIG_MAR) _reasons.push('AMBIG');
                                 _status = _reasons.join('·') || 'LOW';
                             } else _status = 'UNKNOWN';
 
                             // Pick top-5 candidates from the swp that produced the final best.
-                            // class3opts on each (cheap — only top 5).
-                            const _topCands = _swp.slice().sort((a,b) => b.adj - a.adj).slice(0,5).map(c => ({
+                            const _topCands = _finalSwp.slice().sort((a,b) => b.adj - a.adj).slice(0,5).map(c => ({
                                 sz: c.sz, dx: c.dx, dy: c.dy,
                                 top1: c.top1, sim: +c.sim.toFixed(3), margin: +c.margin.toFixed(3),
                                 adj: +c.adj.toFixed(3), class3opts: resolveClass2ToClass3(c.top1)
@@ -10548,12 +10650,12 @@ ${playerList}
                                 name: pp.name,
                                 geoPreset: geo.preset,
                                 cx, cy, expectedCY,
-                                cropBox: bestCropRect,
+                                cropBox: _finalCropRect,
                                 cropQuality: _cq,
-                                top1: best.class2,
-                                sim: +(best.similarity || 0).toFixed(3),
-                                margin: +(best.margin || 0).toFixed(3),
-                                top3: (best.top3 || []).map(x => ({ name: x.name || x.class2, sim: +(x.sim||x.similarity||0).toFixed(3) })),
+                                top1: _finalBest.class2,
+                                sim: +(_finalBest.similarity || 0).toFixed(3),
+                                margin: +(_finalBest.margin || 0).toFixed(3),
+                                top3: (_finalBest.top3 || []).map(x => ({ name: x.name || x.class2, sim: +(x.sim||x.similarity||0).toFixed(3) })),
                                 trigger: !!_trigger,
                                 safeLowAuto: !!_safeLowAuto,
                                 avPwAmbig: !!_avPwAmbig,
@@ -10571,6 +10673,9 @@ ${playerList}
                                 rescueAccepted: rescueAccepted,
                                 rescueRejectReason: rescueRejectReason,
                                 appliedSource: _appliedSource,
+                                antiFpGates: _gateReasons.slice(),
+                                conflictBlock: _conflictBlock,
+                                autoLowSeen: !!_autoLowSeen,
                                 normalBest: _normalSnapshot,
                                 rescueBest: _rescueSnapshot,
                                 candidateTop5: _topCands
@@ -13274,6 +13379,9 @@ ${playerList}
                     rescueAccepted: !!r.rescueAccepted,
                     rescueRejectReason: r.rescueRejectReason || null,
                     appliedSource:  r.appliedSource || null,
+                    antiFpGates:    Array.isArray(r.antiFpGates) ? r.antiFpGates : null,
+                    conflictBlock:  r.conflictBlock || null,
+                    autoLowSeen:    !!r.autoLowSeen,
                     normalBest:     sanitiseSnapshot(r.normalBest),
                     rescueBest:     sanitiseSnapshot(r.rescueBest),
                     candidateTop5:  Array.isArray(r.candidateTop5) ? r.candidateTop5 : null,
@@ -13287,9 +13395,10 @@ ${playerList}
             const all = allRows.map(sanitiseRow);
             const ofPack = currentPack ? all.filter(r => r.pack === currentPack) : [];
             // Status partitions (no overlaps): distinguish auto-low / rescue / unresolved.
-            const isAutoLow = (r) => r.status === 'AUTO_LOW' || r.status === 'RESCUE_AUTO_LOW';
-            const isAuto    = (r) => r.status === 'AUTO' || r.status === 'RESCUE_AUTO';
-            const isRescue  = (r) => r.status === 'RESCUE_AUTO' || r.status === 'RESCUE_AUTO_LOW';
+            const isAutoLow = (r) => !!r.autoLowSeen || r.status === 'AUTO_LOW' || r.status === 'RESCUE_AUTO_LOW';
+            const isAuto    = (r) => r.wroteProfa && (r.status === 'AUTO' || r.status === 'RESCUE_AUTO');
+            const isRescue  = (r) => r.rescueAccepted && (r.status === 'RESCUE_AUTO' || r.status === 'RESCUE_AUTO_LOW');
+            const hasGate   = (r, name) => Array.isArray(r.antiFpGates) && r.antiFpGates.indexOf(name) !== -1;
             const unresolvedLow   = all.filter(r => !r.wroteProfa && r.top1 && (r.status||'').includes('LOW_SIM'));
             const unresolvedAmbig = all.filter(r => !r.wroteProfa && r.top1 && ((r.status||'') === 'AMBIG' || (r.status||'').includes('·AMBIG') || (r.status||'') === 'AVPW_AMBIG' || (r.status||'') === 'CLASS_MAP_AMBIG'));
             const autoLowRows  = all.filter(isAutoLow);
@@ -13297,19 +13406,25 @@ ${playerList}
             const lows  = all.filter(r => !r.wroteProfa && r.top1 && !isAutoLow(r)); // real unresolved
             const bads  = all.filter(r => r.status === 'BAD_CROP' || r.status === 'BAD_GEOMETRY');
             const noAuto = all.filter(r => !r.wroteAuto);
-            const noProfa = all.filter(r => !r.wroteProfa);
+            const noProfa = all.filter(r => !r.wroteProfa); // includes AUTO_LOW/AUTO_BLOCKED
             const cardinals = all.filter(r => Array.isArray(r.class3opts) && r.class3opts.includes('Cardinal'));
             const summary = {
                 totalRows:       all.length,
-                autoCount:       all.filter(r => r.wroteAuto).length,
+                autoCount:       all.filter(r => r.wroteAuto).length, // tied to wroteProfa now
                 autoStrictCount: all.filter(isAuto).length,
                 autoLowCount:    autoLowRows.length,
+                autoLowNoWriteCount: all.filter(r => isAutoLow(r) && !r.wroteProfa).length,
                 rescueCount:     rescueRows.length,
                 profaWriteCount: all.filter(r => r.wroteProfa).length,
                 unresolvedLowCount:   unresolvedLow.length,
                 unresolvedAmbigCount: unresolvedAmbig.length,
                 classMapAmbigCount:   all.filter(r => (r.status||'') === 'CLASS_MAP_AMBIG').length,
                 avpwAmbigCount:       all.filter(r => (r.status||'') === 'AVPW_AMBIG').length,
+                rowLeakBlockCount:    all.filter(r => hasGate(r,'normal_row_leak_down') || r.rescueRejectReason === 'rescue_row_leak').length,
+                smallCropBlockCount:  all.filter(r => hasGate(r,'crop_small_auto_block')).length,
+                consensusBlockCount:  all.filter(r => hasGate(r,'consensus_disagrees_auto_block')).length,
+                conflictBlockCount:   all.filter(r => r.conflictBlock === 'no_write').length,
+                conflictKeptNormalCount: all.filter(r => r.conflictBlock === 'kept_normal').length,
                 lowCount:        lows.length, // legacy alias — now excludes AUTO_LOW
                 badCount:        bads.length,
                 emptyProfaCount: noProfa.length,
