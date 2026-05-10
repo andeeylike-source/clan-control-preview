@@ -3914,6 +3914,7 @@
             <!-- Статус обработки -->
             <div id="dayScreenshotStatus" style="display:none;font-size:12px;padding:8px 12px;border-radius:8px;margin-bottom:8px;position:relative;padding-right:28px"><span id="dayScreenshotStatusText"></span><button onclick="document.getElementById('dayScreenshotStatus').style.display='none'" style="position:absolute;top:50%;right:8px;transform:translateY(-50%);background:none;border:none;color:inherit;cursor:pointer;font-size:14px;opacity:0.6;line-height:1" title="Закрыть">✕</button></div>
             <div id="dayOcrBatchSummary" style="display:none;font-size:11px;padding:7px 10px;border-radius:7px;margin-bottom:6px;line-height:1.8"></div>
+            <div id="dayUnsupportedTableWarn" style="display:none;font-size:11px;padding:7px 10px;border-radius:7px;margin-bottom:6px;background:#1c0a00;border:1px solid #f9731644;color:#fb923c;line-height:1.7"></div>
 
             <!-- Результаты анализа -->
             <div id="dayAnalyzeResults" style="display:none;margin-bottom:8px">
@@ -12574,6 +12575,45 @@ ${playerList}
                 .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
         }
 
+        function _kmDetectLeaderListPack(players) {
+            // Heuristic: leader-list screenshots have no stat columns → all zeros
+            if (!players || players.length < 4) return false;
+            return players.every(p => !p.kills && !p.deaths && !p.pvp_dmg && !p.pve_dmg);
+        }
+
+        function _kmOcrFilterUnsupportedPacks() {
+            if (!window._gtDebug) window._gtDebug = {};
+            window._gtDebug.unsupportedTableSkipCount = 0;
+            window._gtDebug.unsupportedTableSkipped = [];
+            const map = dayScreenPlayersMap;
+            if (!map) return;
+            for (const packName of Object.keys(map)) {
+                if (_kmDetectLeaderListPack(map[packName])) {
+                    const count = (map[packName] || []).length;
+                    window._gtDebug.unsupportedTableSkipCount++;
+                    window._gtDebug.unsupportedTableSkipped.push({
+                        packName, playerCount: count,
+                        reason: 'unsupported_table_type_leaders',
+                        tableType: 'leader_list'
+                    });
+                    delete map[packName];
+                    if (dayScreenShotMap && packName in dayScreenShotMap) delete dayScreenShotMap[packName];
+                }
+            }
+            const warnEl = document.getElementById('dayUnsupportedTableWarn');
+            if (warnEl) {
+                const n = window._gtDebug.unsupportedTableSkipCount;
+                if (n > 0) {
+                    const files = window._gtDebug.unsupportedTableSkipped.map(s => s.packName).join(', ');
+                    warnEl.innerHTML = '⚠️ Пропущено: ' + n + ' скрин(ов) со списком лидеров групп, не таблица членов группы<br>'
+                        + '<span style="color:#94a3b8;font-size:10px">' + files + '</span>';
+                    warnEl.style.display = 'block';
+                } else {
+                    warnEl.style.display = 'none';
+                }
+            }
+        }
+
         function _kmRwBuildParties() {
             const parties = [];
             const packNames = Object.keys(dayScreenPlayersMap || {});
@@ -12592,6 +12632,7 @@ ${playerList}
         }
 
         function openKMReviewWizard() {
+            _kmOcrFilterUnsupportedPacks();
             const parties = _kmRwBuildParties();
             if (parties.length === 0) {
                 if (Array.isArray(dayLastParsed) && dayLastParsed.length > 0) {
@@ -12610,11 +12651,15 @@ ${playerList}
             if (ov) ov.style.display = 'flex';
             const _bInfo = window._kmOcrLastBatchInfo;
             const _bannerEl = document.getElementById('kmRwOcrBanner');
-            if (_bannerEl && _bInfo && _bInfo.skippedList && _bInfo.skippedList.length > 0) {
-                _bannerEl.textContent = `⚠️ OCR: распознано ${_bInfo.successCount} из ${_bInfo.totalInput}, пропущено ${_bInfo.skippedList.length}`;
-                _bannerEl.style.display = 'block';
-            } else if (_bannerEl) {
-                _bannerEl.style.display = 'none';
+            const _bannerLines = [];
+            if (_bInfo && _bInfo.skippedList && _bInfo.skippedList.length > 0)
+                _bannerLines.push('⚠️ OCR: распознано ' + _bInfo.successCount + ' из ' + _bInfo.totalInput + ', пропущено ' + _bInfo.skippedList.length);
+            const _unsupN = window._gtDebug && window._gtDebug.unsupportedTableSkipCount;
+            if (_unsupN > 0)
+                _bannerLines.push('🚫 Список лидеров пропущен: ' + _unsupN + ' скрин(ов)');
+            if (_bannerEl) {
+                if (_bannerLines.length > 0) { _bannerEl.innerHTML = _bannerLines.join('<br>'); _bannerEl.style.display = 'block'; }
+                else _bannerEl.style.display = 'none';
             }
             kmRwRender();
         }
@@ -13183,6 +13228,10 @@ ${playerList}
                 rosterNoProfaSkipCount: dbg.rosterNoProfaSkipCount || 0,
                 rosterNoProfaSkipped: Array.isArray(dbg.rosterNoProfaSkipped)
                     ? dbg.rosterNoProfaSkipped.map(x => ({ name: x.name, rosterSkippedReason: x.rosterSkippedReason }))
+                    : [],
+                unsupportedTableSkipCount: dbg.unsupportedTableSkipCount || 0,
+                unsupportedTableSkipped: Array.isArray(dbg.unsupportedTableSkipped)
+                    ? dbg.unsupportedTableSkipped
                     : []
             };
             return {
