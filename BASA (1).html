@@ -10143,19 +10143,12 @@ ${playerList}
                         }
                         const normName = normalizeNick(pp.name);
                         const target = dayLastParsed.find(p => normalizeNick(p.name) === normName);
-                        if (!target) {
-                            try {
-                                window._gtDebug.rows.push({
-                                    pack: packName, row: rowIdx, name: pp.name,
-                                    geoPreset: geo.preset, status: 'NO_PARSED_TARGET',
-                                    reason: 'normName=' + normName + ' not found in dayLastParsed',
-                                    top1: null, sim: 0, margin: 0, top3: [],
-                                    trigger: false, wroteAuto: false, wroteProfa: false
-                                });
-                            } catch(e) { /* ignore */ }
-                            window._gtDebug.matcherProcessed = (window._gtDebug.matcherProcessed || 0) + 1;
-                            continue;
-                        }
+                        // Decouple matcher from name lookup: crop/match always run on the
+                        // review-row geometry. When no dayLastParsed target exists (alias-merged
+                        // or OCR'd nick), write into the review-row itself so the wizard UI
+                        // still sees profa via pp.* fallback.
+                        const targetFound = !!target;
+                        const writeTarget = target || pp;
 
                         // Expected row position
                         const ry = geo.y + rowIdx * geo.rowH;
@@ -10181,23 +10174,24 @@ ${playerList}
                         // Quality guard at expected center
                         const _cq = _ccCropQuality(sc, cx, expectedCY, 22);
                         if (!_cq.ok) {
-                            target.matcher_top1        = null;
-                            target.matcher_locHit      = false;
-                            target.matcher_locInvalid  = true;
-                            target.matcher_cropQuality = _cq;
-                            target.matcher_cx          = cx;
-                            target.matcher_cy          = expectedCY;
-                            target.matcher_expectedCY  = expectedCY;
-                            target.matcher_prevRowCY   = prevRowCY;
-                            target.matcher_nextRowCY   = nextRowCY;
-                            target.matcher_pack        = packName;
-                            target.matcher_row         = rowIdx;
-                            target.matcher_geoPreset   = geo.preset;
+                            writeTarget.matcher_top1        = null;
+                            writeTarget.matcher_locHit      = false;
+                            writeTarget.matcher_locInvalid  = true;
+                            writeTarget.matcher_cropQuality = _cq;
+                            writeTarget.matcher_cx          = cx;
+                            writeTarget.matcher_cy          = expectedCY;
+                            writeTarget.matcher_expectedCY  = expectedCY;
+                            writeTarget.matcher_prevRowCY   = prevRowCY;
+                            writeTarget.matcher_nextRowCY   = nextRowCY;
+                            writeTarget.matcher_pack        = packName;
+                            writeTarget.matcher_row         = rowIdx;
+                            writeTarget.matcher_geoPreset   = geo.preset;
                             try {
                                 window._gtDebug.rows.push({
                                     pack: packName, row: rowIdx, name: pp.name, geoPreset: geo.preset,
                                     cx, cy: expectedCY, expectedCY,
                                     cropQuality: _cq, status: 'BAD_CROP', reason: _cq.reason,
+                                    targetFound: targetFound,
                                     top1: null, sim: 0, margin: 0, top3: [],
                                     trigger: false, wroteAuto: false, wroteProfa: false
                                 });
@@ -10236,6 +10230,7 @@ ${playerList}
                                     cx, cy: expectedCY, expectedCY,
                                     cropQuality: _cq, status: 'NO_MATCH_ATTEMPT',
                                     reason: 'sweep produced no candidate',
+                                    targetFound: targetFound,
                                     top1: null, sim: 0, margin: 0, top3: [],
                                     trigger: false, wroteAuto: false, wroteProfa: false
                                 });
@@ -10262,39 +10257,39 @@ ${playerList}
                             cropUrl = dc.toDataURL();
                         }
 
-                        target.matcher_top1        = best.class2;
-                        target.matcher_sim         = best.similarity;
-                        target.matcher_margin      = best.margin;
-                        target.matcher_top3        = best.top3;
-                        target.matcher_source      = 'gt_exemplar_matcher';
+                        writeTarget.matcher_top1        = best.class2;
+                        writeTarget.matcher_sim         = best.similarity;
+                        writeTarget.matcher_margin      = best.margin;
+                        writeTarget.matcher_top3        = best.top3;
+                        writeTarget.matcher_source      = 'gt_exemplar_matcher';
                         // trigger = score passes threshold (ROW_UNSTABLE is debug-only)
-                        target.matcher_trigger     = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
-                        target.matcher_rowUnstable    = _rowUnstable;
-                        target.matcher_unstableReason = _unstableReason;
-                        target.matcher_yDrift         = _yDrift;
-                        target.matcher_distToPrev     = _distToPrev;
-                        target.matcher_distToNext     = _distToNext;
-                        target.matcher_pack           = packName;
-                        target.matcher_row            = rowIdx;
-                        target.matcher_cx             = cx;
-                        target.matcher_cy             = cy;
-                        target.matcher_expectedCY     = expectedCY;
-                        target.matcher_prevRowCY      = prevRowCY;
-                        target.matcher_nextRowCY      = nextRowCY;
-                        target.matcher_crop        = bestCropRect;
-                        target.matcher_cropUrl     = cropUrl;
-                        target.matcher_locHit      = false;
-                        target.matcher_locConf     = null;
-                        target.matcher_locInvalid  = false;
-                        target.matcher_cropQuality = _cq;
-                        target.matcher_geoPreset   = geo.preset;
+                        writeTarget.matcher_trigger     = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
+                        writeTarget.matcher_rowUnstable    = _rowUnstable;
+                        writeTarget.matcher_unstableReason = _unstableReason;
+                        writeTarget.matcher_yDrift         = _yDrift;
+                        writeTarget.matcher_distToPrev     = _distToPrev;
+                        writeTarget.matcher_distToNext     = _distToNext;
+                        writeTarget.matcher_pack           = packName;
+                        writeTarget.matcher_row            = rowIdx;
+                        writeTarget.matcher_cx             = cx;
+                        writeTarget.matcher_cy             = cy;
+                        writeTarget.matcher_expectedCY     = expectedCY;
+                        writeTarget.matcher_prevRowCY      = prevRowCY;
+                        writeTarget.matcher_nextRowCY      = nextRowCY;
+                        writeTarget.matcher_crop        = bestCropRect;
+                        writeTarget.matcher_cropUrl     = cropUrl;
+                        writeTarget.matcher_locHit      = false;
+                        writeTarget.matcher_locConf     = null;
+                        writeTarget.matcher_locInvalid  = false;
+                        writeTarget.matcher_cropQuality = _cq;
+                        writeTarget.matcher_geoPreset   = geo.preset;
 
                         // AUTO-WRITE: safe GT_EX only (trigger + not rowUnstable + not locInvalid)
-                        if (target.matcher_trigger && !_rowUnstable) {
-                            target.class2     = best.class2;
-                            target.profaSource = 'gt_exemplar_matcher';
+                        if (writeTarget.matcher_trigger && !_rowUnstable) {
+                            writeTarget.class2     = best.class2;
+                            writeTarget.profaSource = 'gt_exemplar_matcher';
                             const _c3opts = resolveClass2ToClass3(best.class2);
-                            if (_c3opts.length === 1) target.profa = _c3opts[0];
+                            if (_c3opts.length === 1) writeTarget.profa = _c3opts[0];
                         }
                         // Per-row diagnostic dump (does not affect matcher behaviour)
                         try {
@@ -10311,11 +10306,12 @@ ${playerList}
                                 sim: +(best.similarity || 0).toFixed(3),
                                 margin: +(best.margin || 0).toFixed(3),
                                 top3: (best.top3 || []).map(x => ({ name: x.name || x.class2, sim: +(x.sim||x.similarity||0).toFixed(3) })),
-                                trigger: !!target.matcher_trigger,
-                                wroteAuto: !!(target.matcher_trigger && !_rowUnstable),
-                                wroteProfa: !!(target.matcher_trigger && !_rowUnstable && _c3opts.length === 1),
+                                trigger: !!writeTarget.matcher_trigger,
+                                wroteAuto: !!(writeTarget.matcher_trigger && !_rowUnstable),
+                                wroteProfa: !!(writeTarget.matcher_trigger && !_rowUnstable && _c3opts.length === 1),
                                 class3opts: _c3opts,
-                                cropUrl: cropUrl
+                                cropUrl: cropUrl,
+                                targetFound: targetFound
                             });
                         } catch(e) { /* ignore */ }
                         window._gtDebug.matcherProcessed = (window._gtDebug.matcherProcessed || 0) + 1;
@@ -12609,7 +12605,9 @@ ${playerList}
                 '</span> <span style="color:#475569">·</span> <span style="color:#64748b">игроков:</span> <span style="color:#e2e8f0;font-weight:800">' + party.players.length + '</span>';
 
             const rowsHtml = party.players.map((pp, i) => {
-                const parsed = _kmRwFindParsed(pp.name) || {};
+                // Fallback to the review-row itself when alias merge dropped the parsed entry —
+                // matcher writes profa/matcher_* into pp directly in that case.
+                const parsed = _kmRwFindParsed(pp.name) || pp || {};
                 const profa = (parsed.profa && parsed.profa !== '—') ? parsed.profa : '';
                 const profaIconSmall = profa && typeof profaIconHtml === 'function'
                     ? profaIconHtml(profa, 16)
@@ -12704,7 +12702,7 @@ ${playerList}
             _kmRw.profaTarget = { partyIdx: partyIdx, rowIdx: rowIdx };
             const party = _kmRw.parties[partyIdx];
             const row = party && party.players[rowIdx];
-            const parsed = row ? (_kmRwFindParsed(row.name) || {}) : {};
+            const parsed = row ? (_kmRwFindParsed(row.name) || row || {}) : {};
             const currentProfa = parsed.profa && parsed.profa !== '—' ? parsed.profa : '';
             picker.innerHTML =
                 '<div style="padding:7px 8px;border-bottom:1px solid #1e2530;display:flex;gap:6px;align-items:center">' +
@@ -12768,7 +12766,7 @@ ${playerList}
             const t = _kmRw.profaTarget;
             const party = t ? _kmRw.parties[t.partyIdx] : null;
             const row = party ? party.players[t.rowIdx] : null;
-            const parsed = row ? (_kmRwFindParsed(row.name) || {}) : {};
+            const parsed = row ? (_kmRwFindParsed(row.name) || row || {}) : {};
             const currentProfa = parsed.profa && parsed.profa !== '—' ? parsed.profa : '';
             const allKeys = Object.keys(PROFA_NAMES || {});
             const items = allKeys.filter(pf => {
