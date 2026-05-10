@@ -10100,17 +10100,20 @@ ${playerList}
                     if (!geo) {
                         for (let _ri = 0; _ri < packPlayers.length; _ri++) {
                             const pp = packPlayers[_ri];
-                            if (!pp || !pp.name) continue;
-                            const t = dayLastParsed.find(p => normalizeNick(p.name) === normalizeNick(pp.name));
-                            if (t) { t.matcher_geoPreset = 'LOC_BAD_GEOMETRY'; t.matcher_locInvalid = true; t.matcher_pack = packName; }
+                            const _name = (pp && pp.name) || '';
+                            if (_name) {
+                                const t = dayLastParsed.find(p => normalizeNick(p.name) === normalizeNick(_name));
+                                if (t) { t.matcher_geoPreset = 'LOC_BAD_GEOMETRY'; t.matcher_locInvalid = true; t.matcher_pack = packName; }
+                            }
                             try {
                                 window._gtDebug.rows.push({
-                                    pack: packName, row: _ri, name: pp.name,
-                                    geoPreset: 'LOC_BAD_GEOMETRY', status: 'BAD_GEOMETRY',
+                                    pack: packName, row: _ri, name: _name,
+                                    geoPreset: 'LOC_BAD_GEOMETRY', status: _name ? 'BAD_GEOMETRY' : 'NO_NAME',
                                     top1: null, sim: 0, margin: 0, top3: [],
                                     trigger: false, wroteAuto: false, wroteProfa: false
                                 });
                             } catch(e) { /* ignore */ }
+                            window._gtDebug.matcherProcessed = (window._gtDebug.matcherProcessed || 0) + 1;
                         }
                         continue;
                     }
@@ -10122,14 +10125,53 @@ ${playerList}
 
                     for (let rowIdx = 0; rowIdx < packPlayers.length; rowIdx++) {
                         const pp = packPlayers[rowIdx];
-                        if (!pp || !pp.name) continue;
+                        // Coverage guard: every review-row gets a _gtDebug.rows entry,
+                        // even when the row is skipped before the matcher runs. Without
+                        // this, rows missing a parsed target (alias-merged names) or
+                        // out-of-bounds geometry vanished from debug entirely.
+                        if (!pp || !pp.name) {
+                            try {
+                                window._gtDebug.rows.push({
+                                    pack: packName, row: rowIdx, name: (pp && pp.name) || '',
+                                    geoPreset: geo.preset, status: 'NO_NAME',
+                                    top1: null, sim: 0, margin: 0, top3: [],
+                                    trigger: false, wroteAuto: false, wroteProfa: false
+                                });
+                            } catch(e) { /* ignore */ }
+                            window._gtDebug.matcherProcessed = (window._gtDebug.matcherProcessed || 0) + 1;
+                            continue;
+                        }
                         const normName = normalizeNick(pp.name);
                         const target = dayLastParsed.find(p => normalizeNick(p.name) === normName);
-                        if (!target) continue;
+                        if (!target) {
+                            try {
+                                window._gtDebug.rows.push({
+                                    pack: packName, row: rowIdx, name: pp.name,
+                                    geoPreset: geo.preset, status: 'NO_PARSED_TARGET',
+                                    reason: 'normName=' + normName + ' not found in dayLastParsed',
+                                    top1: null, sim: 0, margin: 0, top3: [],
+                                    trigger: false, wroteAuto: false, wroteProfa: false
+                                });
+                            } catch(e) { /* ignore */ }
+                            window._gtDebug.matcherProcessed = (window._gtDebug.matcherProcessed || 0) + 1;
+                            continue;
+                        }
 
                         // Expected row position
                         const ry = geo.y + rowIdx * geo.rowH;
-                        if (ry + geo.iconH > sc.height + 4) break;
+                        if (ry + geo.iconH > sc.height + 4) {
+                            try {
+                                window._gtDebug.rows.push({
+                                    pack: packName, row: rowIdx, name: pp.name,
+                                    geoPreset: geo.preset, status: 'OUT_OF_BOUNDS',
+                                    reason: 'ry=' + ry + '+iconH=' + geo.iconH + ' > imgH=' + sc.height,
+                                    top1: null, sim: 0, margin: 0, top3: [],
+                                    trigger: false, wroteAuto: false, wroteProfa: false
+                                });
+                            } catch(e) { /* ignore */ }
+                            window._gtDebug.matcherProcessed = (window._gtDebug.matcherProcessed || 0) + 1;
+                            continue;
+                        }
                         const cx = geo.x + Math.floor(geo.iconW/2);
                         const expectedCY = ry + Math.floor(geo.iconH/2);
                         const prevRowCY = expectedCY - geo.rowH;
@@ -10160,6 +10202,7 @@ ${playerList}
                                     trigger: false, wroteAuto: false, wroteProfa: false
                                 });
                             } catch(e) { /* ignore */ }
+                            window._gtDebug.matcherProcessed = (window._gtDebug.matcherProcessed || 0) + 1;
                             continue;
                         }
 
@@ -10186,7 +10229,20 @@ ${playerList}
                                 }
                             }
                         }
-                        if (!best) continue;
+                        if (!best) {
+                            try {
+                                window._gtDebug.rows.push({
+                                    pack: packName, row: rowIdx, name: pp.name, geoPreset: geo.preset,
+                                    cx, cy: expectedCY, expectedCY,
+                                    cropQuality: _cq, status: 'NO_MATCH_ATTEMPT',
+                                    reason: 'sweep produced no candidate',
+                                    top1: null, sim: 0, margin: 0, top3: [],
+                                    trigger: false, wroteAuto: false, wroteProfa: false
+                                });
+                            } catch(e) { /* ignore */ }
+                            window._gtDebug.matcherProcessed = (window._gtDebug.matcherProcessed || 0) + 1;
+                            continue;
+                        }
 
                         // ── Row alignment guard (debug-only — does NOT block trigger)
                         //    Unstable when best crop dy shifted into neighbor territory.
