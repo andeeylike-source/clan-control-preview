@@ -8515,6 +8515,8 @@ function getClass2IconByClass3(c3) {
         function checkSimilarNicks(players, onDone) {
             similarNickQueue = [];
             for (const p of players) {
+                // Skip identity-matching for players without confirmed profa
+                if (!p.profa || p.profa === '—' || p.profa === '') continue;
                 const resolved = resolveAlias(p.name);
                 const normResolved = normalizeNick(resolved);
                 const exact = roster.find(r => normalizeNick(r.name) === normResolved);
@@ -12338,6 +12340,14 @@ ${playerList}
             const profaConflicts = [];
 
             dayLastParsed.forEach(p => {
+                // Guard: skip roster matching for players without confirmed profa
+                if (!p.profa || p.profa === '—' || p.profa === '') {
+                    if (!window._gtDebug) window._gtDebug = {};
+                    window._gtDebug.rosterNoProfaSkipCount = (window._gtDebug.rosterNoProfaSkipCount || 0) + 1;
+                    if (!window._gtDebug.rosterNoProfaSkipped) window._gtDebug.rosterNoProfaSkipped = [];
+                    window._gtDebug.rosterNoProfaSkipped.push({ name: p.name, rosterSkippedReason: 'no_profa' });
+                    return;
+                }
                 // 1. Резолвим через алиас
                 const resolvedName = resolveAlias(p.name);
                 const normKey = normalizeNick(resolvedName);
@@ -13169,7 +13179,11 @@ ${playerList}
                 topMissingClasses: (dbg.classCoverage && Array.isArray(dbg.classCoverage.missing))
                     ? dbg.classCoverage.missing.slice(0, 12) : [],
                 effectiveMissingClasses: (dbg.classCoverage && Array.isArray(dbg.classCoverage.effectiveMissing))
-                    ? dbg.classCoverage.effectiveMissing.slice(0, 12) : []
+                    ? dbg.classCoverage.effectiveMissing.slice(0, 12) : [],
+                rosterNoProfaSkipCount: dbg.rosterNoProfaSkipCount || 0,
+                rosterNoProfaSkipped: Array.isArray(dbg.rosterNoProfaSkipped)
+                    ? dbg.rosterNoProfaSkipped.map(x => ({ name: x.name, rosterSkippedReason: x.rosterSkippedReason }))
+                    : []
             };
             return {
                 timestamp: new Date().toISOString(),
