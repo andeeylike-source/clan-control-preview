@@ -8894,7 +8894,7 @@ function getClass2IconByClass3(c3) {
                         }
 
                         if (!players.length) {
-                            skippedScreenshots.push({ num: i + 1, reason: 'OCR.space не вернул игроков' });
+                            skippedScreenshots.push({ num: i + 1, fileName: shot.name || null, provider: 'ocrspace', reason: 'empty_players' });
                             continue;
                         }
 
@@ -8921,10 +8921,16 @@ function getClass2IconByClass3(c3) {
                     } catch(e) {
                         const msg = e?.name === 'AbortError' ? 'timeout after 60 seconds' : (e.message || String(e));
                         console.warn(`OCR.space скриншот ${i + 1}:`, msg);
-                        skippedScreenshots.push({ num: i + 1, reason: msg });
+                        skippedScreenshots.push({ num: i + 1, fileName: shot.name || null, provider: 'ocrspace', reason: msg, errorType: e?.name || null });
                         if (!firstError) firstError = msg;
                     }
                 }
+
+                console.info('[km-ocr-skip-summary] provider=ocrspace total=' + shots.length + ' success=' + Object.keys(screenPlayersMap).length + ' skipped=' + skippedScreenshots.length, skippedScreenshots.map(function(s){return {num:s.num,file:s.fileName,reason:s.reason};}));
+                if (!window._gtDebug) window._gtDebug = {};
+                window._gtDebug.ocrSkippedScreenshots = skippedScreenshots.slice();
+                window._gtDebug.ocrTotalInput = shots.length;
+                window._gtDebug.ocrSuccessCount = Object.keys(screenPlayersMap).length;
 
                 dayLastParsed = Object.values(allPlayers);
                 dayExpectedTotal = null;
@@ -9198,7 +9204,7 @@ function getClass2IconByClass3(c3) {
                         });
 
                         if (!players.length) {
-                            skippedScreenshots.push({ num: i + 1, reason: 'OpenRouter OCR не вернул игроков' });
+                            skippedScreenshots.push({ num: i + 1, fileName: shot.name || null, provider: 'openrouter_baidu', reason: 'empty_players', rawRows: rows.length, rawTextLen: text.length });
                             continue;
                         }
 
@@ -9225,10 +9231,16 @@ function getClass2IconByClass3(c3) {
                     } catch(e) {
                         const msg = e?.name === 'AbortError' ? 'timeout' : (e.message || String(e));
                         console.warn(`[openrouter-ocr] screenshot ${i + 1}:`, msg);
-                        skippedScreenshots.push({ num: i + 1, reason: msg });
+                        skippedScreenshots.push({ num: i + 1, fileName: shot.name || null, provider: 'openrouter_baidu', reason: msg, errorType: e?.name || null });
                         if (!firstError) firstError = msg;
                     }
                 }
+
+                console.info('[km-ocr-skip-summary] provider=openrouter_baidu total=' + shots.length + ' success=' + Object.keys(screenPlayersMap).length + ' skipped=' + skippedScreenshots.length, skippedScreenshots.map(function(s){return {num:s.num,file:s.fileName,reason:s.reason};}));
+                if (!window._gtDebug) window._gtDebug = {};
+                window._gtDebug.ocrSkippedScreenshots = skippedScreenshots.slice();
+                window._gtDebug.ocrTotalInput = shots.length;
+                window._gtDebug.ocrSuccessCount = Object.keys(screenPlayersMap).length;
 
                 dayLastParsed      = Object.values(allPlayers);
                 dayExpectedTotal   = null;
@@ -12994,6 +13006,9 @@ ${playerList}
                 matcherSkipReason: dbg.matcherSkipReason || null,
                 matcherProcessed: dbg.matcherProcessed || 0,
                 matcherError: dbg.matcherError || null,
+                ocrTotalInput: dbg.ocrTotalInput || null,
+                ocrSuccessCount: dbg.ocrSuccessCount || null,
+                ocrSkippedScreenshots: dbg.ocrSkippedScreenshots || [],
                 summary: summary,
                 rowsCurrentPack: ofPack,
                 rowsLow: lows,
