@@ -3983,6 +3983,11 @@
             <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-top:1px solid #1e2530;background:#12171f;gap:8px;flex-wrap:wrap">
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0">
                     <button onclick="kmRwCopyDebug()" title="Скопировать JSON-диагностику icon matcher (текущий пак + summary)" style="background:#1a1f29;color:#a5b4fc;border:1px solid #2d3748;border-radius:7px;padding:5px 9px;font-size:10.5px;font-weight:700;cursor:pointer;white-space:nowrap">🐞 Debug проф</button>
+                    <button onclick="kmRwSaveTraining()" id="kmRwTrainBtn" title="Запомнить ручные исправления профы как эталоны для icon matcher" style="background:#1a1f29;color:#f59e0b;border:1px solid #44330a;border-radius:7px;padding:5px 9px;font-size:10.5px;font-weight:700;cursor:pointer;white-space:nowrap">🧠 Запомнить</button>
+                    <span id="kmRwTrainStatus" style="font-size:10px;color:#64748b;flex-shrink:0"></span>
+                    <button onclick="kmRwExportTraining()" title="Экспорт эталонов обучения в JSON" style="background:#1a1f29;color:#64748b;border:1px solid #1e2530;border-radius:7px;padding:5px 7px;font-size:10px;cursor:pointer">📤</button>
+                    <button onclick="kmRwImportTraining()" title="Импорт эталонов из JSON" style="background:#1a1f29;color:#64748b;border:1px solid #1e2530;border-radius:7px;padding:5px 7px;font-size:10px;cursor:pointer">📥</button>
+                    <button onclick="kmRwResetTraining()" title="Сбросить локальное обучение" style="background:#1a1f29;color:#64748b;border:1px solid #1e2530;border-radius:7px;padding:5px 7px;font-size:10px;cursor:pointer">🗑️</button>
                     <div id="kmRwSaveStatus" style="font-size:11px;color:#64748b">Правки записываются сразу при изменении полей.</div>
                 </div>
                 <div style="display:flex;gap:7px;flex-wrap:wrap">
@@ -9793,6 +9798,7 @@ function getClass2IconByClass3(c3) {
         // GT exemplar catalog (real in-game party-window portrait sprites, 52 labeled crops)
         const _CC_GT_CATALOG_URL = 'gt_exemplar_catalog.json';
         let   _ccGTExemplars = null; // [{class2, vec}] loaded at runtime
+        let   _ccTrainedVecs = []; // [{class2, vec, trained:true, id}] from localStorage
 
         function _ccImgToFeature(img, size) {
             const c = document.createElement('canvas'); c.width = size; c.height = size;
@@ -9883,22 +9889,53 @@ function getClass2IconByClass3(c3) {
             }
         }
 
-        // Classify against GT exemplars: max-sim per class, then rank classes
+        // Classify against GT exemplars + trained exemplars: max-sim per class, then rank classes
         function _ccClassifyGT(feat) {
-            if (!feat || !_ccGTExemplars || !_ccGTExemplars.length) return null;
-            const classBest = {};
-            for (const ex of _ccGTExemplars) {
+            const allEx = (_ccGTExemplars || []).concat(_ccTrainedVecs || []);
+            if (!feat || !allEx.length) return null;
+            const classBest = {}; // class2 -> { sim, trained, id }
+            for (const ex of allEx) {
                 const s = _ccCosineSim(feat, ex.vec);
-                if (!(ex.class2 in classBest) || s > classBest[ex.class2]) classBest[ex.class2] = s;
+                if (!(ex.class2 in classBest) || s > classBest[ex.class2].sim) {
+                    classBest[ex.class2] = { sim: s, trained: !!ex.trained, id: ex.id || null };
+                }
             }
-            const sorted = Object.entries(classBest).sort((a,b) => b[1]-a[1]);
+            const sorted = Object.entries(classBest).sort((a,b) => b[1].sim - a[1].sim);
             if (!sorted.length) return null;
+            const top = sorted[0];
             return {
-                class2:    sorted[0][0],
-                similarity: sorted[0][1],
-                margin:    sorted[0][1] - (sorted[1] ? sorted[1][1] : 0),
-                top3:      sorted.slice(0,3).map(([name,sim]) => ({name, sim}))
+                class2:    top[0],
+                similarity: top[1].sim,
+                margin:    top[1].sim - (sorted[1] ? sorted[1][1].sim : 0),
+                top3:      sorted.slice(0,3).map(([name,d]) => ({name, sim: d.sim})),
+                matchedFrom: top[1].trained ? 'trained' : 'base',
+                trainedExemplarId: top[1].trained ? top[1].id : null
             };
+        }
+
+        async function _ccLoadAndPrepareTrainedVecs() {
+            try {
+                const raw = localStorage.getItem('cc_km_icon_training_v1');
+                if (!raw) return [];
+                const training = JSON.parse(raw);
+                if (!Array.isArray(training) || !training.length) return [];
+                const vecs = [];
+                await Promise.all(training.map(t => new Promise(res => {
+                    if (!t.cropUrl || !t.class2Key) { res(); return; }
+                    const img = new Image();
+                    img.onload = () => {
+                        const vec = _ccImgToFeature(img, _CC_FEAT_SIZE);
+                        if (vec) vecs.push({ class2: t.class2Key, vec, trained: true, id: t.id });
+                        res();
+                    };
+                    img.onerror = () => res();
+                    img.src = t.cropUrl;
+                })));
+                return vecs;
+            } catch(e) {
+                console.warn('[training] load failed', e);
+                return [];
+            }
         }
 
         function _ccBuildGeometryCandidates(W, H) {
@@ -10078,6 +10115,11 @@ ${playerList}
                     window._gtDebug.matcherSkipReason = 'exemplars_empty (loaded=' + (_ccGTExemplars ? _ccGTExemplars.length : 'null') + ')';
                     return;
                 }
+                window._gtDebug.trainedHitCount = 0;
+                window._gtDebug.baseHitCount = 0;
+                _ccTrainedVecs = await _ccLoadAndPrepareTrainedVecs();
+                window._gtDebug.trainedExemplarCount = _ccTrainedVecs.length;
+                window._gtDebug.trainedClassCount = new Set(_ccTrainedVecs.map(e => e.class2)).size;
                 // Coverage snapshot — which class2 names are present in exemplar catalog vs CLASS2_TO_CLASS3.
                 // Helps the user spot missing / mislabelled exemplars without affecting matcher behaviour.
                 try {
@@ -10251,6 +10293,13 @@ ${playerList}
                             continue;
                         }
 
+                        // Track trained vs base hit per row
+                        if (best.matchedFrom === 'trained') {
+                            window._gtDebug.trainedHitCount = (window._gtDebug.trainedHitCount || 0) + 1;
+                        } else {
+                            window._gtDebug.baseHitCount = (window._gtDebug.baseHitCount || 0) + 1;
+                        }
+
                         // ── Row alignment guard (debug-only — does NOT block trigger)
                         //    Unstable when best crop dy shifted into neighbor territory.
                         const _yDrift    = Math.abs(cy - expectedCY);
@@ -10344,6 +10393,9 @@ ${playerList}
                                 profaWarningReason: writeTarget.matcher_profaWarningReason || null,
                                 originalStatus: writeTarget.matcher_originalStatus || null,
                                 profaValue: writeTarget.profa || null,
+                                matchedFrom: best.matchedFrom || 'base',
+                                trainedExemplarId: best.trainedExemplarId || null,
+                                manualCorrected: !!(writeTarget.profaSource === 'manual_review'),
                                 cropUrl: cropUrl,
                                 targetFound: targetFound
                             });
@@ -13009,6 +13061,9 @@ ${playerList}
                     profaWarningReason: r.profaWarningReason || null,
                     originalStatus: r.originalStatus || null,
                     profaValue: r.profaValue || null,
+                    matchedFrom: r.matchedFrom || 'base',
+                    trainedExemplarId: r.trainedExemplarId || null,
+                    manualCorrected: !!r.manualCorrected,
                     cropUrl_available: cropOk
                 };
                 if (cropOk && cropUrl.length <= _CROP_LIMIT) out.cropUrl = cropUrl;
@@ -13031,6 +13086,11 @@ ${playerList}
                 checkCount:       all.filter(r => r.profaWarning && r.originalStatus === 'LOW').length,
                 ambigCount:       all.filter(r => r.profaWarning && r.originalStatus === 'AMBIG').length,
                 profaWarningCount: all.filter(r => r.profaWarning).length,
+                trainingEnabled:   _ccTrainedVecs.length > 0,
+                trainedClassCount: dbg.trainedClassCount || 0,
+                trainedExemplarCount: dbg.trainedExemplarCount || 0,
+                trainedHitCount:   dbg.trainedHitCount || 0,
+                baseHitCount:      dbg.baseHitCount || 0,
                 topMissingClasses: (dbg.classCoverage && Array.isArray(dbg.classCoverage.missing))
                     ? dbg.classCoverage.missing.slice(0, 12) : []
             };
@@ -13056,6 +13116,126 @@ ${playerList}
                 rowsAll: all
             };
         }
+
+        // ── LOCAL ICON TRAINING ──
+        const _CC_TRAINING_KEY = 'cc_km_icon_training_v1';
+        const _CC_MAX_PER_CLASS = 12;
+
+        // Reverse mapping: class3 → class2
+        function _ccBuildClass3ToClass2Map() {
+            const map = {};
+            Object.entries(CLASS2_TO_CLASS3).forEach(([c2, c3arr]) => {
+                c3arr.forEach(c3 => { map[c3] = c2; });
+            });
+            // Handle the special AW/PW group label — ambiguous, skip
+            map['АВ/ПВ'] = null;
+            return map;
+        }
+
+        async function kmRwSaveTraining() {
+            const trainBtn = document.getElementById('kmRwTrainBtn');
+            const statusEl = document.getElementById('kmRwTrainStatus');
+            if (trainBtn) { trainBtn.disabled = true; trainBtn.textContent = '⏳…'; }
+            const class3ToClass2 = _ccBuildClass3ToClass2Map();
+            let existing = [];
+            try { existing = JSON.parse(localStorage.getItem(_CC_TRAINING_KEY) || '[]'); } catch(e) { existing = []; }
+            let savedCount = 0, unresolvedCount = 0;
+
+            for (const party of (_kmRw.parties || [])) {
+                for (let rowIdx = 0; rowIdx < party.players.length; rowIdx++) {
+                    const row = party.players[rowIdx];
+                    const parsed = _kmRwFindParsed(row.name) || row;
+                    if (!parsed || parsed.profaSource !== 'manual_review') continue;
+                    const selectedProfa = parsed.profa;
+                    if (!selectedProfa || selectedProfa === '—') continue;
+                    const class2Key = class3ToClass2[selectedProfa];
+                    if (class2Key === undefined || class2Key === null) {
+                        unresolvedCount++;
+                        console.warn('[training] unresolved class2 for profa:', selectedProfa, 'debug_reason: unresolved_profile_mapping');
+                        continue;
+                    }
+                    const cropUrl = parsed.matcher_cropUrl || null;
+                    if (!cropUrl) { unresolvedCount++; continue; }
+                    const packName = parsed.matcher_pack || party.packName;
+                    const isDup = existing.some(e =>
+                        e.class2Key === class2Key && e.playerName === row.name &&
+                        e.pack === packName && e.row === rowIdx
+                    );
+                    if (isDup) continue;
+                    const countForClass = existing.filter(e => e.class2Key === class2Key).length;
+                    if (countForClass >= _CC_MAX_PER_CLASS) continue;
+                    existing.push({
+                        id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+                        createdAt: new Date().toISOString(),
+                        source: 'manual_correction',
+                        pack: packName,
+                        row: rowIdx,
+                        playerName: row.name,
+                        selectedProfa: selectedProfa,
+                        class2Key: class2Key,
+                        cropUrl: cropUrl,
+                        cropBox: parsed.matcher_crop || null,
+                        geoPreset: parsed.matcher_geoPreset || null,
+                        simBefore: parsed.matcher_sim || null,
+                        top1Before: parsed.matcher_top1 || null,
+                        top3Before: parsed.matcher_top3 || null
+                    });
+                    savedCount++;
+                }
+            }
+            try { localStorage.setItem(_CC_TRAINING_KEY, JSON.stringify(existing)); }
+            catch(e) { console.warn('[training] save failed', e); }
+            if (trainBtn) { trainBtn.disabled = false; trainBtn.textContent = '🧠 Запомнить'; }
+            let msg = savedCount > 0 ? '✅ сохранено: ' + savedCount : '';
+            if (unresolvedCount > 0) msg += (msg ? ' · ' : '') + '⚠ не сопоставлено: ' + unresolvedCount;
+            if (!savedCount && !unresolvedCount) msg = 'нет ручных исправлений';
+            if (statusEl) statusEl.textContent = msg;
+            console.info('[training] saved', savedCount, 'exemplars, unresolved:', unresolvedCount, 'total in storage:', existing.length);
+        }
+
+        function kmRwExportTraining() {
+            try {
+                const raw = localStorage.getItem(_CC_TRAINING_KEY) || '[]';
+                const training = JSON.parse(raw);
+                if (!training.length) { _kmRwToast('нет сохранённых эталонов'); return; }
+                const blob = new Blob([JSON.stringify(training, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'km_icon_training.json';
+                document.body.appendChild(a); a.click();
+                document.body.removeChild(a); URL.revokeObjectURL(url);
+                _kmRwToast('экспортировано: ' + training.length + ' эталонов');
+            } catch(e) { _kmRwToast('ошибка экспорта: ' + e.message); }
+        }
+
+        function kmRwImportTraining() {
+            const input = document.createElement('input');
+            input.type = 'file'; input.accept = '.json,application/json';
+            input.onchange = async (e) => {
+                const file = e.target.files[0]; if (!file) return;
+                const text = await file.text();
+                try {
+                    const imported = JSON.parse(text);
+                    if (!Array.isArray(imported)) throw new Error('not an array');
+                    let existing = [];
+                    try { existing = JSON.parse(localStorage.getItem(_CC_TRAINING_KEY) || '[]'); } catch(e2) {}
+                    const merged = existing.concat(imported.filter(t => !existing.some(e => e.id === t.id)));
+                    localStorage.setItem(_CC_TRAINING_KEY, JSON.stringify(merged));
+                    _kmRwToast('импортировано: ' + imported.length + ' (всего: ' + merged.length + ')');
+                } catch(e) { _kmRwToast('ошибка импорта: ' + e.message); }
+            };
+            input.click();
+        }
+
+        function kmRwResetTraining() {
+            if (!confirm('Сбросить все локальные эталоны обучения?')) return;
+            localStorage.removeItem(_CC_TRAINING_KEY);
+            _ccTrainedVecs = [];
+            const statusEl = document.getElementById('kmRwTrainStatus');
+            if (statusEl) statusEl.textContent = '';
+            _kmRwToast('эталоны сброшены');
+        }
+        // ── END LOCAL ICON TRAINING ──
 
         function _kmRwShowDebugTextarea(jsonStr) {
             // Fallback when clipboard API is denied / unavailable: open a small modal
