@@ -10243,93 +10243,35 @@ ${playerList}
                         // Use geometry-computed center directly (y-refine removed — was degrading crop quality)
                         const cy = expectedCY;
 
-                        // Adjusted scoring: penalise small crops (size aliasing) and, in the
-                        // rescue pass, also penalise candidates riding the edge of the sweep
-                        // window (likely truncated by limit, not by the underlying optimum).
-                        const _adjScore = (sim, sz, dx, dy, isRescue) => {
-                            let adj = sim;
-                            if (isRescue) {
-                                if      (sz >= 24) adj += 0;
-                                else if (sz >= 22) adj -= 0.002;
-                                else if (sz >= 20) adj -= 0.005;
-                                else               adj -= 0.012;
-                                if (Math.abs(dx) >= 10 || Math.abs(dy) >= 10) adj -= 0.005;
-                            } else {
-                                if      (sz >= 22) adj += 0;
-                                else if (sz >= 20) adj -= 0.003;
-                                else if (sz >= 18) adj -= 0.006;
-                                else               adj -= 0.010;
-                            }
-                            return adj;
-                        };
-                        const _runSweep = (sizes, offsets, isRescue) => {
-                            let bst = null, rect = null, bAdj = -Infinity;
-                            const swp = [];
-                            for (const sz of sizes) {
-                                for (const dx of offsets) {
-                                    for (const dy of offsets) {
-                                        const sx = Math.max(0, cx+dx-Math.floor(sz/2));
-                                        const sy = Math.max(0, cy+dy-Math.floor(sz/2));
-                                        const sw = Math.min(sc.width-sx,  sz);
-                                        const sh = Math.min(sc.height-sy, sz);
-                                        if (sw<4||sh<4) continue;
-                                        const feat = _ccCanvasRegionToFeature(sc,sx,sy,sw,sh,_CC_FEAT_SIZE);
-                                        if (!feat) continue;
-                                        const res = _ccClassifyGT(feat);
-                                        if (!res) continue;
-                                        const adjSim = _adjScore(res.similarity, sz, dx, dy, isRescue);
-                                        swp.push({ sz, dx, dy, top1: res.class2, sim: res.similarity, margin: res.margin, adj: adjSim });
-                                        if (adjSim > bAdj) {
-                                            bst = res;
-                                            bAdj = adjSim;
-                                            rect = { sx, sy, sw, sh, dx, dy, sz };
-                                        }
+                        let best = null, bestCropRect = null, bestAdj = -Infinity;
+                        const _swp = []; // per-candidate result, used for sweep consensus voting
+                        for (const sz of SWEEP_SZ) {
+                            for (const dx of SWEEP_OFF) {
+                                for (const dy of SWEEP_OFF) {
+                                    const sx = Math.max(0, cx+dx-Math.floor(sz/2));
+                                    const sy = Math.max(0, cy+dy-Math.floor(sz/2));
+                                    const sw = Math.min(sc.width-sx,  sz);
+                                    const sh = Math.min(sc.height-sy, sz);
+                                    if (sw<4||sh<4) continue;
+                                    const feat = _ccCanvasRegionToFeature(sc,sx,sy,sw,sh,_CC_FEAT_SIZE);
+                                    if (!feat) continue;
+                                    const res = _ccClassifyGT(feat);
+                                    if (!res) continue;
+                                    // Mild size preference: tiny crops win raw sim ties more often
+                                    // than they should (crop aliasing). A small monotone bonus for
+                                    // larger sizes nudges scoring toward 22/24 without overriding
+                                    // a clearly better small-crop candidate.
+                                    const sizeBonus = sz >= 22 ? 0 : (sz >= 20 ? -0.003 : (sz >= 18 ? -0.006 : -0.010));
+                                    const adjSim = res.similarity + sizeBonus;
+                                    _swp.push({ sz, dx, dy, top1: res.class2, sim: res.similarity, margin: res.margin, adj: adjSim });
+                                    if (adjSim > bestAdj) {
+                                        best = res;
+                                        bestAdj = adjSim;
+                                        bestCropRect = {sx, sy, sw, sh, dx, dy, sz};
                                     }
                                 }
                             }
-                            return { best: bst, bestCropRect: rect, swp };
-                        };
-                        // Post-sweep assessment: consensus, AVPW guard, c3opts, trigger,
-                        // safeLowAuto, classMapAmbig, autoOk — pure function of (best, swp).
-                        const _AVPW = { 'Abyss Walker': 1, 'Plains Walker': 1 };
-                        const _assess = (bst, swp) => {
-                            const sorted = swp.slice().sort((a, b) => b.adj - a.adj);
-                            const topN = sorted.slice(0, Math.min(15, sorted.length));
-                            const votes = {};
-                            for (const v of topN) votes[v.top1] = (votes[v.top1] || 0) + 1;
-                            const vSorted = Object.entries(votes).sort((a, b) => b[1] - a[1]);
-                            const cClass = vSorted[0] ? vSorted[0][0] : null;
-                            const cVotes = vSorted[0] ? vSorted[0][1] : 0;
-                            const cRatio = topN.length ? cVotes / topN.length : 0;
-                            const top1IsAVPW = !!_AVPW[bst.class2];
-                            const top2Name   = bst.top3 && bst.top3[1] ? (bst.top3[1].name || bst.top3[1].class2 || null) : null;
-                            const top2IsAVPW = !!(top2Name && _AVPW[top2Name]);
-                            const avPwAmbig  = top1IsAVPW && top2IsAVPW && bst.margin < 0.12;
-                            let c3opts = resolveClass2ToClass3(bst.class2);
-                            if (avPwAmbig) c3opts = ['АВ/ПВ', 'Ghost Hunter', 'Wind Rider'];
-                            const trigger = bst.similarity >= TRIG_SIM && bst.margin >= TRIG_MAR;
-                            const safeLowAuto = !trigger
-                                && bst.similarity >= 0.50
-                                && bst.margin >= TRIG_MAR
-                                && cClass === bst.class2
-                                && cRatio >= 0.6
-                                && c3opts.length === 1
-                                && !_rowUnstable
-                                && !avPwAmbig;
-                            const classMapAmbig = (trigger || safeLowAuto) && c3opts.length > 1;
-                            const autoOk = (trigger && !_rowUnstable && !avPwAmbig) || safeLowAuto;
-                            return {
-                                consensus: { class2: cClass, votes: cVotes, total: topN.length, ratio: +cRatio.toFixed(2) },
-                                consensusMatchesBest: cClass === bst.class2,
-                                avPwAmbig, c3opts, trigger, safeLowAuto, classMapAmbig, autoOk
-                            };
-                        };
-
-                        // ── First-pass sweep (normal window) ──
-                        const _normalRun = _runSweep(SWEEP_SZ, SWEEP_OFF, false);
-                        let best = _normalRun.best;
-                        let bestCropRect = _normalRun.bestCropRect;
-                        let _swp = _normalRun.swp;
+                        }
                         if (!best) {
                             try {
                                 window._gtDebug.rows.push({
@@ -10356,116 +10298,6 @@ ${playerList}
                             ? `yDrift=${_yDrift} rowH/2=${(geo.rowH/2).toFixed(1)}`
                             : '';
 
-                        // First-pass assessment on normal sweep result
-                        const _normalEval   = _assess(best, _swp);
-                        const _normalSnapshot = {
-                            class2: best.class2,
-                            sim: +(best.similarity || 0).toFixed(3),
-                            margin: +(best.margin || 0).toFixed(3),
-                            cropBox: Object.assign({}, bestCropRect),
-                            consensus: _normalEval.consensus,
-                            c3opts: _normalEval.c3opts.slice(),
-                            trigger: _normalEval.trigger,
-                            safeLowAuto: _normalEval.safeLowAuto,
-                            autoOk: _normalEval.autoOk
-                        };
-
-                        // ── Decide whether to run a second-pass rescue sweep ──
-                        // Triggers: ambiguous outcome, edge-of-window winner, tiny crop, or
-                        // borderline sim that almost made AUTO_LOW. Confident AUTO with a
-                        // healthy crop is left untouched.
-                        const _NORMAL_OFF_LIMIT = 6;
-                        const _smallCrop = bestCropRect && bestCropRect.sz <= 18;
-                        const _edgeHit = bestCropRect && (
-                            Math.abs(bestCropRect.dx) >= _NORMAL_OFF_LIMIT ||
-                            Math.abs(bestCropRect.dy) >= _NORMAL_OFF_LIMIT
-                        );
-                        const _borderlineSim = best.similarity >= 0.50 && best.similarity < 0.60 && _normalEval.c3opts.length === 1;
-                        const _runRescue =
-                            !_normalEval.autoOk
-                            || _normalEval.classMapAmbig
-                            || _normalEval.avPwAmbig
-                            || _smallCrop
-                            || _edgeHit
-                            || _borderlineSim;
-
-                        let rescueRan = false, rescueAccepted = false, rescueRejectReason = null;
-                        let _rescueSnapshot = null, _rescueEval = null, _swpRescue = null;
-                        let _appliedSource = 'normal';
-                        if (_runRescue) {
-                            rescueRan = true;
-                            const SWEEP_OFF_RESCUE = [-12,-10,-8,-6,-4,-2,0,2,4,6,8,10,12];
-                            const SWEEP_SZ_RESCUE  = [20,22,24,26];
-                            const _rescueRun = _runSweep(SWEEP_SZ_RESCUE, SWEEP_OFF_RESCUE, true);
-                            _swpRescue = _rescueRun.swp;
-                            const rBest = _rescueRun.best;
-                            const rRect = _rescueRun.bestCropRect;
-                            if (!rBest) {
-                                rescueRejectReason = 'rescue_sweep_empty';
-                            } else {
-                                _rescueEval = _assess(rBest, _swpRescue);
-                                _rescueSnapshot = {
-                                    class2: rBest.class2,
-                                    sim: +(rBest.similarity || 0).toFixed(3),
-                                    margin: +(rBest.margin || 0).toFixed(3),
-                                    cropBox: Object.assign({}, rRect),
-                                    consensus: _rescueEval.consensus,
-                                    c3opts: _rescueEval.c3opts.slice(),
-                                    trigger: _rescueEval.trigger,
-                                    safeLowAuto: _rescueEval.safeLowAuto
-                                };
-                                // Rescue acceptance — stricter than normal first-pass to avoid
-                                // false positives. RESCUE_AUTO requires regular trigger; the LOW
-                                // tier requires sturdier consensus / margin / centered crop.
-                                const rcons = _rescueEval.consensus;
-                                const rescueAuto = _rescueEval.trigger
-                                    && rBest.margin >= 0.08
-                                    && _rescueEval.c3opts.length === 1
-                                    && rcons.ratio >= 0.6
-                                    && _rescueEval.consensusMatchesBest
-                                    && !_rescueEval.avPwAmbig
-                                    && !_rowUnstable;
-                                const rescueAutoLow = !_rescueEval.trigger
-                                    && rBest.similarity >= 0.52
-                                    && rBest.margin >= 0.10
-                                    && _rescueEval.c3opts.length === 1
-                                    && rcons.ratio >= 0.7
-                                    && _rescueEval.consensusMatchesBest
-                                    && rRect && rRect.sz >= 22
-                                    && rRect && Math.abs(rRect.dx) < 10
-                                    && rRect && Math.abs(rRect.dy) < 10
-                                    && !_rescueEval.avPwAmbig
-                                    && !_rowUnstable;
-                                if (rescueAuto || rescueAutoLow) {
-                                    rescueAccepted = true;
-                                    _appliedSource = rescueAuto ? 'rescue_auto' : 'rescue_auto_low';
-                                    best = rBest;
-                                    bestCropRect = rRect;
-                                    _swp = _swpRescue;
-                                } else {
-                                    if (_rowUnstable) rescueRejectReason = 'row_unstable';
-                                    else if (_rescueEval.avPwAmbig) rescueRejectReason = 'avpw_ambig';
-                                    else if (_rescueEval.c3opts.length !== 1) rescueRejectReason = 'class3_multi';
-                                    else if (rcons.ratio < 0.6) rescueRejectReason = 'consensus_low_' + rcons.ratio.toFixed(2);
-                                    else if (!_rescueEval.consensusMatchesBest) rescueRejectReason = 'consensus_disagrees';
-                                    else if (!_rescueEval.trigger && rBest.margin < 0.10) rescueRejectReason = 'margin_low_' + rBest.margin.toFixed(3);
-                                    else if (!_rescueEval.trigger && rBest.similarity < 0.52) rescueRejectReason = 'sim_low_' + rBest.similarity.toFixed(3);
-                                    else if (!_rescueEval.trigger && rRect && rRect.sz < 22) rescueRejectReason = 'crop_small_' + rRect.sz;
-                                    else if (!_rescueEval.trigger && rRect && (Math.abs(rRect.dx) >= 10 || Math.abs(rRect.dy) >= 10)) rescueRejectReason = 'rescue_edge';
-                                    else rescueRejectReason = 'unknown';
-                                }
-                            }
-                        }
-
-                        const _finalEval = (rescueAccepted && _rescueEval) ? _rescueEval : _normalEval;
-                        const _trigger = _finalEval.trigger;
-                        const _safeLowAuto = _finalEval.safeLowAuto;
-                        const _avPwAmbig = _finalEval.avPwAmbig;
-                        const _classMapAmbig = _finalEval.classMapAmbig;
-                        const _c3opts = _finalEval.c3opts;
-                        const _autoOk = _finalEval.autoOk;
-                        const _consensus = _finalEval.consensus;
-
                         // Generate 48×48 data URL of the winning crop for debug preview
                         let cropUrl = '';
                         if (bestCropRect) {
@@ -10473,6 +10305,47 @@ ${playerList}
                             dc.getContext('2d').drawImage(sc, bestCropRect.sx, bestCropRect.sy, bestCropRect.sw, bestCropRect.sh, 0, 0, 48, 48);
                             cropUrl = dc.toDataURL();
                         }
+
+                        // Sweep consensus: count which class2 wins across the top-N adj-ranked
+                        // crop candidates. A tight consensus on best.class2 lets us accept a
+                        // sub-trigger sim without lowering global thresholds (SAFE_LOW_AUTO).
+                        _swp.sort((a, b) => b.adj - a.adj);
+                        const _topN = _swp.slice(0, Math.min(15, _swp.length));
+                        const _voteCounts = {};
+                        for (const v of _topN) _voteCounts[v.top1] = (_voteCounts[v.top1] || 0) + 1;
+                        const _votesSorted = Object.entries(_voteCounts).sort((a, b) => b[1] - a[1]);
+                        const _consensusClass = _votesSorted[0] ? _votesSorted[0][0] : null;
+                        const _consensusVotes = _votesSorted[0] ? _votesSorted[0][1] : 0;
+                        const _consensusRatio = _topN.length ? _consensusVotes / _topN.length : 0;
+                        const _consensusMatchesBest = _consensusClass === best.class2;
+
+                        // AV/PW disambiguation: matcher routinely confuses Abyss Walker and
+                        // Plains Walker portraits. If both occupy the top-2 within a tight
+                        // margin, hold the row as ambiguous (3 class3 options) rather than
+                        // committing to either side.
+                        const _AVPW = { 'Abyss Walker': 1, 'Plains Walker': 1 };
+                        const _top1IsAVPW = !!_AVPW[best.class2];
+                        const _top2Name   = best.top3 && best.top3[1] ? (best.top3[1].name || best.top3[1].class2 || null) : null;
+                        const _top2IsAVPW = !!(_top2Name && _AVPW[_top2Name]);
+                        const _avPwAmbig  = _top1IsAVPW && _top2IsAVPW && best.margin < 0.12;
+
+                        let _c3opts = resolveClass2ToClass3(best.class2);
+                        if (_avPwAmbig) _c3opts = ['АВ/ПВ', 'Ghost Hunter', 'Wind Rider'];
+
+                        const _trigger = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
+                        // SAFE_LOW_AUTO: sub-trigger sim accepted only when the sweep agrees,
+                        // the margin is healthy, the class3 mapping is unique, and we are not
+                        // in the AV/PW confusable group. Conservative by design — designed to
+                        // pick up obvious-but-soft hits without inviting false positives.
+                        const _safeLowAuto = !_trigger
+                            && best.similarity >= 0.50
+                            && best.margin >= TRIG_MAR
+                            && _consensusMatchesBest
+                            && _consensusRatio >= 0.6
+                            && _c3opts.length === 1
+                            && !_rowUnstable
+                            && !_avPwAmbig;
+                        const _classMapAmbig = (_trigger || _safeLowAuto) && _c3opts.length > 1;
 
                         writeTarget.matcher_top1        = best.class2;
                         writeTarget.matcher_sim         = best.similarity;
@@ -10484,8 +10357,7 @@ ${playerList}
                         writeTarget.matcher_avPwAmbig   = _avPwAmbig;
                         writeTarget.matcher_classMapAmbig = _classMapAmbig;
                         writeTarget.matcher_class3opts  = _c3opts;
-                        writeTarget.matcher_consensus   = _consensus;
-                        writeTarget.matcher_rescue      = { ran: rescueRan, accepted: rescueAccepted, applied: _appliedSource, reject: rescueRejectReason };
+                        writeTarget.matcher_consensus   = { class2: _consensusClass, votes: _consensusVotes, total: _topN.length, ratio: +_consensusRatio.toFixed(2) };
                         writeTarget.matcher_rowUnstable    = _rowUnstable;
                         writeTarget.matcher_unstableReason = _unstableReason;
                         writeTarget.matcher_yDrift         = _yDrift;
@@ -10506,10 +10378,10 @@ ${playerList}
                         writeTarget.matcher_cropQuality = _cq;
                         writeTarget.matcher_geoPreset   = geo.preset;
 
-                        // AUTO-WRITE: regular AUTO, SAFE_LOW_AUTO, RESCUE_AUTO, or RESCUE_AUTO_LOW.
-                        // All require a unique class3 mapping to write profa; AUTO with multi-option
-                        // mapping leaves profa empty but flags matcher_classMapAmbig so the UI
-                        // surfaces a picker.
+                        // AUTO-WRITE: regular AUTO or SAFE_LOW_AUTO. Both require a unique class3
+                        // mapping to write profa; AUTO with multi-option mapping leaves profa
+                        // empty but flags matcher_classMapAmbig so the UI surfaces a picker.
+                        const _autoOk = (_trigger && !_rowUnstable && !_avPwAmbig) || _safeLowAuto;
                         if (_autoOk) {
                             writeTarget.class2     = best.class2;
                             writeTarget.profaSource = 'gt_exemplar_matcher';
@@ -10520,9 +10392,7 @@ ${playerList}
                             const _wroteAuto = !!_autoOk;
                             const _wroteProfa = _wroteAuto && _c3opts.length === 1;
                             let _status;
-                            if (rescueAccepted && _appliedSource === 'rescue_auto')      _status = 'RESCUE_AUTO';
-                            else if (rescueAccepted && _appliedSource === 'rescue_auto_low') _status = 'RESCUE_AUTO_LOW';
-                            else if (_trigger && !_rowUnstable && !_avPwAmbig && _c3opts.length === 1) _status = 'AUTO';
+                            if (_trigger && !_rowUnstable && !_avPwAmbig && _c3opts.length === 1) _status = 'AUTO';
                             else if (_safeLowAuto) _status = 'AUTO_LOW';
                             else if (_avPwAmbig) _status = 'AVPW_AMBIG';
                             else if (_trigger && !_rowUnstable && _c3opts.length > 1) _status = 'CLASS_MAP_AMBIG';
@@ -10533,15 +10403,6 @@ ${playerList}
                                 if (best.margin     < TRIG_MAR) _reasons.push('AMBIG');
                                 _status = _reasons.join('·') || 'LOW';
                             } else _status = 'UNKNOWN';
-
-                            // Pick top-5 candidates from the swp that produced the final best.
-                            // class3opts on each (cheap — only top 5).
-                            const _topCands = _swp.slice().sort((a,b) => b.adj - a.adj).slice(0,5).map(c => ({
-                                sz: c.sz, dx: c.dx, dy: c.dy,
-                                top1: c.top1, sim: +c.sim.toFixed(3), margin: +c.margin.toFixed(3),
-                                adj: +c.adj.toFixed(3), class3opts: resolveClass2ToClass3(c.top1)
-                            }));
-
                             window._gtDebug.rows.push({
                                 pack: packName,
                                 row: rowIdx,
@@ -10558,22 +10419,13 @@ ${playerList}
                                 safeLowAuto: !!_safeLowAuto,
                                 avPwAmbig: !!_avPwAmbig,
                                 classMapAmbig: !!_classMapAmbig,
-                                consensus: _consensus,
+                                consensus: writeTarget.matcher_consensus,
                                 wroteAuto: _wroteAuto,
                                 wroteProfa: _wroteProfa,
                                 class3opts: _c3opts,
                                 status: _status,
                                 cropUrl: cropUrl,
-                                targetFound: targetFound,
-                                edgeHit: !!_edgeHit,
-                                smallCrop: !!_smallCrop,
-                                rescueApplied: rescueRan,
-                                rescueAccepted: rescueAccepted,
-                                rescueRejectReason: rescueRejectReason,
-                                appliedSource: _appliedSource,
-                                normalBest: _normalSnapshot,
-                                rescueBest: _rescueSnapshot,
-                                candidateTop5: _topCands
+                                targetFound: targetFound
                             });
                         } catch(e) { /* ignore */ }
                         window._gtDebug.matcherProcessed = (window._gtDebug.matcherProcessed || 0) + 1;
@@ -12799,22 +12651,11 @@ ${playerList}
             const isClassMapAmbig = !!parsed.matcher_classMapAmbig;
             const isAvPwAmbig = !!parsed.matcher_avPwAmbig;
             const isManual = profaSrc === 'manual_review';
-            const rescue = parsed.matcher_rescue || null;
-            const isRescueAuto    = rescue && rescue.accepted && rescue.applied === 'rescue_auto';
-            const isRescueAutoLow = rescue && rescue.accepted && rescue.applied === 'rescue_auto_low';
             const top3Title = parsed.matcher_top3 && parsed.matcher_top3.length
                 ? 'top3: ' + parsed.matcher_top3.slice(0,3).map(x => (x.name||x.class2||'?') + ' ' + Math.round((x.sim||x.similarity||0)*100) + '%').join(', ')
                 : '';
             if (isManual) {
                 return '<span title="Ручная правка" style="font-size:8.5px;color:#a5b4fc;background:#1e1b4b;border:1px solid #4338ca;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">MANUAL</span>';
-            }
-            if (isRescueAuto && !isClassMapAmbig) {
-                const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
-                return '<span title="Авто после rescue-pass (расширенный crop sweep) · ' + _kmRwEsc(top3Title) + '" style="font-size:8.5px;color:#67e8f9;background:#083344;border:1px solid #0e7490;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">RESCUE ' + sim + '</span>';
-            }
-            if (isRescueAutoLow && !isClassMapAmbig) {
-                const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
-                return '<span title="Авто после rescue-pass с пониженной уверенностью · ' + _kmRwEsc(top3Title) + '" style="font-size:8.5px;color:#a5f3fc;background:#082f49;border:1px solid #0369a1;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">RESCUE* ' + sim + '</span>';
             }
             if (isAutoTrig && !isClassMapAmbig) {
                 const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
@@ -12824,7 +12665,7 @@ ${playerList}
                 const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
                 return '<span title="Авто (низкая уверенность, sweep consensus) · ' + _kmRwEsc(top3Title) + '" style="font-size:8.5px;color:#a7f3d0;background:#022c22;border:1px solid #047857;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">AUTO* ' + sim + '</span>';
             }
-            if ((isAutoTrig || isSafeLow || isRescueAuto || isRescueAutoLow) && isClassMapAmbig) {
+            if ((isAutoTrig || isSafeLow) && isClassMapAmbig) {
                 const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
                 return '<span title="Иконка распознана, но class3 неоднозначен — выбери вручную · ' + _kmRwEsc(top3Title) + '" style="font-size:8.5px;color:#fcd34d;background:#1c1500;border:1px solid #b45309;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">CLASS_MAP_AMBIG ' + sim + '</span>';
             }
@@ -13228,20 +13069,6 @@ ${playerList}
             const allRows = Array.isArray(dbg.rows) ? dbg.rows : [];
             const currentPack = (_kmRw && _kmRw.parties && _kmRw.parties[_kmRw.idx]) ? _kmRw.parties[_kmRw.idx].packName : null;
             const _CROP_LIMIT = 220; // chars; longer base64 omitted to keep payload pasteable
-            const sanitiseSnapshot = (s) => {
-                if (!s) return null;
-                return {
-                    class2: s.class2 || null,
-                    sim: typeof s.sim === 'number' ? +s.sim.toFixed(3) : s.sim,
-                    margin: typeof s.margin === 'number' ? +s.margin.toFixed(3) : s.margin,
-                    cropBox: s.cropBox || null,
-                    consensus: s.consensus || null,
-                    c3opts: Array.isArray(s.c3opts) ? s.c3opts : null,
-                    trigger: !!s.trigger,
-                    safeLowAuto: !!s.safeLowAuto,
-                    autoOk: typeof s.autoOk === 'boolean' ? s.autoOk : null
-                };
-            };
             const sanitiseRow = (r) => {
                 const cropUrl = r.cropUrl || '';
                 const cropOk = !!cropUrl;
@@ -13258,26 +13085,12 @@ ${playerList}
                         name: x.name || x.class2 || null,
                         sim: typeof x.sim === 'number' ? +x.sim.toFixed(3) : (x.sim || x.similarity || null)
                     })),
-                    trigger:       !!r.trigger,
-                    safeLowAuto:   !!r.safeLowAuto,
-                    avPwAmbig:     !!r.avPwAmbig,
-                    classMapAmbig: !!r.classMapAmbig,
-                    consensus:     r.consensus || null,
-                    wroteAuto:     !!r.wroteAuto,
-                    wroteProfa:    !!r.wroteProfa,
+                    trigger:    !!r.trigger,
+                    wroteAuto:  !!r.wroteAuto,
+                    wroteProfa: !!r.wroteProfa,
                     class3opts: Array.isArray(r.class3opts) ? r.class3opts : null,
                     status: r.status || (r.trigger ? 'AUTO' : (r.top1 ? 'LOW' : 'NONE')),
                     reason: r.reason || null,
-                    edgeHit:        !!r.edgeHit,
-                    smallCrop:      !!r.smallCrop,
-                    rescueApplied:  !!r.rescueApplied,
-                    rescueAccepted: !!r.rescueAccepted,
-                    rescueRejectReason: r.rescueRejectReason || null,
-                    appliedSource:  r.appliedSource || null,
-                    normalBest:     sanitiseSnapshot(r.normalBest),
-                    rescueBest:     sanitiseSnapshot(r.rescueBest),
-                    candidateTop5:  Array.isArray(r.candidateTop5) ? r.candidateTop5 : null,
-                    targetFound:    typeof r.targetFound === 'boolean' ? r.targetFound : null,
                     cropUrl_available: cropOk
                 };
                 if (cropOk && cropUrl.length <= _CROP_LIMIT) out.cropUrl = cropUrl;
@@ -13286,33 +13099,17 @@ ${playerList}
             };
             const all = allRows.map(sanitiseRow);
             const ofPack = currentPack ? all.filter(r => r.pack === currentPack) : [];
-            // Status partitions (no overlaps): distinguish auto-low / rescue / unresolved.
-            const isAutoLow = (r) => r.status === 'AUTO_LOW' || r.status === 'RESCUE_AUTO_LOW';
-            const isAuto    = (r) => r.status === 'AUTO' || r.status === 'RESCUE_AUTO';
-            const isRescue  = (r) => r.status === 'RESCUE_AUTO' || r.status === 'RESCUE_AUTO_LOW';
-            const unresolvedLow   = all.filter(r => !r.wroteProfa && r.top1 && (r.status||'').includes('LOW_SIM'));
-            const unresolvedAmbig = all.filter(r => !r.wroteProfa && r.top1 && ((r.status||'') === 'AMBIG' || (r.status||'').includes('·AMBIG') || (r.status||'') === 'AVPW_AMBIG' || (r.status||'') === 'CLASS_MAP_AMBIG'));
-            const autoLowRows  = all.filter(isAutoLow);
-            const rescueRows   = all.filter(isRescue);
-            const lows  = all.filter(r => !r.wroteProfa && r.top1 && !isAutoLow(r)); // real unresolved
+            const lows  = all.filter(r => !r.trigger && r.top1);
             const bads  = all.filter(r => r.status === 'BAD_CROP' || r.status === 'BAD_GEOMETRY');
             const noAuto = all.filter(r => !r.wroteAuto);
-            const noProfa = all.filter(r => !r.wroteProfa);
             const cardinals = all.filter(r => Array.isArray(r.class3opts) && r.class3opts.includes('Cardinal'));
             const summary = {
                 totalRows:       all.length,
                 autoCount:       all.filter(r => r.wroteAuto).length,
-                autoStrictCount: all.filter(isAuto).length,
-                autoLowCount:    autoLowRows.length,
-                rescueCount:     rescueRows.length,
                 profaWriteCount: all.filter(r => r.wroteProfa).length,
-                unresolvedLowCount:   unresolvedLow.length,
-                unresolvedAmbigCount: unresolvedAmbig.length,
-                classMapAmbigCount:   all.filter(r => (r.status||'') === 'CLASS_MAP_AMBIG').length,
-                avpwAmbigCount:       all.filter(r => (r.status||'') === 'AVPW_AMBIG').length,
-                lowCount:        lows.length, // legacy alias — now excludes AUTO_LOW
+                lowCount:        lows.length,
                 badCount:        bads.length,
-                emptyProfaCount: noProfa.length,
+                emptyProfaCount: all.filter(r => !r.wroteProfa).length,
                 topMissingClasses: (dbg.classCoverage && Array.isArray(dbg.classCoverage.missing))
                     ? dbg.classCoverage.missing.slice(0, 12) : []
             };
@@ -13329,13 +13126,8 @@ ${playerList}
                 summary: summary,
                 rowsCurrentPack: ofPack,
                 rowsLow: lows,
-                rowsAutoLow: autoLowRows,
-                rowsRescue: rescueRows,
                 rowsBad: bads,
-                rowsNotAuto: noAuto,    // legacy
-                rowsNoProfa: noProfa,
-                rowsUnresolvedLow:   unresolvedLow,
-                rowsUnresolvedAmbig: unresolvedAmbig,
+                rowsNotAuto: noAuto,
                 rowsCardinal: cardinals,
                 rowsAll: all
             };
