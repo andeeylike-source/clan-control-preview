@@ -3913,6 +3913,7 @@
 
             <!-- Статус обработки -->
             <div id="dayScreenshotStatus" style="display:none;font-size:12px;padding:8px 12px;border-radius:8px;margin-bottom:8px;position:relative;padding-right:28px"><span id="dayScreenshotStatusText"></span><button onclick="document.getElementById('dayScreenshotStatus').style.display='none'" style="position:absolute;top:50%;right:8px;transform:translateY(-50%);background:none;border:none;color:inherit;cursor:pointer;font-size:14px;opacity:0.6;line-height:1" title="Закрыть">✕</button></div>
+            <div id="dayOcrBatchSummary" style="display:none;font-size:11px;padding:7px 10px;border-radius:7px;margin-bottom:6px;line-height:1.8"></div>
 
             <!-- Результаты анализа -->
             <div id="dayAnalyzeResults" style="display:none;margin-bottom:8px">
@@ -3953,6 +3954,8 @@
                     <button onclick="kmRwClose()" title="Закрыть" style="background:none;border:none;color:#64748b;font-size:17px;cursor:pointer;padding:3px 7px;line-height:1">✕</button>
                 </div>
             </div>
+            <!-- ocr batch banner -->
+            <div id="kmRwOcrBanner" style="display:none;font-size:10.5px;padding:4px 14px;background:#78350f22;border-bottom:1px solid #f59e0b33;color:#fbbf24;text-align:center"></div>
             <!-- body -->
             <div id="kmRwBody" style="display:flex;flex:1;overflow:hidden;min-height:0">
                 <!-- left: cropped «Член группы» -->
@@ -8823,6 +8826,7 @@ function getClass2IconByClass3(c3) {
                 btn.innerText = 'OCR.space...';
             }
             document.getElementById('dayAnalyzeResults').style.display = 'none';
+            { const _bs = document.getElementById('dayOcrBatchSummary'); if (_bs) _bs.style.display = 'none'; }
             setDayStatus('loading', `OCR.space: обрабатываю ${shots.length} скриншотов...`);
             let progBar = document.getElementById('analyzeProgressWrap');
             if (!progBar && btn) {
@@ -8903,7 +8907,7 @@ function getClass2IconByClass3(c3) {
                             continue;
                         }
 
-                        const packName = shot.packName || shot.name || 'OCR ' + (i + 1);
+                        const packName = (shot.name || shot.packName || 'OCR') + ' #' + (i + 1);
                         screenPlayersMap[packName] = players.map(p => ({...p}));
                         screenShotDataMap[packName] = shot.dataUrl;
                         geometryMap[packName] = {
@@ -8991,6 +8995,7 @@ function getClass2IconByClass3(c3) {
                         statusMsg += ` | Пропущено скриншотов: ${skippedScreenshots.length} - №${skippedScreenshots.map(s => s.num + ' (' + s.reason + ')').join(', №')}`;
                     }
                     setDayStatus(skippedScreenshots.length > 0 ? 'warning' : 'success', statusMsg);
+                    _kmOcrRenderBatchSummary(shots.length, Object.keys(screenPlayersMap).length, skippedScreenshots);
                     expandDayModal();
                     if (minibarText) minibarText.innerText = `OCR.space: ${dayLastParsed.length} игроков`;
                     notifyAnalysisComplete(dayLastParsed.length);
@@ -9055,6 +9060,7 @@ function getClass2IconByClass3(c3) {
             const btn = document.getElementById('analyzeBtn');
             if (btn) { btn.disabled = true; btn.innerText = 'Baidu OCR...'; }
             document.getElementById('dayAnalyzeResults').style.display = 'none';
+            { const _bs = document.getElementById('dayOcrBatchSummary'); if (_bs) _bs.style.display = 'none'; }
             setDayStatus('loading', `OpenRouter OCR: обрабатываю ${shots.length} скриншотов...`);
 
             let progBar = document.getElementById('analyzeProgressWrap');
@@ -9213,7 +9219,7 @@ function getClass2IconByClass3(c3) {
                             continue;
                         }
 
-                        const packName = shot.packName || shot.name || 'OCR ' + (i + 1);
+                        const packName = (shot.name || shot.packName || 'OCR') + ' #' + (i + 1);
                         screenPlayersMap[packName]  = players.map(p => ({...p}));
                         screenShotDataMap[packName] = shot.dataUrl;
                         geometryMap[packName] = {
@@ -9301,6 +9307,7 @@ function getClass2IconByClass3(c3) {
                         statusMsg += ` | Пропущено: ${skippedScreenshots.length} — №${skippedScreenshots.map(s => s.num + ' (' + s.reason + ')').join(', №')}`;
                     }
                     setDayStatus(skippedScreenshots.length > 0 ? 'warning' : 'success', statusMsg);
+                    _kmOcrRenderBatchSummary(shots.length, Object.keys(screenPlayersMap).length, skippedScreenshots);
                     expandDayModal();
                     if (minibarText) minibarText.innerText = `OpenRouter OCR: ${dayLastParsed.length} игроков`;
                     notifyAnalysisComplete(dayLastParsed.length);
@@ -12543,6 +12550,14 @@ ${playerList}
             _kmRw.shotReq = 0;
             const ov = document.getElementById('kmReviewWizard');
             if (ov) ov.style.display = 'flex';
+            const _bInfo = window._kmOcrLastBatchInfo;
+            const _bannerEl = document.getElementById('kmRwOcrBanner');
+            if (_bannerEl && _bInfo && _bInfo.skippedList && _bInfo.skippedList.length > 0) {
+                _bannerEl.textContent = `⚠️ OCR: распознано ${_bInfo.successCount} из ${_bInfo.totalInput}, пропущено ${_bInfo.skippedList.length}`;
+                _bannerEl.style.display = 'block';
+            } else if (_bannerEl) {
+                _bannerEl.style.display = 'none';
+            }
             kmRwRender();
         }
 
@@ -13467,6 +13482,22 @@ ${playerList}
             if (list && list.children.length === 0) {
                 document.getElementById('similarNicksOverlay')?.remove();
             }
+        }
+
+        function _kmOcrRenderBatchSummary(totalInput, successCount, skippedList) {
+            window._kmOcrLastBatchInfo = { totalInput, successCount, skippedList: skippedList.slice() };
+            const el = document.getElementById('dayOcrBatchSummary');
+            if (!el || !totalInput) return;
+            const skipped = skippedList.length;
+            const ok = skipped === 0;
+            el.style.cssText = `display:block;font-size:11px;padding:7px 10px;border-radius:7px;margin-bottom:6px;line-height:1.8;background:#0d1117;border:1px solid ${ok ? '#22c55e44' : '#f59e0b44'};color:${ok ? '#4ade80' : '#fbbf24'}`;
+            let html = `<b>OCR batch:</b> &nbsp;input: ${totalInput} &nbsp;/ &nbsp;success: ${successCount} &nbsp;/ &nbsp;skipped: ${skipped}`;
+            if (skipped > 0) {
+                html += '<br><span style="color:#94a3b8;font-size:10px">' +
+                    skippedList.map(s => `&nbsp;&nbsp;#${s.num} — ${s.fileName || '(no name)'} — ${s.reason}${s.rawRows != null ? ' (rows:'+s.rawRows+')' : ''}`).join('<br>') +
+                    '</span>';
+            }
+            el.innerHTML = html;
         }
 
         function setDayStatus(type, text) {
