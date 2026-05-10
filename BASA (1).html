@@ -5594,6 +5594,7 @@ function getClass2Icon(n) { return n ? CLASS2_ICONS[n] || null : null; }
 function getClass3Options(n) { return CLASS2_TO_CLASS3[n] || []; }
 function resolveClass2ToClass3(n) {
     if (!n) return [];
+    if (n === 'Abyss Walker' || n === 'Plains Walker') return ['АВ/ПВ', 'Ghost Hunter', 'Wind Rider'];
     if (CLASS2_TO_CLASS3[n]) return CLASS2_TO_CLASS3[n];
     const k = Object.keys(CLASS2_TO_CLASS3).find(k =>
         n.toLowerCase().includes(k.toLowerCase()) || k.toLowerCase().includes(n.toLowerCase())
@@ -9839,10 +9840,6 @@ function getClass2IconByClass3(c3) {
             _ccIconFeatures = { names: ok.map(x=>x.name), vectors: ok.map(x=>x.vec) };
         }
 
-        // Class2 label fixups for the in-game catalog. 'Sword Muse' is a class3 name —
-        // when the catalog uses it as class2 it leaks into rankings as a phantom class.
-        const _CC_GT_CLASS2_FIXUP = { 'Sword Muse': 'Sword Singer' };
-
         // ── GT exemplar catalog: real in-game portrait sprites (52 labeled) ──
         async function _ccEnsureGTFeatures() {
             if (_ccGTExemplars !== null) return;
@@ -9854,61 +9851,24 @@ function getClass2IconByClass3(c3) {
                 const r = await fetch(_CC_GT_CATALOG_URL);
                 if (!r.ok) {
                     window._gtDebug.catalogFetch = 'http_error_' + r.status;
-                    console.warn('[gt-exemplar] fetch failed', r.status);
-                } else {
-                    const entries = await r.json();
-                    window._gtDebug.catalogEntries = entries.length;
-                    await Promise.all(entries.map(e => new Promise(res => {
-                        const img = new Image();
-                        img.onload = () => {
-                            const c2 = _CC_GT_CLASS2_FIXUP[e.class2] || e.class2;
-                            _ccGTExemplars.push({ class2: c2, vec: _ccImgToFeature(img, _CC_FEAT_SIZE), source: 'catalog' });
-                            res();
-                        };
-                        img.onerror = () => res();
-                        img.src = e.b64;
-                    })));
-                    window._gtDebug.catalogFetch = 'ok';
+                    console.warn('[gt-exemplar] fetch failed', r.status); return;
                 }
+                const entries = await r.json();
+                window._gtDebug.catalogEntries = entries.length;
+                await Promise.all(entries.map(e => new Promise(res => {
+                    const img = new Image();
+                    img.onload = () => { _ccGTExemplars.push({ class2: e.class2, vec: _ccImgToFeature(img, _CC_FEAT_SIZE) }); res(); };
+                    img.onerror = () => res();
+                    img.src = e.b64;
+                })));
+                window._gtDebug.catalogFetch = 'ok';
+                window._gtDebug.exemplarsLoaded = _ccGTExemplars.length;
+                window._gtDebug.classesLoaded = new Set(_ccGTExemplars.map(e=>e.class2)).size;
+                console.log('[gt-exemplar] loaded', _ccGTExemplars.length, 'exemplars,', window._gtDebug.classesLoaded, 'classes');
             } catch(err) {
                 window._gtDebug.catalogFetch = 'exception:' + String(err).slice(0,80);
                 console.warn('[gt-exemplar]', err);
             }
-            // Supplementary exemplars: for any class2 still missing from the catalog,
-            // derive a single feature vector from the embedded CLASS2_ICONS sprite.
-            // These are project canonical icon assets shipped in the HTML — not a
-            // roster lookup. Synthetic exemplars are weaker than real in-game crops
-            // (likely AMBIG or LOW_SIM rather than AUTO), but they unblock the worst
-            // failure mode where matcher had zero anchor for an entire class.
-            try {
-                const covered = new Set(_ccGTExemplars.map(x => x.class2));
-                const supplementary = [];
-                if (typeof CLASS2_ICONS === 'object' && CLASS2_ICONS) {
-                    for (const class2 of Object.keys(CLASS2_ICONS)) {
-                        if (covered.has(class2)) continue;
-                        const b64 = CLASS2_ICONS[class2];
-                        if (!b64 || typeof b64 !== 'string' || !b64.startsWith('data:')) continue;
-                        supplementary.push({ class2, b64 });
-                    }
-                }
-                if (supplementary.length) {
-                    await Promise.all(supplementary.map(s => new Promise(res => {
-                        const img = new Image();
-                        img.onload = () => {
-                            _ccGTExemplars.push({ class2: s.class2, vec: _ccImgToFeature(img, _CC_FEAT_SIZE), source: 'supplementary' });
-                            res();
-                        };
-                        img.onerror = () => res();
-                        img.src = s.b64;
-                    })));
-                }
-                window._gtDebug.supplementaryAdded = supplementary.length;
-            } catch(e) {
-                window._gtDebug.supplementaryAdded = 'error:' + String(e).slice(0,80);
-            }
-            window._gtDebug.exemplarsLoaded = _ccGTExemplars.length;
-            window._gtDebug.classesLoaded = new Set(_ccGTExemplars.map(e=>e.class2)).size;
-            console.log('[gt-exemplar] loaded', _ccGTExemplars.length, 'exemplars,', window._gtDebug.classesLoaded, 'classes (supplementary:', window._gtDebug.supplementaryAdded || 0, ')');
         }
 
         // Classify against GT exemplars: max-sim per class, then rank classes
@@ -10243,8 +10203,7 @@ ${playerList}
                         // Use geometry-computed center directly (y-refine removed — was degrading crop quality)
                         const cy = expectedCY;
 
-                        let best = null, bestCropRect = null, bestAdj = -Infinity;
-                        const _swp = []; // per-candidate result, used for sweep consensus voting
+                        let best = null, bestCropRect = null;
                         for (const sz of SWEEP_SZ) {
                             for (const dx of SWEEP_OFF) {
                                 for (const dy of SWEEP_OFF) {
@@ -10257,16 +10216,8 @@ ${playerList}
                                     if (!feat) continue;
                                     const res = _ccClassifyGT(feat);
                                     if (!res) continue;
-                                    // Mild size preference: tiny crops win raw sim ties more often
-                                    // than they should (crop aliasing). A small monotone bonus for
-                                    // larger sizes nudges scoring toward 22/24 without overriding
-                                    // a clearly better small-crop candidate.
-                                    const sizeBonus = sz >= 22 ? 0 : (sz >= 20 ? -0.003 : (sz >= 18 ? -0.006 : -0.010));
-                                    const adjSim = res.similarity + sizeBonus;
-                                    _swp.push({ sz, dx, dy, top1: res.class2, sim: res.similarity, margin: res.margin, adj: adjSim });
-                                    if (adjSim > bestAdj) {
+                                    if (!best || res.similarity > best.similarity) {
                                         best = res;
-                                        bestAdj = adjSim;
                                         bestCropRect = {sx, sy, sw, sh, dx, dy, sz};
                                     }
                                 }
@@ -10306,58 +10257,13 @@ ${playerList}
                             cropUrl = dc.toDataURL();
                         }
 
-                        // Sweep consensus: count which class2 wins across the top-N adj-ranked
-                        // crop candidates. A tight consensus on best.class2 lets us accept a
-                        // sub-trigger sim without lowering global thresholds (SAFE_LOW_AUTO).
-                        _swp.sort((a, b) => b.adj - a.adj);
-                        const _topN = _swp.slice(0, Math.min(15, _swp.length));
-                        const _voteCounts = {};
-                        for (const v of _topN) _voteCounts[v.top1] = (_voteCounts[v.top1] || 0) + 1;
-                        const _votesSorted = Object.entries(_voteCounts).sort((a, b) => b[1] - a[1]);
-                        const _consensusClass = _votesSorted[0] ? _votesSorted[0][0] : null;
-                        const _consensusVotes = _votesSorted[0] ? _votesSorted[0][1] : 0;
-                        const _consensusRatio = _topN.length ? _consensusVotes / _topN.length : 0;
-                        const _consensusMatchesBest = _consensusClass === best.class2;
-
-                        // AV/PW disambiguation: matcher routinely confuses Abyss Walker and
-                        // Plains Walker portraits. If both occupy the top-2 within a tight
-                        // margin, hold the row as ambiguous (3 class3 options) rather than
-                        // committing to either side.
-                        const _AVPW = { 'Abyss Walker': 1, 'Plains Walker': 1 };
-                        const _top1IsAVPW = !!_AVPW[best.class2];
-                        const _top2Name   = best.top3 && best.top3[1] ? (best.top3[1].name || best.top3[1].class2 || null) : null;
-                        const _top2IsAVPW = !!(_top2Name && _AVPW[_top2Name]);
-                        const _avPwAmbig  = _top1IsAVPW && _top2IsAVPW && best.margin < 0.12;
-
-                        let _c3opts = resolveClass2ToClass3(best.class2);
-                        if (_avPwAmbig) _c3opts = ['АВ/ПВ', 'Ghost Hunter', 'Wind Rider'];
-
-                        const _trigger = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
-                        // SAFE_LOW_AUTO: sub-trigger sim accepted only when the sweep agrees,
-                        // the margin is healthy, the class3 mapping is unique, and we are not
-                        // in the AV/PW confusable group. Conservative by design — designed to
-                        // pick up obvious-but-soft hits without inviting false positives.
-                        const _safeLowAuto = !_trigger
-                            && best.similarity >= 0.50
-                            && best.margin >= TRIG_MAR
-                            && _consensusMatchesBest
-                            && _consensusRatio >= 0.6
-                            && _c3opts.length === 1
-                            && !_rowUnstable
-                            && !_avPwAmbig;
-                        const _classMapAmbig = (_trigger || _safeLowAuto) && _c3opts.length > 1;
-
                         writeTarget.matcher_top1        = best.class2;
                         writeTarget.matcher_sim         = best.similarity;
                         writeTarget.matcher_margin      = best.margin;
                         writeTarget.matcher_top3        = best.top3;
                         writeTarget.matcher_source      = 'gt_exemplar_matcher';
-                        writeTarget.matcher_trigger     = _trigger;
-                        writeTarget.matcher_safeLowAuto = _safeLowAuto;
-                        writeTarget.matcher_avPwAmbig   = _avPwAmbig;
-                        writeTarget.matcher_classMapAmbig = _classMapAmbig;
-                        writeTarget.matcher_class3opts  = _c3opts;
-                        writeTarget.matcher_consensus   = { class2: _consensusClass, votes: _consensusVotes, total: _topN.length, ratio: +_consensusRatio.toFixed(2) };
+                        // trigger = score passes threshold (ROW_UNSTABLE is debug-only)
+                        writeTarget.matcher_trigger     = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
                         writeTarget.matcher_rowUnstable    = _rowUnstable;
                         writeTarget.matcher_unstableReason = _unstableReason;
                         writeTarget.matcher_yDrift         = _yDrift;
@@ -10378,31 +10284,16 @@ ${playerList}
                         writeTarget.matcher_cropQuality = _cq;
                         writeTarget.matcher_geoPreset   = geo.preset;
 
-                        // AUTO-WRITE: regular AUTO or SAFE_LOW_AUTO. Both require a unique class3
-                        // mapping to write profa; AUTO with multi-option mapping leaves profa
-                        // empty but flags matcher_classMapAmbig so the UI surfaces a picker.
-                        const _autoOk = (_trigger && !_rowUnstable && !_avPwAmbig) || _safeLowAuto;
-                        if (_autoOk) {
+                        // AUTO-WRITE: safe GT_EX only (trigger + not rowUnstable + not locInvalid)
+                        if (writeTarget.matcher_trigger && !_rowUnstable) {
                             writeTarget.class2     = best.class2;
                             writeTarget.profaSource = 'gt_exemplar_matcher';
+                            const _c3opts = resolveClass2ToClass3(best.class2);
                             if (_c3opts.length === 1) writeTarget.profa = _c3opts[0];
                         }
                         // Per-row diagnostic dump (does not affect matcher behaviour)
                         try {
-                            const _wroteAuto = !!_autoOk;
-                            const _wroteProfa = _wroteAuto && _c3opts.length === 1;
-                            let _status;
-                            if (_trigger && !_rowUnstable && !_avPwAmbig && _c3opts.length === 1) _status = 'AUTO';
-                            else if (_safeLowAuto) _status = 'AUTO_LOW';
-                            else if (_avPwAmbig) _status = 'AVPW_AMBIG';
-                            else if (_trigger && !_rowUnstable && _c3opts.length > 1) _status = 'CLASS_MAP_AMBIG';
-                            else if (_rowUnstable && best.class2) _status = 'ROW_UNSTABLE';
-                            else if (best.class2 && !_trigger) {
-                                const _reasons = [];
-                                if (best.similarity < TRIG_SIM) _reasons.push('LOW_SIM');
-                                if (best.margin     < TRIG_MAR) _reasons.push('AMBIG');
-                                _status = _reasons.join('·') || 'LOW';
-                            } else _status = 'UNKNOWN';
+                            const _c3opts = resolveClass2ToClass3(best.class2);
                             window._gtDebug.rows.push({
                                 pack: packName,
                                 row: rowIdx,
@@ -10415,15 +10306,10 @@ ${playerList}
                                 sim: +(best.similarity || 0).toFixed(3),
                                 margin: +(best.margin || 0).toFixed(3),
                                 top3: (best.top3 || []).map(x => ({ name: x.name || x.class2, sim: +(x.sim||x.similarity||0).toFixed(3) })),
-                                trigger: !!_trigger,
-                                safeLowAuto: !!_safeLowAuto,
-                                avPwAmbig: !!_avPwAmbig,
-                                classMapAmbig: !!_classMapAmbig,
-                                consensus: writeTarget.matcher_consensus,
-                                wroteAuto: _wroteAuto,
-                                wroteProfa: _wroteProfa,
+                                trigger: !!writeTarget.matcher_trigger,
+                                wroteAuto: !!(writeTarget.matcher_trigger && !_rowUnstable),
+                                wroteProfa: !!(writeTarget.matcher_trigger && !_rowUnstable && _c3opts.length === 1),
                                 class3opts: _c3opts,
-                                status: _status,
                                 cropUrl: cropUrl,
                                 targetFound: targetFound
                             });
@@ -12646,10 +12532,7 @@ ${playerList}
 
         function _kmRwBadge(parsed) {
             const profaSrc = parsed.profaSource || '';
-            const isAutoTrig = parsed.matcher_source === 'gt_exemplar_matcher' && parsed.matcher_trigger && !parsed.matcher_rowUnstable && !parsed.matcher_locInvalid;
-            const isSafeLow  = parsed.matcher_source === 'gt_exemplar_matcher' && !!parsed.matcher_safeLowAuto && !parsed.matcher_rowUnstable && !parsed.matcher_locInvalid;
-            const isClassMapAmbig = !!parsed.matcher_classMapAmbig;
-            const isAvPwAmbig = !!parsed.matcher_avPwAmbig;
+            const isAuto = parsed.matcher_source === 'gt_exemplar_matcher' && parsed.matcher_trigger && !parsed.matcher_rowUnstable && !parsed.matcher_locInvalid;
             const isManual = profaSrc === 'manual_review';
             const top3Title = parsed.matcher_top3 && parsed.matcher_top3.length
                 ? 'top3: ' + parsed.matcher_top3.slice(0,3).map(x => (x.name||x.class2||'?') + ' ' + Math.round((x.sim||x.similarity||0)*100) + '%').join(', ')
@@ -12657,21 +12540,9 @@ ${playerList}
             if (isManual) {
                 return '<span title="Ручная правка" style="font-size:8.5px;color:#a5b4fc;background:#1e1b4b;border:1px solid #4338ca;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">MANUAL</span>';
             }
-            if (isAutoTrig && !isClassMapAmbig) {
+            if (isAuto) {
                 const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
                 return '<span title="Авто · ' + _kmRwEsc(top3Title) + '" style="font-size:8.5px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">AUTO ' + sim + '</span>';
-            }
-            if (isSafeLow && !isClassMapAmbig) {
-                const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
-                return '<span title="Авто (низкая уверенность, sweep consensus) · ' + _kmRwEsc(top3Title) + '" style="font-size:8.5px;color:#a7f3d0;background:#022c22;border:1px solid #047857;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">AUTO* ' + sim + '</span>';
-            }
-            if ((isAutoTrig || isSafeLow) && isClassMapAmbig) {
-                const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
-                return '<span title="Иконка распознана, но class3 неоднозначен — выбери вручную · ' + _kmRwEsc(top3Title) + '" style="font-size:8.5px;color:#fcd34d;background:#1c1500;border:1px solid #b45309;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">CLASS_MAP_AMBIG ' + sim + '</span>';
-            }
-            if (isAvPwAmbig) {
-                const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
-                return '<span title="AW vs PW неоднозначно — выбери вручную · ' + _kmRwEsc(top3Title) + '" style="font-size:8.5px;color:#fcd34d;background:#1c1500;border:1px solid #b45309;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">AVPW? ' + sim + '</span>';
             }
             if (parsed.matcher_locInvalid) {
                 return '<span title="Плохой кроп иконки — выбери профу вручную" style="font-size:8.5px;color:#f97316;background:#1c0a00;border:1px solid #7c2d12;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">BAD CROP</span>';
