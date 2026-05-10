@@ -10301,7 +10301,25 @@ ${playerList}
                             writeTarget.class2     = best.class2;
                             writeTarget.profaSource = 'gt_exemplar_matcher';
                             const _c3opts = resolveClass2ToClass3(best.class2);
-                            if (_c3opts.length === 1) writeTarget.profa = _c3opts[0];
+                            if (_c3opts.length === 1) {
+                                writeTarget.profa = _c3opts[0];
+                                writeTarget.matcher_profaWarning = false;
+                            } else {
+                                // AMBIG: unambiguous icon but 3-class is unclear — write group label with warning
+                                writeTarget.profa = _c3opts[0] || best.class2;
+                                writeTarget.matcher_profaWarning = true;
+                                writeTarget.matcher_profaWarningReason = 'ambiguous_class2';
+                                writeTarget.matcher_originalStatus = 'AMBIG';
+                            }
+                        } else if (best && best.class2) {
+                            // LOW: below threshold but candidate exists — write best guess with warning
+                            const _c3low = resolveClass2ToClass3(best.class2);
+                            if (_c3low.length >= 1) {
+                                writeTarget.profa = _c3low[0];
+                                writeTarget.matcher_profaWarning = true;
+                                writeTarget.matcher_profaWarningReason = _c3low.length === 1 ? 'low_confidence' : 'low_confidence_ambig';
+                                writeTarget.matcher_originalStatus = 'LOW';
+                            }
                         }
                         // Per-row diagnostic dump (does not affect matcher behaviour)
                         try {
@@ -10320,8 +10338,12 @@ ${playerList}
                                 top3: (best.top3 || []).map(x => ({ name: x.name || x.class2, sim: +(x.sim||x.similarity||0).toFixed(3) })),
                                 trigger: !!writeTarget.matcher_trigger,
                                 wroteAuto: !!(writeTarget.matcher_trigger && !_rowUnstable),
-                                wroteProfa: !!(writeTarget.matcher_trigger && !_rowUnstable && _c3opts.length === 1),
+                                wroteProfa: !!(writeTarget.profa),
                                 class3opts: _c3opts,
+                                profaWarning: !!writeTarget.matcher_profaWarning,
+                                profaWarningReason: writeTarget.matcher_profaWarningReason || null,
+                                originalStatus: writeTarget.matcher_originalStatus || null,
+                                profaValue: writeTarget.profa || null,
                                 cropUrl: cropUrl,
                                 targetFound: targetFound
                             });
@@ -12641,6 +12663,14 @@ ${playerList}
                     ? '<span title="Лидер" style="color:#fbbf24;font-size:11px;line-height:1;flex-shrink:0">★</span>'
                     : '<span style="display:inline-block;width:7px;flex-shrink:0"></span>';
 
+                const profaWarnReason = parsed.matcher_profaWarningReason || '';
+                const profaWarnTip = profaWarnReason === 'ambiguous_class2'
+                    ? 'Проверьте профессию: неоднозначная профессия'
+                    : 'Проверьте профессию: низкая уверенность распознавания';
+                const profaWarnHtml = parsed.matcher_profaWarning
+                    ? '<span title="' + _kmRwEsc(profaWarnTip) + '" style="font-size:10px;color:#f59e0b;flex-shrink:0;cursor:default;line-height:1;margin-left:1px">⚠</span>'
+                    : '';
+
                 const badgeHtml = _kmRwBadge(parsed);
 
                 const numCellStyle = 'background:#0b0e14;border:1px solid #1e2530;border-radius:5px;padding:3px 4px;font-size:11px;text-align:center;width:100%;box-sizing:border-box;outline:none';
@@ -12656,6 +12686,7 @@ ${playerList}
                         'style="flex:1 1 110px;min-width:80px;background:transparent;border:1px solid #1e2530;border-radius:5px;padding:3px 6px;color:#e2e8f0;font-weight:700;font-size:12px;outline:none">' +
                         profaIconSmall +
                         profaSelect +
+                        profaWarnHtml +
                         badgeHtml +
                     '</div>' +
                     num('kills','#f59e0b') +
@@ -12974,6 +13005,10 @@ ${playerList}
                     class3opts: Array.isArray(r.class3opts) ? r.class3opts : null,
                     status: r.status || (r.trigger ? 'AUTO' : (r.top1 ? 'LOW' : 'NONE')),
                     reason: r.reason || null,
+                    profaWarning: !!r.profaWarning,
+                    profaWarningReason: r.profaWarningReason || null,
+                    originalStatus: r.originalStatus || null,
+                    profaValue: r.profaValue || null,
                     cropUrl_available: cropOk
                 };
                 if (cropOk && cropUrl.length <= _CROP_LIMIT) out.cropUrl = cropUrl;
@@ -12987,12 +13022,15 @@ ${playerList}
             const noAuto = all.filter(r => !r.wroteAuto);
             const cardinals = all.filter(r => Array.isArray(r.class3opts) && r.class3opts.includes('Cardinal'));
             const summary = {
-                totalRows:       all.length,
-                autoCount:       all.filter(r => r.wroteAuto).length,
-                profaWriteCount: all.filter(r => r.wroteProfa).length,
-                lowCount:        lows.length,
-                badCount:        bads.length,
-                emptyProfaCount: all.filter(r => !r.wroteProfa).length,
+                totalRows:        all.length,
+                autoCount:        all.filter(r => r.wroteAuto).length,
+                profaWriteCount:  all.filter(r => r.wroteProfa).length,
+                lowCount:         lows.length,
+                badCount:         bads.length,
+                emptyProfaCount:  all.filter(r => !r.wroteProfa).length,
+                checkCount:       all.filter(r => r.profaWarning && r.originalStatus === 'LOW').length,
+                ambigCount:       all.filter(r => r.profaWarning && r.originalStatus === 'AMBIG').length,
+                profaWarningCount: all.filter(r => r.profaWarning).length,
                 topMissingClasses: (dbg.classCoverage && Array.isArray(dbg.classCoverage.missing))
                     ? dbg.classCoverage.missing.slice(0, 12) : []
             };
