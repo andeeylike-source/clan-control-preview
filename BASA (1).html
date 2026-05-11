@@ -10539,11 +10539,22 @@ ${playerList}
                         // Trained-strong path: trained exemplar priority — bypasses margin gate at ≥0.85
                         const _trainedStrong = best.matchedFrom === 'trained' && best.similarity >= 0.85 && !!best.trainedExemplarId;
                         if (_trainedStrong) window._gtDebug.trainedStrongHitCount = (window._gtDebug.trainedStrongHitCount || 0) + 1;
-                        writeTarget.matcher_trigger     = _trainedStrong || (best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR);
+                        // Legacy AUTO gate: sim ≥ TRIG_SIM (0.60) AND margin ≥ TRIG_MAR (0.08).
+                        // Mid-sim guard: when sim < 0.80, a single 0.08 margin is too lenient —
+                        // the feature vector collapses to a near-tie between visually similar
+                        // classes (e.g. ZoS→Spectral Dancer at 0.76, Draktar→Dominator at 0.72).
+                        // In that band require a wider margin (≥0.15) before AUTO; otherwise
+                        // demote to LOW so the row goes to manual review instead of writing
+                        // a confidently-wrong class2.
+                        const _legacyAutoOk  = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
+                        const _midSimGuardOk = best.similarity >= 0.80 || best.margin >= 0.15;
+                        const _midSimBlocked = _legacyAutoOk && !_midSimGuardOk;
+                        writeTarget.matcher_trigger     = _trainedStrong || (_legacyAutoOk && _midSimGuardOk);
                         writeTarget.matcher_autoTrained = _trainedStrong;
                         const _finalReason = _trainedStrong ? 'trained_strong'
                             : (best.matchedFrom === 'trained' && writeTarget.matcher_trigger) ? 'trained_above_threshold'
                             : writeTarget.matcher_trigger ? 'base_above_threshold'
+                            : _midSimBlocked ? 'low_margin_mid_sim_demoted'
                             : best.class2 ? 'low_sim'
                             : 'no_match';
                         writeTarget.matcher_finalReason = _finalReason;
@@ -10584,13 +10595,25 @@ ${playerList}
                                 writeTarget.matcher_originalStatus = 'AMBIG';
                             }
                         } else if (best && best.class2) {
-                            // LOW: below threshold but candidate exists — write best guess with warning
-                            const _c3low = resolveClass2ToClass3(best.class2);
-                            if (_c3low.length >= 1) {
-                                writeTarget.profa = _c3low[0];
+                            // LOW: below threshold but candidate exists.
+                            // Special case — mid-sim demoted by the margin guard: do NOT write
+                            // profa at all. The matcher's top1 here is the very value we just
+                            // refused to AUTO-assign (e.g. ZoS→Spectral Dancer at sim 0.76 with
+                            // marginal gap). Writing it as a "best guess" would still surface
+                            // the wrong class3 in the row, defeating the guard. Leave profa
+                            // empty so the row goes to manual review.
+                            if (_midSimBlocked) {
                                 writeTarget.matcher_profaWarning = true;
-                                writeTarget.matcher_profaWarningReason = _c3low.length === 1 ? 'low_confidence' : 'low_confidence_ambig';
+                                writeTarget.matcher_profaWarningReason = 'mid_sim_margin_demoted';
                                 writeTarget.matcher_originalStatus = 'LOW';
+                            } else {
+                                const _c3low = resolveClass2ToClass3(best.class2);
+                                if (_c3low.length >= 1) {
+                                    writeTarget.profa = _c3low[0];
+                                    writeTarget.matcher_profaWarning = true;
+                                    writeTarget.matcher_profaWarningReason = _c3low.length === 1 ? 'low_confidence' : 'low_confidence_ambig';
+                                    writeTarget.matcher_originalStatus = 'LOW';
+                                }
                             }
                         }
                         // Per-row diagnostic dump (does not affect matcher behaviour)
