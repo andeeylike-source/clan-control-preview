@@ -8907,12 +8907,14 @@ function getClass2IconByClass3(c3) {
 
                         // local PaddleOCR — first provider
                         let players = [];
+                        let _ocrRawRows = null;
                         const _localResult = await _tryLocalPaddleOcr(
                             crop.processedCanvas.toDataURL('image/png'),
                             (shot.name || ('shot_' + (i + 1))) + '.png'
                         );
                         if (_localResult && _localResult.length > 0) {
                             console.info('[local-ocr] using local result for shot', i + 1, '—', _localResult.length, 'rows');
+                            _ocrRawRows = _localResult.length;
                             _localResult.forEach(row => { const n = _ccOcrNormalizeRow(row); if (n) players.push(n); });
                         }
 
@@ -8941,11 +8943,12 @@ function getClass2IconByClass3(c3) {
                             if (!response.ok || json.error || json.ok === false) throw new Error(json.error || `HTTP ${response.status}`);
                             console.debug('[ocrspace] raw response', json);
                             const rows = json.finalParsed || json.parsed || [];
+                            _ocrRawRows = rows.length;
                             rows.forEach(row => { const n = _ccOcrNormalizeRow(row); if (n) players.push(n); });
                         }
 
                         if (!players.length) {
-                            skippedScreenshots.push({ num: i + 1, fileName: shot.name || null, provider: 'ocrspace', reason: 'empty_players' });
+                            skippedScreenshots.push({ num: i + 1, fileName: shot.name || null, provider: 'ocrspace', reason: 'empty_players', rawRows: _ocrRawRows });
                             continue;
                         }
 
@@ -8982,6 +8985,7 @@ function getClass2IconByClass3(c3) {
                 window._gtDebug.ocrSkippedScreenshots = skippedScreenshots.slice();
                 window._gtDebug.ocrTotalInput = shots.length;
                 window._gtDebug.ocrSuccessCount = Object.keys(screenPlayersMap).length;
+                window._gtDebug.ocrProviderSuccessPackNames = Object.keys(screenPlayersMap);
 
                 dayLastParsed = Object.values(allPlayers);
                 dayExpectedTotal = null;
@@ -9348,6 +9352,7 @@ function getClass2IconByClass3(c3) {
                 window._gtDebug.ocrSkippedScreenshots = skippedScreenshots.slice();
                 window._gtDebug.ocrTotalInput = shots.length;
                 window._gtDebug.ocrSuccessCount = Object.keys(screenPlayersMap).length;
+                window._gtDebug.ocrProviderSuccessPackNames = Object.keys(screenPlayersMap);
 
                 dayLastParsed      = Object.values(allPlayers);
                 dayExpectedTotal   = null;
@@ -10593,6 +10598,26 @@ ${playerList}
                 console.warn('[icon-matcher]', e);
             }
         }
+
+        // Console helper: full OCR pipeline diagnosis.
+        // Usage: dumpOcrDiag()
+        window.dumpOcrDiag = function() {
+            const d = window._gtDebug || {};
+            console.group('[OCR Diagnosis]');
+            console.log('input:', d.ocrTotalInput, '| success:', d.ocrSuccessCount, '| skipped:', (d.ocrSkippedScreenshots||[]).length);
+            console.log('successPackNames:', JSON.stringify(d.ocrProviderSuccessPackNames||[]));
+            if ((d.ocrSkippedScreenshots||[]).length) {
+                console.log('skipped detail:');
+                (d.ocrSkippedScreenshots||[]).forEach(s =>
+                    console.log(' #' + s.num + ' [' + (s.fileName||'?') + '] reason=' + s.reason + ' rawRows=' + (s.rawRows!=null?s.rawRows:'?') + ' rawTextLen=' + (s.rawTextLen!=null?s.rawTextLen:'?') + (s.errorType?' errorType='+s.errorType:'')));
+            }
+            console.log('unsupportedTableSkips:', d.unsupportedTableSkipCount||0);
+            (d.unsupportedTableSkipped||[]).forEach(s => console.log(' ', s.packName, 'tableType='+s.tableType, 'evidence='+JSON.stringify(s.detectionEvidence)));
+            console.log('fallbackDropped:', (d.fallbackPackDropped||[]).length);
+            (d.fallbackPackDropped||[]).forEach(s => console.log(' ', s.packName, 'reason='+s.reason));
+            console.log('wizardVisible:', JSON.stringify(d.wizardVisiblePackNames||[]));
+            console.groupEnd();
+        };
 
         // Console helper: print compact per-row table for icon matcher diagnostics.
         // Usage:
@@ -12785,6 +12810,7 @@ ${playerList}
 
             const build = _kmRwBuildParties();
             const parties = build.parties;
+            window._gtDebug.wizardVisiblePackNames = parties.map(p => p.packName);
             (build.droppedNoCrop || []).forEach(d => {
                 window._gtDebug.fallbackPackDroppedCount++;
                 if (window._gtDebug.fallbackPackDropped.length < 20)
