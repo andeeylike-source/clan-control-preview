@@ -12636,31 +12636,59 @@ ${playerList}
 
         function _kmRwBuildParties() {
             const parties = [];
+            const droppedNoCrop = [];
             const packNames = Object.keys(dayScreenPlayersMap || {});
             packNames.forEach(pn => {
                 const players = (dayScreenPlayersMap || {})[pn] || [];
                 if (!players.length) return;
+                const shotUrl = (dayScreenShotMap && dayScreenShotMap[pn]) || '';
+                if (!shotUrl) {
+                    droppedNoCrop.push({ packName: pn, playerCount: players.length, reason: 'no_source_screenshot' });
+                    return;
+                }
                 const leader = (dayPackLeaders && dayPackLeaders[pn]) || (players[0] && players[0].name) || pn;
                 parties.push({
                     packName: pn,
                     leader: leader,
-                    shotUrl: (dayScreenShotMap && dayScreenShotMap[pn]) || '',
+                    shotUrl: shotUrl,
                     players: players
                 });
             });
-            return parties;
+            return { parties: parties, droppedNoCrop: droppedNoCrop };
         }
 
         function openKMReviewWizard() {
             _kmOcrFilterUnsupportedPacks();
-            const parties = _kmRwBuildParties();
+            if (!window._gtDebug) window._gtDebug = {};
+            window._gtDebug.fallbackPackDroppedCount = 0;
+            window._gtDebug.fallbackPackDropped = [];
+
+            const build = _kmRwBuildParties();
+            const parties = build.parties;
+            (build.droppedNoCrop || []).forEach(d => {
+                window._gtDebug.fallbackPackDroppedCount++;
+                if (window._gtDebug.fallbackPackDropped.length < 20)
+                    window._gtDebug.fallbackPackDropped.push(d);
+            });
+
             if (parties.length === 0) {
-                if (Array.isArray(dayLastParsed) && dayLastParsed.length > 0) {
-                    parties.push({ packName: '(нет данных по пакам)', leader: '—', shotUrl: '', players: dayLastParsed });
+                // Do NOT create synthetic "(нет данных по пакам)" fallback —
+                // dayLastParsed aggregates rows from filtered leader-list screens
+                // and packs without source crop, which produces a mixed/no-crop pack.
+                const fbCount = Array.isArray(dayLastParsed) ? dayLastParsed.length : 0;
+                if (fbCount > 0) {
+                    window._gtDebug.fallbackPackDroppedCount++;
+                    if (window._gtDebug.fallbackPackDropped.length < 20)
+                        window._gtDebug.fallbackPackDropped.push({
+                            packName: '(нет данных по пакам)',
+                            playerCount: fbCount,
+                            reason: 'synthetic_fallback_no_source_pack'
+                        });
+                    setDayStatus('warning', '⚠️ Нет паков с исходным скриншотом — wizard не открыт (' + fbCount + ' строк без пака отброшено).');
                 } else {
                     setDayStatus('warning', '⚠️ Нет распознанных паков — сначала запусти анализ скриншотов.');
-                    return;
                 }
+                return;
             }
             _kmRw.parties = parties;
             _kmRw.idx = 0;
