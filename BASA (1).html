@@ -10005,22 +10005,30 @@ function getClass2IconByClass3(c3) {
             const allEx = (_ccGTExemplars || []).concat(_ccTrainedVecs || []);
             if (!feat || !allEx.length) return null;
             const classBest = {}; // class2 -> { sim, trained, id }
+            let _bestTrSim = -1, _bestTrClass = null;
+            let _bestBaSim = -1, _bestBaClass = null;
             for (const ex of allEx) {
                 const s = _ccCosineSim(feat, ex.vec);
                 if (!(ex.class2 in classBest) || s > classBest[ex.class2].sim) {
                     classBest[ex.class2] = { sim: s, trained: !!ex.trained, id: ex.id || null };
                 }
+                if (ex.trained  && s > _bestTrSim) { _bestTrSim = s; _bestTrClass = ex.class2; }
+                if (!ex.trained && s > _bestBaSim) { _bestBaSim = s; _bestBaClass = ex.class2; }
             }
             const sorted = Object.entries(classBest).sort((a,b) => b[1].sim - a[1].sim);
             if (!sorted.length) return null;
             const top = sorted[0];
             return {
-                class2:    top[0],
+                class2:     top[0],
                 similarity: top[1].sim,
-                margin:    top[1].sim - (sorted[1] ? sorted[1][1].sim : 0),
-                top3:      sorted.slice(0,3).map(([name,d]) => ({name, sim: d.sim})),
-                matchedFrom: top[1].trained ? 'trained' : 'base',
-                trainedExemplarId: top[1].trained ? top[1].id : null
+                margin:     top[1].sim - (sorted[1] ? sorted[1][1].sim : 0),
+                top3:       sorted.slice(0,3).map(([name,d]) => ({name, sim: d.sim})),
+                matchedFrom:       top[1].trained ? 'trained' : 'base',
+                trainedExemplarId: top[1].trained ? top[1].id : null,
+                trainedTop1: _bestTrClass,
+                trainedSim:  _bestTrSim  > -1 ? _bestTrSim  : null,
+                baseTop1:    _bestBaClass,
+                baseSim:     _bestBaSim  > -1 ? _bestBaSim  : null,
             };
         }
 
@@ -10503,11 +10511,17 @@ ${playerList}
                         writeTarget.matcher_margin      = best.margin;
                         writeTarget.matcher_top3        = best.top3;
                         writeTarget.matcher_source      = 'gt_exemplar_matcher';
-                        // Trained-strong path: high-confidence trained exemplar bypasses margin gate
-                        const _trainedStrong = best.matchedFrom === 'trained' && best.similarity >= 0.95 && !!best.trainedExemplarId;
+                        // Trained-strong path: trained exemplar priority — bypasses margin gate at ≥0.85
+                        const _trainedStrong = best.matchedFrom === 'trained' && best.similarity >= 0.85 && !!best.trainedExemplarId;
                         if (_trainedStrong) window._gtDebug.trainedStrongHitCount = (window._gtDebug.trainedStrongHitCount || 0) + 1;
                         writeTarget.matcher_trigger     = _trainedStrong || (best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR);
                         writeTarget.matcher_autoTrained = _trainedStrong;
+                        const _finalReason = _trainedStrong ? 'trained_strong'
+                            : (best.matchedFrom === 'trained' && writeTarget.matcher_trigger) ? 'trained_above_threshold'
+                            : writeTarget.matcher_trigger ? 'base_above_threshold'
+                            : best.class2 ? 'low_sim'
+                            : 'no_match';
+                        writeTarget.matcher_finalReason = _finalReason;
                         writeTarget.matcher_rowUnstable    = _rowUnstable;
                         writeTarget.matcher_unstableReason = _unstableReason;
                         writeTarget.matcher_yDrift         = _yDrift;
@@ -10585,6 +10599,12 @@ ${playerList}
                                 profaValue: writeTarget.profa || null,
                                 matchedFrom: best.matchedFrom || 'base',
                                 trainedExemplarId: best.trainedExemplarId || null,
+                                trainedClass2: best.trainedTop1 || null,
+                                trainedSim: best.trainedSim != null ? +(best.trainedSim).toFixed(3) : null,
+                                baseTop1: best.baseTop1 || null,
+                                baseSim: best.baseSim != null ? +(best.baseSim).toFixed(3) : null,
+                                finalClass2: best.class2 || null,
+                                finalReason: _finalReason,
                                 manualCorrected: !!(writeTarget.profaSource === 'manual_review'),
                                 cropUrl: cropUrl,
                                 targetFound: targetFound
@@ -10616,6 +10636,46 @@ ${playerList}
             console.log('fallbackDropped:', (d.fallbackPackDropped||[]).length);
             (d.fallbackPackDropped||[]).forEach(s => console.log(' ', s.packName, 'reason='+s.reason));
             console.log('wizardVisible:', JSON.stringify(d.wizardVisiblePackNames||[]));
+            console.groupEnd();
+        };
+
+        // Console helper: training system diagnosis.
+        // Usage: dumpTrainingDiag()
+        window.dumpTrainingDiag = function() {
+            const d = window._gtDebug || {};
+            console.group('[Training Diagnosis]');
+            console.log('effectiveTrainingCount:', d.effectiveTrainingCount,
+                '(seed:', d.seedTrainingCount, ', local:', d.localTrainingCount, ')');
+            // Class distribution from storage
+            let stored = [];
+            try { stored = JSON.parse(localStorage.getItem('cc_km_icon_training_v1') || '[]'); } catch(e) {}
+            const byClass = {};
+            stored.forEach(function(t) { byClass[t.class2Key] = (byClass[t.class2Key]||0)+1; });
+            console.log('storedClasses (' + stored.length + '):', JSON.stringify(byClass));
+            // Last save report
+            const rep = d.trainingSaveReport;
+            if (rep) {
+                console.log('lastSaveReport: added=' + rep.addedCount + ' skipped=' + rep.skippedCount + ' total=' + rep.totalInStorage);
+                console.log('  savedClasses:', JSON.stringify(rep.savedClasses));
+                console.log('  skippedByReason:', JSON.stringify(rep.skippedByReason));
+                if (rep.skippedDetail && rep.skippedDetail.length)
+                    rep.skippedDetail.forEach(function(s) { console.log('  skip:', s.playerName, s.profa, s.reason); });
+            }
+            // Row breakdown
+            const rows = d.rows || [];
+            const trainedRows = rows.filter(function(r){ return r.matchedFrom === 'trained'; });
+            const baseRows    = rows.filter(function(r){ return r.matchedFrom === 'base'; });
+            const lowRows     = rows.filter(function(r){ return !r.trigger && r.top1; });
+            const emptyRows   = rows.filter(function(r){ return !r.top1; });
+            console.log('matcherRows: total=' + rows.length + ' trained=' + trainedRows.length + ' base=' + baseRows.length + ' low=' + lowRows.length + ' noMatch=' + emptyRows.length);
+            if (lowRows.length) {
+                console.log('LOW rows (train these next):');
+                lowRows.slice(0,12).forEach(function(r){ console.log('  ' + r.name + ' pack=' + r.pack + ' top1=' + r.top1 + ' sim=' + r.sim + ' reason=' + r.finalReason); });
+            }
+            if (emptyRows.length) {
+                console.log('noMatch rows:');
+                emptyRows.slice(0,10).forEach(function(r){ console.log('  ' + r.name + ' pack=' + r.pack); });
+            }
             console.groupEnd();
         };
 
@@ -13473,31 +13533,43 @@ ${playerList}
             const class3ToClass2 = _ccBuildClass3ToClass2Map();
             let existing = [];
             try { existing = JSON.parse(localStorage.getItem(_CC_TRAINING_KEY) || '[]'); } catch(e) { existing = []; }
-            let savedCount = 0, unresolvedCount = 0;
+
+            const savedClasses = {};    // class2Key -> count added this run
+            const skippedByReason = {}; // reason -> count
+            const skippedDetail = [];   // { playerName, profa, reason }
+            const _skip = (name, profa, reason) => {
+                skippedByReason[reason] = (skippedByReason[reason] || 0) + 1;
+                if (skippedDetail.length < 40) skippedDetail.push({ playerName: name, profa: profa || null, reason });
+            };
 
             for (const party of (_kmRw.parties || [])) {
                 for (let rowIdx = 0; rowIdx < party.players.length; rowIdx++) {
                     const row = party.players[rowIdx];
                     const parsed = _kmRwFindParsed(row.name) || row;
-                    if (!parsed || parsed.profaSource !== 'manual_review') continue;
+                    if (!parsed || parsed.profaSource !== 'manual_review') {
+                        // Not manually corrected — skip silently (do not count, user didn't touch it)
+                        continue;
+                    }
                     const selectedProfa = parsed.profa;
-                    if (!selectedProfa || selectedProfa === '—') continue;
+                    if (!selectedProfa || selectedProfa === '—') {
+                        _skip(row.name, selectedProfa, 'no_profa'); continue;
+                    }
                     const class2Key = class3ToClass2[selectedProfa];
                     if (class2Key === undefined || class2Key === null) {
-                        unresolvedCount++;
-                        console.warn('[training] unresolved class2 for profa:', selectedProfa, 'debug_reason: unresolved_profile_mapping');
+                        _skip(row.name, selectedProfa, 'unresolved_class');
+                        console.warn('[training] unresolved class2 for profa:', selectedProfa);
                         continue;
                     }
                     const cropUrl = parsed.matcher_cropUrl || null;
-                    if (!cropUrl) { unresolvedCount++; continue; }
+                    if (!cropUrl) { _skip(row.name, selectedProfa, 'no_crop'); continue; }
                     const packName = parsed.matcher_pack || party.packName;
                     const isDup = existing.some(e =>
                         e.class2Key === class2Key && e.playerName === row.name &&
                         e.pack === packName && e.row === rowIdx
                     );
-                    if (isDup) continue;
+                    if (isDup) { _skip(row.name, selectedProfa, 'duplicate'); continue; }
                     const countForClass = existing.filter(e => e.class2Key === class2Key).length;
-                    if (countForClass >= _CC_MAX_PER_CLASS) continue;
+                    if (countForClass >= _CC_MAX_PER_CLASS) { _skip(row.name, selectedProfa, 'limit'); continue; }
                     existing.push({
                         id: Date.now().toString(36) + Math.random().toString(36).slice(2),
                         createdAt: new Date().toISOString(),
@@ -13514,17 +13586,32 @@ ${playerList}
                         top1Before: parsed.matcher_top1 || null,
                         top3Before: parsed.matcher_top3 || null
                     });
-                    savedCount++;
+                    savedClasses[class2Key] = (savedClasses[class2Key] || 0) + 1;
                 }
             }
             try { localStorage.setItem(_CC_TRAINING_KEY, JSON.stringify(existing)); }
             catch(e) { console.warn('[training] save failed', e); }
+
+            const addedCount  = Object.values(savedClasses).reduce((a,b) => a+b, 0);
+            const skippedCount = Object.values(skippedByReason).reduce((a,b) => a+b, 0);
+            const report = { addedCount, skippedCount, savedClasses, skippedByReason, skippedDetail, totalInStorage: existing.length };
+            if (!window._gtDebug) window._gtDebug = {};
+            window._gtDebug.trainingSaveReport = report;
+
             if (trainBtn) { trainBtn.disabled = false; trainBtn.textContent = '🧠 Запомнить'; }
-            let msg = savedCount > 0 ? '✅ сохранено: ' + savedCount : '';
-            if (unresolvedCount > 0) msg += (msg ? ' · ' : '') + '⚠ не сопоставлено: ' + unresolvedCount;
-            if (!savedCount && !unresolvedCount) msg = 'нет ручных исправлений';
-            if (statusEl) statusEl.textContent = msg;
-            console.info('[training] saved', savedCount, 'exemplars, unresolved:', unresolvedCount, 'total in storage:', existing.length);
+
+            let msg = '';
+            if (addedCount > 0) {
+                const classStr = Object.entries(savedClasses).map(([k,v]) => k + (v>1?'×'+v:'')).join(', ');
+                msg = '✅ ' + addedCount + ' эталон(а): ' + classStr;
+            }
+            if (skippedCount > 0) {
+                const rStr = Object.entries(skippedByReason).map(([k,v]) => k+':'+v).join(' ');
+                msg += (msg ? ' · ' : '') + '⚠ пропущено ' + skippedCount + ' (' + rStr + ')';
+            }
+            if (!addedCount && !skippedCount) msg = 'нет ручных исправлений';
+            if (statusEl) statusEl.innerHTML = '<span style="font-size:10px">' + msg + '</span>';
+            console.info('[training] saved', addedCount, 'skipped', skippedCount, JSON.stringify(report));
         }
 
         function kmRwExportTraining() {
