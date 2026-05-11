@@ -15459,6 +15459,12 @@ ${playerList}
             }
         }
 
+        function _safeArrayField(value, fallback) {
+            if (Array.isArray(value)) return value;
+            if (value && typeof value === 'object') return Object.values(value);
+            return fallback || [];
+        }
+
         function loadFromStorage() {
             if (window._appDataReady) return true; // data already loaded from Supabase — skip localStorage
             try {
@@ -15469,7 +15475,7 @@ ${playerList}
                 if (data.archive)      archive       = data.archive;
                 if (data.kmArchive)    kmArchive     = data.kmArchive;
                 if (data.packs)        packs         = data.packs;
-                if (data.manualEvents) manualEvents  = data.manualEvents;
+                if (data.manualEvents) manualEvents  = _safeArrayField(data.manualEvents, manualEvents);
                 if (data.eventStatuses) eventStatuses = data.eventStatuses;
                 if (data.eventOverrides) eventOverrides = data.eventOverrides;
                 if (data.kmStats)      kmStats       = data.kmStats;
@@ -15494,7 +15500,7 @@ ${playerList}
             if (data.archive)            archive            = data.archive;
             if (data.kmArchive)          kmArchive          = data.kmArchive;
             if (data.packs)              packs              = data.packs;
-            if (data.manualEvents)       manualEvents       = data.manualEvents;
+            if (data.manualEvents)       manualEvents       = _safeArrayField(data.manualEvents, manualEvents);
             if (data.eventStatuses)      eventStatuses      = data.eventStatuses;
             if (data.eventOverrides)     eventOverrides     = data.eventOverrides;
             if (data.kmStats)            kmStats            = data.kmStats;
@@ -15573,7 +15579,7 @@ ${playerList}
                             if (d.archive)            archive            = d.archive;
                             if (d.kmArchive)          kmArchive          = d.kmArchive;
                             if (d.packs)              packs              = d.packs;
-                            if (d.manualEvents)       manualEvents       = d.manualEvents;
+                            if (d.manualEvents)       manualEvents       = _safeArrayField(d.manualEvents, manualEvents);
                             if (d.eventStatuses)      eventStatuses      = d.eventStatuses;
                             if (d.eventOverrides)     eventOverrides     = d.eventOverrides;
                             if (d.nickAliases)        nickAliases        = d.nickAliases;
