@@ -8750,6 +8750,42 @@ function getClass2IconByClass3(c3) {
             };
         }
 
+        // Build raw side-specific crop of the "Член группы" panel for wizard preview.
+        // Used post-OCR when model returns member_side: 'left' or 'right'.
+        // Mirrors right-side relative bounds from _ccOcrPreprocessCrop for parity.
+        function _kmComputeSideCrop(img, side) {
+            const W = img.naturalWidth;
+            const H = img.naturalHeight;
+            let cropX, cropY, cropW, cropH, source;
+            if (side === 'left') {
+                cropX = 0;
+                cropY = Math.floor(H * 0.05);
+                cropW = Math.min(W, Math.floor(W * 0.525));
+                cropH = Math.floor(H * 0.85);
+                source = 'member_side_left';
+            } else {
+                // right (default, mirrors _ccOcrPreprocessCrop bounds)
+                cropX = Math.floor(W * 0.475);
+                cropY = Math.floor(H * 0.05);
+                cropW = Math.min(W - cropX, Math.floor(W * 0.55));
+                cropH = Math.floor(H * 0.85);
+                source = 'member_side_right';
+            }
+            cropX = _ccOcrClamp(cropX, 0, W - 1);
+            cropY = _ccOcrClamp(cropY, 0, H - 1);
+            cropW = _ccOcrClamp(cropW, 1, W - cropX);
+            cropH = _ccOcrClamp(cropH, 1, H - cropY);
+            const cropCanvas = document.createElement('canvas');
+            cropCanvas.width = cropW;
+            cropCanvas.height = cropH;
+            cropCanvas.getContext('2d', { willReadFrequently: true })
+                .drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+            return {
+                cropCanvas,
+                geometry: { x: cropX, y: cropY, w: cropW, h: cropH, source }
+            };
+        }
+
         function _ccOcrCanvasToBlob(canvas) {
             return new Promise((resolve, reject) => {
                 canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not create PNG blob from processed crop.')), 'image/png');
@@ -9232,10 +9268,6 @@ function getClass2IconByClass3(c3) {
                         const packName = (shot.name || shot.packName || 'OCR') + ' #' + (i + 1);
                         screenPlayersMap[packName]  = players.map(p => ({...p}));
                         screenShotDataMap[packName] = shot.dataUrl;
-                        geometryMap[packName] = {
-                            ...crop.geometry,
-                            cropUrl: crop.cropCanvas.toDataURL('image/png'),
-                        };
                         // Table-type + member-side from model (preferred); fall back to legacy notes parse.
                         const _ttRaw = (parsed.table_type || '').toString().toLowerCase().trim();
                         const _msRaw = (parsed.member_side || '').toString().toLowerCase().trim();
@@ -9248,6 +9280,33 @@ function getClass2IconByClass3(c3) {
                             tableType: tableType,
                             memberSide: memberSide,
                             ignoredLeaderTable: tableType === 'both' || /both/.test(_lhNotes),
+                        };
+                        // Dynamic side-aware geometry/cropUrl for wizard preview.
+                        // member_side='left'  → recompute crop from left panel.
+                        // member_side='right' → keep existing right crop from _ccOcrPreprocessCrop.
+                        // member_side unknown → legacy_fallback to right crop, mark in debug.
+                        let _effectiveCrop, _geometrySource, _cropUrlSide, _sideFallbackReason = null;
+                        if (memberSide === 'left') {
+                            _effectiveCrop = _kmComputeSideCrop(img, 'left');
+                            _geometrySource = 'member_side_left';
+                            _cropUrlSide = 'left';
+                        } else if (memberSide === 'right') {
+                            _effectiveCrop = crop;
+                            _geometrySource = 'member_side_right';
+                            _cropUrlSide = 'right';
+                        } else {
+                            _effectiveCrop = crop;
+                            _geometrySource = 'legacy_fallback';
+                            _cropUrlSide = 'right';
+                            _sideFallbackReason = 'member_side_not_provided_or_unknown';
+                        }
+                        geometryMap[packName] = {
+                            ..._effectiveCrop.geometry,
+                            cropUrl: _effectiveCrop.cropCanvas.toDataURL('image/png'),
+                            memberSide: memberSide,
+                            cropUrlSide: _cropUrlSide,
+                            geometrySource: _geometrySource,
+                            geometrySideFallbackReason: _sideFallbackReason,
                         };
                         // Leader-list hints: only when model says leader_list (no Член группы extracted).
                         // If table_type is party_members or both, NEVER mark as leader_list — valid screen.
@@ -10261,10 +10320,19 @@ ${playerList}
                         }
                         continue;
                     }
-                    // Persist geometry so KM review wizard can crop just the «Член группы» table
+                    // Persist geometry so KM review wizard can crop just the «Член группы» table.
+                    // Preserve side-aware cropUrl/memberSide/cropUrlSide/geometrySource that the
+                    // OCR provider loop stored, so we don't lose left-side wizard preview here.
+                    const _prevGeom = dayPackGeometry[packName] || {};
+                    const _matcherSide = /LEFT/i.test(geo.preset || '') ? 'left'
+                                       : /RIGHT/i.test(geo.preset || '') ? 'right'
+                                       : 'unknown';
                     dayPackGeometry[packName] = {
+                        ..._prevGeom,
                         x: geo.x, y: geo.y, rowH: geo.rowH, iconW: geo.iconW, iconH: geo.iconH,
-                        packLen: packPlayers.length, imgW: sc.width, imgH: sc.height, preset: geo.preset
+                        packLen: packPlayers.length, imgW: sc.width, imgH: sc.height, preset: geo.preset,
+                        iconMatcherSide: _matcherSide,
+                        geometryMemberSide: _prevGeom.memberSide || 'unknown'
                     };
 
                     for (let rowIdx = 0; rowIdx < packPlayers.length; rowIdx++) {
