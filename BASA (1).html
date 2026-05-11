@@ -10064,10 +10064,12 @@ function getClass2IconByClass3(c3) {
                     if (seedEl) { const p = JSON.parse(seedEl.textContent || '[]'); if (Array.isArray(p)) seedItems = p; }
                 } catch(e) { console.warn('[training] seed parse failed', e); }
 
-                // 2. User training from localStorage
+                // 2. User training from localStorage — v2 only.
+                // v1 is the polluted legacy store; it is intentionally ignored
+                // and NOT migrated. dumpTrainingDiag still reports its size.
                 let localItems = [];
                 try {
-                    const raw = localStorage.getItem('cc_km_icon_training_v1');
+                    const raw = localStorage.getItem('cc_km_icon_training_v2');
                     if (raw) { const p = JSON.parse(raw); if (Array.isArray(p)) localItems = p; }
                 } catch(e) { console.warn('[training] localStorage parse failed', e); }
 
@@ -10671,11 +10673,23 @@ ${playerList}
         window.dumpTrainingDiag = function() {
             const d = window._gtDebug || {};
             console.group('[Training Diagnosis]');
+            // Storage rotation: v1 is the polluted legacy key, v2 is the active one.
+            const ACTIVE_KEY = 'cc_km_icon_training_v2';
+            const OLD_KEY    = 'cc_km_icon_training_v1';
+            let v2Stored = [];
+            try { v2Stored = JSON.parse(localStorage.getItem(ACTIVE_KEY) || '[]'); } catch(e) {}
+            let v1Raw = null;
+            try { v1Raw = localStorage.getItem(OLD_KEY); } catch(e) {}
+            let v1Count = 0;
+            if (v1Raw) { try { const p = JSON.parse(v1Raw); v1Count = Array.isArray(p) ? p.length : 0; } catch(e) {} }
+            console.log('storageKey:', ACTIVE_KEY);
+            if (v1Raw !== null) console.log('oldV1Count:', v1Count, '(ignored — legacy polluted store)');
+            console.log('localV2Count:', v2Stored.length);
+            console.log('seedRawCount:', d.seedRawCount);
             console.log('effectiveTrainingCount:', d.effectiveTrainingCount,
                 '(seed:', d.seedTrainingCount, ', local:', d.localTrainingCount, ')');
-            // Class distribution from storage
-            let stored = [];
-            try { stored = JSON.parse(localStorage.getItem('cc_km_icon_training_v1') || '[]'); } catch(e) {}
+            // Class distribution from active (v2) storage
+            const stored = v2Stored;
             const byClass = {};
             stored.forEach(function(t) { byClass[t.class2Key] = (byClass[t.class2Key]||0)+1; });
             console.log('storedClasses (' + stored.length + '):', JSON.stringify(byClass));
@@ -10766,7 +10780,7 @@ ${playerList}
                 if (seedEl) { const p = JSON.parse(seedEl.textContent || '[]'); if (Array.isArray(p)) seedItems = p; }
             } catch(e) {}
             let localItems = [];
-            try { localItems = JSON.parse(localStorage.getItem('cc_km_icon_training_v1') || '[]'); } catch(e) {}
+            try { localItems = JSON.parse(localStorage.getItem('cc_km_icon_training_v2') || '[]'); } catch(e) {}
             const byId = {};
             seedItems.forEach(t => { if (t.id) byId[t.id] = Object.assign({}, t, { _src: 'seed' }); });
             localItems.forEach(t => { if (t.id) byId[t.id] = Object.assign({}, t, { _src: 'local' }); });
@@ -13628,7 +13642,9 @@ ${playerList}
         }
 
         // ── LOCAL ICON TRAINING ──
-        const _CC_TRAINING_KEY = 'cc_km_icon_training_v1';
+        // Rotated to v2 to abandon the polluted v1 store. v1 is intentionally
+        // NOT migrated — see dumpTrainingDiag() for the oldV1Count breadcrumb.
+        const _CC_TRAINING_KEY = 'cc_km_icon_training_v2';
         const _CC_MAX_PER_CLASS = 12;
 
         // Reverse mapping: class3 → class2
