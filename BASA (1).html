@@ -8204,6 +8204,7 @@ function getClass2IconByClass3(c3) {
         let dayCommandChannel = []; // лидеры паков из командного канала
         let dayPackLeaders = {}; // { packName: leaderName }
         let dayScreenPlayersMap = {}; // { packName: [players] } — игроки каждого пака со скрина
+        let dayPackLeaderHints = {}; // { packName: string[] } — evidence для фильтра leader-list
         let dayScreenShotMap = {};   // { packName: dataUrl } — скрин каждого пака
         let dayIconLocations = {};   // { packName: { normName: {icon_center_x,icon_center_y,icon_bbox,confidence} } }
         let dayPackGeometry = {};    // { packName: {x,y,rowH,iconW,iconH,packLen,imgW,imgH,preset} } — для кропа таблицы «Член группы» в wizard
@@ -8849,6 +8850,7 @@ function getClass2IconByClass3(c3) {
 
             const allPlayers = {};
             const screenPlayersMap = {};
+            const packLeaderHints = {};
             const screenShotDataMap = {};
             const geometryMap = {};
             const skippedScreenshots = [];
@@ -8949,6 +8951,7 @@ function getClass2IconByClass3(c3) {
                 dayCommandChannel = [];
                 dayPackLeaders = {};
                 dayScreenPlayersMap = screenPlayersMap;
+                dayPackLeaderHints = packLeaderHints;
                 dayScreenShotMap = screenShotDataMap;
                 Object.assign(dayPackGeometry, geometryMap);
 
@@ -9047,7 +9050,7 @@ function getClass2IconByClass3(c3) {
         async function analyzeWithOpenRouterBaiduProvider({ dateStr, shots }) {
             console.info('[openrouter-ocr] provider=baidu-only');
             console.info('[openrouter-ocr] no paid fallback');
-            const BAIDU_OCR_PROMPT = `Extract ONLY the visible KM member table from this cropped game screenshot.\nReturn ONLY valid JSON:\n{"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"confidence":0,"notes":""}\nRules:\n- preserve nick spelling exactly as seen\n- kills, deaths, pvp, pve must be integers\n- if a value is unreadable, use null\n- no markdown\n- no code fences`;
+            const BAIDU_OCR_PROMPT = `Extract ONLY the visible KM member table from this cropped game screenshot.\nReturn ONLY valid JSON:\n{"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"confidence":0,"notes":""}\nRules:\n- preserve nick spelling exactly as seen\n- kills, deaths, pvp, pve must be integers\n- if a value is unreadable, use null\n- no markdown\n- no code fences\n- if the table shows Глава/Лидер/Состав column headers (Командный канал leader overview, not Член группы member rows), set notes to "leader_list"`;
 
             const openRouterKeys = getOpenRouterApiKeys();
             const exhaustionBefore = getOpenRouterExhaustionSnapshot();
@@ -9084,6 +9087,7 @@ function getClass2IconByClass3(c3) {
 
             const allPlayers = {};
             const screenPlayersMap = {};
+            const packLeaderHints = {};
             const screenShotDataMap = {};
             const geometryMap = {};
             const skippedScreenshots = [];
@@ -9229,6 +9233,15 @@ function getClass2IconByClass3(c3) {
                             ...crop.geometry,
                             cropUrl: crop.cropCanvas.toDataURL('image/png'),
                         };
+                        // Leader-list evidence: based on model notes from BAIDU_OCR_PROMPT
+                        const _lhNotes = (parsed.notes || '').toLowerCase();
+                        const _lhEv = [];
+                        if (/leader.?list|глава|командный/.test(_lhNotes)) _lhEv.push('Глава');
+                        if (/состав/.test(_lhNotes)) _lhEv.push('Состав');
+                        if (/\bлидер\b/.test(_lhNotes)) _lhEv.push('Лидер');
+                        if (!/член.*группы/.test(_lhNotes)) _lhEv.push('no Член группы');
+                        if (_lhEv.filter(h => h !== 'no Член группы').length >= 1 && _lhEv.includes('no Член группы'))
+                            packLeaderHints[packName] = _lhEv;
                         players.forEach(p => {
                             const key = normalizeNick(p.name);
                             if (!key) return;
@@ -9261,6 +9274,7 @@ function getClass2IconByClass3(c3) {
                 dayCommandChannel  = [];
                 dayPackLeaders     = {};
                 dayScreenPlayersMap = screenPlayersMap;
+                dayPackLeaderHints  = packLeaderHints;
                 dayScreenShotMap   = screenShotDataMap;
                 Object.assign(dayPackGeometry, geometryMap);
 
@@ -12575,10 +12589,14 @@ ${playerList}
                 .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
         }
 
-        function _kmDetectLeaderListPack(players) {
-            // Heuristic: leader-list screenshots have no stat columns → all zeros
-            if (!players || players.length < 4) return false;
-            return players.every(p => !p.kills && !p.deaths && !p.pvp_dmg && !p.pve_dmg);
+        function _kmDetectLeaderListPack(players, packName) {
+            // Detect leader-list (Командный канал) by OCR evidence saved during provider pass.
+            // Zero-stat heuristic removed: leader rows can have non-zero aggregated stats.
+            const hints = (dayPackLeaderHints || {})[packName];
+            if (!hints || !hints.length) return null;
+            const positive = hints.filter(h => h !== 'no Член группы');
+            if (positive.length >= 1 && hints.includes('no Член группы')) return hints;
+            return null;
         }
 
         function _kmOcrFilterUnsupportedPacks() {
@@ -12588,13 +12606,15 @@ ${playerList}
             const map = dayScreenPlayersMap;
             if (!map) return;
             for (const packName of Object.keys(map)) {
-                if (_kmDetectLeaderListPack(map[packName])) {
+                const evidence = _kmDetectLeaderListPack(map[packName], packName);
+                if (evidence) {
                     const count = (map[packName] || []).length;
                     window._gtDebug.unsupportedTableSkipCount++;
                     window._gtDebug.unsupportedTableSkipped.push({
                         packName, playerCount: count,
                         reason: 'unsupported_table_type_leaders',
-                        tableType: 'leader_list'
+                        tableType: 'leader_list',
+                        detectionEvidence: evidence
                     });
                     delete map[packName];
                     if (dayScreenShotMap && packName in dayScreenShotMap) delete dayScreenShotMap[packName];
