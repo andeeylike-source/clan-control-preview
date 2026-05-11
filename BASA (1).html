@@ -10336,7 +10336,9 @@ ${playerList}
                     // Preserve side-aware cropUrl/memberSide/cropUrlSide/geometrySource that the
                     // OCR provider loop stored, so we don't lose left-side wizard preview here.
                     const _prevGeom = dayPackGeometry[packName] || {};
-                    const _matcherSide = /LEFT/i.test(geo.preset || '') ? 'left'
+                    const _matcherSide = _forceSide
+                                       ? _forceSide
+                                       : /LEFT/i.test(geo.preset || '') ? 'left'
                                        : /RIGHT/i.test(geo.preset || '') ? 'right'
                                        : 'unknown';
                     dayPackGeometry[packName] = {
