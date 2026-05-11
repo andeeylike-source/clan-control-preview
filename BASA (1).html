@@ -3988,10 +3988,11 @@
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0">
                     <button onclick="kmRwCopyDebug()" title="Скопировать JSON-диагностику icon matcher (текущий пак + summary)" style="background:#1a1f29;color:#a5b4fc;border:1px solid #2d3748;border-radius:7px;padding:5px 9px;font-size:10.5px;font-weight:700;cursor:pointer;white-space:nowrap">🐞 Debug проф</button>
                     <button onclick="kmRwSaveTraining()" id="kmRwTrainBtn" title="Запомнить ручные исправления профы как эталоны для icon matcher" style="background:#1a1f29;color:#f59e0b;border:1px solid #44330a;border-radius:7px;padding:5px 9px;font-size:10.5px;font-weight:700;cursor:pointer;white-space:nowrap">🧠 Запомнить</button>
+                    <button onclick="kmRwPurgeAllTraining()" title="Удалить v1/v2/manual training keys и in-memory cache. Подсказки matcher останутся только от встроенного seed." style="background:#1a1f29;color:#fca5a5;border:1px solid #4c1d1d;border-radius:7px;padding:5px 9px;font-size:10.5px;font-weight:700;cursor:pointer;white-space:nowrap">🧹 Очистить обучение</button>
                     <span id="kmRwTrainStatus" style="font-size:10px;color:#64748b;flex-shrink:0"></span>
                     <button onclick="kmRwExportTraining()" title="Экспорт эталонов обучения в JSON" style="background:#1a1f29;color:#64748b;border:1px solid #1e2530;border-radius:7px;padding:5px 7px;font-size:10px;cursor:pointer">📤</button>
                     <button onclick="kmRwImportTraining()" title="Импорт эталонов из JSON" style="background:#1a1f29;color:#64748b;border:1px solid #1e2530;border-radius:7px;padding:5px 7px;font-size:10px;cursor:pointer">📥</button>
-                    <button onclick="kmRwResetTraining()" title="Сбросить локальное обучение" style="background:#1a1f29;color:#64748b;border:1px solid #1e2530;border-radius:7px;padding:5px 7px;font-size:10px;cursor:pointer">🗑️</button>
+                    <button onclick="kmRwResetTraining()" title="Сбросить только текущий manual ключ" style="background:#1a1f29;color:#64748b;border:1px solid #1e2530;border-radius:7px;padding:5px 7px;font-size:10px;cursor:pointer">🗑️</button>
                     <div id="kmRwSaveStatus" style="font-size:11px;color:#64748b">Правки записываются сразу при изменении полей.</div>
                 </div>
                 <div style="display:flex;gap:7px;flex-wrap:wrap">
@@ -9911,6 +9912,41 @@ function getClass2IconByClass3(c3) {
         let   _ccGTExemplars = null; // [{class2, vec}] loaded at runtime
         let   _ccTrainedVecs = []; // [{class2, vec, trained:true, id}] from localStorage
 
+        // ── MANUAL PROFA MODE ──
+        // Auto icon matcher is now a HINT system only. It still computes
+        // matcher_top1 / matcher_sim / matcher_margin for the gray hint badge,
+        // but it must NOT write profa / class2 / profaSource into the row.
+        // The dropdown is the sole source of truth. Flip this flag back to
+        // true to restore the previous "AUTO writes profa" behaviour.
+        const _CC_AUTO_PROFA_WRITE = false;
+
+        // Startup purge — legacy training localStorage keys are abandoned.
+        // v1 was the polluted store; v2 was a clean rotation but the auto
+        // matcher built off it kept producing wrong class assignments
+        // (e.g. ZoS → Spectral Dancer, Draktar → Dominator on 7.jpg).
+        // We delete both at script load so neither feeds _ccTrainedVecs and
+        // neither can be picked up by export/import. Only the new manual key
+        // (cc_km_icon_training_manual_v1) is honoured going forward.
+        (function _ccPurgeLegacyTraining() {
+            const LEGACY = ['cc_km_icon_training_v1', 'cc_km_icon_training_v2'];
+            const removed = {};
+            try {
+                for (const k of LEGACY) {
+                    const raw = localStorage.getItem(k);
+                    if (raw !== null) {
+                        let n = 0;
+                        try { const p = JSON.parse(raw); if (Array.isArray(p)) n = p.length; } catch(e) {}
+                        removed[k] = n;
+                        localStorage.removeItem(k);
+                    }
+                }
+            } catch(e) { /* localStorage blocked — nothing to purge */ }
+            window._ccPurgedLegacyTraining = removed;
+            if (Object.keys(removed).length) {
+                console.info('[training] legacy training keys purged at startup:', removed);
+            }
+        })();
+
         function _ccImgToFeature(img, size) {
             const c = document.createElement('canvas'); c.width = size; c.height = size;
             const ctx = c.getContext('2d', { willReadFrequently: true });
@@ -10064,12 +10100,13 @@ function getClass2IconByClass3(c3) {
                     if (seedEl) { const p = JSON.parse(seedEl.textContent || '[]'); if (Array.isArray(p)) seedItems = p; }
                 } catch(e) { console.warn('[training] seed parse failed', e); }
 
-                // 2. User training from localStorage — v2 only.
-                // v1 is the polluted legacy store; it is intentionally ignored
-                // and NOT migrated. dumpTrainingDiag still reports its size.
+                // 2. User training from localStorage — manual_v1 only.
+                // v1 / v2 are abandoned and purged at script start (see
+                // _ccPurgeLegacyTraining IIFE). They will never reach the
+                // matcher even if they reappear somehow.
                 let localItems = [];
                 try {
-                    const raw = localStorage.getItem('cc_km_icon_training_v2');
+                    const raw = localStorage.getItem('cc_km_icon_training_manual_v1');
                     if (raw) { const p = JSON.parse(raw); if (Array.isArray(p)) localItems = p; }
                 } catch(e) { console.warn('[training] localStorage parse failed', e); }
 
@@ -10549,9 +10586,17 @@ ${playerList}
                         const _legacyAutoOk  = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
                         const _midSimGuardOk = best.similarity >= 0.80 || best.margin >= 0.15;
                         const _midSimBlocked = _legacyAutoOk && !_midSimGuardOk;
-                        writeTarget.matcher_trigger     = _trainedStrong || (_legacyAutoOk && _midSimGuardOk);
-                        writeTarget.matcher_autoTrained = _trainedStrong;
-                        const _finalReason = _trainedStrong ? 'trained_strong'
+                        // Compute what the matcher WOULD do if AUTO-write were enabled.
+                        // In manual mode (_CC_AUTO_PROFA_WRITE=false) we force trigger
+                        // off so the UI renders a gray hint badge instead of green AUTO,
+                        // and so downstream consumers (profa column, save flow, stats)
+                        // see the row as not-auto.
+                        const _wouldTrigger = _trainedStrong || (_legacyAutoOk && _midSimGuardOk);
+                        writeTarget.matcher_wouldTrigger = _wouldTrigger;
+                        writeTarget.matcher_trigger     = _CC_AUTO_PROFA_WRITE && _wouldTrigger;
+                        writeTarget.matcher_autoTrained = _CC_AUTO_PROFA_WRITE && _trainedStrong;
+                        const _finalReason = !_CC_AUTO_PROFA_WRITE ? 'manual_mode_hint_only'
+                            : _trainedStrong ? 'trained_strong'
                             : (best.matchedFrom === 'trained' && writeTarget.matcher_trigger) ? 'trained_above_threshold'
                             : writeTarget.matcher_trigger ? 'base_above_threshold'
                             : _midSimBlocked ? 'low_margin_mid_sim_demoted'
@@ -10578,43 +10623,45 @@ ${playerList}
                         writeTarget.matcher_cropQuality = _cq;
                         writeTarget.matcher_geoPreset   = geo.preset;
 
-                        // AUTO-WRITE: safe GT_EX only (trigger + not rowUnstable + not locInvalid)
-                        if (writeTarget.matcher_trigger && !_rowUnstable) {
-                            if (_trainedStrong) window._gtDebug.autoTrainedCount = (window._gtDebug.autoTrainedCount || 0) + 1;
-                            writeTarget.class2     = best.class2;
-                            writeTarget.profaSource = 'gt_exemplar_matcher';
-                            const _c3opts = resolveClass2ToClass3(best.class2);
-                            if (_c3opts.length === 1) {
-                                writeTarget.profa = _c3opts[0];
-                                writeTarget.matcher_profaWarning = false;
-                            } else {
-                                // AMBIG: unambiguous icon but 3-class is unclear — write group label with warning
-                                writeTarget.profa = _c3opts[0] || best.class2;
-                                writeTarget.matcher_profaWarning = true;
-                                writeTarget.matcher_profaWarningReason = 'ambiguous_class2';
-                                writeTarget.matcher_originalStatus = 'AMBIG';
-                            }
-                        } else if (best && best.class2) {
-                            // LOW: below threshold but candidate exists.
-                            // Special case — mid-sim demoted by the margin guard: do NOT write
-                            // profa at all. The matcher's top1 here is the very value we just
-                            // refused to AUTO-assign (e.g. ZoS→Spectral Dancer at sim 0.76 with
-                            // marginal gap). Writing it as a "best guess" would still surface
-                            // the wrong class3 in the row, defeating the guard. Leave profa
-                            // empty so the row goes to manual review.
-                            if (_midSimBlocked) {
-                                writeTarget.matcher_profaWarning = true;
-                                writeTarget.matcher_profaWarningReason = 'mid_sim_margin_demoted';
-                                writeTarget.matcher_originalStatus = 'LOW';
-                            } else {
-                                const _c3low = resolveClass2ToClass3(best.class2);
-                                if (_c3low.length >= 1) {
-                                    writeTarget.profa = _c3low[0];
+                        // PROFA-WRITE: gated by manual-mode flag.
+                        // In manual mode (_CC_AUTO_PROFA_WRITE=false) the matcher never
+                        // writes profa / class2 / profaSource — the dropdown is the only
+                        // way profa gets set. Diagnostic fields (matcher_top1, matcher_sim,
+                        // matcher_margin, matcher_cropUrl, matcher_finalReason) still flow
+                        // through so the UI can render the gray hint badge.
+                        if (_CC_AUTO_PROFA_WRITE) {
+                            if (writeTarget.matcher_trigger && !_rowUnstable) {
+                                if (_trainedStrong) window._gtDebug.autoTrainedCount = (window._gtDebug.autoTrainedCount || 0) + 1;
+                                writeTarget.class2     = best.class2;
+                                writeTarget.profaSource = 'gt_exemplar_matcher';
+                                const _c3opts = resolveClass2ToClass3(best.class2);
+                                if (_c3opts.length === 1) {
+                                    writeTarget.profa = _c3opts[0];
+                                    writeTarget.matcher_profaWarning = false;
+                                } else {
+                                    writeTarget.profa = _c3opts[0] || best.class2;
                                     writeTarget.matcher_profaWarning = true;
-                                    writeTarget.matcher_profaWarningReason = _c3low.length === 1 ? 'low_confidence' : 'low_confidence_ambig';
+                                    writeTarget.matcher_profaWarningReason = 'ambiguous_class2';
+                                    writeTarget.matcher_originalStatus = 'AMBIG';
+                                }
+                            } else if (best && best.class2) {
+                                if (_midSimBlocked) {
+                                    writeTarget.matcher_profaWarning = true;
+                                    writeTarget.matcher_profaWarningReason = 'mid_sim_margin_demoted';
                                     writeTarget.matcher_originalStatus = 'LOW';
+                                } else {
+                                    const _c3low = resolveClass2ToClass3(best.class2);
+                                    if (_c3low.length >= 1) {
+                                        writeTarget.profa = _c3low[0];
+                                        writeTarget.matcher_profaWarning = true;
+                                        writeTarget.matcher_profaWarningReason = _c3low.length === 1 ? 'low_confidence' : 'low_confidence_ambig';
+                                        writeTarget.matcher_originalStatus = 'LOW';
+                                    }
                                 }
                             }
+                        } else {
+                            // Manual mode breadcrumb — visible in dumpRowDiag / matcher_originalStatus.
+                            writeTarget.matcher_originalStatus = 'HINT_ONLY';
                         }
                         // Per-row diagnostic dump (does not affect matcher behaviour)
                         try {
@@ -10696,23 +10743,33 @@ ${playerList}
         window.dumpTrainingDiag = function() {
             const d = window._gtDebug || {};
             console.group('[Training Diagnosis]');
-            // Storage rotation: v1 is the polluted legacy key, v2 is the active one.
-            const ACTIVE_KEY = 'cc_km_icon_training_v2';
-            const OLD_KEY    = 'cc_km_icon_training_v1';
-            let v2Stored = [];
-            try { v2Stored = JSON.parse(localStorage.getItem(ACTIVE_KEY) || '[]'); } catch(e) {}
-            let v1Raw = null;
-            try { v1Raw = localStorage.getItem(OLD_KEY); } catch(e) {}
-            let v1Count = 0;
-            if (v1Raw) { try { const p = JSON.parse(v1Raw); v1Count = Array.isArray(p) ? p.length : 0; } catch(e) {} }
+            const ACTIVE_KEY = 'cc_km_icon_training_manual_v1';
+            const OLD_V1     = 'cc_km_icon_training_v1';
+            const OLD_V2     = 'cc_km_icon_training_v2';
+            const _count = k => {
+                try { const r = localStorage.getItem(k); if (!r) return { present:false, n:0 };
+                    const p = JSON.parse(r); return { present:true, n: Array.isArray(p)?p.length:0 }; }
+                catch(e) { return { present:true, n:0 }; }
+            };
+            const manualStored = (function() {
+                try { return JSON.parse(localStorage.getItem(ACTIVE_KEY) || '[]'); } catch(e) { return []; }
+            })();
+            const v1 = _count(OLD_V1), v2 = _count(OLD_V2);
+            console.log('mode: MANUAL (auto matcher writes hint only, never profa)');
             console.log('storageKey:', ACTIVE_KEY);
-            if (v1Raw !== null) console.log('oldV1Count:', v1Count, '(ignored — legacy polluted store)');
-            console.log('localV2Count:', v2Stored.length);
+            if (v1.present) console.log('oldV1Count:', v1.n, '(present, ignored — legacy purged-on-load)');
+            else            console.log('oldV1Count: 0 (purged at startup)');
+            if (v2.present) console.log('oldV2Count:', v2.n, '(present, ignored — legacy purged-on-load)');
+            else            console.log('oldV2Count: 0 (purged at startup)');
+            console.log('localManualCount:', manualStored.length);
             console.log('seedRawCount:', d.seedRawCount);
             console.log('effectiveTrainingCount:', d.effectiveTrainingCount,
                 '(seed:', d.seedTrainingCount, ', local:', d.localTrainingCount, ')');
-            // Class distribution from active (v2) storage
-            const stored = v2Stored;
+            if (window._ccPurgedLegacyTraining) {
+                console.log('purgedAtStartup:', JSON.stringify(window._ccPurgedLegacyTraining));
+            }
+            // Class distribution from active (manual) storage
+            const stored = manualStored;
             const byClass = {};
             stored.forEach(function(t) { byClass[t.class2Key] = (byClass[t.class2Key]||0)+1; });
             console.log('storedClasses (' + stored.length + '):', JSON.stringify(byClass));
@@ -10803,7 +10860,7 @@ ${playerList}
                 if (seedEl) { const p = JSON.parse(seedEl.textContent || '[]'); if (Array.isArray(p)) seedItems = p; }
             } catch(e) {}
             let localItems = [];
-            try { localItems = JSON.parse(localStorage.getItem('cc_km_icon_training_v2') || '[]'); } catch(e) {}
+            try { localItems = JSON.parse(localStorage.getItem('cc_km_icon_training_manual_v1') || '[]'); } catch(e) {}
             const byId = {};
             seedItems.forEach(t => { if (t.id) byId[t.id] = Object.assign({}, t, { _src: 'seed' }); });
             localItems.forEach(t => { if (t.id) byId[t.id] = Object.assign({}, t, { _src: 'local' }); });
@@ -13665,9 +13722,9 @@ ${playerList}
         }
 
         // ── LOCAL ICON TRAINING ──
-        // Rotated to v2 to abandon the polluted v1 store. v1 is intentionally
-        // NOT migrated — see dumpTrainingDiag() for the oldV1Count breadcrumb.
-        const _CC_TRAINING_KEY = 'cc_km_icon_training_v2';
+        // Manual-prof mode key. v1 / v2 are abandoned and purged at startup
+        // (see _ccPurgeLegacyTraining). Save / export / import use only this.
+        const _CC_TRAINING_KEY = 'cc_km_icon_training_manual_v1';
         const _CC_MAX_PER_CLASS = 12;
 
         // Reverse mapping: class3 → class2
@@ -13872,6 +13929,36 @@ ${playerList}
             const statusEl = document.getElementById('kmRwTrainStatus');
             if (statusEl) statusEl.textContent = '';
             _kmRwToast('эталоны сброшены');
+        }
+
+        // 🧹 Очистить обучение — hard purge: wipes the legacy v1/v2 stores AND the
+        // current manual store, plus the in-memory _ccTrainedVecs cache. Use when
+        // the matcher hints look polluted and you want to start from seed-only.
+        async function kmRwPurgeAllTraining() {
+            if (!confirm('Очистить ВСЁ обучение (v1, v2, manual)?\nПодсказки matcher останутся только от встроенного seed.')) return;
+            const KEYS = ['cc_km_icon_training_v1', 'cc_km_icon_training_v2', 'cc_km_icon_training_manual_v1'];
+            const before = {};
+            for (const k of KEYS) {
+                try { const r = localStorage.getItem(k);
+                    if (r === null) { before[k] = null; continue; }
+                    let n = 0; try { const p = JSON.parse(r); if (Array.isArray(p)) n = p.length; } catch(e) {}
+                    before[k] = n;
+                } catch(e) { before[k] = '?'; }
+            }
+            for (const k of KEYS) { try { localStorage.removeItem(k); } catch(e) {} }
+            const memBefore = (_ccTrainedVecs || []).length;
+            _ccTrainedVecs = [];
+            // Reload trained vecs so the next analysis pass uses ONLY embedded seed.
+            try { _ccTrainedVecs = await _ccLoadAndPrepareTrainedVecs(); } catch(e) {}
+            const memAfter = _ccTrainedVecs.length;
+            const statusEl = document.getElementById('kmRwTrainStatus');
+            const summary = 'v1=' + (before['cc_km_icon_training_v1'] ?? '—') +
+                          ', v2=' + (before['cc_km_icon_training_v2'] ?? '—') +
+                          ', manual=' + (before['cc_km_icon_training_manual_v1'] ?? '—') +
+                          ' · in-memory: ' + memBefore + ' → ' + memAfter + ' (seed only)';
+            if (statusEl) statusEl.innerHTML = '<span style="font-size:10px">🧹 очищено · ' + summary + '</span>';
+            console.info('[training] purge-all before:', before, '· in-memory before:', memBefore, 'after:', memAfter);
+            _kmRwToast('обучение очищено · ' + summary);
         }
 
         // Console helper: surgically delete a single polluted local training
