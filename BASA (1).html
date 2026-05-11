@@ -10107,10 +10107,13 @@ function getClass2IconByClass3(c3) {
             return { validCount, avgSat: Math.round(avgSat), score: validCount*20 + avgSat };
         }
 
-        function _ccSelectBestGeometry(sc, nPlayers) {
+        function _ccSelectBestGeometry(sc, nPlayers, forceSide) {
             const W = sc.width, H = sc.height;
             const nCheck = Math.min(nPlayers, 4);
-            const candidates = _ccBuildGeometryCandidates(W, H);
+            // When memberSide is known, restrict to matching candidates only.
+            let candidates = _ccBuildGeometryCandidates(W, H);
+            if (forceSide === 'left')  candidates = candidates.filter(g => /LEFT/i.test(g.preset));
+            else if (forceSide === 'right') candidates = candidates.filter(g => /RIGHT/i.test(g.preset));
             let bestScore = -1, bestGeo = null, bestSc = null;
             for (const geo of candidates) {
                 const s = _ccScoreGeometry(sc, geo, nCheck);
@@ -10120,8 +10123,10 @@ function getClass2IconByClass3(c3) {
                 bestGeo.preset = `${bestGeo.preset}(vc=${bestSc.validCount} sat=${bestSc.avgSat})`;
                 return bestGeo;
             }
-            // FULL_SCAN: sweep x 5%–90% in 2% steps
-            for (let xPct = 0.05; xPct <= 0.90; xPct += 0.02) {
+            // FULL_SCAN: sweep x, restricted to the forced side when known
+            const _fsXMin = (forceSide === 'right') ? 0.45 : 0.05;
+            const _fsXMax = (forceSide === 'left')  ? 0.50 : 0.90;
+            for (let xPct = _fsXMin; xPct <= _fsXMax; xPct += 0.02) {
                 const geo = { x:Math.round(W*xPct), y:Math.round(H*0.265), rowH:Math.round(H*0.038),
                               iconW:Math.round(W*0.028), iconH:Math.round(H*0.038), nRows:9, preset:'' };
                 const s = _ccScoreGeometry(sc, geo, nCheck);
@@ -10299,7 +10304,12 @@ ${playerList}
                     const sc = document.createElement('canvas');
                     sc.width = img.naturalWidth; sc.height = img.naturalHeight;
                     sc.getContext('2d', { willReadFrequently:true }).drawImage(img, 0, 0);
-                    const geo = _ccSelectBestGeometry(sc, packPlayers.length);
+                    // Use known memberSide to restrict geometry candidates to the correct side.
+                    const _tableInfo = (dayPackTableInfo || {})[packName] || {};
+                    const _forceSide = (_tableInfo.memberSide === 'left' || _tableInfo.memberSide === 'right')
+                        ? _tableInfo.memberSide : null;
+                    const _forceSideReason = _forceSide ? 'dayPackTableInfo.memberSide' : null;
+                    const geo = _ccSelectBestGeometry(sc, packPlayers.length, _forceSide);
                     if (!geo) {
                         for (let _ri = 0; _ri < packPlayers.length; _ri++) {
                             const pp = packPlayers[_ri];
@@ -10312,6 +10322,8 @@ ${playerList}
                                 window._gtDebug.rows.push({
                                     pack: packName, row: _ri, name: _name,
                                     geoPreset: 'LOC_BAD_GEOMETRY', status: _name ? 'BAD_GEOMETRY' : 'NO_NAME',
+                                    forcedMemberSide: _forceSide || null,
+                                    forcedSideReason: _forceSideReason,
                                     top1: null, sim: 0, margin: 0, top3: [],
                                     trigger: false, wroteAuto: false, wroteProfa: false
                                 });
@@ -10332,7 +10344,10 @@ ${playerList}
                         x: geo.x, y: geo.y, rowH: geo.rowH, iconW: geo.iconW, iconH: geo.iconH,
                         packLen: packPlayers.length, imgW: sc.width, imgH: sc.height, preset: geo.preset,
                         iconMatcherSide: _matcherSide,
-                        geometryMemberSide: _prevGeom.memberSide || 'unknown'
+                        geometryMemberSide: _prevGeom.memberSide || 'unknown',
+                        forcedMemberSide: _forceSide || null,
+                        forcedSideReason: _forceSideReason,
+                        selectedGeoPreset: geo.preset,
                     };
 
                     for (let rowIdx = 0; rowIdx < packPlayers.length; rowIdx++) {
@@ -10540,9 +10555,14 @@ ${playerList}
                                 row: rowIdx,
                                 name: pp.name,
                                 geoPreset: geo.preset,
+                                selectedGeoPreset: geo.preset,
                                 cx, cy, expectedCY,
                                 cropBox: bestCropRect,
                                 cropQuality: _cq,
+                                geometryMemberSide: _tableInfo.memberSide || 'unknown',
+                                iconMatcherSide: _matcherSide,
+                                forcedMemberSide: _forceSide || null,
+                                forcedSideReason: _forceSideReason,
                                 top1: best.class2,
                                 sim: +(best.similarity || 0).toFixed(3),
                                 margin: +(best.margin || 0).toFixed(3),
