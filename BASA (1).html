@@ -9912,12 +9912,9 @@ function getClass2IconByClass3(c3) {
         let   _ccGTExemplars = null; // [{class2, vec}] loaded at runtime
         let   _ccTrainedVecs = []; // [{class2, vec, trained:true, id}] from localStorage
 
-        // ── MANUAL PROFA MODE ──
-        // Auto icon matcher is now a HINT system only. It still computes
-        // matcher_top1 / matcher_sim / matcher_margin for the gray hint badge,
-        // but it must NOT write profa / class2 / profaSource into the row.
-        // The dropdown is the sole source of truth. Flip this flag back to
-        // true to restore the previous "AUTO writes profa" behaviour.
+        // ── HYBRID MANUAL PROFA MODE ──
+        // Base AUTO is a hint only. Strong trained/seed matches may write
+        // profa, while weak/base matches leave the dropdown as source of truth.
         const _CC_AUTO_PROFA_WRITE = false;
 
         // Startup purge — legacy training localStorage keys are abandoned.
@@ -10586,17 +10583,16 @@ ${playerList}
                         const _legacyAutoOk  = best.similarity >= TRIG_SIM && best.margin >= TRIG_MAR;
                         const _midSimGuardOk = best.similarity >= 0.80 || best.margin >= 0.15;
                         const _midSimBlocked = _legacyAutoOk && !_midSimGuardOk;
-                        // Compute what the matcher WOULD do if AUTO-write were enabled.
-                        // In manual mode (_CC_AUTO_PROFA_WRITE=false) we force trigger
-                        // off so the UI renders a gray hint badge instead of green AUTO,
-                        // and so downstream consumers (profa column, save flow, stats)
-                        // see the row as not-auto.
-                        const _wouldTrigger = _trainedStrong || (_legacyAutoOk && _midSimGuardOk);
+                        // In hybrid manual mode only strong trained/seed matches are allowed
+                        // to write. Base AUTO remains a hint unless the global flag is enabled.
+                        const _baseAutoWouldTrigger = _legacyAutoOk && _midSimGuardOk;
+                        const _wouldTrigger = _trainedStrong || _baseAutoWouldTrigger;
                         writeTarget.matcher_wouldTrigger = _wouldTrigger;
-                        writeTarget.matcher_trigger     = _CC_AUTO_PROFA_WRITE && _wouldTrigger;
-                        writeTarget.matcher_autoTrained = _CC_AUTO_PROFA_WRITE && _trainedStrong;
-                        const _finalReason = !_CC_AUTO_PROFA_WRITE ? 'manual_mode_hint_only'
-                            : _trainedStrong ? 'trained_strong'
+                        writeTarget.matcher_trigger     = _trainedStrong || (_CC_AUTO_PROFA_WRITE && _baseAutoWouldTrigger);
+                        writeTarget.matcher_autoTrained = _trainedStrong;
+                        const _finalReason = _trainedStrong ? 'trained_strong'
+                            : (!_CC_AUTO_PROFA_WRITE && _baseAutoWouldTrigger) ? 'manual_mode_auto_hint_only'
+                            : (!_CC_AUTO_PROFA_WRITE) ? 'manual_mode_hint_only'
                             : (best.matchedFrom === 'trained' && writeTarget.matcher_trigger) ? 'trained_above_threshold'
                             : writeTarget.matcher_trigger ? 'base_above_threshold'
                             : _midSimBlocked ? 'low_margin_mid_sim_demoted'
@@ -10623,13 +10619,9 @@ ${playerList}
                         writeTarget.matcher_cropQuality = _cq;
                         writeTarget.matcher_geoPreset   = geo.preset;
 
-                        // PROFA-WRITE: gated by manual-mode flag.
-                        // In manual mode (_CC_AUTO_PROFA_WRITE=false) the matcher never
-                        // writes profa / class2 / profaSource — the dropdown is the only
-                        // way profa gets set. Diagnostic fields (matcher_top1, matcher_sim,
-                        // matcher_margin, matcher_cropUrl, matcher_finalReason) still flow
-                        // through so the UI can render the gray hint badge.
-                        if (_CC_AUTO_PROFA_WRITE) {
+                        // PROFA-WRITE: hybrid gate. Strong trained/seed may write even in
+                        // manual mode; weak/base AUTO remains diagnostics and gray hint only.
+                        if (_trainedStrong || _CC_AUTO_PROFA_WRITE) {
                             if (writeTarget.matcher_trigger && !_rowUnstable) {
                                 if (_trainedStrong) window._gtDebug.autoTrainedCount = (window._gtDebug.autoTrainedCount || 0) + 1;
                                 writeTarget.class2     = best.class2;
@@ -10644,7 +10636,7 @@ ${playerList}
                                     writeTarget.matcher_profaWarningReason = 'ambiguous_class2';
                                     writeTarget.matcher_originalStatus = 'AMBIG';
                                 }
-                            } else if (best && best.class2) {
+                            } else if (_CC_AUTO_PROFA_WRITE && best && best.class2) {
                                 if (_midSimBlocked) {
                                     writeTarget.matcher_profaWarning = true;
                                     writeTarget.matcher_profaWarningReason = 'mid_sim_margin_demoted';
@@ -10658,10 +10650,12 @@ ${playerList}
                                         writeTarget.matcher_originalStatus = 'LOW';
                                     }
                                 }
+                            } else {
+                                writeTarget.matcher_originalStatus = _trainedStrong ? 'TRAINED_BLOCKED' : (_baseAutoWouldTrigger ? 'AUTO_HINT_ONLY' : 'HINT_ONLY');
                             }
                         } else {
                             // Manual mode breadcrumb — visible in dumpRowDiag / matcher_originalStatus.
-                            writeTarget.matcher_originalStatus = 'HINT_ONLY';
+                            writeTarget.matcher_originalStatus = _baseAutoWouldTrigger ? 'AUTO_HINT_ONLY' : 'HINT_ONLY';
                         }
                         // Per-row diagnostic dump (does not affect matcher behaviour)
                         try {
@@ -26852,7 +26846,308 @@ setTimeout(function(){clearInterval(_vc);},16000);
 </script>
 <script type="application/json" id="cc-km-training-seed">
 [
+{
+        "id":  "mp1gi90tog6ndkjotbn",
+        "createdAt":  "2026-05-11T17:09:20.045Z",
+        "source":  "manual_correction",
+        "pack":  "7.jpg #1",
+        "row":  0,
+        "playerName":  "X-yi",
+        "selectedProfa":  "Dominator",
+        "class2Key":  "Overlord",
+        "cropUrl":  "data:image/png;base64,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",
+        "cropBox":  {
+                        "sx":  145,
+                        "sy":  113,
+                        "sw":  22,
+                        "sh":  22,
+                        "dx":  -6,
+                        "dy":  -5,
+                        "sz":  22
+                    },
+        "geoPreset":  "PROP_LEFT(vc=4 sat=4)",
+        "simBefore":  0.9986562302595099,
+        "top1Before":  "Overlord",
+        "top3Before":  [
+                           {
+                               "name":  "Overlord",
+                               "sim":  0.9986562302595099,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1be1c7pevqxhgq227"
+                           },
+                           {
+                               "name":  "Silver Ranger",
+                               "sim":  0.5553915867181931,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1bct2fqm0rcloshb"
+                           },
+                           {
+                               "name":  "Phantom Ranger",
+                               "sim":  0.49704057352394676,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1bbt3xyk80kfnady"
+                           }
+                       ]
+    },
     {
+        "id":  "mp1gi90usw1vly8vnss",
+        "createdAt":  "2026-05-11T17:09:20.046Z",
+        "source":  "manual_correction",
+        "pack":  "7.jpg #1",
+        "row":  1,
+        "playerName":  "Р”Р¶РµР№Рє",
+        "selectedProfa":  "Hierophant",
+        "class2Key":  "Prophet",
+        "cropUrl":  "data:image/png;base64,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",
+        "cropBox":  {
+                        "sx":  152,
+                        "sy":  139,
+                        "sw":  18,
+                        "sh":  18,
+                        "dx":  -1,
+                        "dy":  2,
+                        "sz":  18
+                    },
+        "geoPreset":  "PROP_LEFT(vc=4 sat=4)",
+        "simBefore":  0.9960440484360448,
+        "top1Before":  "Prophet",
+        "top3Before":  [
+                           {
+                               "name":  "Prophet",
+                               "sim":  0.9960440484360448,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1bd57vildkq59aq78"
+                           },
+                           {
+                               "name":  "Elven Elder",
+                               "sim":  0.9020805560758767,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1b92rr37uxk4ftdsd"
+                           },
+                           {
+                               "name":  "Tyrant",
+                               "sim":  0.9006949141831567,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1be1c8qlbwqh5f1fs"
+                           }
+                       ]
+    },
+    {
+        "id":  "mp1gi90uuk18lx24qyi",
+        "createdAt":  "2026-05-11T17:09:20.046Z",
+        "source":  "manual_correction",
+        "pack":  "7.jpg #1",
+        "row":  3,
+        "playerName":  "StunBot",
+        "selectedProfa":  "Phoenix Knight",
+        "class2Key":  "Paladin",
+        "cropUrl":  "data:image/png;base64,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",
+        "cropBox":  {
+                        "sx":  152,
+                        "sy":  176,
+                        "sw":  16,
+                        "sh":  16,
+                        "dx":  -2,
+                        "dy":  4,
+                        "sz":  16
+                    },
+        "geoPreset":  "PROP_LEFT(vc=4 sat=4)",
+        "simBefore":  0.9983258660506922,
+        "top1Before":  "Paladin",
+        "top3Before":  [
+                           {
+                               "name":  "Paladin",
+                               "sim":  0.9983258660506922,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1be1c7m558ertgmfi"
+                           },
+                           {
+                               "name":  "Elven Elder",
+                               "sim":  0.8947980938048028,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1b92rr37uxk4ftdsd"
+                           },
+                           {
+                               "name":  "Bishop",
+                               "sim":  0.8563423211910447,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1bbt3wdm2m0wiku8d"
+                           }
+                       ]
+    },
+    {
+        "id":  "mp1gi90u2a928ls7mcv",
+        "createdAt":  "2026-05-11T17:09:20.046Z",
+        "source":  "manual_correction",
+        "pack":  "7.jpg #1",
+        "row":  5,
+        "playerName":  "Ympa",
+        "selectedProfa":  "Grand Khavatari",
+        "class2Key":  "Tyrant",
+        "cropUrl":  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAIkklEQVR4AbyZ644ktw2FSfXaiIE4yTs4iLOZ265jxMivvP/jxA7gWWe6lO+Qolp9nQ3s3YZOkTykpENVdc9MT/vnN//qP3zzQ//Hn7/v3//lff/7tw/9u7/e9e/evu3v//ZtfweewKNw97Y/3N33+7vHgSfsO/DU7+Du7h/73f3DwP2wD/0evvDw8NQv4fHxXf8YrHOfnt739qabtQ2E7dZkga2w8RKH6wE3D2thG9eau1rV2Hi5r9EgMe6XeVJnw/1Qu9vtrDmiRHnvSDirX4ioGrF8uWXl28X5Dutm42pnL3dlz+ibhHvO2e/31hrCBVGBnnPlp6drRbLCysk3BJrprlWWaBlX2CFEhe5u7peh/Cnc3aIBJ1OQAEKbNgJl5ay2fPFmEdH4kbV8iSskk1d3sed+MsdX90PtmskGmode9h+54YWpiaOmwqVSZQGexQ10ajZWlA2M2uwyA3eK0jX3gz+oi8b9vC7fA7tmcyMEHM2WMkvxmEiJKgTButsReqy3kYw6crU+rrnrSpLhfuy7e+Tdjy2lMdw9bF2ygUYDwbDxsPkMqXiIhw8x2HWUsMjRvO5ANRM5LbFOWAS4H5LuB38tL9/9kHc/+NlA3AHEw3ON04vNmS1hGCsrv6Aa+ZGLuYpWKBMrQuJTkwdD+BuNbdv4GN3FytY5QYlab72R6mMz2Ql40YrXGnEJMqoZ0LoSD5vpV67umvhKEelsQG9iiYfQRhOKwZnAsXaIwQ+rugkYeAk+xiy46bjHZHNPe6s4Gvj6T3+ws2eXWcHJAiRZwfi5AZWjSDjOwApRA5eW0qrDrdHJC4plhdWvWJzgfmjI3aNBd7eWDVg0odOfb0Izi8fKeI6lDAsV11gcAVSY3uauRCCVOs+hMIrJsIYC5miuABlDvqBAVpB/Ce5u7j5TjQ+g9vs/fr2IZyPysxFKU5KkCoogaygciF9F8LNXHMSKk+6JmoeV0AIhN4u9mXPqKz6Fu0cj0cAvz8+mU5S83JDNY8ecpkhep8pAt1deFPiVkqHvLKtGirzmV/7Utg8//zyeXXaOLJahhiLk0hGOGW1JniAmUVGcflJjhk1r47UKHFSYlb/mR+HJpX14pgGkxV3QEQnEGlmb8rKJ9Fc+fa4dMNYKwpORRavAtWDlr/lrvfz2ZW/2hjfdTmD9+bu8WZyeBBVsvCgb3sGsNeXnHaGawUN+KMZbBRJeHGvN6q/FNODRgP6wqSa08QTV8jFHQ5qOiBGU+HkHozAu8VSuQlZ/TD8za438U8wGSvylO6BVS5ikCOLKyq+8rMTLzsZVCPicUSk3gyA8eopHdgRXjERfSVnTc6LlhLVIcUH86itOSGZ6yss70zMSJV41wirqmq+6wlqzctFAfAzBahPtp58DhDabC5125UVSk8iebjLow4kXQa3GWn/qKy6oVqi4rLhoQOtO0WJBcFiN8mUV38Zp1Wl8PFtiiln94mRv8e2ZryR+4cH/b8DspQEOdc8DvOdhluUDygRJKSv/OvJe5pXnHBV6tCLGkaACqbhDile/YnGC4oLiQnv2vX3gHVxNvEg4eIkmLISX6LJoYFMbCFn4ndqC2UZ3DI4gr4anURuXXUWtvvIVyyouKC5wB/ZW4nUXzu4Au0q4EFK4MGAlqQ9riLfpx+JEaRe+OE4gcsNKWMWnvmKh8rKKC+3H//zE5luiYwVFsTibo1aTCht8YXIcd/lndua2uEtnedb7NVz7908/cru77UM4dhG/cWIltmxttqmezfVHRXHX7MfUXJv7Gs8doAGJFkLURkMA8ejjqrvAo0KgxTasIL9/xOlurKnabdYe1hL/a9H8ZTPf94DxR7KxkdDxO36XRbQ2OhKh3BDX5auuoPrJIVg+3NF8Yq0pbJo34mu+6gpVI0sDfL/IAs4mguGr0Ij7IlDFGXN3qNnYMIAfPPWak9i4bVs881wY+KNO66zorCOIkxVOfcUF5QXFsjSwxen7frPcvGO14Tg5hG3VCJttxJrYxZUfVnMKh7ldwiM/ONboCzblR3zNv1Yvvv3uzRemkxcODdBECEQQliNk4LOZKZZFVPhjcxtWi3Zq+lGM+BmzzvTZh3dZj/riy2qOfEH+CnFCt/bVmy+t6T2AoGiCxdWITs60MGLTZ7OKscqpzsgbczrzuyzYBPhOHW58ZHeczgdF2OBZj0zGnSWEFHXM3ebbV1+c34HOBiZBiDB8xQk2JTb4DpQzhBlcx05o7hrjG8h8irQ4eYkrJJ81K1d8WeXkC9yBHZrW/w9wKPwSyu8RGgIEXwLAGb97M4F4x+aCvlWNuazhcKQYbhYTsAYYpheWISagBhJK9uBiDRoVH75SsW4Pb/KjRjH/4LCcTE1sEJvDRWCmJL/fGV/gmayEFxon33gsGptE+Zhr2O5UY7WAu5vbePF7lgGGDHwH5ETICJ0La+quaZ6aCRQ/cqb9D3eg50LM1SQF7GsT8NlENzXQOIWysTj5HMyek4afiVwLH5ZrHzCr+ZqmU00kX76xX/hhjRfz8ZtEEb0yKB5dx2ZMlBVVVguMKtETsamiUK2KUTnj4gYvo/pABFyoqfqysPHFVqP/7A7maJJigclhZAHiJUpfgh3Ew6vmCOIEyGVTojHIBU9YFnc8V/JM0my+qh47uLZr1tzH7AM/0osZotWoREv82oRW4LMh2tcyqx+CIrOsN92snuF0bvGzyFqjAZXabFVSBLv6yvpM15+hK5eZz3N9eXmJ/2uP84mzHTv//02MiWk+03U2YHEHSvSptYuvo1OvKRcrPx0Z/2aNn3zsocdBogp5W1AmgvztUUWygqrLyv80iPcAP5Atxeutp7dm2tgyNNBEBLcvmiVohYTqYwE5nwSjgdxOWxW0W7/4WClzDZ2EWkibq0KZYtnfHtkABxx3AFtbHG9ZiYOt/Kmt+Z/T/g8AAP//XzzPAwAAAAZJREFUAwDtavSmmFKeGQAAAABJRU5ErkJggg==",
+        "cropBox":  {
+                        "sx":  152,
+                        "sy":  212,
+                        "sw":  16,
+                        "sh":  16,
+                        "dx":  -2,
+                        "dy":  6,
+                        "sz":  16
+                    },
+        "geoPreset":  "PROP_LEFT(vc=4 sat=4)",
+        "simBefore":  0.9976430268880468,
+        "top1Before":  "Tyrant",
+        "top3Before":  [
+                           {
+                               "name":  "Tyrant",
+                               "sim":  0.9976430268880468,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1be1c8qlbwqh5f1fs"
+                           },
+                           {
+                               "name":  "Prophet",
+                               "sim":  0.8990970445024754,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1bd57vildkq59aq78"
+                           },
+                           {
+                               "name":  "Elemental Summoner",
+                               "sim":  0.8841294747832983,
+                               "matchedFrom":  "trained",
+                               "id":  "mp17xp2vwdlqnne66me"
+                           }
+                       ]
+    },
+    {
+        "id":  "mp1gi90ukw5yl6d5wgp",
+        "createdAt":  "2026-05-11T17:09:20.046Z",
+        "source":  "manual_correction",
+        "pack":  "7.jpg #1",
+        "row":  6,
+        "playerName":  "VasilisaAye",
+        "selectedProfa":  "Adventurer",
+        "class2Key":  "Treasure Hunter",
+        "cropUrl":  "data:image/png;base64,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",
+        "cropBox":  {
+                        "sx":  152,
+                        "sy":  216,
+                        "sw":  18,
+                        "sh":  18,
+                        "dx":  -1,
+                        "dy":  -6,
+                        "sz":  18
+                    },
+        "geoPreset":  "PROP_LEFT(vc=4 sat=4)",
+        "simBefore":  0.9952276478724095,
+        "top1Before":  "Treasure Hunter",
+        "top3Before":  [
+                           {
+                               "name":  "Treasure Hunter",
+                               "sim":  0.9952276478724095,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1be1c8h4aivugvoej"
+                           },
+                           {
+                               "name":  "Tyrant",
+                               "sim":  0.7677123850963996,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1be1c8xrep86sn35"
+                           },
+                           {
+                               "name":  "Silver Ranger",
+                               "sim":  0.6790834473517126,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1bbt3wcv8r5p2saru"
+                           }
+                       ]
+    },
+    {
+        "id":  "mp1gi90uoupzthrlca",
+        "createdAt":  "2026-05-11T17:09:20.046Z",
+        "source":  "manual_correction",
+        "pack":  "7.jpg #1",
+        "row":  7,
+        "playerName":  "TEHbKA",
+        "selectedProfa":  "Cardinal",
+        "class2Key":  "Bishop",
+        "cropUrl":  "data:image/png;base64,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",
+        "cropBox":  {
+                        "sx":  152,
+                        "sy":  245,
+                        "sw":  18,
+                        "sh":  18,
+                        "dx":  -1,
+                        "dy":  6,
+                        "sz":  18
+                    },
+        "geoPreset":  "PROP_LEFT(vc=4 sat=4)",
+        "simBefore":  0.9959226893005204,
+        "top1Before":  "Bishop",
+        "top3Before":  [
+                           {
+                               "name":  "Bishop",
+                               "sim":  0.9959226893005204,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1be1c8bdqu8eyaxw"
+                           },
+                           {
+                               "name":  "Tyrant",
+                               "sim":  0.8068288063159235,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1be1c8qlbwqh5f1fs"
+                           },
+                           {
+                               "name":  "Elven Elder",
+                               "sim":  0.7928868086334266,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1b92rr37uxk4ftdsd"
+                           }
+                       ]
+    },
+    {
+        "id":  "mp1gi90u2y8o395232",
+        "createdAt":  "2026-05-11T17:09:20.046Z",
+        "source":  "manual_correction",
+        "pack":  "7.jpg #1",
+        "row":  8,
+        "playerName":  "AlucarD646",
+        "selectedProfa":  "Grand Khavatari",
+        "class2Key":  "Tyrant",
+        "cropUrl":  "data:image/png;base64,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",
+        "cropBox":  {
+                        "sx":  152,
+                        "sy":  250,
+                        "sw":  18,
+                        "sh":  18,
+                        "dx":  -1,
+                        "dy":  -6,
+                        "sz":  18
+                    },
+        "geoPreset":  "PROP_LEFT(vc=4 sat=4)",
+        "simBefore":  0.9966056129760203,
+        "top1Before":  "Tyrant",
+        "top3Before":  [
+                           {
+                               "name":  "Tyrant",
+                               "sim":  0.9966056129760203,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1be1c8xrep86sn35"
+                           },
+                           {
+                               "name":  "Prophet",
+                               "sim":  0.7548675047102315,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1bd57vildkq59aq78"
+                           },
+                           {
+                               "name":  "Treasure Hunter",
+                               "sim":  0.751862319698096,
+                               "matchedFrom":  "trained",
+                               "id":  "mp1be1c8h4aivugvoej"
+                           }
+                       ]
+    },
+{
         "id":  "mozyyonzdsrbzoc42cu",
         "createdAt":  "2026-05-10T16:10:27.551Z",
         "source":  "manual_correction",
