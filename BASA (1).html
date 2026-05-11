@@ -13536,10 +13536,12 @@ ${playerList}
             const class3ToClass2 = _ccBuildClass3ToClass2Map();
             let existing = [];
             try { existing = JSON.parse(localStorage.getItem(_CC_TRAINING_KEY) || '[]'); } catch(e) { existing = []; }
+            const beforeCount = existing.length;
 
-            const savedClasses = {};    // class2Key -> count added this run
-            const skippedByReason = {}; // reason -> count
-            const skippedDetail = [];   // { playerName, profa, reason }
+            const savedClasses = {};      // class2Key -> count added this run
+            const updatedClasses = {};    // class2Key -> count of REPLACED existing entries (corrections)
+            const skippedByReason = {};   // reason -> count
+            const skippedDetail = [];     // { playerName, profa, reason }
             const _skip = (name, profa, reason) => {
                 skippedByReason[reason] = (skippedByReason[reason] || 0) + 1;
                 if (skippedDetail.length < 40) skippedDetail.push({ playerName: name, profa: profa || null, reason });
@@ -13566,11 +13568,45 @@ ${playerList}
                     const cropUrl = parsed.matcher_cropUrl || null;
                     if (!cropUrl) { _skip(row.name, selectedProfa, 'no_crop'); continue; }
                     const packName = parsed.matcher_pack || party.packName;
-                    const isDup = existing.some(e =>
-                        e.class2Key === class2Key && e.playerName === row.name &&
-                        e.pack === packName && e.row === rowIdx
+
+                    // Lookup by (playerName, pack, row) — class2-agnostic.
+                    // Why: the OLD key included class2Key, which prevented "corrections"
+                    // from propagating. If user trained a row wrongly as class2=X then
+                    // re-corrected the same (player,pack,row) to class2=Y, BOTH entries
+                    // ended up in storage; on a third correction back to class2=Y the
+                    // dedup matched and the save became a silent no-op — the wrong X
+                    // entry stayed and the export looked unchanged. With this key, the
+                    // latest user pick REPLACES the prior entry for that (player,pack,row).
+                    const existingIdx = existing.findIndex(e =>
+                        e.playerName === row.name && e.pack === packName && e.row === rowIdx
                     );
-                    if (isDup) { _skip(row.name, selectedProfa, 'duplicate'); continue; }
+                    if (existingIdx >= 0) {
+                        const prev = existing[existingIdx];
+                        if (prev.class2Key === class2Key && prev.selectedProfa === selectedProfa && prev.cropUrl === cropUrl) {
+                            // truly identical — nothing to store
+                            _skip(row.name, selectedProfa, 'duplicate'); continue;
+                        }
+                        // CORRECTION path: replace existing entry, keep its id for stability
+                        existing[existingIdx] = {
+                            id: prev.id || (Date.now().toString(36) + Math.random().toString(36).slice(2)),
+                            createdAt: new Date().toISOString(),
+                            source: 'manual_correction',
+                            pack: packName, row: rowIdx,
+                            playerName: row.name,
+                            selectedProfa: selectedProfa,
+                            class2Key: class2Key,
+                            cropUrl: cropUrl,
+                            cropBox: parsed.matcher_crop || null,
+                            geoPreset: parsed.matcher_geoPreset || null,
+                            simBefore: parsed.matcher_sim || null,
+                            top1Before: parsed.matcher_top1 || null,
+                            top3Before: parsed.matcher_top3 || null,
+                            prevClass2Key: prev.class2Key || null  // debug breadcrumb
+                        };
+                        updatedClasses[class2Key] = (updatedClasses[class2Key] || 0) + 1;
+                        continue;
+                    }
+                    // NEW entry path
                     const countForClass = existing.filter(e => e.class2Key === class2Key).length;
                     if (countForClass >= _CC_MAX_PER_CLASS) { _skip(row.name, selectedProfa, 'limit'); continue; }
                     existing.push({
@@ -13592,44 +13628,59 @@ ${playerList}
                     savedClasses[class2Key] = (savedClasses[class2Key] || 0) + 1;
                 }
             }
+            let storageWriteError = null;
             try { localStorage.setItem(_CC_TRAINING_KEY, JSON.stringify(existing)); }
-            catch(e) { console.warn('[training] save failed', e); }
+            catch(e) { storageWriteError = (e && e.message) || String(e); console.warn('[training] save failed', e); }
 
+            const afterCount  = existing.length;
             const addedCount  = Object.values(savedClasses).reduce((a,b) => a+b, 0);
+            const updatedCount = Object.values(updatedClasses).reduce((a,b) => a+b, 0);
             const skippedCount = Object.values(skippedByReason).reduce((a,b) => a+b, 0);
-            const report = { addedCount, skippedCount, savedClasses, skippedByReason, skippedDetail, totalInStorage: existing.length };
+            const report = { beforeCount, afterCount, addedCount, updatedCount, skippedCount, savedClasses, updatedClasses, skippedByReason, skippedDetail, totalInStorage: existing.length, storageWriteError };
             if (!window._gtDebug) window._gtDebug = {};
             window._gtDebug.trainingSaveReport = report;
 
             if (trainBtn) { trainBtn.disabled = false; trainBtn.textContent = '🧠 Запомнить'; }
 
-            let msg = '';
+            let msg = 'было: ' + beforeCount + ' → стало: ' + afterCount;
             if (addedCount > 0) {
                 const classStr = Object.entries(savedClasses).map(([k,v]) => k + (v>1?'×'+v:'')).join(', ');
-                msg = '✅ ' + addedCount + ' эталон(а): ' + classStr;
+                msg += ' · ➕ ' + addedCount + ' (' + classStr + ')';
+            }
+            if (updatedCount > 0) {
+                const classStr = Object.entries(updatedClasses).map(([k,v]) => k + (v>1?'×'+v:'')).join(', ');
+                msg += ' · ✏️ исправлено ' + updatedCount + ' (' + classStr + ')';
             }
             if (skippedCount > 0) {
                 const rStr = Object.entries(skippedByReason).map(([k,v]) => k+':'+v).join(' ');
-                msg += (msg ? ' · ' : '') + '⚠ пропущено ' + skippedCount + ' (' + rStr + ')';
+                msg += ' · ⚠ пропущено ' + skippedCount + ' (' + rStr + ')';
             }
-            if (!addedCount && !skippedCount) msg = 'нет ручных исправлений';
+            if (storageWriteError) msg += ' · ❌ storage write: ' + storageWriteError;
+            if (!addedCount && !updatedCount && !skippedCount) msg = 'нет ручных исправлений (было: ' + beforeCount + ')';
             if (statusEl) statusEl.innerHTML = '<span style="font-size:10px">' + msg + '</span>';
-            console.info('[training] saved', addedCount, 'skipped', skippedCount, JSON.stringify(report));
+            console.info('[training] saved', addedCount, 'updated', updatedCount, 'skipped', skippedCount, 'before=' + beforeCount + ' after=' + afterCount, '— report:', report);
         }
 
         function kmRwExportTraining() {
             try {
+                // Always re-read storage at export time — no cached snapshot.
                 const raw = localStorage.getItem(_CC_TRAINING_KEY) || '[]';
                 const training = JSON.parse(raw);
                 if (!training.length) { _kmRwToast('нет сохранённых эталонов'); return; }
-                const blob = new Blob([JSON.stringify(training, null, 2)], { type: 'application/json' });
+                const payload = JSON.stringify(training, null, 2);
+                const blob = new Blob([payload], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                a.href = url; a.download = 'km_icon_training.json';
+                // Timestamped filename — browser still appends (1)(2) on collision but
+                // the base name changes every export, so the user can tell freshly
+                // exported files apart from cached copies in Downloads.
+                const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+                a.href = url; a.download = 'km_icon_training_' + stamp + '.json';
                 document.body.appendChild(a); a.click();
                 document.body.removeChild(a); URL.revokeObjectURL(url);
-                _kmRwToast('экспортировано: ' + training.length + ' эталонов');
-            } catch(e) { _kmRwToast('ошибка экспорта: ' + e.message); }
+                _kmRwToast('экспортировано: ' + training.length + ' эталонов · payload ' + payload.length + ' симв.');
+                console.info('[training] export', training.length, 'entries · payload', payload.length, 'chars · first id:', (training[0]||{}).id, '· last id:', (training[training.length-1]||{}).id);
+            } catch(e) { _kmRwToast('ошибка экспорта: ' + e.message); console.error('[training] export error', e); }
         }
 
         function kmRwImportTraining() {
