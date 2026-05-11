@@ -10000,35 +10000,58 @@ function getClass2IconByClass3(c3) {
             }
         }
 
-        // Classify against GT exemplars + trained exemplars: max-sim per class, then rank classes
+        // Classify against GT exemplars + trained exemplars: max-sim per class, then rank classes.
+        // Also returns SEPARATE rankings for base-only and trained-only exemplars so the user
+        // can spot a polluted trained exemplar dominating the combined ranking
+        // (e.g. trained.Bladedancer=0.92 when base.Bladedancer=0.51 and base.top1=PlainsWalker=0.74
+        // means a mislabeled trained crop is poisoning the match).
         function _ccClassifyGT(feat) {
             const allEx = (_ccGTExemplars || []).concat(_ccTrainedVecs || []);
             if (!feat || !allEx.length) return null;
-            const classBest = {}; // class2 -> { sim, trained, id }
-            let _bestTrSim = -1, _bestTrClass = null;
+            const classBest    = {}; // class2 -> { sim, trained, id } (combined winner)
+            const trainedBest  = {}; // class2 -> { sim, id }          (trained-only)
+            const baseBest     = {}; // class2 -> sim                  (base-only)
+            let _bestTrSim = -1, _bestTrClass = null, _bestTrId = null;
             let _bestBaSim = -1, _bestBaClass = null;
             for (const ex of allEx) {
                 const s = _ccCosineSim(feat, ex.vec);
                 if (!(ex.class2 in classBest) || s > classBest[ex.class2].sim) {
                     classBest[ex.class2] = { sim: s, trained: !!ex.trained, id: ex.id || null };
                 }
-                if (ex.trained  && s > _bestTrSim) { _bestTrSim = s; _bestTrClass = ex.class2; }
-                if (!ex.trained && s > _bestBaSim) { _bestBaSim = s; _bestBaClass = ex.class2; }
+                if (ex.trained) {
+                    if (!(ex.class2 in trainedBest) || s > trainedBest[ex.class2].sim) {
+                        trainedBest[ex.class2] = { sim: s, id: ex.id || null };
+                    }
+                    if (s > _bestTrSim) { _bestTrSim = s; _bestTrClass = ex.class2; _bestTrId = ex.id || null; }
+                } else {
+                    if (!(ex.class2 in baseBest) || s > baseBest[ex.class2]) {
+                        baseBest[ex.class2] = s;
+                    }
+                    if (s > _bestBaSim) { _bestBaSim = s; _bestBaClass = ex.class2; }
+                }
             }
             const sorted = Object.entries(classBest).sort((a,b) => b[1].sim - a[1].sim);
             if (!sorted.length) return null;
             const top = sorted[0];
+            const baseRank    = Object.entries(baseBest).sort((a,b) => b[1] - a[1])
+                                  .slice(0, 5).map(([name,sim]) => ({ name, sim }));
+            const trainedRank = Object.entries(trainedBest).sort((a,b) => b[1].sim - a[1].sim)
+                                  .slice(0, 5).map(([name,d]) => ({ name, sim: d.sim, id: d.id }));
             return {
                 class2:     top[0],
                 similarity: top[1].sim,
                 margin:     top[1].sim - (sorted[1] ? sorted[1][1].sim : 0),
-                top3:       sorted.slice(0,3).map(([name,d]) => ({name, sim: d.sim})),
+                top3:       sorted.slice(0,3).map(([name,d]) => ({name, sim: d.sim, matchedFrom: d.trained ? 'trained' : 'base', id: d.id})),
+                top5:       sorted.slice(0,5).map(([name,d]) => ({name, sim: d.sim, matchedFrom: d.trained ? 'trained' : 'base', id: d.id})),
                 matchedFrom:       top[1].trained ? 'trained' : 'base',
                 trainedExemplarId: top[1].trained ? top[1].id : null,
                 trainedTop1: _bestTrClass,
+                trainedTopId: _bestTrId,
                 trainedSim:  _bestTrSim  > -1 ? _bestTrSim  : null,
+                trainedTop5: trainedRank,
                 baseTop1:    _bestBaClass,
                 baseSim:     _bestBaSim  > -1 ? _bestBaSim  : null,
+                baseTop5:    baseRank,
             };
         }
 
@@ -10600,9 +10623,13 @@ ${playerList}
                                 matchedFrom: best.matchedFrom || 'base',
                                 trainedExemplarId: best.trainedExemplarId || null,
                                 trainedClass2: best.trainedTop1 || null,
+                                trainedTopId: best.trainedTopId || null,
                                 trainedSim: best.trainedSim != null ? +(best.trainedSim).toFixed(3) : null,
+                                trainedTop5: (best.trainedTop5 || []).map(x => ({ name: x.name, sim: +(x.sim||0).toFixed(3), id: x.id || null })),
                                 baseTop1: best.baseTop1 || null,
                                 baseSim: best.baseSim != null ? +(best.baseSim).toFixed(3) : null,
+                                baseTop5: (best.baseTop5 || []).map(x => ({ name: x.name, sim: +(x.sim||0).toFixed(3) })),
+                                top5: (best.top5 || []).map(x => ({ name: x.name, sim: +(x.sim||0).toFixed(3), matchedFrom: x.matchedFrom, id: x.id || null })),
                                 finalClass2: best.class2 || null,
                                 finalReason: _finalReason,
                                 manualCorrected: !!(writeTarget.profaSource === 'manual_review'),
@@ -10717,6 +10744,84 @@ ${playerList}
             console.log('[matcher] processed:', window._gtDebug.matcherProcessed,
                 ' | classCoverage:', window._gtDebug.classCoverage);
             return compact;
+        };
+
+        // Console helper: deep per-row diagnostic. Resolves trained exemplar ids to their
+        // source records (playerName/pack/row) so the user can spot a polluted trained
+        // exemplar that is dominating the match.
+        // Usage: dumpRowDiag('ZoS') · dumpRowDiag('Draktar') · dumpRowDiag(/zos/i)
+        window.dumpRowDiag = function(matcher) {
+            const rows = (window._gtDebug && Array.isArray(window._gtDebug.rows)) ? window._gtDebug.rows : [];
+            const test = (typeof matcher === 'string')
+                ? (s => String(s||'').toLowerCase().includes(matcher.toLowerCase()))
+                : (matcher instanceof RegExp ? (s => matcher.test(String(s||''))) : null);
+            if (!test) { console.warn('dumpRowDiag(name) — pass a string substring or RegExp'); return; }
+            const hits = rows.filter(r => test(r.name));
+            if (!hits.length) { console.warn('no matcher rows match ' + matcher); return; }
+
+            // Build a lookup from trained-exemplar id → source record (seed + localStorage)
+            let seedItems = [];
+            try {
+                const seedEl = document.getElementById('cc-km-training-seed');
+                if (seedEl) { const p = JSON.parse(seedEl.textContent || '[]'); if (Array.isArray(p)) seedItems = p; }
+            } catch(e) {}
+            let localItems = [];
+            try { localItems = JSON.parse(localStorage.getItem('cc_km_icon_training_v1') || '[]'); } catch(e) {}
+            const byId = {};
+            seedItems.forEach(t => { if (t.id) byId[t.id] = Object.assign({}, t, { _src: 'seed' }); });
+            localItems.forEach(t => { if (t.id) byId[t.id] = Object.assign({}, t, { _src: 'local' }); });
+            const resolve = id => {
+                if (!id) return null;
+                const e = byId[id]; if (!e) return { id, _src: 'unknown' };
+                return { id, _src: e._src, class2Key: e.class2Key, selectedProfa: e.selectedProfa, playerName: e.playerName, pack: e.pack, row: e.row };
+            };
+
+            hits.forEach(r => {
+                console.group('[row-diag] ' + r.name + ' · pack=' + r.pack + ' · row=' + r.row);
+                console.log('finalClass2=' + r.finalClass2 + ' · finalReason=' + r.finalReason +
+                            ' · matchedFrom=' + r.matchedFrom + ' · sim=' + r.sim + ' · margin=' + r.margin);
+                console.log('trigger=' + r.trigger + ' · wroteAuto=' + r.wroteAuto + ' · autoTrained=' + r.autoTrained +
+                            ' · profa=' + r.profaValue + ' · class3opts=' + JSON.stringify(r.class3opts));
+                console.log('geometry: preset=' + r.geoPreset + ' · selected=' + r.selectedGeoPreset +
+                            ' · cx=' + r.cx + ' · cy=' + r.cy + ' · expectedCY=' + r.expectedCY +
+                            ' · memberSide=' + r.geometryMemberSide + ' · matcherSide=' + r.iconMatcherSide +
+                            ' · forcedSide=' + r.forcedMemberSide + ' (' + (r.forcedSideReason || '-') + ')');
+                console.log('cropBox:', r.cropBox, ' · cropQuality:', r.cropQuality);
+                console.log('base:    top1=' + r.baseTop1 + ' sim=' + r.baseSim);
+                console.log('  baseTop5:', (r.baseTop5||[]).map(x => x.name + ' ' + x.sim).join(' | '));
+                console.log('trained: top1=' + r.trainedClass2 + ' sim=' + r.trainedSim + ' id=' + r.trainedTopId);
+                const tt5 = (r.trainedTop5||[]).map(x => {
+                    const src = resolve(x.id);
+                    return x.name + ' ' + x.sim + ' [' + (src ? (src._src + ':' + (src.playerName||'?') + '/' + (src.pack||'?') + '#' + (src.row!=null?src.row:'?')) : '?') + ']';
+                });
+                console.log('  trainedTop5:', tt5.join(' | ') || '(no trained)');
+                console.log('combinedTop5:');
+                (r.top5 || r.top3 || []).forEach(x => {
+                    const src = x.matchedFrom === 'trained' ? resolve(x.id) : null;
+                    console.log('  ' + x.name + ' sim=' + x.sim + ' from=' + (x.matchedFrom||'?') +
+                                (src ? ' [' + src._src + ':' + (src.playerName||'?') + '/' + (src.pack||'?') + '#' + (src.row!=null?src.row:'?') + ']' : ''));
+                });
+                if (r.matchedFrom === 'trained' && r.trainedExemplarId) {
+                    const winner = resolve(r.trainedExemplarId);
+                    console.warn('WINNING TRAINED EXEMPLAR:', winner);
+                    if (winner && winner._src) {
+                        const baseEquiv = (r.baseTop5||[]).find(x => x.name === r.finalClass2);
+                        const gap = baseEquiv ? (r.sim - baseEquiv.sim) : null;
+                        if (gap != null && gap > 0.15) {
+                            console.warn('SUSPECT: trained.' + r.finalClass2 + '=' + r.sim +
+                                        ' but base.' + r.finalClass2 + '=' + baseEquiv.sim +
+                                        ' (gap=' + gap.toFixed(3) + ') · base top1=' + r.baseTop1 + '=' + r.baseSim +
+                                        ' — this trained exemplar may be mislabeled/cropped wrong');
+                        }
+                    }
+                }
+                if (r.cropUrl) {
+                    console.log('cropUrl (' + r.cropUrl.length + ' chars) preview:',
+                                r.cropUrl.slice(0, 80) + '...');
+                }
+                console.groupEnd();
+            });
+            return hits;
         };
         // ── END LOCAL ICON MATCHER ──
 
