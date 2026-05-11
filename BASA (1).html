@@ -5600,10 +5600,16 @@ const CLASS2_TO_CLASS3 = {
   'Abyss Walker': ["Ghost Hunter"],
 };
 
+const _CC_AB_PW_CLASS2_KEY = 'АВ/ПВ';
+
 function getClass2Icon(n) { return n ? CLASS2_ICONS[n] || null : null; }
-function getClass3Options(n) { return CLASS2_TO_CLASS3[n] || []; }
+function getClass3Options(n) {
+    if (n === _CC_AB_PW_CLASS2_KEY) return ['АВ/ПВ'];
+    return CLASS2_TO_CLASS3[n] || [];
+}
 function resolveClass2ToClass3(n) {
     if (!n) return [];
+    if (n === _CC_AB_PW_CLASS2_KEY) return ['АВ/ПВ'];
     if (n === 'Abyss Walker' || n === 'Plains Walker') return ['АВ/ПВ', 'Ghost Hunter', 'Wind Rider'];
     if (CLASS2_TO_CLASS3[n]) return CLASS2_TO_CLASS3[n];
     const k = Object.keys(CLASS2_TO_CLASS3).find(k =>
@@ -13727,13 +13733,52 @@ ${playerList}
             Object.entries(CLASS2_TO_CLASS3).forEach(([c2, c3arr]) => {
                 c3arr.forEach(c3 => { map[c3] = c2; });
             });
-            // Handle the special AW/PW group label — ambiguous, skip
-            map['АВ/ПВ'] = null;
+            // Manual AW/PW group is a valid training class. It stays grouped
+            // until the player is known as Ghost Hunter or Wind Rider.
+            map['АВ/ПВ'] = _CC_AB_PW_CLASS2_KEY;
             // PROFA_NAMES dropdown uses suffixed names; map them to canonical class2
             map["Eva's Saint (EE)"]    = map["Eva's Saint"]    || 'Elven Elder';
             map["Shillien Saint (SE)"] = map["Shillien Saint"] || 'Shillien Elder';
             return map;
         }
+
+        function _ccSimulateAbPwManualTrainingExport() {
+            const selectedProfa = 'АВ/ПВ';
+            const class3ToClass2 = _ccBuildClass3ToClass2Map();
+            const class2Key = class3ToClass2[selectedProfa];
+            const skippedByReason = {};
+            const skip = (reason) => { skippedByReason[reason] = (skippedByReason[reason] || 0) + 1; };
+            const mockRow = {
+                pack: 'mock-pack',
+                row: 0,
+                playerName: 'mock-ab-pw',
+                selectedProfa,
+                class2Key,
+                cropUrl: 'data:image/png;base64,mock'
+            };
+
+            if (class2Key === undefined || class2Key === null) skip('unresolved_class');
+            if (!mockRow.cropUrl) skip('no_crop');
+            const storage = Object.keys(skippedByReason).length ? [] : [mockRow];
+            const exported = JSON.parse(JSON.stringify(storage));
+            const exportIncludes = exported.some(t =>
+                t.selectedProfa === selectedProfa &&
+                t.class2Key === _CC_AB_PW_CLASS2_KEY &&
+                !!t.cropUrl
+            );
+            const report = {
+                selectedProfa,
+                class2Key,
+                unresolvedClass: !!skippedByReason.unresolved_class,
+                skippedByReason,
+                exportCount: exported.length,
+                exportIncludes
+            };
+            if (!window._gtDebug) window._gtDebug = {};
+            window._gtDebug.abPwTrainingSimulation = report;
+            return report;
+        }
+        window._ccSimulateAbPwManualTrainingExport = _ccSimulateAbPwManualTrainingExport;
 
         async function kmRwSaveTraining() {
             const trainBtn = document.getElementById('kmRwTrainBtn');
