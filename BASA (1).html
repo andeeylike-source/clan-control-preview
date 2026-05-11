@@ -13475,6 +13475,17 @@ ${playerList}
                 parsed = Object.assign({}, row);
                 if (Array.isArray(dayLastParsed)) dayLastParsed.push(parsed);
             }
+            // Snapshot the pre-manual (auto/matcher) profa once, before the first
+            // manual edit. Save flow uses this to skip "re-confirm" clicks where
+            // the user re-picks the same value the matcher already chose. Without
+            // this guard, every click through the picker produced a new local
+            // training exemplar that simply re-encoded the matcher's own output
+            // — including its mistakes — and those polluted exemplars then
+            // dominated subsequent matches (e.g. local:X-yi/7.jpg #8#0 → Draktar
+            // wrongly classified as Overlord).
+            if (parsed._autoProfaSnapshot === undefined) {
+                parsed._autoProfaSnapshot = parsed.profa || null;
+            }
             if (val) {
                 parsed.profa = val;
                 parsed.profaSource = 'manual_review';
@@ -13664,6 +13675,14 @@ ${playerList}
                     if (!selectedProfa || selectedProfa === '—') {
                         _skip(row.name, selectedProfa, 'no_profa'); continue;
                     }
+                    // Pollution guard: if the user clicked the picker but ended up
+                    // on the same profa the matcher auto-assigned, this is a
+                    // re-confirmation, not a correction. Saving it would encode
+                    // the matcher's own decision (including AUTO mistakes) as a
+                    // new local exemplar that then dominates future matches.
+                    if (parsed._autoProfaSnapshot && parsed._autoProfaSnapshot === selectedProfa) {
+                        _skip(row.name, selectedProfa, 'unchanged_from_auto'); continue;
+                    }
                     const class2Key = class3ToClass2[selectedProfa];
                     if (class2Key === undefined || class2Key === null) {
                         _skip(row.name, selectedProfa, 'unresolved_class');
@@ -13815,6 +13834,66 @@ ${playerList}
             if (statusEl) statusEl.textContent = '';
             _kmRwToast('эталоны сброшены');
         }
+
+        // Console helper: surgically delete a single polluted local training
+        // exemplar by id. Use after dumpRowDiag(name) identifies the offending
+        // local:<player>/<pack>#<row> entry that dominates a wrong match.
+        // Usage: removeTrainingById('mp1be1c7pevqxhgq227')
+        // Returns { before, after, removed } and reloads _ccTrainedVecs so the
+        // next analysis run reflects the change without a page reload.
+        window.removeTrainingById = async function(id) {
+            if (!id) { console.warn('removeTrainingById(id) — id required'); return null; }
+            let arr = [];
+            try { arr = JSON.parse(localStorage.getItem(_CC_TRAINING_KEY) || '[]'); }
+            catch(e) { console.warn('[removeTrainingById] parse failed', e); return null; }
+            const before = arr.length;
+            const idx = arr.findIndex(function(t) { return t.id === id; });
+            if (idx < 0) {
+                console.warn('[removeTrainingById] id not found in localStorage:', id, '· localStorage size=' + before);
+                return { before: before, after: before, removed: 0 };
+            }
+            const removed = arr.splice(idx, 1)[0];
+            try { localStorage.setItem(_CC_TRAINING_KEY, JSON.stringify(arr)); }
+            catch(e) { console.warn('[removeTrainingById] save failed', e); return null; }
+            const after = arr.length;
+            console.info('[removeTrainingById] REMOVED:', {
+                id: removed.id, class2Key: removed.class2Key, selectedProfa: removed.selectedProfa,
+                playerName: removed.playerName, pack: removed.pack, row: removed.row
+            });
+            console.info('[removeTrainingById] localStorage: before=' + before + ' after=' + after);
+            // Reload trained vectors so the next analysis pass uses the cleaned set.
+            try {
+                _ccTrainedVecs = await _ccLoadAndPrepareTrainedVecs();
+                console.info('[removeTrainingById] _ccTrainedVecs reloaded · count=' + _ccTrainedVecs.length);
+                console.info('Now re-run analysis (или закрой/открой wizard) — polluted exemplar больше не учитывается.');
+            } catch(e) {
+                console.warn('[removeTrainingById] _ccTrainedVecs reload failed — reload the page for the change to take effect.', e);
+            }
+            return { before: before, after: after, removed: removed };
+        };
+
+        // Console helper: list all local training entries (compact view) so the user
+        // can scan for suspicious ones. Use with sortBy='class2Key' to spot anomalies.
+        // Usage: listTraining() · listTraining({class2: 'Overlord'}) · listTraining({player: 'X-yi'})
+        window.listTraining = function(opts) {
+            opts = opts || {};
+            let arr = [];
+            try { arr = JSON.parse(localStorage.getItem(_CC_TRAINING_KEY) || '[]'); }
+            catch(e) { console.warn('parse failed', e); return []; }
+            let view = arr.slice();
+            if (opts.class2) view = view.filter(function(t){ return t.class2Key === opts.class2; });
+            if (opts.player) view = view.filter(function(t){ return (t.playerName||'').toLowerCase().includes(String(opts.player).toLowerCase()); });
+            if (opts.pack)   view = view.filter(function(t){ return (t.pack||'').toLowerCase().includes(String(opts.pack).toLowerCase()); });
+            const compact = view.map(function(t){ return {
+                id: t.id, class2: t.class2Key, profa: t.selectedProfa,
+                player: t.playerName, pack: t.pack, row: t.row,
+                prevClass2: t.prevClass2Key || null
+            }; });
+            if (typeof console.table === 'function') console.table(compact);
+            else console.log(compact);
+            console.info('[listTraining] total in storage:', arr.length, '· filtered:', compact.length);
+            return compact;
+        };
         // ── END LOCAL ICON TRAINING ──
 
         function _kmRwShowDebugTextarea(jsonStr) {
