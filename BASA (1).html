@@ -18080,15 +18080,29 @@ ${playerList}
                     _resetToLoginStep1WithHint(t3.infoEmailConfirmedSignIn);
                 }
             } else {
+                // Page-reload session restore: subscribe to INITIAL_SESSION.
+                // Why: previous `await getSession()` could hang silently when the
+                // SDK's token-refresh network call stalled after reload, leaving
+                // both loginScreen (opacity:0 default) and appLayout (.hidden)
+                // untouched — visually a black screen. onAuthStateChange's
+                // INITIAL_SESSION fires reliably once SDK init completes.
+                var _initialSafetyTimer = setTimeout(function() {
+                    if (!_authInitDone) _showLoginScreen();
+                }, 10000);
                 try {
-                    var gsRes3 = await window._supabase.auth.getSession();
-                    if (gsRes3.data && gsRes3.data.session && gsRes3.data.session.user) {
-                        await _safeInitUser(gsRes3.data.session.user);
-                    } else {
-                        _showLoginScreen();
-                    }
+                    window._supabase.auth.onAuthStateChange(function(event, session) {
+                        if (event !== 'INITIAL_SESSION') return;
+                        clearTimeout(_initialSafetyTimer);
+                        if (_authInitDone) return;
+                        if (session && session.user) {
+                            _safeInitUser(session.user);
+                        } else {
+                            _showLoginScreen();
+                        }
+                    });
                 } catch(e) {
-                    console.warn('getSession error:', e);
+                    clearTimeout(_initialSafetyTimer);
+                    console.warn('onAuthStateChange register failed:', e);
                     _showLoginScreen();
                 }
             }
