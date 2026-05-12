@@ -8867,6 +8867,42 @@ function getClass2IconByClass3(c3) {
             }
         }
 
+        function _kmOcrAttemptInfo(players, rawRows, error) {
+            const finalRows = Array.isArray(players) ? players.length : 0;
+            return {
+                players: Array.isArray(players) ? players : [],
+                rawRows: rawRows == null ? null : rawRows,
+                error: error || null,
+                expectedCount: 1,
+                recognizedCount: finalRows > 0 ? 1 : 0,
+                skippedCount: finalRows > 0 ? 0 : 1,
+                finalParsedRows: finalRows
+            };
+        }
+
+        function _kmOcrNeedsRetry(info) {
+            if (!info) return false;
+            return info.skippedCount > 0 || info.recognizedCount < info.expectedCount;
+        }
+
+        function _kmOcrPickBestAttempt(first, second) {
+            if (!first) return second;
+            if (!second) return first;
+            if (second.finalParsedRows > first.finalParsedRows) return second;
+            if (second.finalParsedRows < first.finalParsedRows) return first;
+            if (second.skippedCount < first.skippedCount) return second;
+            if (first.error && !second.error) return second;
+            if (second.error && !first.error) return first;
+            return first;
+        }
+
+        function _kmOcrRetryText(before, after) {
+            const b = before || _kmOcrAttemptInfo([], null, null);
+            const a = after || b;
+            return 'OCR retry 1/1 выполнен: было ' + b.recognizedCount + '/' + b.expectedCount +
+                ', стало ' + a.recognizedCount + '/' + a.expectedCount;
+        }
+
         async function analyzeWithOcrSpaceProvider({ dateStr, shots }) {
             const btn = document.getElementById('analyzeBtn');
             if (btn) {
@@ -8898,6 +8934,7 @@ function getClass2IconByClass3(c3) {
             const screenShotDataMap = {};
             const geometryMap = {};
             const skippedScreenshots = [];
+            const ocrRetryReports = [];
             let firstError = null;
 
             try {
@@ -8912,47 +8949,74 @@ function getClass2IconByClass3(c3) {
                         const crop = _ccOcrPreprocessCrop(img, shot.name || shot.id || ('shot' + (i + 1)));
                         console.debug('[ocrspace] crop geometry', crop.geometry);
 
-                        // local PaddleOCR — first provider
-                        let players = [];
-                        let _ocrRawRows = null;
-                        const _localResult = await _tryLocalPaddleOcr(
-                            crop.processedCanvas.toDataURL('image/png'),
-                            (shot.name || ('shot_' + (i + 1))) + '.png'
-                        );
-                        if (_localResult && _localResult.length > 0) {
-                            console.info('[local-ocr] using local result for shot', i + 1, '—', _localResult.length, 'rows');
-                            _ocrRawRows = _localResult.length;
-                            _localResult.forEach(row => { const n = _ccOcrNormalizeRow(row); if (n) players.push(n); });
-                        }
-
-                        if (!players.length) {
-                            // fallback: OCR.space proxy
-                            console.warn('[local-ocr] fallback -> OCR.space proxy for shot', i + 1);
-                            const apiUrl = _ccOcrValidateProxyUrl();
-                            const blob = await _ccOcrCanvasToBlob(crop.processedCanvas);
-                            const form = new FormData();
-                            form.append('file', blob, 'clan_control_crop_processed.png');
-
-                            const controller = new AbortController();
-                            const timeoutId = setTimeout(() => controller.abort(), 60000);
-                            let response, json;
-                            try {
-                                response = await fetch(apiUrl, { method: 'POST', body: form, signal: controller.signal });
-                                const responseText = await response.text();
-                                try {
-                                    json = JSON.parse(responseText);
-                                } catch(e) {
-                                    throw new Error(`OCR.space proxy returned non-JSON response: HTTP ${response.status}`);
-                                }
-                            } finally {
-                                clearTimeout(timeoutId);
+                        let bestAttempt = null;
+                        let firstAttempt = null;
+                        for (let ocrAttempt = 0; ocrAttempt < 2; ocrAttempt++) {
+                            if (ocrAttempt > 0) {
+                                setDayStatus('loading', `OCR retry 1/1: скриншот ${i + 1} из ${shots.length}...`);
                             }
-                            if (!response.ok || json.error || json.ok === false) throw new Error(json.error || `HTTP ${response.status}`);
-                            console.debug('[ocrspace] raw response', json);
-                            const rows = json.finalParsed || json.parsed || [];
-                            _ocrRawRows = rows.length;
-                            rows.forEach(row => { const n = _ccOcrNormalizeRow(row); if (n) players.push(n); });
+                            let players = [];
+                            let _ocrRawRows = null;
+                            let attemptError = null;
+                            try {
+                                // local PaddleOCR — first provider
+                                const _localResult = await _tryLocalPaddleOcr(
+                                    crop.processedCanvas.toDataURL('image/png'),
+                                    (shot.name || ('shot_' + (i + 1))) + '.png'
+                                );
+                                if (_localResult && _localResult.length > 0) {
+                                    console.info('[local-ocr] using local result for shot', i + 1, '—', _localResult.length, 'rows');
+                                    _ocrRawRows = _localResult.length;
+                                    _localResult.forEach(row => { const n = _ccOcrNormalizeRow(row); if (n) players.push(n); });
+                                }
+
+                                if (!players.length) {
+                                    // fallback: OCR.space proxy
+                                    console.warn('[local-ocr] fallback -> OCR.space proxy for shot', i + 1);
+                                    const apiUrl = _ccOcrValidateProxyUrl();
+                                    const blob = await _ccOcrCanvasToBlob(crop.processedCanvas);
+                                    const form = new FormData();
+                                    form.append('file', blob, 'clan_control_crop_processed.png');
+
+                                    const controller = new AbortController();
+                                    const timeoutId = setTimeout(() => controller.abort(), 60000);
+                                    let response, json;
+                                    try {
+                                        response = await fetch(apiUrl, { method: 'POST', body: form, signal: controller.signal });
+                                        const responseText = await response.text();
+                                        try {
+                                            json = JSON.parse(responseText);
+                                        } catch(e) {
+                                            throw new Error(`OCR.space proxy returned non-JSON response: HTTP ${response.status}`);
+                                        }
+                                    } finally {
+                                        clearTimeout(timeoutId);
+                                    }
+                                    if (!response.ok || json.error || json.ok === false) throw new Error(json.error || `HTTP ${response.status}`);
+                                    console.debug('[ocrspace] raw response', json);
+                                    const rows = json.finalParsed || json.parsed || [];
+                                    _ocrRawRows = rows.length;
+                                    rows.forEach(row => { const n = _ccOcrNormalizeRow(row); if (n) players.push(n); });
+                                }
+                            } catch (e) {
+                                attemptError = e;
+                            }
+                            const attemptInfo = _kmOcrAttemptInfo(players, _ocrRawRows, attemptError);
+                            if (!firstAttempt) firstAttempt = attemptInfo;
+                            bestAttempt = _kmOcrPickBestAttempt(bestAttempt, attemptInfo);
+                            if (!_kmOcrNeedsRetry(attemptInfo)) break;
                         }
+
+                        if (firstAttempt && bestAttempt && firstAttempt !== bestAttempt || (firstAttempt && _kmOcrNeedsRetry(firstAttempt))) {
+                            const retryMsg = _kmOcrRetryText(firstAttempt, bestAttempt);
+                            console.info('[ocr-retry]', retryMsg, { shot: i + 1, fileName: shot.name || null, beforeRows: firstAttempt.finalParsedRows, afterRows: bestAttempt.finalParsedRows });
+                            ocrRetryReports.push({ num: i + 1, fileName: shot.name || null, before: firstAttempt, after: bestAttempt, text: retryMsg });
+                            setDayStatus(bestAttempt && bestAttempt.finalParsedRows > firstAttempt.finalParsedRows ? 'success' : 'warning', retryMsg);
+                        }
+
+                        if (bestAttempt && bestAttempt.error && !bestAttempt.players.length) throw bestAttempt.error;
+                        const players = bestAttempt ? bestAttempt.players : [];
+                        const _ocrRawRows = bestAttempt ? bestAttempt.rawRows : null;
 
                         if (!players.length) {
                             skippedScreenshots.push({ num: i + 1, fileName: shot.name || null, provider: 'ocrspace', reason: 'empty_players', rawRows: _ocrRawRows });
@@ -8993,6 +9057,7 @@ function getClass2IconByClass3(c3) {
                 window._gtDebug.ocrTotalInput = shots.length;
                 window._gtDebug.ocrSuccessCount = Object.keys(screenPlayersMap).length;
                 window._gtDebug.ocrProviderSuccessPackNames = Object.keys(screenPlayersMap);
+                window._gtDebug.ocrRetryReports = ocrRetryReports.slice();
 
                 dayLastParsed = Object.values(allPlayers);
                 dayExpectedTotal = null;
@@ -9049,8 +9114,11 @@ function getClass2IconByClass3(c3) {
                     if (skippedScreenshots.length > 0) {
                         statusMsg += ` | Пропущено скриншотов: ${skippedScreenshots.length} - №${skippedScreenshots.map(s => s.num + ' (' + s.reason + ')').join(', №')}`;
                     }
+                    if (ocrRetryReports.length > 0) {
+                        statusMsg += ` | ${ocrRetryReports.map(r => r.text).join(' | ')}`;
+                    }
                     setDayStatus(skippedScreenshots.length > 0 ? 'warning' : 'success', statusMsg);
-                    _kmOcrRenderBatchSummary(shots.length, Object.keys(screenPlayersMap).length, skippedScreenshots);
+                    _kmOcrRenderBatchSummary(shots.length, Object.keys(screenPlayersMap).length, skippedScreenshots, ocrRetryReports);
                     expandDayModal();
                     if (minibarText) minibarText.innerText = `OCR.space: ${dayLastParsed.length} игроков`;
                     notifyAnalysisComplete(dayLastParsed.length);
@@ -9141,6 +9209,7 @@ function getClass2IconByClass3(c3) {
             const screenShotDataMap = {};
             const geometryMap = {};
             const skippedScreenshots = [];
+            const ocrRetryReports = [];
             let firstError = null;
 
             try {
@@ -9178,98 +9247,138 @@ function getClass2IconByClass3(c3) {
                             'HTTP-Referer': location.origin,
                             'X-Title': 'Clan Control OCR',
                         });
-                        let response = null;
-                        let saw429 = false;
-                        let lastNon429Error = null;
-                        let attemptCount = 0;
-                        for (let keyIndex = 0; keyIndex < openRouterKeys.length; keyIndex++) {
-                            const fetchKey = openRouterKeys[keyIndex];
-                            attemptCount++;
-                            console.info(`[openrouter-ocr] trying key index ${keyIndex + 1} of ${openRouterKeys.length}`);
-                            console.info('[openrouter-ocr] POST start model=baidu/qianfan-ocr-fast:free');
+                        let bestAttempt = null;
+                        let firstAttempt = null;
+                        let chosenParsed = null;
+                        let chosenRows = [];
+                        let chosenText = '';
+                        for (let ocrAttempt = 0; ocrAttempt < 2; ocrAttempt++) {
+                            if (ocrAttempt > 0) {
+                                setDayStatus('loading', `OCR retry 1/1: скриншот ${i + 1} из ${shots.length}...`);
+                            }
+                            let parsed = null;
+                            let rows = [];
+                            let text = '';
+                            let players = [];
+                            let attemptError = null;
                             try {
-                                response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                                    method: 'POST',
-                                    headers: _baiduReqHeaders(fetchKey),
-                                    body: _baiduReqBody(fetchKey),
-                                    signal: AbortSignal.timeout(60000),
+                                let response = null;
+                                let saw429 = false;
+                                let lastNon429Error = null;
+                                let attemptCount = 0;
+                                for (let keyIndex = 0; keyIndex < openRouterKeys.length; keyIndex++) {
+                                    const fetchKey = openRouterKeys[keyIndex];
+                                    attemptCount++;
+                                    console.info(`[openrouter-ocr] trying key index ${keyIndex + 1} of ${openRouterKeys.length}`);
+                                    console.info('[openrouter-ocr] POST start model=baidu/qianfan-ocr-fast:free');
+                                    try {
+                                        response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                                            method: 'POST',
+                                            headers: _baiduReqHeaders(fetchKey),
+                                            body: _baiduReqBody(fetchKey),
+                                            signal: AbortSignal.timeout(60000),
+                                        });
+                                        console.info(`[openrouter-ocr] response status=${response.status}`);
+                                    } catch (e) {
+                                        response = null;
+                                        lastNon429Error = { status: 'NETWORK', message: e?.message || String(e) };
+                                        console.info('[openrouter-ocr] response status=network-error');
+                                        continue;
+                                    }
+                                    if (response.status === 429) {
+                                        saw429 = true;
+                                        markCurrentKeyExhausted(keyIndex);
+                                        continue;
+                                    }
+                                    if (!response.ok) {
+                                        const errJson = await response.json().catch(() => ({}));
+                                        lastNon429Error = {
+                                            status: response.status,
+                                            message: errJson.error?.message || `HTTP ${response.status}`,
+                                        };
+                                        continue;
+                                    }
+                                    break;
+                                }
+                                if (attemptCount === 0) {
+                                    throw new Error('Внутренняя ошибка выбора ключа');
+                                }
+                                if (!response) {
+                                    if (lastNon429Error) {
+                                        throw new Error(`OpenRouter OCR error: ${lastNon429Error.status} ${lastNon429Error.message}`);
+                                    }
+                                    if (saw429) {
+                                        throw new Error('Все ключи временно ограничены');
+                                    }
+                                    throw new Error('Внутренняя ошибка выбора ключа');
+                                }
+                                if (!response.ok) {
+                                    if (lastNon429Error) {
+                                        throw new Error(`OpenRouter OCR error: ${lastNon429Error.status} ${lastNon429Error.message}`);
+                                    }
+                                    if (saw429) {
+                                        throw new Error('Все ключи временно ограничены');
+                                    }
+                                    throw new Error(`OpenRouter OCR error: HTTP ${response.status}`);
+                                }
+
+                                const json = await response.json();
+                                text = json.choices?.[0]?.message?.content || '';
+                                console.info('[openrouter-ocr] raw:', text.slice(0, 200));
+
+                                try {
+                                    const cleaned = text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+                                    parsed = JSON.parse(cleaned);
+                                } catch(_) {
+                                    const m = text.match(/\{[\s\S]*\}/);
+                                    if (m) parsed = JSON.parse(m[0]);
+                                    else throw new Error('Ответ не содержит JSON: ' + text.slice(0, 100));
+                                }
+
+                                rows = Array.isArray(parsed.rows) ? parsed.rows : [];
+                                console.info('[openrouter-ocr] rows:', rows.length);
+
+                                rows.forEach(row => {
+                                    const rawNick  = row.nick || '';
+                                    const corrNick = _resolveBaiduOcrNick(rawNick);
+                                    const n = _ccOcrNormalizeRow({
+                                        name: corrNick, nick: corrNick,
+                                        kills: row.kills, deaths: row.deaths,
+                                        pvp: row.pvp, pvp_dmg: row.pvp,
+                                        pve: row.pve, pve_dmg: row.pve,
+                                    });
+                                    if (n) {
+                                        if (rawNick !== corrNick) n._rawNick = rawNick;
+                                        players.push(n);
+                                    }
                                 });
-                                console.info(`[openrouter-ocr] response status=${response.status}`);
                             } catch (e) {
-                                response = null;
-                                lastNon429Error = { status: 'NETWORK', message: e?.message || String(e) };
-                                console.info('[openrouter-ocr] response status=network-error');
-                                continue;
+                                attemptError = e;
                             }
-                            if (response.status === 429) {
-                                saw429 = true;
-                                markCurrentKeyExhausted(keyIndex);
-                                continue;
+                            const attemptInfo = _kmOcrAttemptInfo(players, rows.length, attemptError);
+                            if (!firstAttempt) firstAttempt = attemptInfo;
+                            const previousBest = bestAttempt;
+                            bestAttempt = _kmOcrPickBestAttempt(bestAttempt, attemptInfo);
+                            if (bestAttempt !== previousBest) {
+                                chosenParsed = parsed;
+                                chosenRows = rows;
+                                chosenText = text;
                             }
-                            if (!response.ok) {
-                                const errJson = await response.json().catch(() => ({}));
-                                lastNon429Error = {
-                                    status: response.status,
-                                    message: errJson.error?.message || `HTTP ${response.status}`,
-                                };
-                                continue;
-                            }
-                            break;
-                        }
-                        if (attemptCount === 0) {
-                            throw new Error('Внутренняя ошибка выбора ключа');
-                        }
-                        if (!response) {
-                            if (lastNon429Error) {
-                                throw new Error(`OpenRouter OCR error: ${lastNon429Error.status} ${lastNon429Error.message}`);
-                            }
-                            if (saw429) {
-                                throw new Error('Все ключи временно ограничены');
-                            }
-                            throw new Error('Внутренняя ошибка выбора ключа');
-                        }
-                        if (!response.ok) {
-                            if (lastNon429Error) {
-                                throw new Error(`OpenRouter OCR error: ${lastNon429Error.status} ${lastNon429Error.message}`);
-                            }
-                            if (saw429) {
-                                throw new Error('Все ключи временно ограничены');
-                            }
-                            throw new Error(`OpenRouter OCR error: HTTP ${response.status}`);
+                            if (!_kmOcrNeedsRetry(attemptInfo)) break;
                         }
 
-                        const json = await response.json();
-                        const text = json.choices?.[0]?.message?.content || '';
-                        console.info('[openrouter-ocr] raw:', text.slice(0, 200));
-
-                        let parsed;
-                        try {
-                            const cleaned = text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
-                            parsed = JSON.parse(cleaned);
-                        } catch(_) {
-                            const m = text.match(/\{[\s\S]*\}/);
-                            if (m) parsed = JSON.parse(m[0]);
-                            else throw new Error('Ответ не содержит JSON: ' + text.slice(0, 100));
+                        if (firstAttempt && bestAttempt && firstAttempt !== bestAttempt || (firstAttempt && _kmOcrNeedsRetry(firstAttempt))) {
+                            const retryMsg = _kmOcrRetryText(firstAttempt, bestAttempt);
+                            console.info('[ocr-retry]', retryMsg, { shot: i + 1, fileName: shot.name || null, beforeRows: firstAttempt.finalParsedRows, afterRows: bestAttempt.finalParsedRows });
+                            ocrRetryReports.push({ num: i + 1, fileName: shot.name || null, before: firstAttempt, after: bestAttempt, text: retryMsg });
+                            setDayStatus(bestAttempt && bestAttempt.finalParsedRows > firstAttempt.finalParsedRows ? 'success' : 'warning', retryMsg);
                         }
 
-                        const rows = Array.isArray(parsed.rows) ? parsed.rows : [];
-                        console.info('[openrouter-ocr] rows:', rows.length);
-
-                        const players = [];
-                        rows.forEach(row => {
-                            const rawNick  = row.nick || '';
-                            const corrNick = _resolveBaiduOcrNick(rawNick);
-                            const n = _ccOcrNormalizeRow({
-                                name: corrNick, nick: corrNick,
-                                kills: row.kills, deaths: row.deaths,
-                                pvp: row.pvp, pvp_dmg: row.pvp,
-                                pve: row.pve, pve_dmg: row.pve,
-                            });
-                            if (n) {
-                                if (rawNick !== corrNick) n._rawNick = rawNick;
-                                players.push(n);
-                            }
-                        });
+                        if (bestAttempt && bestAttempt.error && !bestAttempt.players.length) throw bestAttempt.error;
+                        const players = bestAttempt ? bestAttempt.players : [];
+                        const rows = chosenRows || [];
+                        const parsed = chosenParsed || {};
+                        const text = chosenText || '';
 
                         if (!players.length) {
                             skippedScreenshots.push({ num: i + 1, fileName: shot.name || null, provider: 'openrouter_baidu', reason: 'empty_players', rawRows: rows.length, rawTextLen: text.length });
@@ -9360,6 +9469,7 @@ function getClass2IconByClass3(c3) {
                 window._gtDebug.ocrTotalInput = shots.length;
                 window._gtDebug.ocrSuccessCount = Object.keys(screenPlayersMap).length;
                 window._gtDebug.ocrProviderSuccessPackNames = Object.keys(screenPlayersMap);
+                window._gtDebug.ocrRetryReports = ocrRetryReports.slice();
 
                 dayLastParsed      = Object.values(allPlayers);
                 dayExpectedTotal   = null;
@@ -9416,8 +9526,11 @@ function getClass2IconByClass3(c3) {
                     if (skippedScreenshots.length > 0) {
                         statusMsg += ` | Пропущено: ${skippedScreenshots.length} — №${skippedScreenshots.map(s => s.num + ' (' + s.reason + ')').join(', №')}`;
                     }
+                    if (ocrRetryReports.length > 0) {
+                        statusMsg += ` | ${ocrRetryReports.map(r => r.text).join(' | ')}`;
+                    }
                     setDayStatus(skippedScreenshots.length > 0 ? 'warning' : 'success', statusMsg);
-                    _kmOcrRenderBatchSummary(shots.length, Object.keys(screenPlayersMap).length, skippedScreenshots);
+                    _kmOcrRenderBatchSummary(shots.length, Object.keys(screenPlayersMap).length, skippedScreenshots, ocrRetryReports);
                     expandDayModal();
                     if (minibarText) minibarText.innerText = `OpenRouter OCR: ${dayLastParsed.length} игроков`;
                     notifyAnalysisComplete(dayLastParsed.length);
@@ -13105,6 +13218,8 @@ ${playerList}
             const _bInfo = window._kmOcrLastBatchInfo;
             const _bannerEl = document.getElementById('kmRwOcrBanner');
             const _bannerLines = [];
+            if (_bInfo && _bInfo.retryReports && _bInfo.retryReports.length > 0)
+                _bannerLines.push('ℹ️ ' + _bInfo.retryReports.map(r => r.text || 'OCR retry 1/1 выполнен').join('<br>ℹ️ '));
             if (_bInfo && _bInfo.skippedList && _bInfo.skippedList.length > 0)
                 _bannerLines.push('⚠️ OCR: распознано ' + _bInfo.successCount + ' из ' + _bInfo.totalInput + ', пропущено ' + _bInfo.skippedList.length);
             const _unsupN = window._gtDebug && window._gtDebug.unsupportedTableSkipCount;
@@ -14293,14 +14408,20 @@ ${playerList}
             }
         }
 
-        function _kmOcrRenderBatchSummary(totalInput, successCount, skippedList) {
-            window._kmOcrLastBatchInfo = { totalInput, successCount, skippedList: skippedList.slice() };
+        function _kmOcrRenderBatchSummary(totalInput, successCount, skippedList, retryReports) {
+            const retries = Array.isArray(retryReports) ? retryReports.slice() : [];
+            window._kmOcrLastBatchInfo = { totalInput, successCount, skippedList: skippedList.slice(), retryReports: retries };
             const el = document.getElementById('dayOcrBatchSummary');
             if (!el || !totalInput) return;
             const skipped = skippedList.length;
             const ok = skipped === 0;
             el.style.cssText = `display:block;font-size:11px;padding:7px 10px;border-radius:7px;margin-bottom:6px;line-height:1.8;background:#0d1117;border:1px solid ${ok ? '#22c55e44' : '#f59e0b44'};color:${ok ? '#4ade80' : '#fbbf24'}`;
             let html = `<b>OCR batch:</b> &nbsp;input: ${totalInput} &nbsp;/ &nbsp;success: ${successCount} &nbsp;/ &nbsp;skipped: ${skipped}`;
+            if (retries.length > 0) {
+                html += '<br><span style="color:#93c5fd;font-size:10px">' +
+                    retries.map(r => `&nbsp;&nbsp;#${r.num} — ${r.fileName || '(no name)'} — ${r.text || 'OCR retry 1/1 выполнен'}`).join('<br>') +
+                    '</span>';
+            }
             if (skipped > 0) {
                 html += '<br><span style="color:#94a3b8;font-size:10px">' +
                     skippedList.map(s => `&nbsp;&nbsp;#${s.num} — ${s.fileName || '(no name)'} — ${s.reason}${s.rawRows != null ? ' (rows:'+s.rawRows+')' : ''}`).join('<br>') +
