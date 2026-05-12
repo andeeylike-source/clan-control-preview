@@ -8903,6 +8903,50 @@ function getClass2IconByClass3(c3) {
                 ', стало ' + a.recognizedCount + '/' + a.expectedCount;
         }
 
+        function _kmOcrRecordRetryReport(list, report) {
+            if (!Array.isArray(list) || !report) return;
+            const key = (report.fileName || '') + '#' + (report.num || '');
+            const existing = list.findIndex(r => ((r.fileName || '') + '#' + (r.num || '')) === key);
+            if (existing >= 0) list[existing] = report;
+            else list.push(report);
+        }
+
+        function _kmOcrRetryReportsText(reports) {
+            const items = Array.isArray(reports) ? reports : [];
+            if (!items.length) return '';
+            const grouped = {};
+            items.forEach(r => {
+                const text = r && r.text ? r.text : 'OCR retry 1/1 выполнен';
+                grouped[text] = (grouped[text] || 0) + 1;
+            });
+            return Object.entries(grouped).map(([text, count]) => count > 1 ? text + ' x' + count : text).join(' | ');
+        }
+
+        function _kmOcrSafeExpectedRowCount(value, finalRows) {
+            const n = Number(value);
+            const rows = Number(finalRows) || 0;
+            if (!Number.isFinite(n) || n < 1) return rows;
+            if (n > 9) return Math.max(rows, rows > 0 && rows < 9 ? 9 : rows);
+            return Math.max(rows, Math.round(n));
+        }
+
+        function _kmOcrBuildFinalRowSummary(screenPlayersMap, expectedRowsByPack) {
+            const skippedList = [];
+            let expectedRows = 0;
+            let recognizedRows = 0;
+            Object.entries(screenPlayersMap || {}).forEach(([packName, players]) => {
+                const finalRows = Array.isArray(players) ? players.filter(p => p && (p.name || p.nick)).length : 0;
+                const expected = _kmOcrSafeExpectedRowCount(expectedRowsByPack && expectedRowsByPack[packName], finalRows);
+                recognizedRows += finalRows;
+                expectedRows += expected;
+                const missing = Math.max(0, expected - finalRows);
+                if (missing > 0) {
+                    skippedList.push({ num: skippedList.length + 1, fileName: packName, reason: 'missing_final_rows', missingRows: missing, rawRows: finalRows, expectedRows: expected });
+                }
+            });
+            return { expectedRows, recognizedRows, skippedRows: Math.max(0, expectedRows - recognizedRows), skippedList };
+        }
+
         async function analyzeWithOcrSpaceProvider({ dateStr, shots }) {
             const btn = document.getElementById('analyzeBtn');
             if (btn) {
@@ -8935,6 +8979,7 @@ function getClass2IconByClass3(c3) {
             const geometryMap = {};
             const skippedScreenshots = [];
             const ocrRetryReports = [];
+            const expectedRowsByPack = {};
             let firstError = null;
 
             try {
@@ -9010,7 +9055,7 @@ function getClass2IconByClass3(c3) {
                         if (firstAttempt && bestAttempt && firstAttempt !== bestAttempt || (firstAttempt && _kmOcrNeedsRetry(firstAttempt))) {
                             const retryMsg = _kmOcrRetryText(firstAttempt, bestAttempt);
                             console.info('[ocr-retry]', retryMsg, { shot: i + 1, fileName: shot.name || null, beforeRows: firstAttempt.finalParsedRows, afterRows: bestAttempt.finalParsedRows });
-                            ocrRetryReports.push({ num: i + 1, fileName: shot.name || null, before: firstAttempt, after: bestAttempt, text: retryMsg });
+                            _kmOcrRecordRetryReport(ocrRetryReports, { num: i + 1, fileName: shot.name || null, before: firstAttempt, after: bestAttempt, text: retryMsg });
                             setDayStatus(bestAttempt && bestAttempt.finalParsedRows > firstAttempt.finalParsedRows ? 'success' : 'warning', retryMsg);
                         }
 
@@ -9025,6 +9070,7 @@ function getClass2IconByClass3(c3) {
 
                         const packName = (shot.name || shot.packName || 'OCR') + ' #' + (i + 1);
                         screenPlayersMap[packName] = players.map(p => ({...p}));
+                        expectedRowsByPack[packName] = players.length;
                         screenShotDataMap[packName] = shot.dataUrl;
                         geometryMap[packName] = {
                             ...crop.geometry,
@@ -9051,11 +9097,13 @@ function getClass2IconByClass3(c3) {
                     }
                 }
 
-                console.info('[km-ocr-skip-summary] provider=ocrspace total=' + shots.length + ' success=' + Object.keys(screenPlayersMap).length + ' skipped=' + skippedScreenshots.length, skippedScreenshots.map(function(s){return {num:s.num,file:s.fileName,reason:s.reason};}));
+                const rowSummary = _kmOcrBuildFinalRowSummary(screenPlayersMap, expectedRowsByPack);
+                console.info('[km-ocr-skip-summary] provider=ocrspace images=' + shots.length + ' finalRows=' + rowSummary.recognizedRows + '/' + rowSummary.expectedRows + ' skippedRows=' + rowSummary.skippedRows, rowSummary.skippedList);
                 if (!window._gtDebug) window._gtDebug = {};
                 window._gtDebug.ocrSkippedScreenshots = skippedScreenshots.slice();
-                window._gtDebug.ocrTotalInput = shots.length;
-                window._gtDebug.ocrSuccessCount = Object.keys(screenPlayersMap).length;
+                window._gtDebug.ocrTotalInput = rowSummary.expectedRows;
+                window._gtDebug.ocrSuccessCount = rowSummary.recognizedRows;
+                window._gtDebug.ocrSkippedRows = rowSummary.skippedRows;
                 window._gtDebug.ocrProviderSuccessPackNames = Object.keys(screenPlayersMap);
                 window._gtDebug.ocrRetryReports = ocrRetryReports.slice();
 
@@ -9111,14 +9159,15 @@ function getClass2IconByClass3(c3) {
                     renderDayAnalyzedPlayers(dayLastParsed);
                     document.getElementById('dayAnalyzeResults').style.display = '';
                     let statusMsg = `OCR.space готово: ${dayLastParsed.length} уникальных игроков из ${shots.length} скриншотов`;
-                    if (skippedScreenshots.length > 0) {
-                        statusMsg += ` | Пропущено скриншотов: ${skippedScreenshots.length} - №${skippedScreenshots.map(s => s.num + ' (' + s.reason + ')').join(', №')}`;
+                    if (rowSummary.skippedRows > 0) {
+                        statusMsg += ` | Не хватает строк: ${rowSummary.skippedRows}`;
                     }
-                    if (ocrRetryReports.length > 0) {
-                        statusMsg += ` | ${ocrRetryReports.map(r => r.text).join(' | ')}`;
+                    const retryText = _kmOcrRetryReportsText(ocrRetryReports);
+                    if (retryText) {
+                        statusMsg += ` | ${retryText}`;
                     }
-                    setDayStatus(skippedScreenshots.length > 0 ? 'warning' : 'success', statusMsg);
-                    _kmOcrRenderBatchSummary(shots.length, Object.keys(screenPlayersMap).length, skippedScreenshots, ocrRetryReports);
+                    setDayStatus(rowSummary.skippedRows > 0 ? 'warning' : 'success', statusMsg);
+                    _kmOcrRenderBatchSummary(rowSummary.expectedRows, rowSummary.recognizedRows, rowSummary.skippedList, ocrRetryReports);
                     expandDayModal();
                     if (minibarText) minibarText.innerText = `OCR.space: ${dayLastParsed.length} игроков`;
                     notifyAnalysisComplete(dayLastParsed.length);
@@ -9167,7 +9216,7 @@ function getClass2IconByClass3(c3) {
         async function analyzeWithOpenRouterBaiduProvider({ dateStr, shots }) {
             console.info('[openrouter-ocr] provider=baidu-only');
             console.info('[openrouter-ocr] no paid fallback');
-            const BAIDU_OCR_PROMPT = `Extract the "Член группы" (party member) table from this game screenshot.\nReturn ONLY valid JSON:\n{"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"confidence":0,"notes":"","table_type":"party_members","member_side":"unknown"}\nRules:\n- The screenshot may contain TWO side-by-side panels: a "Лидер"/"Командный канал"/"Глава"/"Состав" leader-list table on one side, and a "Член группы" (party members) table on the other side. The "Член группы" table can be on the LEFT or on the RIGHT.\n- Extract rows ONLY from the table titled "Член группы". IGNORE any "Лидер"/"Командный канал"/"Глава"/"Состав" leader-list table.\n- table_type values: "party_members" if you extracted Член группы rows; "leader_list" if ONLY a Лидер/Командный канал table is visible (no Член группы); "both" if both tables are visible and you extracted Член группы; "unknown" if unsure.\n- member_side values: "left" if Член группы is on the left side of the screenshot; "right" if on the right; "unknown" if you cannot tell.\n- preserve nick spelling exactly as seen\n- kills, deaths, pvp, pve must be integers\n- if a value is unreadable, use null\n- no markdown\n- no code fences\n- if there is NO "Член группы" table at all, set rows=[], table_type="leader_list", and notes="leader_list"`;
+            const BAIDU_OCR_PROMPT = `Extract the "Член группы" (party member) table from this game screenshot.\nReturn ONLY valid JSON:\n{"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"total_count":0,"confidence":0,"notes":"","table_type":"party_members","member_side":"unknown"}\nRules:\n- The screenshot may contain TWO side-by-side panels: a "Лидер"/"Командный канал"/"Глава"/"Состав" leader-list table on one side, and a "Член группы" (party members) table on the other side. The "Член группы" table can be on the LEFT or on the RIGHT.\n- Extract rows ONLY from the table titled "Член группы". IGNORE any "Лидер"/"Командный канал"/"Глава"/"Состав" leader-list table.\n- total_count is the number of real player rows in the extracted "Член группы" table, or the N from "Состав: N чел." inside that same party-member window. Do not count headers, column labels, leader-list rows, chat, background text, or any rows outside the party-member table.\n- table_type values: "party_members" if you extracted Член группы rows; "leader_list" if ONLY a Лидер/Командный канал table is visible (no Член группы); "both" if both tables are visible and you extracted Член группы; "unknown" if unsure.\n- member_side values: "left" if Член группы is on the left side of the screenshot; "right" if on the right; "unknown" if you cannot tell.\n- preserve nick spelling exactly as seen\n- kills, deaths, pvp, pve must be integers\n- if a value is unreadable, use null\n- no markdown\n- no code fences\n- if there is NO "Член группы" table at all, set rows=[], total_count=0, table_type="leader_list", and notes="leader_list"`;
 
             const openRouterKeys = getOpenRouterApiKeys();
             const exhaustionBefore = getOpenRouterExhaustionSnapshot();
@@ -9210,6 +9259,7 @@ function getClass2IconByClass3(c3) {
             const geometryMap = {};
             const skippedScreenshots = [];
             const ocrRetryReports = [];
+            const expectedRowsByPack = {};
             let firstError = null;
 
             try {
@@ -9370,7 +9420,7 @@ function getClass2IconByClass3(c3) {
                         if (firstAttempt && bestAttempt && firstAttempt !== bestAttempt || (firstAttempt && _kmOcrNeedsRetry(firstAttempt))) {
                             const retryMsg = _kmOcrRetryText(firstAttempt, bestAttempt);
                             console.info('[ocr-retry]', retryMsg, { shot: i + 1, fileName: shot.name || null, beforeRows: firstAttempt.finalParsedRows, afterRows: bestAttempt.finalParsedRows });
-                            ocrRetryReports.push({ num: i + 1, fileName: shot.name || null, before: firstAttempt, after: bestAttempt, text: retryMsg });
+                            _kmOcrRecordRetryReport(ocrRetryReports, { num: i + 1, fileName: shot.name || null, before: firstAttempt, after: bestAttempt, text: retryMsg });
                             setDayStatus(bestAttempt && bestAttempt.finalParsedRows > firstAttempt.finalParsedRows ? 'success' : 'warning', retryMsg);
                         }
 
@@ -9387,6 +9437,7 @@ function getClass2IconByClass3(c3) {
 
                         const packName = (shot.name || shot.packName || 'OCR') + ' #' + (i + 1);
                         screenPlayersMap[packName]  = players.map(p => ({...p}));
+                        expectedRowsByPack[packName] = _kmOcrSafeExpectedRowCount(parsed.total_count, players.length);
                         screenShotDataMap[packName] = shot.dataUrl;
                         // Table-type + member-side from model (preferred); fall back to legacy notes parse.
                         const _ttRaw = (parsed.table_type || '').toString().toLowerCase().trim();
@@ -9463,11 +9514,13 @@ function getClass2IconByClass3(c3) {
                     }
                 }
 
-                console.info('[km-ocr-skip-summary] provider=openrouter_baidu total=' + shots.length + ' success=' + Object.keys(screenPlayersMap).length + ' skipped=' + skippedScreenshots.length, skippedScreenshots.map(function(s){return {num:s.num,file:s.fileName,reason:s.reason};}));
+                const rowSummary = _kmOcrBuildFinalRowSummary(screenPlayersMap, expectedRowsByPack);
+                console.info('[km-ocr-skip-summary] provider=openrouter_baidu images=' + shots.length + ' finalRows=' + rowSummary.recognizedRows + '/' + rowSummary.expectedRows + ' skippedRows=' + rowSummary.skippedRows, rowSummary.skippedList);
                 if (!window._gtDebug) window._gtDebug = {};
                 window._gtDebug.ocrSkippedScreenshots = skippedScreenshots.slice();
-                window._gtDebug.ocrTotalInput = shots.length;
-                window._gtDebug.ocrSuccessCount = Object.keys(screenPlayersMap).length;
+                window._gtDebug.ocrTotalInput = rowSummary.expectedRows;
+                window._gtDebug.ocrSuccessCount = rowSummary.recognizedRows;
+                window._gtDebug.ocrSkippedRows = rowSummary.skippedRows;
                 window._gtDebug.ocrProviderSuccessPackNames = Object.keys(screenPlayersMap);
                 window._gtDebug.ocrRetryReports = ocrRetryReports.slice();
 
@@ -9523,14 +9576,15 @@ function getClass2IconByClass3(c3) {
                     renderDayAnalyzedPlayers(dayLastParsed);
                     document.getElementById('dayAnalyzeResults').style.display = '';
                     let statusMsg = `OpenRouter OCR готово: ${dayLastParsed.length} уникальных игроков из ${shots.length} скриншотов`;
-                    if (skippedScreenshots.length > 0) {
-                        statusMsg += ` | Пропущено: ${skippedScreenshots.length} — №${skippedScreenshots.map(s => s.num + ' (' + s.reason + ')').join(', №')}`;
+                    if (rowSummary.skippedRows > 0) {
+                        statusMsg += ` | Не хватает строк: ${rowSummary.skippedRows}`;
                     }
-                    if (ocrRetryReports.length > 0) {
-                        statusMsg += ` | ${ocrRetryReports.map(r => r.text).join(' | ')}`;
+                    const retryText = _kmOcrRetryReportsText(ocrRetryReports);
+                    if (retryText) {
+                        statusMsg += ` | ${retryText}`;
                     }
-                    setDayStatus(skippedScreenshots.length > 0 ? 'warning' : 'success', statusMsg);
-                    _kmOcrRenderBatchSummary(shots.length, Object.keys(screenPlayersMap).length, skippedScreenshots, ocrRetryReports);
+                    setDayStatus(rowSummary.skippedRows > 0 ? 'warning' : 'success', statusMsg);
+                    _kmOcrRenderBatchSummary(rowSummary.expectedRows, rowSummary.recognizedRows, rowSummary.skippedList, ocrRetryReports);
                     expandDayModal();
                     if (minibarText) minibarText.innerText = `OpenRouter OCR: ${dayLastParsed.length} игроков`;
                     notifyAnalysisComplete(dayLastParsed.length);
@@ -13219,9 +13273,9 @@ ${playerList}
             const _bannerEl = document.getElementById('kmRwOcrBanner');
             const _bannerLines = [];
             if (_bInfo && _bInfo.retryReports && _bInfo.retryReports.length > 0)
-                _bannerLines.push('ℹ️ ' + _bInfo.retryReports.map(r => r.text || 'OCR retry 1/1 выполнен').join('<br>ℹ️ '));
+                _bannerLines.push('ℹ️ ' + _kmOcrRetryReportsText(_bInfo.retryReports));
             if (_bInfo && _bInfo.skippedList && _bInfo.skippedList.length > 0)
-                _bannerLines.push('⚠️ OCR: распознано ' + _bInfo.successCount + ' из ' + _bInfo.totalInput + ', пропущено ' + _bInfo.skippedList.length);
+                _bannerLines.push('⚠️ OCR: распознано ' + _bInfo.successCount + ' из ' + _bInfo.totalInput + ', пропущено ' + Math.max(0, _bInfo.totalInput - _bInfo.successCount));
             const _unsupN = window._gtDebug && window._gtDebug.unsupportedTableSkipCount;
             if (_unsupN > 0)
                 _bannerLines.push('🚫 Список лидеров пропущен: ' + _unsupN + ' скрин(ов)');
@@ -14413,18 +14467,18 @@ ${playerList}
             window._kmOcrLastBatchInfo = { totalInput, successCount, skippedList: skippedList.slice(), retryReports: retries };
             const el = document.getElementById('dayOcrBatchSummary');
             if (!el || !totalInput) return;
-            const skipped = skippedList.length;
+            const skipped = Math.max(0, totalInput - successCount);
             const ok = skipped === 0;
             el.style.cssText = `display:block;font-size:11px;padding:7px 10px;border-radius:7px;margin-bottom:6px;line-height:1.8;background:#0d1117;border:1px solid ${ok ? '#22c55e44' : '#f59e0b44'};color:${ok ? '#4ade80' : '#fbbf24'}`;
-            let html = `<b>OCR batch:</b> &nbsp;input: ${totalInput} &nbsp;/ &nbsp;success: ${successCount} &nbsp;/ &nbsp;skipped: ${skipped}`;
+            let html = `<b>OCR rows:</b> &nbsp;expected: ${totalInput} &nbsp;/ &nbsp;final: ${successCount} &nbsp;/ &nbsp;missing: ${skipped}`;
             if (retries.length > 0) {
                 html += '<br><span style="color:#93c5fd;font-size:10px">' +
-                    retries.map(r => `&nbsp;&nbsp;#${r.num} — ${r.fileName || '(no name)'} — ${r.text || 'OCR retry 1/1 выполнен'}`).join('<br>') +
+                    _kmOcrRetryReportsText(retries) +
                     '</span>';
             }
             if (skipped > 0) {
                 html += '<br><span style="color:#94a3b8;font-size:10px">' +
-                    skippedList.map(s => `&nbsp;&nbsp;#${s.num} — ${s.fileName || '(no name)'} — ${s.reason}${s.rawRows != null ? ' (rows:'+s.rawRows+')' : ''}`).join('<br>') +
+                    skippedList.map(s => `&nbsp;&nbsp;${s.fileName || '(no pack)'} — ${s.reason}${s.missingRows != null ? ' (missing:'+s.missingRows+')' : ''}${s.rawRows != null ? ' (final:'+s.rawRows+')' : ''}${s.expectedRows != null ? ' (expected:'+s.expectedRows+')' : ''}`).join('<br>') +
                     '</span>';
             }
             el.innerHTML = html;
