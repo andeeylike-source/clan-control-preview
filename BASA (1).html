@@ -10100,38 +10100,106 @@ function getClass2IconByClass3(c3) {
                         const tableType = (_ttRaw === 'party_members' || _ttRaw === 'leader_list' || _ttRaw === 'both')
                             ? _ttRaw
                             : ((/leader_list/.test(_lhNotes) && !/член.*группы/.test(_lhNotes)) ? 'leader_list' : 'unknown');
-                        const memberSide = (_msRaw === 'left' || _msRaw === 'right') ? _msRaw : 'unknown';
+                        const memberSideRaw = (_msRaw === 'left' || _msRaw === 'right') ? _msRaw : 'unknown';
+                        // ── KM crop source selection (member-group table) ──
+                        // Build BOTH candidate crops so we can prefer left when model is ambiguous
+                        // and the screen contains two tables side-by-side. The legacy fallback was
+                        // to default unknown→right, which silently picked the clan/leader panel
+                        // when the member-group table was actually on the LEFT.
+                        const _cropLeft = _kmComputeSideCrop(img, 'left');
+                        const _cropRight = crop; // already computed for right panel
+                        // Notes-based hints
+                        const _notesLeaderHint = /leader.?list|лидер|глава|командный|состав/.test(_lhNotes);
+                        const _notesMemberHint = /член.*группы/.test(_lhNotes);
+                        // Resolve final memberSide + record audit fields
+                        let memberSide = memberSideRaw;
+                        let wrongTableCandidate = false;
+                        let wrongTableReason = null;
+                        let rejectedCandidateReason = null;
+                        if (memberSideRaw === 'left') {
+                            // Model is confident — honor it.
+                        } else if (memberSideRaw === 'right') {
+                            // Honor model, but flag when right panel contradicts itself:
+                            // model returned member rows AND said right, yet notes describe a
+                            // leader-list panel (which would mean right is leader, not members).
+                            if (tableType === 'both' && _notesLeaderHint && !_notesMemberHint) {
+                                wrongTableCandidate = true;
+                                wrongTableReason = 'model_said_right_but_notes_hint_right_is_leader_list';
+                                rejectedCandidateReason = 'right_panel_likely_leader_list';
+                                memberSide = 'left';
+                            }
+                        } else {
+                            // memberSideRaw === 'unknown'
+                            if (tableType === 'both') {
+                                // Two tables visible, model didn't tell us which side has members.
+                                // Default to LEFT (was: right) — matches the most common UI layout
+                                // where the right panel is the clan/leader list.
+                                memberSide = 'left';
+                                wrongTableCandidate = true;
+                                wrongTableReason = 'side_unknown_both_tables_default_left';
+                                rejectedCandidateReason = 'right_crop_rejected_unknown_side_both_tables';
+                            } else if (tableType === 'unknown') {
+                                // Both side and table-type unknown — most defensive choice is LEFT
+                                // because legacy right-default is exactly what produced this defect.
+                                memberSide = 'left';
+                                wrongTableCandidate = true;
+                                wrongTableReason = 'side_and_table_type_unknown_default_left';
+                                rejectedCandidateReason = 'right_crop_rejected_fully_unknown';
+                            } else if (tableType === 'leader_list') {
+                                // Pure leader-list view — no member-group crop is correct. Keep right
+                                // crop for visual debugging but flag the pack so rows go to CHECK.
+                                memberSide = 'right';
+                                wrongTableCandidate = true;
+                                wrongTableReason = 'table_type_is_leader_list_no_member_group';
+                            } else {
+                                // tableType === 'party_members' single-panel — legacy right default.
+                                memberSide = 'right';
+                            }
+                        }
+                        let _effectiveCrop, _geometrySource, _cropUrlSide;
+                        if (memberSide === 'left') {
+                            _effectiveCrop = _cropLeft;
+                            _geometrySource = wrongTableCandidate ? ('forced_left_due_to_' + wrongTableReason) : 'member_side_left';
+                            _cropUrlSide = 'left';
+                        } else {
+                            _effectiveCrop = _cropRight;
+                            _geometrySource = (memberSideRaw === 'right') ? 'member_side_right' : 'fallback_right_default';
+                            _cropUrlSide = 'right';
+                        }
+                        const _selectedCropBox = {
+                            x: _effectiveCrop.geometry.x,
+                            y: _effectiveCrop.geometry.y,
+                            w: _effectiveCrop.geometry.w,
+                            h: _effectiveCrop.geometry.h,
+                        };
+                        const _selectedHeaderGuess = memberSide === 'left'
+                            ? 'left_panel_assumed_member_group'
+                            : (memberSideRaw === 'right' ? 'right_panel_model_confirmed_member_group' : 'right_panel_legacy_default');
+                        console.info('[km-crop-select] pack=' + packName + ' memberSideRaw=' + memberSideRaw + ' memberSide=' + memberSide + ' tableType=' + tableType + ' wrongTableCandidate=' + wrongTableCandidate + ' reason=' + (wrongTableReason || 'none'));
                         packTableInfo[packName] = {
                             tableType: tableType,
                             memberSide: memberSide,
+                            memberSideRaw: memberSideRaw,
                             ignoredLeaderTable: tableType === 'both' || /both/.test(_lhNotes),
+                            wrongTableCandidate: wrongTableCandidate,
+                            wrongTableReason: wrongTableReason,
                         };
-                        // Dynamic side-aware geometry/cropUrl for wizard preview.
-                        // member_side='left'  → recompute crop from left panel.
-                        // member_side='right' → keep existing right crop from _ccOcrPreprocessCrop.
-                        // member_side unknown → legacy_fallback to right crop, mark in debug.
-                        let _effectiveCrop, _geometrySource, _cropUrlSide, _sideFallbackReason = null;
-                        if (memberSide === 'left') {
-                            _effectiveCrop = _kmComputeSideCrop(img, 'left');
-                            _geometrySource = 'member_side_left';
-                            _cropUrlSide = 'left';
-                        } else if (memberSide === 'right') {
-                            _effectiveCrop = crop;
-                            _geometrySource = 'member_side_right';
-                            _cropUrlSide = 'right';
-                        } else {
-                            _effectiveCrop = crop;
-                            _geometrySource = 'legacy_fallback';
-                            _cropUrlSide = 'right';
-                            _sideFallbackReason = 'member_side_not_provided_or_unknown';
-                        }
                         geometryMap[packName] = {
                             ..._effectiveCrop.geometry,
                             cropUrl: _effectiveCrop.cropCanvas.toDataURL('image/png'),
                             memberSide: memberSide,
+                            memberSideRaw: memberSideRaw,
                             cropUrlSide: _cropUrlSide,
                             geometrySource: _geometrySource,
-                            geometrySideFallbackReason: _sideFallbackReason,
+                            geometrySideFallbackReason: wrongTableReason,
+                            // Debug fields per crop-source audit
+                            selectedTableSide: memberSide,
+                            cropCandidateCount: 2,
+                            rejectedCandidateReason: rejectedCandidateReason,
+                            selectedCropBox: _selectedCropBox,
+                            selectedHeaderGuess: _selectedHeaderGuess,
+                            wrongTableCandidate: wrongTableCandidate,
+                            wrongTableReason: wrongTableReason,
                         };
                         // Leader-list hints: only when model says leader_list (no Член группы extracted).
                         // If table_type is party_members or both, NEVER mark as leader_list — valid screen.
@@ -11417,7 +11485,20 @@ ${playerList}
                         writeTarget.matcher_wouldTrigger = _wouldTrigger;
                         writeTarget.matcher_trigger     = _trainedStrong || (_CC_AUTO_PROFA_WRITE && _baseAutoWouldTrigger);
                         writeTarget.matcher_autoTrained = _trainedStrong;
-                        const _finalReason = _trainedStrong ? 'trained_strong'
+                        // Wrong-table guard: pack's source crop is the wrong panel (clan/leader
+                        // table mistakenly picked instead of the member-group table). Demote
+                        // trigger to keep these rows out of training and force them into the
+                        // CHECK queue with reason wrong_table_candidate.
+                        if (_tableInfo && _tableInfo.wrongTableCandidate) {
+                            writeTarget.matcher_wrongTableCandidate = true;
+                            writeTarget.matcher_wrongTableReason = _tableInfo.wrongTableReason || 'unknown';
+                            writeTarget.matcher_trigger = false;
+                            writeTarget.matcher_wouldTrigger = false;
+                            writeTarget.matcher_autoTrained = false;
+                            writeTarget.matcher_originalStatus = 'WRONG_TABLE_CANDIDATE';
+                        }
+                        const _finalReason = (writeTarget.matcher_wrongTableCandidate) ? 'wrong_table_candidate'
+                            : _trainedStrong ? 'trained_strong'
                             : (!_CC_AUTO_PROFA_WRITE && _baseAutoWouldTrigger) ? 'manual_mode_auto_hint_only'
                             : (!_CC_AUTO_PROFA_WRITE) ? 'manual_mode_hint_only'
                             : (best.matchedFrom === 'trained' && writeTarget.matcher_trigger) ? 'trained_above_threshold'
@@ -11527,7 +11608,15 @@ ${playerList}
                                 finalReason: _finalReason,
                                 manualCorrected: !!(writeTarget.profaSource === 'manual_review'),
                                 cropUrl: cropUrl,
-                                targetFound: targetFound
+                                targetFound: targetFound,
+                                // KM crop-source audit (per task: wrong member-group table detection)
+                                selectedTableSide: (dayPackGeometry[packName] && dayPackGeometry[packName].selectedTableSide) || _tableInfo.memberSide || 'unknown',
+                                cropCandidateCount: (dayPackGeometry[packName] && dayPackGeometry[packName].cropCandidateCount) || null,
+                                rejectedCandidateReason: (dayPackGeometry[packName] && dayPackGeometry[packName].rejectedCandidateReason) || null,
+                                selectedCropBox: (dayPackGeometry[packName] && dayPackGeometry[packName].selectedCropBox) || null,
+                                selectedHeaderGuess: (dayPackGeometry[packName] && dayPackGeometry[packName].selectedHeaderGuess) || null,
+                                wrongTableCandidate: !!writeTarget.matcher_wrongTableCandidate,
+                                wrongTableReason: writeTarget.matcher_wrongTableReason || null
                             });
                         } catch(e) { /* ignore */ }
                         window._gtDebug.matcherProcessed = (window._gtDebug.matcherProcessed || 0) + 1;
@@ -14119,6 +14208,10 @@ ${playerList}
             if (isAuto) {
                 const sim = parsed.matcher_sim != null ? Math.round(parsed.matcher_sim*100) + '%' : '';
                 return '<span title="Авто · ' + _kmRwEsc(top3Title) + '" style="font-size:8.5px;color:#86efac;background:#052e16;border:1px solid #166534;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">AUTO ' + sim + '</span>';
+            }
+            if (parsed.matcher_wrongTableCandidate) {
+                const _wtReason = parsed.matcher_wrongTableReason || 'wrong_table_candidate';
+                return '<span title="Источник скрина — не та таблица (вероятно правая клан/лидер вместо «Член группы»). Причина: ' + _kmRwEsc(_wtReason) + '" style="font-size:8.5px;color:#fda4af;background:#3f0d1c;border:1px solid #be123c;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">WRONG_TABLE</span>';
             }
             if (parsed.matcher_locInvalid) {
                 return '<span title="Плохой кроп иконки — выбери профу вручную" style="font-size:8.5px;color:#f97316;background:#1c0a00;border:1px solid #7c2d12;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">BAD CROP</span>';
