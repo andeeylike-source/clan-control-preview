@@ -3700,6 +3700,7 @@
                     <div id="ocrModelChainStatus" style="font-size:11px;color:#94a3b8;padding:10px;border:1px solid #1e2530;border-radius:8px;background:#0b1018;line-height:1.6"></div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap">
                         <button type="button" onclick="discoverOcrModelsClick(this)" style="background:#1e2530;color:#6366f1;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🔎 Найти OCR модели</button>
+                        <button type="button" onclick="benchmarkOcrFreeModelsClick(this)" style="background:#1e2530;color:#22d3ee;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🧪 Benchmark OCR (1 скрин)</button>
                         <button type="button" onclick="window._ccOcrHardReset(); renderAnalysisProviderSettings();" style="background:#1e2530;color:#f59e0b;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🔄 OCR hard reset (cache + chain)</button>
                     </div>
                 </div>
@@ -8537,6 +8538,195 @@ function getClass2IconByClass3(c3) {
             };
         }
         window._ccOcrEffectiveChain = _ccOcrEffectiveChain;
+
+        // ── Free model benchmark ──
+        // Run ONE screenshot through every discovered free vision model, collect quality
+        // metrics, rank, and set the winner as preferred. CRITICAL: free models only —
+        // discovery.freeVision is the authoritative allow-list, paid endpoints never hit.
+        async function _ccOcrBenchmarkFreeModels(imageDataUrl, opts) {
+            opts = opts || {};
+            const keys = getOpenRouterApiKeys();
+            if (!keys.length) { console.error('[ocr-benchmark] no OpenRouter API key'); return null; }
+            if (!imageDataUrl) { console.error('[ocr-benchmark] no screenshot dataUrl'); return null; }
+            const apiKey = keys[0];
+            const disc = await _ccOcrEnsureDiscovery(apiKey);
+            const freeList = Array.isArray(disc.freeVision) ? disc.freeVision.slice() : [];
+            if (!freeList.length) {
+                console.error('[ocr-benchmark] discovery returned 0 free vision models — nothing to benchmark');
+                return { ts: Date.now(), results: [], best: null, error: 'no free vision models' };
+            }
+            console.info('[ocr-benchmark] starting on 1 screenshot against ' + freeList.length + ' free vision models: ' + freeList.join(', '));
+            const prompt = 'Extract the "Член группы" (party member) table from this game screenshot.\n' +
+                'Return ONLY valid JSON: {"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"total_count":0,"confidence":0,"notes":"","table_type":"party_members","member_side":"unknown"}\n' +
+                'Preserve nick spelling exactly. kills/deaths/pvp/pve integers or null. No markdown. No code fences.';
+            const results = [];
+            const max = (opts.maxModels && opts.maxModels > 0) ? Math.min(opts.maxModels, freeList.length) : freeList.length;
+            for (let mi = 0; mi < max; mi++) {
+                const model = freeList[mi];
+                console.info('[ocr-benchmark] ' + (mi + 1) + '/' + max + ' testing ' + model);
+                const r = {
+                    model: model,
+                    status: null,
+                    durationMs: null,
+                    rowsCount: 0,
+                    emptyNicks: 0,
+                    nullStatFields: 0,
+                    skippedRows: 0,
+                    players: [],
+                    parseError: null,
+                    errorMessage: null,
+                    rawTextSample: null,
+                    qualityScore: 0,
+                };
+                const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+                try {
+                    const body = {
+                        model: model,
+                        messages: [{
+                            role: 'user',
+                            content: [
+                                { type: 'text', text: prompt },
+                                { type: 'image_url', image_url: { url: imageDataUrl } },
+                            ],
+                        }],
+                        temperature: 0,
+                        max_tokens: 1200,
+                    };
+                    const orProvider = _ccOcrModelOpenRouterProvider(model);
+                    if (orProvider) body.provider = orProvider;
+                    const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer ' + apiKey,
+                            'Content-Type': 'application/json',
+                            'HTTP-Referer': location.origin,
+                            'X-Title': 'Clan Control OCR Benchmark',
+                        },
+                        body: JSON.stringify(body),
+                        signal: AbortSignal.timeout(90000),
+                    });
+                    r.status = resp.status;
+                    r.durationMs = Math.round(((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0));
+                    if (!resp.ok) {
+                        const errJson = await resp.json().catch(() => ({}));
+                        r.errorMessage = (errJson.error && errJson.error.message) || ('HTTP ' + resp.status);
+                        if (_ccOcrIsEndpointDeadError(resp.status, r.errorMessage)) {
+                            _ccOcrMarkModelUnavailable(model, resp.status + ' ' + r.errorMessage);
+                        }
+                        results.push(r);
+                        continue;
+                    }
+                    const json = await resp.json();
+                    const text = (json && json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content) || '';
+                    r.rawTextSample = text.slice(0, 200);
+                    let parsed = null;
+                    try {
+                        const cleaned = text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+                        parsed = JSON.parse(cleaned);
+                    } catch (_) {
+                        const m = text.match(/\{[\s\S]*\}/);
+                        if (m) {
+                            try { parsed = JSON.parse(m[0]); }
+                            catch (e2) { r.parseError = e2 && e2.message ? e2.message : 'JSON parse failed'; }
+                        } else {
+                            r.parseError = 'no JSON object in response';
+                        }
+                    }
+                    if (parsed) {
+                        const rows = Array.isArray(parsed.rows) ? parsed.rows : [];
+                        r.rowsCount = rows.length;
+                        let emptyNicks = 0;
+                        let nullStatFields = 0;
+                        r.players = rows.map(row => {
+                            const nick = String(row && row.nick != null ? row.nick : '').trim();
+                            if (!nick) emptyNicks++;
+                            const k = row && row.kills != null ? row.kills : null;
+                            const d = row && row.deaths != null ? row.deaths : null;
+                            const pv = row && row.pvp != null ? row.pvp : null;
+                            const pe = row && row.pve != null ? row.pve : null;
+                            if (k == null) nullStatFields++;
+                            if (d == null) nullStatFields++;
+                            if (pv == null) nullStatFields++;
+                            if (pe == null) nullStatFields++;
+                            return { nick: nick, kills: k, deaths: d, pvp: pv, pve: pe };
+                        });
+                        r.emptyNicks = emptyNicks;
+                        r.nullStatFields = nullStatFields;
+                        const expected = parsed.total_count != null ? Number(parsed.total_count) : null;
+                        if (expected != null && expected > rows.length) r.skippedRows = expected - rows.length;
+                    }
+                } catch (e) {
+                    r.errorMessage = (e && e.message) ? e.message : String(e);
+                    r.durationMs = Math.round(((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0));
+                }
+                // Score: rows >> empty-nicks >> parse-error >> null-stats >> hard-error.
+                // Higher = better. Speed only used as tie-breaker in sort below.
+                r.qualityScore = (r.rowsCount * 100)
+                    - (r.emptyNicks * 15)
+                    - (r.parseError ? 50 : 0)
+                    - (r.nullStatFields * 2)
+                    - ((r.errorMessage && !r.rowsCount) ? 1000 : 0);
+                results.push(r);
+            }
+            // Sort by quality desc; tie-break by duration asc.
+            results.sort((a, b) => {
+                if ((b.qualityScore || 0) !== (a.qualityScore || 0)) return (b.qualityScore || 0) - (a.qualityScore || 0);
+                return (a.durationMs || 9e9) - (b.durationMs || 9e9);
+            });
+            const tableRows = results.map(r => ({
+                model: r.model,
+                status: r.status,
+                ms: r.durationMs,
+                rows: r.rowsCount,
+                emptyNicks: r.emptyNicks,
+                nullStats: r.nullStatFields,
+                skipped: r.skippedRows,
+                score: r.qualityScore,
+                error: r.parseError || r.errorMessage || '',
+            }));
+            try { console.table(tableRows); } catch (_) { console.info('[ocr-benchmark] results', tableRows); }
+            const best = results.find(r => r.rowsCount > 0 && !r.parseError) || results.find(r => r.rowsCount > 0) || null;
+            if (best) {
+                _ccOcrSetPreferredModel(best.model);
+                console.info('[ocr-benchmark] WINNER: ' + best.model + ' (score=' + best.qualityScore + ', rows=' + best.rowsCount + ', emptyNicks=' + best.emptyNicks + ', ms=' + best.durationMs + ') → saved as preferred');
+            } else {
+                console.warn('[ocr-benchmark] no model produced valid rows — preferred not changed');
+            }
+            const report = { ts: Date.now(), screenshotBytes: imageDataUrl.length, modelsTested: results.length, results: results, best: best };
+            window._ccOcrBenchmarkReport = report;
+            return report;
+        }
+        // User-facing console helper: picks the most recently loaded screenshot.
+        async function benchmarkOcrFreeModels(opts) {
+            opts = opts || {};
+            let dataUrl = opts.dataUrl || null;
+            let source = 'arg';
+            if (!dataUrl) {
+                try {
+                    if (typeof activeDayDate === 'string' && activeDayDate && typeof dayScreenshots === 'object' && dayScreenshots && Array.isArray(dayScreenshots[activeDayDate]) && dayScreenshots[activeDayDate].length) {
+                        const arr = dayScreenshots[activeDayDate];
+                        dataUrl = arr[arr.length - 1].dataUrl;
+                        source = 'dayScreenshots[' + activeDayDate + '][' + (arr.length - 1) + ']';
+                    }
+                } catch (_) {}
+            }
+            if (!dataUrl) {
+                try {
+                    if (typeof dayScreenShotMap === 'object' && dayScreenShotMap) {
+                        const keys = Object.keys(dayScreenShotMap);
+                        if (keys.length) { dataUrl = dayScreenShotMap[keys[0]]; source = 'dayScreenShotMap[' + keys[0] + ']'; }
+                    }
+                } catch (_) {}
+            }
+            if (!dataUrl) {
+                console.error('[ocr-benchmark] no screenshot available. Load one in the day modal first, or call benchmarkOcrFreeModels({dataUrl: "data:image/png;base64,..."})');
+                return null;
+            }
+            console.info('[ocr-benchmark] source=' + source + ' bytes=' + dataUrl.length);
+            return await _ccOcrBenchmarkFreeModels(dataUrl, opts);
+        }
+        window._ccOcrBenchmarkFreeModels = _ccOcrBenchmarkFreeModels;
+        window.benchmarkOcrFreeModels = benchmarkOcrFreeModels;
 
         // Snapshot for diagnostics + UI status panel.
         function _ccOcrChainDiagnostics() {
@@ -16900,6 +17090,45 @@ ${playerList}
             }
         }
         window.discoverOcrModelsClick = discoverOcrModelsClick;
+
+        async function benchmarkOcrFreeModelsClick(btnEl) {
+            const orig = btnEl ? btnEl.innerText : null;
+            if (btnEl) { btnEl.disabled = true; btnEl.innerText = '⏳ Benchmark идёт...'; }
+            const st = document.getElementById('analysisProviderStatus');
+            try {
+                if (st) {
+                    st.style.cssText = 'display:block;background:#0e1a2e;border:1px solid #1e3a8a44;color:#93c5fd;font-size:13px;padding:10px;border-radius:8px';
+                    st.innerText = '🧪 Benchmark: прогоняю один скрин по всем free vision моделям. Смотри console.';
+                }
+                const report = await benchmarkOcrFreeModels();
+                if (st) {
+                    if (!report) {
+                        st.style.cssText = 'display:block;background:#7f1d1d22;border:1px solid #ef444444;color:#f87171;font-size:13px;padding:10px;border-radius:8px';
+                        st.innerText = '❌ Benchmark не запущен. Загрузи хотя бы один скрин в дневной модалке и попробуй снова.';
+                    } else if (report.error) {
+                        st.style.cssText = 'display:block;background:#7f1d1d22;border:1px solid #ef444444;color:#f87171;font-size:13px;padding:10px;border-radius:8px';
+                        st.innerText = '❌ ' + report.error;
+                    } else if (report.best) {
+                        st.style.cssText = 'display:block;background:#14532d22;border:1px solid #22c55e44;color:#4ade80;font-size:13px;padding:10px;border-radius:8px';
+                        st.innerText = '✅ Winner: ' + report.best.model + ' (rows=' + report.best.rowsCount + ', emptyNicks=' + report.best.emptyNicks + ', ms=' + report.best.durationMs + '). Установлен как preferred.';
+                        setTimeout(() => { if (st) st.style.display = 'none'; }, 10000);
+                    } else {
+                        st.style.cssText = 'display:block;background:#7f1d1d22;border:1px solid #ef444444;color:#f87171;font-size:13px;padding:10px;border-radius:8px';
+                        st.innerText = '⚠️ Ни одна free vision модель не вернула валидные rows. Подробности в console.';
+                    }
+                }
+                renderAnalysisProviderSettings();
+            } catch (e) {
+                console.warn('[ocr-benchmark] click failed', e);
+                if (st) {
+                    st.style.cssText = 'display:block;background:#7f1d1d22;border:1px solid #ef444444;color:#f87171;font-size:13px;padding:10px;border-radius:8px';
+                    st.innerText = '❌ Benchmark failed: ' + (e && e.message ? e.message : String(e));
+                }
+            } finally {
+                if (btnEl && orig != null) { btnEl.disabled = false; btnEl.innerText = orig; }
+            }
+        }
+        window.benchmarkOcrFreeModelsClick = benchmarkOcrFreeModelsClick;
 
         function saveAnalysisProviderSettings() {
             const providerEl = document.getElementById('analysisProviderSelect');
