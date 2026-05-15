@@ -3676,15 +3676,15 @@
             </div>
             <div class="card mb-6 cc-settings-provider">
                 <h2 class="text-lg font-bold mb-2">Провайдер анализа</h2>
-                <p class="text-slate-500 text-sm mb-4">Основной поток: OpenRouter Baidu Qianfan (free). OCR.space использует локальный proxy.</p>
+                <p class="text-slate-500 text-sm mb-4">Основной поток: OpenRouter OCR / Vision fallback chain (qwen, openrouter/free, llama, pixtral, baidu). OCR.space использует локальный proxy.</p>
                 <div style="display:grid;gap:12px">
                     <label style="display:block">
                         <div style="font-size:11px;color:#64748b;margin-bottom:6px;text-transform:uppercase;font-weight:700">Провайдер</div>
                         <select id="analysisProviderSelect" class="input-dark" style="width:100%">
-                            <option value="openrouter_baidu">OpenRouter OCR / Baidu Qianfan (free)</option>
+                            <option value="openrouter_baidu">OpenRouter OCR / Vision fallback</option>
                             <option value="ocrspace">OCR.space proxy</option>
                         </select>
-                        <div style="font-size:10px;color:#475569;margin-top:5px">Baidu free mode: без платного fallback. При лимите попробует другой ключ или остановится.</div>
+                        <div style="font-size:10px;color:#475569;margin-top:5px">Без жёсткой привязки к Baidu: для каждой модели в chain provider field в request body выставляется только если это baidu/qianfan-ocr-fast:free. Остальные модели уходят как обычный OpenRouter vision request.</div>
                     </label>
                     <label style="display:block">
                         <div style="font-size:11px;color:#64748b;margin-bottom:6px;text-transform:uppercase;font-weight:700">OCR.space proxy URL</div>
@@ -3910,7 +3910,7 @@
             <div id="dayAnalyzeBlock" style="display:none;margin-bottom:8px">
                 <button onclick="analyzeDayScreenshots()" id="analyzeBtn" style="background:#6366f1;color:white;border:none;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;width:100%">🔍 Анализировать скриншоты (AI)</button>
                 <div id="apiKeyIndicator" style="font-size:10px;color:#475569;margin-top:4px;text-align:center">🔑 Используется пул из 6 ключей</div>
-                <div id="analysisProviderIndicator" style="font-size:10px;color:#64748b;margin-top:2px;text-align:center">Провайдер: OpenRouter OCR / Baidu</div>
+                <div id="analysisProviderIndicator" style="font-size:10px;color:#64748b;margin-top:2px;text-align:center">Провайдер: OpenRouter OCR / Vision fallback</div>
             </div>
 
             <!-- Статус обработки -->
@@ -8251,7 +8251,7 @@ function getClass2IconByClass3(c3) {
         function getAnalysisProviderLabel(provider) {
             const p = provider || getAnalysisProvider();
             if (p === 'ocrspace') return 'OCR.space proxy';
-            return 'OpenRouter OCR / Baidu';
+            return 'OpenRouter OCR / Vision fallback';
         }
 
         function getProviderTestModel(provider) {
@@ -8267,6 +8267,7 @@ function getClass2IconByClass3(c3) {
         // because it returns 404 "No endpoints found" on OpenRouter free tier.
         const _CC_OCR_DEFAULT_MODEL_CHAIN = [
             'qwen/qwen2.5-vl-72b-instruct:free',
+            'openrouter/free',
             'meta-llama/llama-3.2-11b-vision-instruct:free',
             'mistralai/pixtral-12b:free',
             'baidu/qianfan-ocr-fast:free'
@@ -8298,8 +8299,13 @@ function getClass2IconByClass3(c3) {
         function _ccOcrModelChain() {
             return _ccOcrResolveChain().chain;
         }
+        // Provider routing override — ONLY applied to the legacy Baidu Qianfan model,
+        // which is the only chain entry that historically needs an explicit OpenRouter
+        // provider.order to route correctly. All other models (qwen/llama/pixtral/openrouter/free)
+        // must NOT carry this restriction — otherwise OpenRouter rejects the request as
+        // "No endpoints found".
         function _ccOcrModelOpenRouterProvider(model) {
-            if (typeof model === 'string' && model.toLowerCase().startsWith('baidu/')) {
+            if (model === 'baidu/qianfan-ocr-fast:free') {
                 return { order: ['Baidu'], allow_fallbacks: false };
             }
             return null;
@@ -8544,7 +8550,7 @@ function getClass2IconByClass3(c3) {
                     el.innerHTML = `⚠️ Нет ключей OpenRouter — <span onclick="showPage('settings')" style="color:#6366f1;cursor:pointer;text-decoration:underline">добавить</span>`;
                     el.style.color = '#ef4444';
                 } else {
-                    el.innerHTML = `🤖 Baidu OCR · ключ ${getCurrentOpenRouterKeyIndex()+1} из ${GEMINI_KEYS.length}`;
+                    el.innerHTML = `🤖 OpenRouter OCR · ключ ${getCurrentOpenRouterKeyIndex()+1} из ${GEMINI_KEYS.length}`;
                     el.style.color = '#475569';
                 }
                 return;
@@ -9383,7 +9389,7 @@ function getClass2IconByClass3(c3) {
             console.info('[ocr-diag] analyze-day READY provider=' + _diag.provider + ' apiKeyCount=' + _diag.apiKeyCount + ' next=' + _diag.nextModel + ' chain=' + _diag.effectiveChain.join(',') + ' unavailable=' + _diag.unavailable.join(',') + ' source=' + _diag.chainSource + (_prep.didReset ? ' (reset once)' : ''));
 
             const btn = document.getElementById('analyzeBtn');
-            if (btn) { btn.disabled = true; btn.innerText = 'Baidu OCR...'; }
+            if (btn) { btn.disabled = true; btn.innerText = 'OCR...'; }
             document.getElementById('dayAnalyzeResults').style.display = 'none';
             { const _bs = document.getElementById('dayOcrBatchSummary'); if (_bs) _bs.style.display = 'none'; }
             setDayStatus('loading', `OpenRouter OCR: обрабатываю ${shots.length} скриншотов...`);
@@ -9488,12 +9494,26 @@ function getClass2IconByClass3(c3) {
                                     for (let keyIndex = 0; keyIndex < openRouterKeys.length; keyIndex++) {
                                         const fetchKey = openRouterKeys[keyIndex];
                                         attemptCount++;
-                                        console.info(`[openrouter-ocr] trying key index ${keyIndex + 1} of ${openRouterKeys.length} model=${candidateModel}`);
+                                        const _bodyStr = _baiduReqBody(fetchKey, candidateModel);
+                                        let _bodyParsed = null;
+                                        try { _bodyParsed = JSON.parse(_bodyStr); } catch (_) {}
+                                        console.info('[openrouter-ocr] pre-fetch ' + JSON.stringify({
+                                            endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+                                            uiProvider: getAnalysisProvider(),
+                                            keyIndex: keyIndex + 1,
+                                            keyTotal: openRouterKeys.length,
+                                            model: _bodyParsed && _bodyParsed.model,
+                                            providerField: _bodyParsed && _bodyParsed.provider ? _bodyParsed.provider : '(absent — no provider lock)',
+                                            messageCount: _bodyParsed && Array.isArray(_bodyParsed.messages) ? _bodyParsed.messages.length : null,
+                                            contentParts: _bodyParsed && _bodyParsed.messages && _bodyParsed.messages[0] && Array.isArray(_bodyParsed.messages[0].content) ? _bodyParsed.messages[0].content.map(c => c.type) : null,
+                                            temperature: _bodyParsed && _bodyParsed.temperature,
+                                            max_tokens: _bodyParsed && _bodyParsed.max_tokens,
+                                        }));
                                         try {
                                             response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                                                 method: 'POST',
                                                 headers: _baiduReqHeaders(fetchKey),
-                                                body: _baiduReqBody(fetchKey, candidateModel),
+                                                body: _bodyStr,
                                                 signal: AbortSignal.timeout(60000),
                                             });
                                             console.info(`[openrouter-ocr] response status=${response.status} model=${candidateModel}`);
@@ -12332,6 +12352,18 @@ ${playerList}
                         };
                         const orProvider = _ccOcrModelOpenRouterProvider(candidateModel);
                         if (orProvider) body.provider = orProvider;
+                        console.info('[pack-upload-verify] pre-fetch ' + JSON.stringify({
+                            endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+                            uiProvider: getAnalysisProvider(),
+                            keyIndex: keyIndex + 1,
+                            keyTotal: keys.length,
+                            model: body.model,
+                            providerField: body.provider || '(absent — no provider lock)',
+                            messageCount: body.messages.length,
+                            contentParts: body.messages[0].content.map(c => c.type),
+                            temperature: body.temperature,
+                            max_tokens: body.max_tokens,
+                        }));
                         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                             method: 'POST',
                             headers: {
