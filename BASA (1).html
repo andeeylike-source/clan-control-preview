@@ -8254,8 +8254,78 @@ function getClass2IconByClass3(c3) {
 
         function getProviderTestModel(provider) {
             const p = provider || getAnalysisProvider();
-            if (p === 'openrouter_baidu') return 'baidu/qianfan-ocr-fast:free';
-            return 'baidu/qianfan-ocr-fast:free';
+            const chain = _ccOcrModelChain();
+            if (p === 'openrouter_baidu') return chain[0] || 'baidu/qianfan-ocr-fast:free';
+            return chain[0] || 'baidu/qianfan-ocr-fast:free';
+        }
+
+        // OCR model fallback chain. Override via localStorage key 'clanControl_ocrModelChain'
+        // (JSON array of OpenRouter model ids). Order = preference; first available is tried first.
+        const _CC_OCR_DEFAULT_MODEL_CHAIN = ['baidu/qianfan-ocr-fast:free'];
+        function _ccOcrModelChain() {
+            try {
+                const raw = localStorage.getItem('clanControl_ocrModelChain');
+                if (raw) {
+                    const arr = JSON.parse(raw);
+                    if (Array.isArray(arr)) {
+                        const cleaned = arr.filter(m => typeof m === 'string' && m && !_ccIsBlockedModel(m));
+                        if (cleaned.length) return cleaned;
+                    }
+                }
+            } catch (_) {}
+            return _CC_OCR_DEFAULT_MODEL_CHAIN.slice();
+        }
+        function _ccOcrModelOpenRouterProvider(model) {
+            if (typeof model === 'string' && model.toLowerCase().startsWith('baidu/')) {
+                return { order: ['Baidu'], allow_fallbacks: false };
+            }
+            return null;
+        }
+        // In-memory + sessionStorage unavailability map. Dead endpoints persist across the
+        // current page session so 11 screenshots don't each hammer a 404 model.
+        const _CC_OCR_UNAVAILABLE_TTL_MS = 30 * 60 * 1000;
+        const _CC_OCR_UNAVAILABLE_KEY = 'clanControl_ocrUnavailableModels';
+        let _ccOcrUnavailableModels = (function _readUnavail() {
+            try {
+                const raw = sessionStorage.getItem(_CC_OCR_UNAVAILABLE_KEY);
+                if (!raw) return {};
+                const obj = JSON.parse(raw);
+                return obj && typeof obj === 'object' ? obj : {};
+            } catch (_) { return {}; }
+        })();
+        function _ccOcrPersistUnavailable() {
+            try { sessionStorage.setItem(_CC_OCR_UNAVAILABLE_KEY, JSON.stringify(_ccOcrUnavailableModels)); } catch (_) {}
+        }
+        function _ccOcrIsModelUnavailable(model) {
+            if (!model) return false;
+            const entry = _ccOcrUnavailableModels[model];
+            if (!entry) return false;
+            if (entry.until && entry.until < Date.now()) {
+                delete _ccOcrUnavailableModels[model];
+                _ccOcrPersistUnavailable();
+                return false;
+            }
+            return true;
+        }
+        function _ccOcrMarkModelUnavailable(model, reason) {
+            if (!model) return;
+            _ccOcrUnavailableModels[model] = { until: Date.now() + _CC_OCR_UNAVAILABLE_TTL_MS, reason: String(reason || '').slice(0, 200) };
+            _ccOcrPersistUnavailable();
+            console.warn('[ocr-model] marked unavailable model=' + model + ' reason=' + reason);
+        }
+        function _ccOcrResetUnavailableModels() {
+            _ccOcrUnavailableModels = {};
+            _ccOcrPersistUnavailable();
+            console.info('[ocr-model] unavailable list cleared');
+        }
+        window._ccOcrResetUnavailableModels = _ccOcrResetUnavailableModels;
+        function _ccOcrAvailableModels() {
+            return _ccOcrModelChain().filter(m => !_ccOcrIsModelUnavailable(m));
+        }
+        function _ccOcrIsEndpointDeadError(status, message) {
+            if (status === 404) return true;
+            const s = String(message || '').toLowerCase();
+            return s.includes('no endpoints found') || s.includes('no allowed providers') || s.includes('model not found');
         }
 
         function getOpenRouterApiKeys() {
@@ -9276,21 +9346,25 @@ function getClass2IconByClass3(c3) {
                         // Right-side crop is kept only for wizard preview / icon-matcher geometry.
                         const cropDataUrl = shot.dataUrl;
                         const effectivePrompt = BAIDU_OCR_PROMPT;
-                        console.info('[openrouter-ocr] model baidu/qianfan-ocr-fast:free (full-image, side-agnostic)');
+                        console.info('[openrouter-ocr] chain=' + _ccOcrModelChain().join(',') + ' avail=' + _ccOcrAvailableModels().join(',') + ' (full-image, side-agnostic)');
 
-                        const _baiduReqBody = (key) => JSON.stringify({
-                            model: 'baidu/qianfan-ocr-fast:free',
-                            provider: { order: ['Baidu'], allow_fallbacks: false },
-                            messages: [{
-                                role: 'user',
-                                content: [
-                                    { type: 'text', text: effectivePrompt },
-                                    { type: 'image_url', image_url: { url: cropDataUrl } },
-                                ],
-                            }],
-                            temperature: 0,
-                            max_tokens: 1200,
-                        });
+                        const _baiduReqBody = (key, model) => {
+                            const body = {
+                                model: model,
+                                messages: [{
+                                    role: 'user',
+                                    content: [
+                                        { type: 'text', text: effectivePrompt },
+                                        { type: 'image_url', image_url: { url: cropDataUrl } },
+                                    ],
+                                }],
+                                temperature: 0,
+                                max_tokens: 1200,
+                            };
+                            const orProvider = _ccOcrModelOpenRouterProvider(model);
+                            if (orProvider) body.provider = orProvider;
+                            return JSON.stringify(body);
+                        };
                         const _baiduReqHeaders = (key) => ({
                             'Authorization': `Bearer ${key}`,
                             'Content-Type': 'application/json',
@@ -9316,60 +9390,74 @@ function getClass2IconByClass3(c3) {
                                 let saw429 = false;
                                 let lastNon429Error = null;
                                 let attemptCount = 0;
-                                for (let keyIndex = 0; keyIndex < openRouterKeys.length; keyIndex++) {
-                                    const fetchKey = openRouterKeys[keyIndex];
-                                    attemptCount++;
-                                    console.info(`[openrouter-ocr] trying key index ${keyIndex + 1} of ${openRouterKeys.length}`);
-                                    console.info('[openrouter-ocr] POST start model=baidu/qianfan-ocr-fast:free');
-                                    try {
-                                        response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                                            method: 'POST',
-                                            headers: _baiduReqHeaders(fetchKey),
-                                            body: _baiduReqBody(fetchKey),
-                                            signal: AbortSignal.timeout(60000),
-                                        });
-                                        console.info(`[openrouter-ocr] response status=${response.status}`);
-                                    } catch (e) {
-                                        response = null;
-                                        lastNon429Error = { status: 'NETWORK', message: e?.message || String(e) };
-                                        console.info('[openrouter-ocr] response status=network-error');
-                                        continue;
+                                const _chainAll = _ccOcrModelChain();
+                                const _chainAvail = _ccOcrAvailableModels();
+                                if (!_chainAvail.length) {
+                                    throw new Error('OCR model unavailable: все OCR модели помечены как недоступные (' + _chainAll.join(', ') + ')');
+                                }
+                                let usedModel = null;
+                                modelLoop: for (let mi = 0; mi < _chainAvail.length; mi++) {
+                                    const candidateModel = _chainAvail[mi];
+                                    let modelDead = false;
+                                    saw429 = false;
+                                    lastNon429Error = null;
+                                    response = null;
+                                    for (let keyIndex = 0; keyIndex < openRouterKeys.length; keyIndex++) {
+                                        const fetchKey = openRouterKeys[keyIndex];
+                                        attemptCount++;
+                                        console.info(`[openrouter-ocr] trying key index ${keyIndex + 1} of ${openRouterKeys.length} model=${candidateModel}`);
+                                        try {
+                                            response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                                                method: 'POST',
+                                                headers: _baiduReqHeaders(fetchKey),
+                                                body: _baiduReqBody(fetchKey, candidateModel),
+                                                signal: AbortSignal.timeout(60000),
+                                            });
+                                            console.info(`[openrouter-ocr] response status=${response.status} model=${candidateModel}`);
+                                        } catch (e) {
+                                            response = null;
+                                            lastNon429Error = { status: 'NETWORK', message: e?.message || String(e) };
+                                            console.info('[openrouter-ocr] response status=network-error');
+                                            continue;
+                                        }
+                                        if (response.status === 429) {
+                                            saw429 = true;
+                                            markCurrentKeyExhausted(keyIndex);
+                                            continue;
+                                        }
+                                        if (!response.ok) {
+                                            const errJson = await response.json().catch(() => ({}));
+                                            const errMsg = errJson.error?.message || `HTTP ${response.status}`;
+                                            lastNon429Error = { status: response.status, message: errMsg };
+                                            if (_ccOcrIsEndpointDeadError(response.status, errMsg)) {
+                                                _ccOcrMarkModelUnavailable(candidateModel, response.status + ' ' + errMsg);
+                                                modelDead = true;
+                                                response = null;
+                                                break;
+                                            }
+                                            continue;
+                                        }
+                                        usedModel = candidateModel;
+                                        break modelLoop;
                                     }
-                                    if (response.status === 429) {
-                                        saw429 = true;
-                                        markCurrentKeyExhausted(keyIndex);
-                                        continue;
-                                    }
-                                    if (!response.ok) {
-                                        const errJson = await response.json().catch(() => ({}));
-                                        lastNon429Error = {
-                                            status: response.status,
-                                            message: errJson.error?.message || `HTTP ${response.status}`,
-                                        };
-                                        continue;
-                                    }
+                                    if (modelDead) continue;
                                     break;
                                 }
                                 if (attemptCount === 0) {
                                     throw new Error('Внутренняя ошибка выбора ключа');
                                 }
-                                if (!response) {
+                                const _chainNowAvail = _ccOcrAvailableModels();
+                                if (!response || !response.ok) {
+                                    if (!_chainNowAvail.length) {
+                                        throw new Error('OCR model unavailable: все OCR модели возвращают 404 / No endpoints found (' + _chainAll.join(', ') + ')');
+                                    }
                                     if (lastNon429Error) {
                                         throw new Error(`OpenRouter OCR error: ${lastNon429Error.status} ${lastNon429Error.message}`);
                                     }
                                     if (saw429) {
                                         throw new Error('Все ключи временно ограничены');
                                     }
-                                    throw new Error('Внутренняя ошибка выбора ключа');
-                                }
-                                if (!response.ok) {
-                                    if (lastNon429Error) {
-                                        throw new Error(`OpenRouter OCR error: ${lastNon429Error.status} ${lastNon429Error.message}`);
-                                    }
-                                    if (saw429) {
-                                        throw new Error('Все ключи временно ограничены');
-                                    }
-                                    throw new Error(`OpenRouter OCR error: HTTP ${response.status}`);
+                                    throw new Error('OpenRouter OCR недоступен');
                                 }
 
                                 const json = await response.json();
@@ -12123,25 +12211,26 @@ ${playerList}
                 return { rows: _kmPackViewerExtractUploadRows(json), provider: 'ocrspace' };
             }
 
-            const model = 'baidu/qianfan-ocr-fast:free';
-            if (_ccGuardModel(model, 'pack-upload-verify')) throw new Error('blocked OCR model');
+            const _chainAll = _ccOcrModelChain();
+            const _chainAvail = _ccOcrAvailableModels();
+            if (!_chainAvail.length) {
+                throw new Error('OCR model unavailable: все OCR модели помечены как недоступные (' + _chainAll.join(', ') + ')');
+            }
             const keys = getOpenRouterApiKeys();
             if (!keys.length) throw new Error('Нет API ключей OpenRouter');
             const prompt = 'Extract ONLY the visible KM party/member table from this screenshot. Return ONLY valid JSON: {"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0,"profa":""}],"confidence":0,"notes":""}. Preserve nick spelling exactly. Use integers or null. No markdown.';
             let lastError = null;
-            for (let keyIndex = 0; keyIndex < keys.length; keyIndex++) {
-                try {
-                    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': 'Bearer ' + keys[keyIndex],
-                            'Content-Type': 'application/json',
-                            'HTTP-Referer': location.origin,
-                            'X-Title': 'Clan Control OCR'
-                        },
-                        body: JSON.stringify({
-                            model: model,
-                            provider: { order: ['Baidu'], allow_fallbacks: false },
+            for (let mi = 0; mi < _chainAvail.length; mi++) {
+                const candidateModel = _chainAvail[mi];
+                if (_ccGuardModel(candidateModel, 'pack-upload-verify')) {
+                    lastError = new Error('blocked OCR model');
+                    continue;
+                }
+                let modelDead = false;
+                for (let keyIndex = 0; keyIndex < keys.length; keyIndex++) {
+                    try {
+                        const body = {
+                            model: candidateModel,
                             messages: [{
                                 role: 'user',
                                 content: [
@@ -12151,25 +12240,47 @@ ${playerList}
                             }],
                             temperature: 0,
                             max_tokens: 1200
-                        }),
-                        signal: AbortSignal.timeout(60000)
-                    });
-                    if (response.status === 429) {
-                        markCurrentKeyExhausted(keyIndex);
-                        lastError = new Error('OpenRouter key rate-limited');
-                        continue;
+                        };
+                        const orProvider = _ccOcrModelOpenRouterProvider(candidateModel);
+                        if (orProvider) body.provider = orProvider;
+                        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': 'Bearer ' + keys[keyIndex],
+                                'Content-Type': 'application/json',
+                                'HTTP-Referer': location.origin,
+                                'X-Title': 'Clan Control OCR'
+                            },
+                            body: JSON.stringify(body),
+                            signal: AbortSignal.timeout(60000)
+                        });
+                        if (response.status === 429) {
+                            markCurrentKeyExhausted(keyIndex);
+                            lastError = new Error('OpenRouter key rate-limited');
+                            continue;
+                        }
+                        if (!response.ok) {
+                            const errJson = await response.json().catch(function() { return {}; });
+                            const errMsg = errJson.error?.message || ('HTTP ' + response.status);
+                            lastError = new Error(errMsg);
+                            if (_ccOcrIsEndpointDeadError(response.status, errMsg)) {
+                                _ccOcrMarkModelUnavailable(candidateModel, response.status + ' ' + errMsg);
+                                modelDead = true;
+                                break;
+                            }
+                            continue;
+                        }
+                        const json = await response.json();
+                        const text = json.choices?.[0]?.message?.content || '';
+                        return { rows: _kmPackViewerParseUploadOcrText(text), provider: 'openrouter_baidu', model: candidateModel };
+                    } catch (e) {
+                        lastError = e;
                     }
-                    if (!response.ok) {
-                        const errJson = await response.json().catch(function() { return {}; });
-                        lastError = new Error(errJson.error?.message || ('HTTP ' + response.status));
-                        continue;
-                    }
-                    const json = await response.json();
-                    const text = json.choices?.[0]?.message?.content || '';
-                    return { rows: _kmPackViewerParseUploadOcrText(text), provider: 'openrouter_baidu' };
-                } catch (e) {
-                    lastError = e;
                 }
+                if (!modelDead) break;
+            }
+            if (_ccOcrAvailableModels().length === 0) {
+                throw new Error('OCR model unavailable: все OCR модели возвращают 404 / No endpoints found (' + _chainAll.join(', ') + ')');
             }
             throw lastError || new Error('OpenRouter OCR failed');
         }
