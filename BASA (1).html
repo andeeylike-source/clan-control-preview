@@ -3697,6 +3697,8 @@
                     </label>
                     <button onclick="saveAnalysisProviderSettings()" class="btn-primary" style="width:max-content">Сохранить провайдер</button>
                     <div id="analysisProviderStatus" style="display:none;font-size:13px;padding:10px;border-radius:8px"></div>
+                    <div id="ocrModelChainStatus" style="font-size:11px;color:#94a3b8;padding:10px;border:1px solid #1e2530;border-radius:8px;background:#0b1018;line-height:1.6"></div>
+                    <button type="button" onclick="window._ccOcrHardReset(); renderAnalysisProviderSettings();" style="background:#1e2530;color:#f59e0b;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;width:max-content">🔄 OCR hard reset (cache + chain)</button>
                 </div>
             </div>
             <div class="card mb-6 cc-settings-aliases">
@@ -8261,19 +8263,40 @@ function getClass2IconByClass3(c3) {
 
         // OCR model fallback chain. Override via localStorage key 'clanControl_ocrModelChain'
         // (JSON array of OpenRouter model ids). Order = preference; first available is tried first.
-        const _CC_OCR_DEFAULT_MODEL_CHAIN = ['baidu/qianfan-ocr-fast:free'];
+        // Multi-model default so a single dead endpoint cannot block analyze. baidu kept last
+        // because it returns 404 "No endpoints found" on OpenRouter free tier.
+        const _CC_OCR_DEFAULT_MODEL_CHAIN = [
+            'qwen/qwen2.5-vl-72b-instruct:free',
+            'meta-llama/llama-3.2-11b-vision-instruct:free',
+            'mistralai/pixtral-12b:free',
+            'baidu/qianfan-ocr-fast:free'
+        ];
+        const _CC_OCR_LEGACY_BAIDU_ONLY = ['baidu/qianfan-ocr-fast:free'];
+        function _ccOcrIsLegacyBaiduOnlyChain(arr) {
+            if (!Array.isArray(arr) || arr.length !== _CC_OCR_LEGACY_BAIDU_ONLY.length) return false;
+            for (let i = 0; i < arr.length; i++) {
+                if (arr[i] !== _CC_OCR_LEGACY_BAIDU_ONLY[i]) return false;
+            }
+            return true;
+        }
+        function _ccOcrReadRawChain() {
+            try { return localStorage.getItem('clanControl_ocrModelChain'); } catch (_) { return null; }
+        }
+        // Returns { chain, source, reason } — source: 'custom' | 'default' | 'default_broken_json' | 'default_legacy_baidu_only' | 'default_empty'
+        function _ccOcrResolveChain() {
+            const raw = _ccOcrReadRawChain();
+            if (!raw) return { chain: _CC_OCR_DEFAULT_MODEL_CHAIN.slice(), source: 'default', reason: 'no localStorage override' };
+            let arr;
+            try { arr = JSON.parse(raw); }
+            catch (_) { return { chain: _CC_OCR_DEFAULT_MODEL_CHAIN.slice(), source: 'default_broken_json', reason: 'localStorage chain JSON broken' }; }
+            if (!Array.isArray(arr)) return { chain: _CC_OCR_DEFAULT_MODEL_CHAIN.slice(), source: 'default_broken_json', reason: 'localStorage chain not an array' };
+            const cleaned = arr.filter(m => typeof m === 'string' && m && !_ccIsBlockedModel(m));
+            if (!cleaned.length) return { chain: _CC_OCR_DEFAULT_MODEL_CHAIN.slice(), source: 'default_empty', reason: 'localStorage chain empty after filter' };
+            if (_ccOcrIsLegacyBaiduOnlyChain(cleaned)) return { chain: _CC_OCR_DEFAULT_MODEL_CHAIN.slice(), source: 'default_legacy_baidu_only', reason: 'localStorage chain is the legacy baidu-only default — replaced with safe multi-model default' };
+            return { chain: cleaned, source: 'custom', reason: 'user-provided chain' };
+        }
         function _ccOcrModelChain() {
-            try {
-                const raw = localStorage.getItem('clanControl_ocrModelChain');
-                if (raw) {
-                    const arr = JSON.parse(raw);
-                    if (Array.isArray(arr)) {
-                        const cleaned = arr.filter(m => typeof m === 'string' && m && !_ccIsBlockedModel(m));
-                        if (cleaned.length) return cleaned;
-                    }
-                }
-            } catch (_) {}
-            return _CC_OCR_DEFAULT_MODEL_CHAIN.slice();
+            return _ccOcrResolveChain().chain;
         }
         function _ccOcrModelOpenRouterProvider(model) {
             if (typeof model === 'string' && model.toLowerCase().startsWith('baidu/')) {
@@ -8326,6 +8349,55 @@ function getClass2IconByClass3(c3) {
             if (status === 404) return true;
             const s = String(message || '').toLowerCase();
             return s.includes('no endpoints found') || s.includes('no allowed providers') || s.includes('model not found');
+        }
+        // Snapshot for diagnostics + UI status panel.
+        function _ccOcrChainDiagnostics() {
+            const resolved = _ccOcrResolveChain();
+            const unavailableList = Object.keys(_ccOcrUnavailableModels).filter(m => _ccOcrIsModelUnavailable(m));
+            const available = resolved.chain.filter(m => !_ccOcrIsModelUnavailable(m));
+            const keys = (typeof getOpenRouterApiKeys === 'function') ? getOpenRouterApiKeys() : [];
+            const provider = (typeof getAnalysisProvider === 'function') ? getAnalysisProvider() : null;
+            return {
+                provider: provider,
+                apiKeyPresent: keys.length > 0,
+                apiKeyCount: keys.length,
+                rawChain: _ccOcrReadRawChain(),
+                effectiveChain: resolved.chain,
+                chainSource: resolved.source,
+                chainReason: resolved.reason,
+                unavailable: unavailableList,
+                unavailableCount: unavailableList.length,
+                available: available,
+                nextModel: available[0] || null,
+            };
+        }
+        window._ccOcrChainDiagnostics = _ccOcrChainDiagnostics;
+        // Hard reset: wipe unavailable cache + custom chain override + restore default; log effective chain.
+        window._ccOcrHardReset = function _ccOcrHardReset() {
+            try { sessionStorage.removeItem(_CC_OCR_UNAVAILABLE_KEY); } catch (_) {}
+            try { localStorage.removeItem('clanControl_ocrModelChain'); } catch (_) {}
+            _ccOcrUnavailableModels = {};
+            const diag = _ccOcrChainDiagnostics();
+            console.info('[ocr-hard-reset]', JSON.stringify(diag));
+            if (typeof renderAnalysisProviderSettings === 'function') {
+                try { renderAnalysisProviderSettings(); } catch (_) {}
+            }
+            return diag;
+        };
+        // One-shot guard called at the start of analyze. If every model is marked unavailable
+        // (e.g. cache from a prior page where everything 404'd), clear cache once so fetch is
+        // actually attempted instead of silently failing. Returns the same diag snapshot.
+        function _ccOcrPrepareChainForAnalyze(tag) {
+            const before = _ccOcrChainDiagnostics();
+            console.info('[ocr-diag] ' + (tag || 'analyze') + ' before-prepare ' + JSON.stringify(before));
+            if (before.effectiveChain.length && before.available.length === 0) {
+                console.warn('[ocr-diag] all chain models marked unavailable — clearing unavailable cache for retry');
+                _ccOcrResetUnavailableModels();
+                const after = _ccOcrChainDiagnostics();
+                console.info('[ocr-diag] ' + (tag || 'analyze') + ' after-prepare ' + JSON.stringify(after));
+                return { diag: after, didReset: true };
+            }
+            return { diag: before, didReset: false };
         }
 
         function getOpenRouterApiKeys() {
@@ -9294,10 +9366,21 @@ function getClass2IconByClass3(c3) {
             console.info(`[provider] openrouter keys count=${openRouterKeys.length}`);
             console.info(`[openrouter-ocr] keys count=${openRouterKeys.length}`);
             console.info(`[openrouter-ocr] exhaustion state before=${JSON.stringify({ sig: exhaustionBefore.sig, exhausted: Object.keys(exhaustionBefore.exhausted), count: Object.keys(exhaustionBefore.exhausted).length })}`);
+            const _prep = _ccOcrPrepareChainForAnalyze('analyze-day');
+            const _diag = _prep.diag;
             if (openRouterKeys.length === 0) {
-                setDayStatus('error', '❌ Нет API ключей OpenRouter');
+                setDayStatus('error', '❌ Нет API ключей OpenRouter (provider=' + _diag.provider + ', chain=' + _diag.effectiveChain.join(',') + ')');
                 return;
             }
+            if (!_diag.effectiveChain.length) {
+                setDayStatus('error', 'OCR fetch skipped: пустой effective model chain (rawChain=' + (_diag.rawChain || 'null') + ', source=' + _diag.chainSource + '). Открой DevTools: window._ccOcrHardReset()');
+                return;
+            }
+            if (!_diag.available.length) {
+                setDayStatus('error', 'OCR fetch skipped: все модели помечены недоступными даже после reset (' + _diag.unavailable.join(',') + '). window._ccOcrHardReset()');
+                return;
+            }
+            console.info('[ocr-diag] analyze-day READY provider=' + _diag.provider + ' apiKeyCount=' + _diag.apiKeyCount + ' next=' + _diag.nextModel + ' chain=' + _diag.effectiveChain.join(',') + ' unavailable=' + _diag.unavailable.join(',') + ' source=' + _diag.chainSource + (_prep.didReset ? ' (reset once)' : ''));
 
             const btn = document.getElementById('analyzeBtn');
             if (btn) { btn.disabled = true; btn.innerText = 'Baidu OCR...'; }
@@ -12211,13 +12294,19 @@ ${playerList}
                 return { rows: _kmPackViewerExtractUploadRows(json), provider: 'ocrspace' };
             }
 
-            const _chainAll = _ccOcrModelChain();
-            const _chainAvail = _ccOcrAvailableModels();
+            const _prepPack = _ccOcrPrepareChainForAnalyze('pack-upload-verify');
+            const _diagPack = _prepPack.diag;
+            const _chainAll = _diagPack.effectiveChain;
+            const _chainAvail = _diagPack.available;
+            if (!_chainAll.length) {
+                throw new Error('OCR fetch skipped: пустой effective model chain (rawChain=' + (_diagPack.rawChain || 'null') + ', source=' + _diagPack.chainSource + '). window._ccOcrHardReset()');
+            }
             if (!_chainAvail.length) {
-                throw new Error('OCR model unavailable: все OCR модели помечены как недоступные (' + _chainAll.join(', ') + ')');
+                throw new Error('OCR fetch skipped: все модели помечены недоступными даже после reset (' + _diagPack.unavailable.join(',') + '). window._ccOcrHardReset()');
             }
             const keys = getOpenRouterApiKeys();
-            if (!keys.length) throw new Error('Нет API ключей OpenRouter');
+            if (!keys.length) throw new Error('Нет API ключей OpenRouter (provider=' + _diagPack.provider + ')');
+            console.info('[ocr-diag] pack-upload-verify READY apiKeyCount=' + keys.length + ' next=' + _diagPack.nextModel + ' chain=' + _chainAll.join(',') + ' unavailable=' + _diagPack.unavailable.join(',') + (_prepPack.didReset ? ' (reset once)' : ''));
             const prompt = 'Extract ONLY the visible KM party/member table from this screenshot. Return ONLY valid JSON: {"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0,"profa":""}],"confidence":0,"notes":""}. Preserve nick spelling exactly. Use integers or null. No markdown.';
             let lastError = null;
             for (let mi = 0; mi < _chainAvail.length; mi++) {
@@ -16378,6 +16467,20 @@ ${playerList}
             if (keyEl) keyEl.value = getOcrSpaceKey();
             console.info(`[provider] selected=${getAnalysisProvider()}`);
             updateAnalysisProviderIndicator();
+            const chainStatusEl = document.getElementById('ocrModelChainStatus');
+            if (chainStatusEl && typeof _ccOcrChainDiagnostics === 'function') {
+                const d = _ccOcrChainDiagnostics();
+                const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+                const chainHtml = d.effectiveChain.map(m => {
+                    const dead = d.unavailable.indexOf(m) !== -1;
+                    return '<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 6px;border-radius:4px;background:' + (dead ? '#3a1212' : '#0f2a18') + ';color:' + (dead ? '#fca5a5' : '#86efac') + ';font-family:monospace;font-size:10px">' + esc(m) + (dead ? ' ⛔' : '') + '</span>';
+                }).join('');
+                chainStatusEl.innerHTML =
+                    '<div><b>OCR model chain</b> <span style="color:#64748b">(source: ' + esc(d.chainSource) + ')</span></div>' +
+                    '<div style="margin-top:4px">' + (chainHtml || '<span style="color:#ef4444">(пусто)</span>') + '</div>' +
+                    '<div style="margin-top:6px;color:#64748b">Unavailable: <b style="color:' + (d.unavailableCount ? '#fca5a5' : '#94a3b8') + '">' + d.unavailableCount + '</b> · Next active: <b style="color:' + (d.nextModel ? '#86efac' : '#ef4444') + '">' + esc(d.nextModel || '(нет)') + '</b></div>' +
+                    '<div style="margin-top:4px;color:#64748b">API key: <b style="color:' + (d.apiKeyPresent ? '#86efac' : '#ef4444') + '">' + (d.apiKeyPresent ? 'есть (' + d.apiKeyCount + ')' : 'НЕТ') + '</b> · Provider: <b>' + esc(d.provider || '?') + '</b></div>';
+            }
         }
 
         function saveAnalysisProviderSettings() {
