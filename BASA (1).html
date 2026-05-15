@@ -3698,7 +3698,10 @@
                     <button onclick="saveAnalysisProviderSettings()" class="btn-primary" style="width:max-content">Сохранить провайдер</button>
                     <div id="analysisProviderStatus" style="display:none;font-size:13px;padding:10px;border-radius:8px"></div>
                     <div id="ocrModelChainStatus" style="font-size:11px;color:#94a3b8;padding:10px;border:1px solid #1e2530;border-radius:8px;background:#0b1018;line-height:1.6"></div>
-                    <button type="button" onclick="window._ccOcrHardReset(); renderAnalysisProviderSettings();" style="background:#1e2530;color:#f59e0b;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;width:max-content">🔄 OCR hard reset (cache + chain)</button>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button type="button" onclick="discoverOcrModelsClick(this)" style="background:#1e2530;color:#6366f1;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🔎 Найти OCR модели</button>
+                        <button type="button" onclick="window._ccOcrHardReset(); renderAnalysisProviderSettings();" style="background:#1e2530;color:#f59e0b;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🔄 OCR hard reset (cache + chain)</button>
+                    </div>
                 </div>
             </div>
             <div class="card mb-6 cc-settings-aliases">
@@ -8297,7 +8300,10 @@ function getClass2IconByClass3(c3) {
             return { chain: cleaned, source: 'custom', reason: 'user-provided chain' };
         }
         function _ccOcrModelChain() {
-            return _ccOcrResolveChain().chain;
+            // Effective chain = user localStorage override ∪ discovered vision models ∪ hardcoded default
+            // (dedup, blocked-model filter). Discovery cache is populated lazily by _ccOcrEnsureDiscovery
+            // before each analyze call. Hardcoded list stays as last-resort fallback.
+            return _ccOcrEffectiveChain().chain;
         }
         // Provider routing override — ONLY applied to the legacy Baidu Qianfan model,
         // which is the only chain entry that historically needs an explicit OpenRouter
@@ -8356,11 +8362,142 @@ function getClass2IconByClass3(c3) {
             const s = String(message || '').toLowerCase();
             return s.includes('no endpoints found') || s.includes('no allowed providers') || s.includes('model not found');
         }
+
+        // ── OpenRouter model discovery ─────────────────────────────────────────────
+        // Hardcoded chain is unreliable: free-tier model ids change. Fetch the live
+        // catalog from /api/v1/models, filter for vision-capable + free, and prepend
+        // those ids to the effective chain so analyze tries real models first.
+        const _CC_OCR_DISCOVERY_KEY = 'clanControl_ocrDiscoveredModels';
+        const _CC_OCR_DISCOVERY_TTL_MS = 15 * 60 * 1000;
+        function _ccOcrReadDiscoveryCache() {
+            try {
+                const raw = sessionStorage.getItem(_CC_OCR_DISCOVERY_KEY);
+                if (!raw) return null;
+                const obj = JSON.parse(raw);
+                if (!obj || typeof obj !== 'object') return null;
+                return obj;
+            } catch (_) { return null; }
+        }
+        function _ccOcrIsDiscoveryFresh(cache) {
+            return !!(cache && cache.ts && (Date.now() - cache.ts) < _CC_OCR_DISCOVERY_TTL_MS);
+        }
+        function _ccOcrPersistDiscovery(payload) {
+            try { sessionStorage.setItem(_CC_OCR_DISCOVERY_KEY, JSON.stringify(payload)); } catch (_) {}
+        }
+        function _ccOcrModelMetaIsVision(m) {
+            if (!m || !m.id) return false;
+            if (_ccIsBlockedModel(m.id)) return false;
+            const arch = m.architecture || {};
+            if (Array.isArray(arch.input_modalities) && arch.input_modalities.indexOf('image') !== -1) return true;
+            if (Array.isArray(arch.modalities) && arch.modalities.indexOf('image') !== -1) return true;
+            if (typeof arch.modality === 'string' && arch.modality.toLowerCase().indexOf('image') !== -1) return true;
+            return false;
+        }
+        function _ccOcrModelMetaIsFree(m) {
+            if (!m || !m.id) return false;
+            if (String(m.id).toLowerCase().endsWith(':free')) return true;
+            const p = m.pricing || {};
+            const isZero = (v) => v === '0' || v === 0 || (typeof v === 'string' && parseFloat(v) === 0);
+            return isZero(p.prompt) && isZero(p.completion);
+        }
+        async function _ccOcrDiscoverModels(apiKey, opts) {
+            const force = !!(opts && opts.force);
+            const cache = _ccOcrReadDiscoveryCache();
+            if (!force && _ccOcrIsDiscoveryFresh(cache)) {
+                return Object.assign({ fromCache: true }, cache);
+            }
+            const headers = { 'Content-Type': 'application/json' };
+            if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
+            let resp;
+            try {
+                resp = await fetch('https://openrouter.ai/api/v1/models', { method: 'GET', headers, signal: AbortSignal.timeout(20000) });
+            } catch (e) {
+                const payload = { ts: Date.now(), error: 'network: ' + (e && e.message ? e.message : String(e)), vision: [], freeVision: [], rawCount: 0 };
+                _ccOcrPersistDiscovery(payload);
+                console.warn('[ocr-discovery] network error', payload.error);
+                return Object.assign({ fromCache: false }, payload);
+            }
+            if (!resp.ok) {
+                let bodyTxt = '';
+                try { bodyTxt = (await resp.text()).slice(0, 200); } catch (_) {}
+                const payload = { ts: Date.now(), error: 'HTTP ' + resp.status + ' ' + bodyTxt, vision: [], freeVision: [], rawCount: 0 };
+                _ccOcrPersistDiscovery(payload);
+                console.warn('[ocr-discovery] http error', payload.error);
+                return Object.assign({ fromCache: false }, payload);
+            }
+            let json;
+            try { json = await resp.json(); } catch (e) {
+                const payload = { ts: Date.now(), error: 'json: ' + (e && e.message ? e.message : String(e)), vision: [], freeVision: [], rawCount: 0 };
+                _ccOcrPersistDiscovery(payload);
+                return Object.assign({ fromCache: false }, payload);
+            }
+            const list = Array.isArray(json && json.data) ? json.data : [];
+            const visionMetas = list.filter(_ccOcrModelMetaIsVision);
+            const freeVision = visionMetas.filter(_ccOcrModelMetaIsFree).map(m => m.id);
+            const paidVision = visionMetas.filter(m => !_ccOcrModelMetaIsFree(m)).map(m => m.id);
+            const ordered = freeVision.concat(paidVision);
+            const payload = { ts: Date.now(), error: null, vision: ordered, freeVision: freeVision, paidVision: paidVision, rawCount: list.length };
+            _ccOcrPersistDiscovery(payload);
+            console.info('[ocr-discovery] catalog=' + list.length + ' vision=' + ordered.length + ' free=' + freeVision.length + ' paid=' + paidVision.length);
+            return Object.assign({ fromCache: false }, payload);
+        }
+        async function _ccOcrEnsureDiscovery(apiKey) {
+            const cache = _ccOcrReadDiscoveryCache();
+            if (_ccOcrIsDiscoveryFresh(cache)) return Object.assign({ fromCache: true }, cache);
+            return await _ccOcrDiscoverModels(apiKey, { force: false });
+        }
+        window._ccOcrDiscoverModels = _ccOcrDiscoverModels;
+        window._ccOcrEnsureDiscovery = _ccOcrEnsureDiscovery;
+        window._ccOcrReadDiscoveryCache = _ccOcrReadDiscoveryCache;
+
+        // ── Effective chain: user-custom ∪ discovered ∪ hardcoded (dedup, blocked-filter) ──
+        function _ccOcrEffectiveChain() {
+            const resolved = _ccOcrResolveChain();
+            const userCustom = resolved.source === 'custom' ? resolved.chain.slice() : [];
+            const cache = _ccOcrReadDiscoveryCache();
+            const discovered = (cache && Array.isArray(cache.vision)) ? cache.vision.slice() : [];
+            const freeDiscovered = (cache && Array.isArray(cache.freeVision)) ? cache.freeVision.slice() : [];
+            const hardcoded = _CC_OCR_DEFAULT_MODEL_CHAIN.slice();
+            const seen = Object.create(null);
+            const merged = [];
+            const pushArr = (arr) => {
+                for (let i = 0; i < arr.length; i++) {
+                    const m = arr[i];
+                    if (!m || seen[m]) continue;
+                    if (_ccIsBlockedModel(m)) continue;
+                    seen[m] = true;
+                    merged.push(m);
+                }
+            };
+            pushArr(userCustom);
+            pushArr(discovered);
+            pushArr(hardcoded);
+            let source;
+            if (userCustom.length && discovered.length) source = 'user+discovered+hardcoded';
+            else if (userCustom.length) source = 'user+hardcoded';
+            else if (discovered.length) source = 'discovered+hardcoded';
+            else source = 'hardcoded-only';
+            return {
+                chain: merged,
+                source: source,
+                userCustom: userCustom,
+                discovered: discovered,
+                freeDiscovered: freeDiscovered,
+                hardcoded: hardcoded,
+                discoveryError: cache && cache.error || null,
+                discoveryTs: cache && cache.ts || null,
+                discoveryFresh: _ccOcrIsDiscoveryFresh(cache),
+                discoveryRawCount: cache && cache.rawCount != null ? cache.rawCount : null,
+            };
+        }
+        window._ccOcrEffectiveChain = _ccOcrEffectiveChain;
+
         // Snapshot for diagnostics + UI status panel.
         function _ccOcrChainDiagnostics() {
+            const effective = _ccOcrEffectiveChain();
             const resolved = _ccOcrResolveChain();
             const unavailableList = Object.keys(_ccOcrUnavailableModels).filter(m => _ccOcrIsModelUnavailable(m));
-            const available = resolved.chain.filter(m => !_ccOcrIsModelUnavailable(m));
+            const available = effective.chain.filter(m => !_ccOcrIsModelUnavailable(m));
             const keys = (typeof getOpenRouterApiKeys === 'function') ? getOpenRouterApiKeys() : [];
             const provider = (typeof getAnalysisProvider === 'function') ? getAnalysisProvider() : null;
             return {
@@ -8368,9 +8505,18 @@ function getClass2IconByClass3(c3) {
                 apiKeyPresent: keys.length > 0,
                 apiKeyCount: keys.length,
                 rawChain: _ccOcrReadRawChain(),
-                effectiveChain: resolved.chain,
-                chainSource: resolved.source,
+                effectiveChain: effective.chain,
+                chainSource: effective.source,
                 chainReason: resolved.reason,
+                userCustomChain: effective.userCustom,
+                discoveredModels: effective.discovered,
+                discoveredFreeModels: effective.freeDiscovered,
+                discoveredModelsCount: effective.discovered.length,
+                discoveryRawCount: effective.discoveryRawCount,
+                discoveryFresh: effective.discoveryFresh,
+                discoveryError: effective.discoveryError,
+                discoveryTs: effective.discoveryTs,
+                hardcodedChain: effective.hardcoded,
                 unavailable: unavailableList,
                 unavailableCount: unavailableList.length,
                 available: available,
@@ -8378,9 +8524,10 @@ function getClass2IconByClass3(c3) {
             };
         }
         window._ccOcrChainDiagnostics = _ccOcrChainDiagnostics;
-        // Hard reset: wipe unavailable cache + custom chain override + restore default; log effective chain.
+        // Hard reset: wipe unavailable cache + discovery cache + custom chain override; restore default.
         window._ccOcrHardReset = function _ccOcrHardReset() {
             try { sessionStorage.removeItem(_CC_OCR_UNAVAILABLE_KEY); } catch (_) {}
+            try { sessionStorage.removeItem(_CC_OCR_DISCOVERY_KEY); } catch (_) {}
             try { localStorage.removeItem('clanControl_ocrModelChain'); } catch (_) {}
             _ccOcrUnavailableModels = {};
             const diag = _ccOcrChainDiagnostics();
@@ -9372,11 +9519,25 @@ function getClass2IconByClass3(c3) {
             console.info(`[provider] openrouter keys count=${openRouterKeys.length}`);
             console.info(`[openrouter-ocr] keys count=${openRouterKeys.length}`);
             console.info(`[openrouter-ocr] exhaustion state before=${JSON.stringify({ sig: exhaustionBefore.sig, exhausted: Object.keys(exhaustionBefore.exhausted), count: Object.keys(exhaustionBefore.exhausted).length })}`);
+            if (openRouterKeys.length === 0) {
+                const _diagNoKey = _ccOcrChainDiagnostics();
+                setDayStatus('error', '❌ Нет API ключей OpenRouter (provider=' + _diagNoKey.provider + ', chain=' + _diagNoKey.effectiveChain.join(',') + ')');
+                return;
+            }
+            // Discover live OpenRouter catalog before building chain — hardcoded ids unreliable.
+            setDayStatus('loading', 'OCR: получаю каталог OpenRouter моделей...');
+            const _discovery = await _ccOcrEnsureDiscovery(openRouterKeys[0]);
+            console.info('[ocr-discovery] ' + JSON.stringify({
+                fromCache: _discovery.fromCache,
+                rawCount: _discovery.rawCount,
+                visionCount: Array.isArray(_discovery.vision) ? _discovery.vision.length : 0,
+                freeVisionCount: Array.isArray(_discovery.freeVision) ? _discovery.freeVision.length : 0,
+                error: _discovery.error,
+            }));
             const _prep = _ccOcrPrepareChainForAnalyze('analyze-day');
             const _diag = _prep.diag;
-            if (openRouterKeys.length === 0) {
-                setDayStatus('error', '❌ Нет API ключей OpenRouter (provider=' + _diag.provider + ', chain=' + _diag.effectiveChain.join(',') + ')');
-                return;
+            if (_diag.discoveredModelsCount === 0 && !_diag.userCustomChain.length) {
+                console.warn('[ocr-discovery] catalog returned 0 vision models — fallback to hardcoded chain only. error=' + (_diag.discoveryError || 'none'));
             }
             if (!_diag.effectiveChain.length) {
                 setDayStatus('error', 'OCR fetch skipped: пустой effective model chain (rawChain=' + (_diag.rawChain || 'null') + ', source=' + _diag.chainSource + '). Открой DevTools: window._ccOcrHardReset()');
@@ -9482,7 +9643,11 @@ function getClass2IconByClass3(c3) {
                                 const _chainAll = _ccOcrModelChain();
                                 const _chainAvail = _ccOcrAvailableModels();
                                 if (!_chainAvail.length) {
-                                    throw new Error('OCR model unavailable: все OCR модели помечены как недоступные (' + _chainAll.join(', ') + ')');
+                                    const _d = _ccOcrChainDiagnostics();
+                                    const discoveryNote = _d.discoveredModelsCount === 0
+                                        ? ' (discovery: нет vision/OCR моделей в каталоге OpenRouter для текущего ключа' + (_d.discoveryError ? ', error=' + _d.discoveryError : '') + ')'
+                                        : ' (discovery нашёл ' + _d.discoveredModelsCount + ' vision моделей, но все они в unavailable-list)';
+                                    throw new Error('OCR model unavailable: все OCR модели помечены как недоступные (' + _chainAll.join(', ') + ')' + discoveryNote);
                                 }
                                 let usedModel = null;
                                 modelLoop: for (let mi = 0; mi < _chainAvail.length; mi++) {
@@ -9552,7 +9717,11 @@ function getClass2IconByClass3(c3) {
                                 const _chainNowAvail = _ccOcrAvailableModels();
                                 if (!response || !response.ok) {
                                     if (!_chainNowAvail.length) {
-                                        throw new Error('OCR model unavailable: все OCR модели возвращают 404 / No endpoints found (' + _chainAll.join(', ') + ')');
+                                        const _d2 = _ccOcrChainDiagnostics();
+                                        const discoveryNote2 = _d2.discoveredModelsCount === 0
+                                            ? ' (discovery: нет free vision/OCR моделей для текущего ключа в каталоге OpenRouter' + (_d2.discoveryError ? ', error=' + _d2.discoveryError : '') + ')'
+                                            : ' (discovery нашёл ' + _d2.discoveredModelsCount + ' vision моделей, но все вернули 404 / No endpoints found)';
+                                        throw new Error('OCR model unavailable: все OCR модели возвращают 404 / No endpoints found (' + _chainAll.join(', ') + ')' + discoveryNote2);
                                     }
                                     if (lastNon429Error) {
                                         throw new Error(`OpenRouter OCR error: ${lastNon429Error.status} ${lastNon429Error.message}`);
@@ -12314,19 +12483,31 @@ ${playerList}
                 return { rows: _kmPackViewerExtractUploadRows(json), provider: 'ocrspace' };
             }
 
+            const _keysEarly = getOpenRouterApiKeys();
+            if (!_keysEarly.length) throw new Error('Нет API ключей OpenRouter (provider=' + getAnalysisProvider() + ')');
+            const _discoveryPack = await _ccOcrEnsureDiscovery(_keysEarly[0]);
+            console.info('[ocr-discovery] pack-upload-verify ' + JSON.stringify({
+                fromCache: _discoveryPack.fromCache,
+                rawCount: _discoveryPack.rawCount,
+                visionCount: Array.isArray(_discoveryPack.vision) ? _discoveryPack.vision.length : 0,
+                freeVisionCount: Array.isArray(_discoveryPack.freeVision) ? _discoveryPack.freeVision.length : 0,
+                error: _discoveryPack.error,
+            }));
             const _prepPack = _ccOcrPrepareChainForAnalyze('pack-upload-verify');
             const _diagPack = _prepPack.diag;
             const _chainAll = _diagPack.effectiveChain;
             const _chainAvail = _diagPack.available;
             if (!_chainAll.length) {
-                throw new Error('OCR fetch skipped: пустой effective model chain (rawChain=' + (_diagPack.rawChain || 'null') + ', source=' + _diagPack.chainSource + '). window._ccOcrHardReset()');
+                const discoveryNotePack = _diagPack.discoveredModelsCount === 0
+                    ? ' (discovery: нет vision моделей для текущего ключа' + (_diagPack.discoveryError ? ', error=' + _diagPack.discoveryError : '') + ')'
+                    : '';
+                throw new Error('OCR fetch skipped: пустой effective model chain (rawChain=' + (_diagPack.rawChain || 'null') + ', source=' + _diagPack.chainSource + ')' + discoveryNotePack + '. window._ccOcrHardReset()');
             }
             if (!_chainAvail.length) {
                 throw new Error('OCR fetch skipped: все модели помечены недоступными даже после reset (' + _diagPack.unavailable.join(',') + '). window._ccOcrHardReset()');
             }
-            const keys = getOpenRouterApiKeys();
-            if (!keys.length) throw new Error('Нет API ключей OpenRouter (provider=' + _diagPack.provider + ')');
-            console.info('[ocr-diag] pack-upload-verify READY apiKeyCount=' + keys.length + ' next=' + _diagPack.nextModel + ' chain=' + _chainAll.join(',') + ' unavailable=' + _diagPack.unavailable.join(',') + (_prepPack.didReset ? ' (reset once)' : ''));
+            const keys = _keysEarly;
+            console.info('[ocr-diag] pack-upload-verify READY apiKeyCount=' + keys.length + ' next=' + _diagPack.nextModel + ' chain=' + _chainAll.join(',') + ' unavailable=' + _diagPack.unavailable.join(',') + ' discovered=' + _diagPack.discoveredModelsCount + (_prepPack.didReset ? ' (reset once)' : ''));
             const prompt = 'Extract ONLY the visible KM party/member table from this screenshot. Return ONLY valid JSON: {"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0,"profa":""}],"confidence":0,"notes":""}. Preserve nick spelling exactly. Use integers or null. No markdown.';
             let lastError = null;
             for (let mi = 0; mi < _chainAvail.length; mi++) {
@@ -16503,17 +16684,72 @@ ${playerList}
             if (chainStatusEl && typeof _ccOcrChainDiagnostics === 'function') {
                 const d = _ccOcrChainDiagnostics();
                 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-                const chainHtml = d.effectiveChain.map(m => {
+                const badge = (m, deadColor, liveColor) => {
                     const dead = d.unavailable.indexOf(m) !== -1;
-                    return '<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 6px;border-radius:4px;background:' + (dead ? '#3a1212' : '#0f2a18') + ';color:' + (dead ? '#fca5a5' : '#86efac') + ';font-family:monospace;font-size:10px">' + esc(m) + (dead ? ' ⛔' : '') + '</span>';
-                }).join('');
+                    return '<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 6px;border-radius:4px;background:' + (dead ? '#3a1212' : deadColor) + ';color:' + (dead ? '#fca5a5' : liveColor) + ';font-family:monospace;font-size:10px">' + esc(m) + (dead ? ' ⛔' : '') + '</span>';
+                };
+                const chainHtml = d.effectiveChain.map(m => badge(m, '#0f2a18', '#86efac')).join('');
+                const discoveredHtml = (d.discoveredFreeModels || []).slice(0, 12).map(m => badge(m, '#0f1e3a', '#93c5fd')).join('') + ((d.discoveredFreeModels || []).length > 12 ? '<span style="color:#64748b;font-size:10px">… +' + ((d.discoveredFreeModels || []).length - 12) + '</span>' : '');
+                let discoveryAge = '(не выполнено)';
+                if (d.discoveryTs) {
+                    const ageMin = Math.round((Date.now() - d.discoveryTs) / 60000);
+                    discoveryAge = ageMin <= 0 ? 'только что' : ageMin + ' мин назад';
+                }
+                const discoveryStateColor = d.discoveryError ? '#fca5a5' : (d.discoveryFresh ? '#86efac' : '#fcd34d');
+                const discoveryStateText = d.discoveryError ? 'ошибка: ' + esc(d.discoveryError) : (d.discoveryFresh ? 'свежий' : 'устарел/нет');
                 chainStatusEl.innerHTML =
                     '<div><b>OCR model chain</b> <span style="color:#64748b">(source: ' + esc(d.chainSource) + ')</span></div>' +
                     '<div style="margin-top:4px">' + (chainHtml || '<span style="color:#ef4444">(пусто)</span>') + '</div>' +
                     '<div style="margin-top:6px;color:#64748b">Unavailable: <b style="color:' + (d.unavailableCount ? '#fca5a5' : '#94a3b8') + '">' + d.unavailableCount + '</b> · Next active: <b style="color:' + (d.nextModel ? '#86efac' : '#ef4444') + '">' + esc(d.nextModel || '(нет)') + '</b></div>' +
-                    '<div style="margin-top:4px;color:#64748b">API key: <b style="color:' + (d.apiKeyPresent ? '#86efac' : '#ef4444') + '">' + (d.apiKeyPresent ? 'есть (' + d.apiKeyCount + ')' : 'НЕТ') + '</b> · Provider: <b>' + esc(d.provider || '?') + '</b></div>';
+                    '<div style="margin-top:4px;color:#64748b">API key: <b style="color:' + (d.apiKeyPresent ? '#86efac' : '#ef4444') + '">' + (d.apiKeyPresent ? 'есть (' + d.apiKeyCount + ')' : 'НЕТ') + '</b> · Provider: <b>' + esc(d.provider || '?') + '</b></div>' +
+                    '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #1e2530"><b>OpenRouter discovery</b> <span style="color:#64748b">(cache: ' + discoveryAge + ')</span></div>' +
+                    '<div style="margin-top:4px;color:#64748b">Каталог: <b style="color:#94a3b8">' + (d.discoveryRawCount != null ? d.discoveryRawCount : '?') + '</b> моделей · vision: <b style="color:#94a3b8">' + d.discoveredModelsCount + '</b> · free vision: <b style="color:#94a3b8">' + ((d.discoveredFreeModels || []).length) + '</b> · state: <b style="color:' + discoveryStateColor + '">' + discoveryStateText + '</b></div>' +
+                    '<div style="margin-top:4px">' + (discoveredHtml || '<span style="color:#64748b;font-size:10px">(нажми «🔎 Найти OCR модели» для обновления каталога)</span>') + '</div>';
             }
         }
+
+        async function discoverOcrModelsClick(btnEl) {
+            const orig = btnEl ? btnEl.innerText : null;
+            if (btnEl) { btnEl.disabled = true; btnEl.innerText = '⏳ Запрос к /api/v1/models...'; }
+            try {
+                const keys = getOpenRouterApiKeys();
+                const apiKey = keys[0] || null;
+                const result = await _ccOcrDiscoverModels(apiKey, { force: true });
+                console.info('[ocr-discovery] manual', JSON.stringify({
+                    fromCache: result.fromCache,
+                    rawCount: result.rawCount,
+                    visionCount: Array.isArray(result.vision) ? result.vision.length : 0,
+                    freeVisionCount: Array.isArray(result.freeVision) ? result.freeVision.length : 0,
+                    error: result.error,
+                }));
+                const st = document.getElementById('analysisProviderStatus');
+                if (st) {
+                    const ok = !result.error;
+                    st.style.cssText = 'display:block;background:' + (ok ? '#14532d22' : '#7f1d1d22') + ';border:1px solid ' + (ok ? '#22c55e44' : '#ef444444') + ';color:' + (ok ? '#4ade80' : '#f87171') + ';font-size:13px;padding:10px;border-radius:8px';
+                    if (result.error) {
+                        st.innerText = '❌ Discovery error: ' + result.error;
+                    } else if (result.rawCount === 0) {
+                        st.innerText = '⚠️ Каталог OpenRouter пустой';
+                    } else if ((result.freeVision || []).length === 0) {
+                        st.innerText = '⚠️ В каталоге нет free vision/OCR моделей для текущего ключа (всего vision: ' + (Array.isArray(result.vision) ? result.vision.length : 0) + ')';
+                    } else {
+                        st.innerText = '✅ Найдено ' + (result.freeVision || []).length + ' free vision моделей из ' + result.rawCount + ' в каталоге. Первая: ' + (result.freeVision || [])[0];
+                    }
+                    setTimeout(() => { if (st) st.style.display = 'none'; }, 6000);
+                }
+                renderAnalysisProviderSettings();
+            } catch (e) {
+                console.warn('[ocr-discovery] click failed', e);
+                const st = document.getElementById('analysisProviderStatus');
+                if (st) {
+                    st.style.cssText = 'display:block;background:#7f1d1d22;border:1px solid #ef444444;color:#f87171;font-size:13px;padding:10px;border-radius:8px';
+                    st.innerText = '❌ Discovery failed: ' + (e && e.message ? e.message : String(e));
+                }
+            } finally {
+                if (btnEl && orig != null) { btnEl.disabled = false; btnEl.innerText = orig; }
+            }
+        }
+        window.discoverOcrModelsClick = discoverOcrModelsClick;
 
         function saveAnalysisProviderSettings() {
             const providerEl = document.getElementById('analysisProviderSelect');
