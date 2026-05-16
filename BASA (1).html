@@ -9374,6 +9374,143 @@ function getClass2IconByClass3(c3) {
             });
         }
 
+        // ── Pixel-based text-row counter (model-independent content evidence) ──
+        // Counts horizontal text bands by per-row light-pixel fraction (game UI is dark,
+        // text/icons are light). Used to compare each candidate crop's row count against
+        // parsed.rows.length when the model's left/right labels are unreliable. Crude but
+        // cheap and runs locally — no extra OCR call.
+        function _ccCountTextRowsInCrop(cropCanvas) {
+            try {
+                if (!cropCanvas || !cropCanvas.width || !cropCanvas.height) return 0;
+                const sW = cropCanvas.width, sH = cropCanvas.height;
+                if (sW < 20 || sH < 20) return 0;
+                // Downsample for speed; preserve aspect roughly.
+                const tw = Math.min(120, sW);
+                const th = Math.min(400, sH);
+                const tc = document.createElement('canvas');
+                tc.width = tw; tc.height = th;
+                const ctx = tc.getContext('2d', { willReadFrequently: true });
+                ctx.drawImage(cropCanvas, 0, 0, tw, th);
+                const data = ctx.getImageData(0, 0, tw, th).data;
+                // Per-row fraction of "light" pixels (luminance > 140 on dark game UI).
+                const rowFill = new Array(th).fill(0);
+                for (let y = 0; y < th; y++) {
+                    let count = 0;
+                    for (let x = 0; x < tw; x++) {
+                        const i = (y * tw + x) * 4;
+                        const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                        if (lum > 140) count++;
+                    }
+                    rowFill[y] = count / tw;
+                }
+                // 5-row moving average to smooth jitter.
+                const smoothed = new Array(th).fill(0);
+                for (let y = 0; y < th; y++) {
+                    let sum = 0, cnt = 0;
+                    for (let dy = -2; dy <= 2; dy++) {
+                        const yy = y + dy;
+                        if (yy >= 0 && yy < th) { sum += rowFill[yy]; cnt++; }
+                    }
+                    smoothed[y] = sum / cnt;
+                }
+                const mean = smoothed.reduce((a, b) => a + b, 0) / th;
+                // Adaptive threshold: above mean × 1.3, but never below 5% to avoid empty crops.
+                const threshold = Math.max(0.05, mean * 1.3);
+                // Contiguous bands of height ≥ 6 px = one text row.
+                let bands = 0, inBand = false, bandStart = 0;
+                for (let y = 0; y < th; y++) {
+                    const high = smoothed[y] > threshold;
+                    if (high && !inBand) { inBand = true; bandStart = y; }
+                    else if (!high && inBand) {
+                        inBand = false;
+                        if (y - bandStart >= 6) bands++;
+                    }
+                }
+                if (inBand && th - bandStart >= 6) bands++;
+                return bands;
+            } catch (e) {
+                console.warn('[ccCountTextRowsInCrop] failed', e);
+                return 0;
+            }
+        }
+
+        // ── Numeric-column density per row (image-positional signal) ──
+        // Member-group rows always have 4 right-aligned number columns (kills, deaths,
+        // pvp_dmg, pve_dmg). Leader-list rows have 0-2 columns. Counting the median
+        // number of contiguous text tokens in the right ~55% of each expected row is
+        // a strong image-coordinate signal that does NOT depend on the model's left/right
+        // labeling. The crop whose median per-row token count ≥ 3 is overwhelmingly
+        // likely to be the member-group panel.
+        function _ccMedianRightHalfTokens(cropCanvas, expectedRows) {
+            try {
+                if (!cropCanvas || !cropCanvas.width || !cropCanvas.height || expectedRows < 1) return 0;
+                const W = cropCanvas.width, H = cropCanvas.height;
+                if (W < 40 || H < 40) return 0;
+                const ctx = cropCanvas.getContext('2d', { willReadFrequently: true });
+                const data = ctx.getImageData(0, 0, W, H).data;
+                const xStart = Math.round(W * 0.45);
+                const xEnd = W;
+                const colsW = xEnd - xStart;
+                if (colsW < 30) return 0;
+                const rowStep = H / (expectedRows + 1);
+                const tokensPerRow = [];
+                for (let r = 0; r < expectedRows; r++) {
+                    const yCenter = Math.round(rowStep * (r + 1));
+                    const yStart = Math.max(0, Math.round(yCenter - rowStep * 0.3));
+                    const yEnd = Math.min(H, Math.round(yCenter + rowStep * 0.3));
+                    if (yEnd <= yStart) continue;
+                    const colFill = new Array(colsW).fill(0);
+                    for (let y = yStart; y < yEnd; y++) {
+                        for (let x = xStart; x < xEnd; x++) {
+                            const i = (y * W + x) * 4;
+                            const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                            if (lum > 140) colFill[x - xStart]++;
+                        }
+                    }
+                    const meanCol = colFill.reduce((a, b) => a + b, 0) / colsW;
+                    const threshold = Math.max(2, meanCol * 1.35);
+                    let tokens = 0, inTok = false, tokStart = 0;
+                    for (let x = 0; x < colsW; x++) {
+                        const high = colFill[x] > threshold;
+                        if (high && !inTok) { inTok = true; tokStart = x; }
+                        else if (!high && inTok) {
+                            inTok = false;
+                            if (x - tokStart >= 3) tokens++;
+                        }
+                    }
+                    if (inTok && colsW - tokStart >= 3) tokens++;
+                    tokensPerRow.push(tokens);
+                }
+                if (!tokensPerRow.length) return 0;
+                tokensPerRow.sort((a, b) => a - b);
+                return tokensPerRow[Math.floor(tokensPerRow.length / 2)];
+            } catch (e) {
+                console.warn('[ccMedianRightHalfTokens] failed', e);
+                return 0;
+            }
+        }
+
+        // ── Roster-membership overlap (model-independent content evidence) ──
+        // For each candidate side, count how many parsed nicks resolve to roster members
+        // vs how many DON'T. The member-group table contains the user's actual party — the
+        // roster. The leader/clan table on the other side contains leaders/external clan
+        // names that typically aren't all in the roster. High roster-match ratio on a side
+        // is weak evidence the rows came from there. Stored as ancillary signal.
+        function _ccRosterOverlapCount(parsedNicks) {
+            if (typeof roster === 'undefined' || !Array.isArray(roster) || !roster.length) return 0;
+            if (!Array.isArray(parsedNicks) || !parsedNicks.length) return 0;
+            const rosterKeys = new Set(
+                roster.map(r => (typeof normalizeNick === 'function') ? normalizeNick(r.name || '') : String(r.name || '').toLowerCase())
+                      .filter(Boolean)
+            );
+            let hit = 0;
+            parsedNicks.forEach(n => {
+                const k = (typeof normalizeNick === 'function') ? normalizeNick(n || '') : String(n || '').toLowerCase();
+                if (k && rosterKeys.has(k)) hit++;
+            });
+            return hit;
+        }
+
         function _ccOcrNormalizeRow(row) {
             const name = String(row?.nick || row?.name || '').trim();
             if (!name) return null;
@@ -10151,12 +10288,35 @@ function getClass2IconByClass3(c3) {
                         // Notes-based hints
                         const _notesLeaderHint = /leader.?list|лидер|глава|командный|состав/.test(_lhNotes);
                         const _notesMemberHint = /член.*группы/.test(_lhNotes);
-                        // ── PRIMARY side decision: name overlap between parsed rows and the
-                        // model-supplied left_panel_nicks / right_panel_nicks lists. The model
-                        // emits these in the SAME OCR call (no extra request). Side with more
-                        // matches IS the side rows came from — regardless of what member_side
-                        // claimed. Falls through to legacy member_side heuristic only when the
-                        // overlap evidence is missing or ambiguous.
+                        // ── Multi-signal side decision (model-independent of left/right labels) ──
+                        // Free vision models often invert left/right or mis-label panels. We
+                        // therefore COMBINE three signals — and only when at least one of them
+                        // gives strong, image-positional evidence is sync trusted. The chosen
+                        // crop is `_cropLeft` (image x<mid) or `_cropRight` (image x>mid), so
+                        // the decision MUST be in image coordinates regardless of what the model
+                        // calls "left" or "right".
+                        //
+                        // Signal A — visual row count per IMAGE side. We count text bands in
+                        //   each candidate crop and compare to players.length. The crop whose
+                        //   visual row count is closer to the parsed-row count is the more
+                        //   likely member-group panel. Confident only when one side is clearly
+                        //   closer (Δdiff ≥ 2 rows).
+                        // Signal B — model name overlap. Compare parsed nicks to model-supplied
+                        //   left_panel_nicks / right_panel_nicks. Authoritative only when the
+                        //   matching list also corresponds to a real text-row count on that
+                        //   image side (i.e. visual A doesn't contradict). When the model
+                        //   inverts left/right, signal B alone is misleading — visual A
+                        //   acts as the tie-breaker.
+                        // Signal C — roster overlap on EACH panel's nicks list. Member-group
+                        //   rows usually map heavily to the user's roster; leader/clan list
+                        //   does not. Used as ancillary evidence.
+                        //
+                        // cropSyncOk = true ONLY when:
+                        //   - signal A points to side X AND chosen preview side = X, OR
+                        //   - signal A is inconclusive AND signal B confidently points to side X
+                        //     AND signal C does NOT contradict A on the same side.
+                        //   Anything else → cropSyncOk = false (matcher_trigger blocked, badge
+                        //   shown, training save skipped).
                         const _leftPanelNicks = Array.isArray(parsed.left_panel_nicks) ? parsed.left_panel_nicks : [];
                         const _rightPanelNicks = Array.isArray(parsed.right_panel_nicks) ? parsed.right_panel_nicks : [];
                         const _normSet = (arr) => {
@@ -10175,16 +10335,52 @@ function getClass2IconByClass3(c3) {
                         let _leftHit = 0, _rightHit = 0;
                         _parsedNickKeys.forEach(k => { if (_leftSet.has(k)) _leftHit++; if (_rightSet.has(k)) _rightHit++; });
                         const _rowCount = _parsedNickKeys.length;
-                        // Confident decision requires (a) majority overlap on one side AND
-                        // (b) strict dominance over the other side. Equal/zero overlap → no decision.
                         const _majority = _rowCount > 0 ? Math.ceil(_rowCount * 0.5) : 0;
                         const _overlapMaxHit = Math.max(_leftHit, _rightHit);
-                        const _overlapDecidedSide =
+                        const _modelOverlapDecidedSide =
                             (_overlapMaxHit > 0 && _overlapMaxHit >= _majority && _leftHit !== _rightHit)
                                 ? (_leftHit > _rightHit ? 'left' : 'right')
                                 : null;
-                        const _overlapConfident = !!_overlapDecidedSide;
+                        const _modelOverlapConfident = !!_modelOverlapDecidedSide;
                         const _overlapAvailable = (_leftSet.size > 0 || _rightSet.size > 0);
+                        // Signal A1: visual row count per IMAGE side (independent of model labels).
+                        const _leftVisualRows = _ccCountTextRowsInCrop(_cropLeft.cropCanvas);
+                        const _rightVisualRows = _ccCountTextRowsInCrop(_cropRight.cropCanvas);
+                        const _leftRowDiff = Math.abs(_leftVisualRows - _rowCount);
+                        const _rightRowDiff = Math.abs(_rightVisualRows - _rowCount);
+                        // Signal A2: median per-row token count in RIGHT 55% of each crop —
+                        // member-group always shows ~4 number columns there, leader-list shows 0-2.
+                        // This is the STRONGEST image-positional signal because it's structural,
+                        // not text-position dependent.
+                        const _leftColTokens = _ccMedianRightHalfTokens(_cropLeft.cropCanvas, _rowCount || 9);
+                        const _rightColTokens = _ccMedianRightHalfTokens(_cropRight.cropCanvas, _rowCount || 9);
+                        const _leftHasStatCols = _leftColTokens >= 3;
+                        const _rightHasStatCols = _rightColTokens >= 3;
+                        const _columnDecidedSide = (_leftHasStatCols !== _rightHasStatCols)
+                            ? (_leftHasStatCols ? 'left' : 'right')
+                            : null;
+                        const _columnConfident = !!_columnDecidedSide;
+                        // Combined visual decision: column-structure beats row-count when they
+                        // disagree (column count of 4 vs 1 is a much stronger fingerprint than
+                        // ±1 row count diff). Row count is only used when columns are equal.
+                        let _visualConfident, _visualDecidedSide;
+                        if (_columnConfident) {
+                            _visualConfident = true;
+                            _visualDecidedSide = _columnDecidedSide;
+                        } else if (_rowCount > 0 && Math.abs(_leftRowDiff - _rightRowDiff) >= 2) {
+                            _visualConfident = true;
+                            _visualDecidedSide = _leftRowDiff < _rightRowDiff ? 'left' : 'right';
+                        } else {
+                            _visualConfident = false;
+                            _visualDecidedSide = null;
+                        }
+                        // Signal C: roster overlap on each panel's nick list (advisory).
+                        const _leftRosterHit = _ccRosterOverlapCount(_leftPanelNicks);
+                        const _rightRosterHit = _ccRosterOverlapCount(_rightPanelNicks);
+                        const _rosterConfident = (_leftRosterHit + _rightRosterHit) >= Math.max(2, Math.floor(_rowCount * 0.4)) && _leftRosterHit !== _rightRosterHit;
+                        const _rosterDecidedSide = _rosterConfident
+                            ? (_leftRosterHit > _rightRosterHit ? 'left' : 'right')
+                            : null;
                         let memberSide = memberSideRaw;
                         let wrongTableCandidate = false;
                         let wrongTableReason = null;
@@ -10192,20 +10388,32 @@ function getClass2IconByClass3(c3) {
                         let forcedLeftFallback = false;
                         let forcedLeftReason = null;
                         let _sideDecisionSource = null;
-                        if (_overlapConfident) {
-                            // Overlap evidence is authoritative — overrides model's member_side hint.
-                            memberSide = _overlapDecidedSide;
-                            _sideDecisionSource = 'name_overlap_' + _overlapDecidedSide + '_hit=' + _overlapMaxHit + '/' + _rowCount;
-                            if (memberSideRaw !== 'unknown' && memberSideRaw !== _overlapDecidedSide) {
-                                // Model said the wrong side. Audit but trust overlap.
-                                rejectedCandidateReason = 'model_said_' + memberSideRaw + '_but_overlap_says_' + _overlapDecidedSide;
+                        // Decision precedence: visual (image-coords, model-independent) > model
+                        // overlap corroborated by roster > model overlap alone > fallback heuristic.
+                        if (_visualDecidedSide && _modelOverlapDecidedSide && _visualDecidedSide === _modelOverlapDecidedSide) {
+                            memberSide = _visualDecidedSide;
+                            _sideDecisionSource = 'visual+overlap_agree_' + _visualDecidedSide
+                                + '_visualRows=' + _leftVisualRows + 'L/' + _rightVisualRows + 'R_target=' + _rowCount
+                                + '_overlapHit=' + _leftHit + 'L/' + _rightHit + 'R';
+                        } else if (_visualDecidedSide) {
+                            // Visual evidence is image-positional — overrides everything else
+                            // because it doesn't depend on model's notion of left/right.
+                            memberSide = _visualDecidedSide;
+                            _sideDecisionSource = 'visual_only_' + _visualDecidedSide
+                                + '_visualRows=' + _leftVisualRows + 'L/' + _rightVisualRows + 'R_target=' + _rowCount;
+                            if (_modelOverlapDecidedSide && _modelOverlapDecidedSide !== _visualDecidedSide) {
+                                rejectedCandidateReason = 'model_overlap_said_' + _modelOverlapDecidedSide + '_but_visual_says_' + _visualDecidedSide;
                             }
+                        } else if (_modelOverlapConfident && _rosterDecidedSide === _modelOverlapDecidedSide) {
+                            memberSide = _modelOverlapDecidedSide;
+                            _sideDecisionSource = 'overlap+roster_agree_' + _modelOverlapDecidedSide
+                                + '_hit=' + _overlapMaxHit + '/' + _rowCount + '_rosterHit=' + _leftRosterHit + 'L/' + _rightRosterHit + 'R';
                         } else if (memberSideRaw === 'left') {
                             memberSide = 'left';
-                            _sideDecisionSource = 'model_member_side_left_no_overlap_evidence';
+                            _sideDecisionSource = 'model_member_side_left_no_visual_evidence';
                         } else if (memberSideRaw === 'right') {
                             memberSide = 'right';
-                            _sideDecisionSource = 'model_member_side_right_no_overlap_evidence';
+                            _sideDecisionSource = 'model_member_side_right_no_visual_evidence';
                             if (tableType === 'both' && _notesLeaderHint && !_notesMemberHint) {
                                 forcedLeftFallback = true;
                                 forcedLeftReason = 'model_said_right_but_notes_hint_right_is_leader_list';
@@ -10214,7 +10422,7 @@ function getClass2IconByClass3(c3) {
                                 _sideDecisionSource = 'forced_left_notes_hint';
                             }
                         } else {
-                            // memberSideRaw === 'unknown' AND no overlap evidence → fall back to tableType.
+                            // memberSideRaw === 'unknown' AND no visual evidence → fall back to tableType.
                             if (tableType === 'both' || tableType === 'party_members') {
                                 memberSide = 'left';
                                 forcedLeftFallback = true;
@@ -10237,6 +10445,9 @@ function getClass2IconByClass3(c3) {
                                 _sideDecisionSource = 'fallback_right_legacy';
                             }
                         }
+                        // Aliases for downstream code that referenced the old single-source overlap.
+                        const _overlapConfident = _modelOverlapConfident;
+                        const _overlapDecidedSide = _modelOverlapDecidedSide;
                         let _effectiveCrop, _geometrySource, _cropUrlSide;
                         if (memberSide === 'left') {
                             _effectiveCrop = _cropLeft;
@@ -10262,32 +10473,54 @@ function getClass2IconByClass3(c3) {
                             ? _overlapDecidedSide
                             : (memberSideRaw !== 'unknown' ? memberSideRaw : memberSide);
                         const _previewCropSide = _cropUrlSide;
-                        // cropSyncOk REQUIRES overlap evidence — name-side agreement alone is NOT
-                        // proof. Sync true only when: (a) we have overlap evidence AND it points to
-                        // the chosen side. When overlap is missing or weak, sync stays false so
-                        // matcher_trigger / profa-write is blocked downstream.
+                        // cropSyncOk REQUIRES image-positional evidence. Model-internal
+                        // consistency (e.g. parsed rows match `right_panel_nicks` AND we
+                        // picked _cropRight) is NOT proof when the model has inverted its
+                        // own left/right labels. The visual row-count signal is independent
+                        // of model labels and breaks ties; when it confirms the chosen side
+                        // we trust sync, otherwise we require BOTH overlap + roster on the
+                        // same side as preview.
                         let _cropSyncOk = false;
                         let _cropDesyncReason = null;
-                        if (_overlapConfident && _overlapDecidedSide === _previewCropSide) {
+                        const _visualConfirmsPreview = _visualDecidedSide && _visualDecidedSide === _previewCropSide;
+                        const _visualContradictsPreview = _visualDecidedSide && _visualDecidedSide !== _previewCropSide;
+                        const _overlapConfirmsPreview = _modelOverlapConfident && _modelOverlapDecidedSide === _previewCropSide;
+                        const _rosterConfirmsPreview = _rosterDecidedSide && _rosterDecidedSide === _previewCropSide;
+                        if (_visualConfirmsPreview) {
                             _cropSyncOk = true;
-                            _cropDesyncReason = null;
-                        } else if (_overlapConfident && _overlapDecidedSide !== _previewCropSide) {
+                        } else if (_visualContradictsPreview) {
                             _cropSyncOk = false;
-                            _cropDesyncReason = 'overlap_says_' + _overlapDecidedSide + '_but_preview_' + _previewCropSide;
-                        } else if (!_overlapAvailable) {
+                            _cropDesyncReason = 'visual_rows_say_' + _visualDecidedSide + '_but_preview_' + _previewCropSide
+                                + '_leftRows=' + _leftVisualRows + '_rightRows=' + _rightVisualRows + '_target=' + _rowCount;
+                        } else if (_overlapConfirmsPreview && _rosterConfirmsPreview) {
+                            // No visual proof, but two independent model-based signals agree
+                            // with preview — accept with audit.
+                            _cropSyncOk = true;
+                        } else if (_overlapConfirmsPreview && !_rosterDecidedSide && _rowCount > 0 && (_leftRosterHit + _rightRosterHit) === 0) {
+                            // No roster data at all (e.g. brand-new clan), no visual edge —
+                            // accept overlap alone since it's the only positive signal we have.
+                            _cropSyncOk = true;
+                        } else if (!_overlapAvailable && !_visualDecidedSide) {
                             _cropSyncOk = false;
-                            _cropDesyncReason = 'no_panel_nicks_from_model_cannot_verify_overlap';
+                            _cropDesyncReason = 'no_evidence_panel_nicks_missing_and_visual_inconclusive_leftRows=' + _leftVisualRows + '_rightRows=' + _rightVisualRows;
+                        } else if (_modelOverlapDecidedSide && _modelOverlapDecidedSide !== _previewCropSide) {
+                            _cropSyncOk = false;
+                            _cropDesyncReason = 'overlap_says_' + _modelOverlapDecidedSide + '_but_preview_' + _previewCropSide;
+                        } else if (!_modelOverlapConfident && _overlapAvailable) {
+                            _cropSyncOk = false;
+                            _cropDesyncReason = 'ambiguous_overlap_left=' + _leftHit + '_right=' + _rightHit + '_rows=' + _rowCount + '_no_visual_tiebreak';
                         } else {
-                            // Overlap lists exist but neither side won the majority/dominance test.
                             _cropSyncOk = false;
-                            _cropDesyncReason = 'ambiguous_overlap_left=' + _leftHit + '_right=' + _rightHit + '_rows=' + _rowCount;
+                            _cropDesyncReason = 'insufficient_evidence_for_sync_decision=' + (_sideDecisionSource || 'none');
                         }
                         console.info('[km-crop-select] pack=' + packName
                             + ' memberSideRaw=' + memberSideRaw + ' chosen=' + memberSide
+                            + ' preview=' + _previewCropSide
                             + ' tableType=' + tableType
-                            + ' overlap left=' + _leftHit + '/' + _leftSet.size
-                            + ' right=' + _rightHit + '/' + _rightSet.size
-                            + ' rows=' + _rowCount
+                            + ' visualRows=' + _leftVisualRows + 'L/' + _rightVisualRows + 'R(target=' + _rowCount + ')'
+                            + ' columns=' + _leftColTokens + 'L/' + _rightColTokens + 'R'
+                            + ' overlap=' + _leftHit + 'L/' + _rightHit + 'R'
+                            + ' roster=' + _leftRosterHit + 'L/' + _rightRosterHit + 'R'
                             + ' decision=' + (_sideDecisionSource || 'none')
                             + ' syncOk=' + _cropSyncOk
                             + ' reason=' + (_cropDesyncReason || 'ok'));
@@ -10341,6 +10574,22 @@ function getClass2IconByClass3(c3) {
                             sideDecisionSource: _sideDecisionSource,
                             leftPanelNicks: _leftPanelNicks.slice(0, 16),
                             rightPanelNicks: _rightPanelNicks.slice(0, 16),
+                            // Visual signals (image-positional, model-independent)
+                            visualLeftRows: _leftVisualRows,
+                            visualRightRows: _rightVisualRows,
+                            visualLeftColTokens: _leftColTokens,
+                            visualRightColTokens: _rightColTokens,
+                            visualLeftHasStatCols: _leftHasStatCols,
+                            visualRightHasStatCols: _rightHasStatCols,
+                            visualColumnConfident: _columnConfident,
+                            visualColumnDecidedSide: _columnDecidedSide,
+                            visualConfident: !!_visualConfident,
+                            visualDecidedSide: _visualDecidedSide,
+                            // Roster-overlap signal per panel (advisory)
+                            rosterLeftHit: _leftRosterHit,
+                            rosterRightHit: _rightRosterHit,
+                            rosterConfident: !!_rosterConfident,
+                            rosterDecidedSide: _rosterDecidedSide,
                         };
                         // Leader-list hints: only when model says leader_list (no Член группы extracted).
                         // If table_type is party_members or both, NEVER mark as leader_list — valid screen.
@@ -11810,7 +12059,14 @@ ${playerList}
                                 overlapLeftHit: (dayPackGeometry[packName] && dayPackGeometry[packName].overlapLeftHit) || 0,
                                 overlapRightHit: (dayPackGeometry[packName] && dayPackGeometry[packName].overlapRightHit) || 0,
                                 overlapRowCount: (dayPackGeometry[packName] && dayPackGeometry[packName].overlapRowCount) || 0,
-                                sideDecisionSource: (dayPackGeometry[packName] && dayPackGeometry[packName].sideDecisionSource) || null
+                                sideDecisionSource: (dayPackGeometry[packName] && dayPackGeometry[packName].sideDecisionSource) || null,
+                                // Visual + roster signals per row (independent evidence)
+                                visualLeftRows: (dayPackGeometry[packName] && dayPackGeometry[packName].visualLeftRows) || 0,
+                                visualRightRows: (dayPackGeometry[packName] && dayPackGeometry[packName].visualRightRows) || 0,
+                                visualConfident: !!(dayPackGeometry[packName] && dayPackGeometry[packName].visualConfident),
+                                visualDecidedSide: (dayPackGeometry[packName] && dayPackGeometry[packName].visualDecidedSide) || null,
+                                rosterLeftHit: (dayPackGeometry[packName] && dayPackGeometry[packName].rosterLeftHit) || 0,
+                                rosterRightHit: (dayPackGeometry[packName] && dayPackGeometry[packName].rosterRightHit) || 0
                             });
                         } catch(e) { /* ignore */ }
                         window._gtDebug.matcherProcessed = (window._gtDebug.matcherProcessed || 0) + 1;
