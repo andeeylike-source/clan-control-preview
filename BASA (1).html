@@ -10006,6 +10006,99 @@ function getClass2IconByClass3(c3) {
             const BAIDU_OCR_PROMPT = `Extract the "Член группы" (party member) table from this game screenshot.\nReturn ONLY valid JSON:\n{"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"total_count":0,"confidence":0,"notes":"","table_type":"party_members","member_side":"unknown","left_panel_nicks":[],"right_panel_nicks":[]}\nRules:\n- The screenshot may contain TWO side-by-side panels: a "Лидер"/"Командный канал"/"Глава"/"Состав" leader-list table on one side, and a "Член группы" (party members) table on the other side. The "Член группы" table can be on the LEFT or on the RIGHT.\n- Extract rows ONLY from the table titled "Член группы". IGNORE any "Лидер"/"Командный канал"/"Глава"/"Состав" leader-list table.\n- total_count is the number of real player rows in the extracted "Член группы" table, or the N from "Состав: N чел." inside that same party-member window. Do not count headers, column labels, leader-list rows, chat, background text, or any rows outside the party-member table.\n- table_type values: "party_members" if you extracted Член группы rows; "leader_list" if ONLY a Лидер/Командный канал table is visible (no Член группы); "both" if both tables are visible and you extracted Член группы; "unknown" if unsure.\n- member_side values: "left" if Член группы is on the left side of the screenshot; "right" if on the right; "unknown" if you cannot tell.\n- CRITICAL — side-evidence fields for sync verification:\n  - left_panel_nicks: list ALL nicks visible in the LEFT panel of the screenshot (whatever table that is — party members or leader list). Order = top-to-bottom. Up to 12 nicks. Preserve spelling exactly. Empty array if there is no left panel.\n  - right_panel_nicks: list ALL nicks visible in the RIGHT panel of the screenshot (whatever table that is). Order = top-to-bottom. Up to 12 nicks. Preserve spelling exactly. Empty array if there is no right panel.\n  These two lists are used to verify which panel "rows" actually came from. They must reflect what is visually on each side regardless of which side is "Член группы".\n- preserve nick spelling exactly as seen\n- kills, deaths, pvp, pve must be integers\n- if a value is unreadable, use null\n- no markdown\n- no code fences\n- if there is NO "Член группы" table at all, set rows=[], total_count=0, table_type="leader_list", and notes="leader_list"`;
 
             const openRouterKeys = getOpenRouterApiKeys();
+            const _ccParseJsonObjectFromText = (text) => {
+                const cleaned = String(text || '').replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+                try { return JSON.parse(cleaned); } catch (_) {}
+                const m = cleaned.match(/\{[\s\S]*\}/);
+                if (m) return JSON.parse(m[0]);
+                throw new Error('Ответ не содержит JSON: ' + cleaned.slice(0, 100));
+            };
+            const _ccHeaderZoneDataUrl = (canvas) => {
+                const h = Math.max(80, Math.min(canvas.height, Math.round(canvas.height * 0.42)));
+                const c = document.createElement('canvas');
+                c.width = canvas.width;
+                c.height = h;
+                c.getContext('2d', { willReadFrequently: true }).drawImage(canvas, 0, 0, canvas.width, h, 0, 0, canvas.width, h);
+                return c.toDataURL('image/png');
+            };
+            const _ccFuzzyMemberHeader = (text) => {
+                const s = String(text || '').toLowerCase()
+                    .replace(/ё/g, 'е')
+                    .replace(/[^a-zа-я0-9]+/g, '');
+                const hasMember = s.includes('член') || s.includes('4лен') || s.includes('илен');
+                const hasGroup = s.includes('групп') || s.includes('групы') || s.includes('rpynn') || s.includes('rpyn');
+                const leaderOnly = /^(лидер|глава|состав|стата|командныйканал)/.test(s);
+                return hasMember && hasGroup && !leaderOnly;
+            };
+            const _ccOcrVerifyCropHeader = async (headerDataUrl, sideLabel, preferredModel) => {
+                const prompt = 'Check only the table header/title in this image crop. Return ONLY valid JSON: {"hasMemberHeader":true,"headerText":"","reason":""}. hasMemberHeader is true only for the party member table header "Член группы" (allow minor OCR typo like "Член групы"). It is false for leader/clan/channel/stat tables such as "Лидер", "Глава", "Состав", "Стата", unless "Член группы" is also visible. No markdown.';
+                const chain = _ccOcrAvailableModels();
+                const models = [];
+                if (preferredModel && chain.indexOf(preferredModel) !== -1) models.push(preferredModel);
+                chain.forEach(m => { if (models.indexOf(m) === -1) models.push(m); });
+                if (!models.length) throw new Error('member header verify skipped: no active OCR model');
+                let lastError = null;
+                for (let mi = 0; mi < models.length; mi++) {
+                    const candidateModel = models[mi];
+                    const orProvider = _ccOcrModelOpenRouterProvider(candidateModel);
+                    for (let keyIndex = 0; keyIndex < openRouterKeys.length; keyIndex++) {
+                        try {
+                            const body = {
+                                model: candidateModel,
+                                messages: [{ role: 'user', content: [
+                                    { type: 'text', text: prompt },
+                                    { type: 'image_url', image_url: { url: headerDataUrl } },
+                                ]}],
+                                temperature: 0,
+                                max_tokens: 180,
+                            };
+                            if (orProvider) body.provider = orProvider;
+                            console.info('[member-header] pre-fetch ' + sideLabel + ' model=' + candidateModel + ' key=' + (keyIndex + 1) + '/' + openRouterKeys.length);
+                            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${openRouterKeys[keyIndex]}`,
+                                    'Content-Type': 'application/json',
+                                    'HTTP-Referer': location.origin,
+                                    'X-Title': 'Clan Control OCR',
+                                },
+                                body: JSON.stringify(body),
+                                signal: AbortSignal.timeout(45000),
+                            });
+                            if (response.status === 429) {
+                                markCurrentKeyExhausted(keyIndex);
+                                lastError = new Error('OpenRouter key rate-limited');
+                                continue;
+                            }
+                            if (!response.ok) {
+                                const errJson = await response.json().catch(() => ({}));
+                                const errMsg = errJson.error?.message || `HTTP ${response.status}`;
+                                lastError = new Error(errMsg);
+                                if (_ccOcrIsEndpointDeadError(response.status, errMsg)) {
+                                    _ccOcrMarkModelUnavailable(candidateModel, response.status + ' ' + errMsg);
+                                    if (_ccOcrReadPreferredModel() === candidateModel) _ccOcrClearPreferredModel();
+                                    break;
+                                }
+                                continue;
+                            }
+                            const json = await response.json();
+                            const parsed = _ccParseJsonObjectFromText(json.choices?.[0]?.message?.content || '');
+                            const headerText = String(parsed.headerText || '').trim();
+                            const hasMemberHeader = parsed.hasMemberHeader === true || _ccFuzzyMemberHeader(headerText);
+                            _ccOcrSetPreferredModel(candidateModel);
+                            return {
+                                hasMemberHeader,
+                                headerText,
+                                reason: String(parsed.reason || '').slice(0, 160),
+                                model: candidateModel,
+                            };
+                        } catch (e) {
+                            lastError = e;
+                        }
+                    }
+                }
+                throw lastError || new Error('member header verify failed');
+            };
             const exhaustionBefore = getOpenRouterExhaustionSnapshot();
             console.info(`[provider] selected=${getAnalysisProvider()}`);
             console.info(`[provider] openrouter keys count=${openRouterKeys.length}`);
@@ -10547,6 +10640,62 @@ function getClass2IconByClass3(c3) {
                             ? _overlapDecidedSide
                             : (memberSideRaw !== 'unknown' ? memberSideRaw : memberSide);
                         let _previewCropSide = _cropUrlSide;
+                        let _candidateHeaders = [];
+                        let _selectedSourceHeader = '';
+                        let _selectedSourceReason = null;
+                        let _rejectedSourceReasons = [];
+                        let _memberHeaderFound = false;
+                        try {
+                            const _activeHeaderModel = chosenModel || _ccOcrReadPreferredModel() || (_ccOcrAvailableModels()[0] || null);
+                            const _leftHeader = await _ccOcrVerifyCropHeader(_ccHeaderZoneDataUrl(_cropLeft.cropCanvas), 'left', _activeHeaderModel);
+                            const _rightHeader = await _ccOcrVerifyCropHeader(_ccHeaderZoneDataUrl(_cropRight.cropCanvas), 'right', _leftHeader.model || _activeHeaderModel);
+                            _candidateHeaders = [
+                                { side: 'left', headerText: _leftHeader.headerText || '', hasMemberHeader: !!_leftHeader.hasMemberHeader, reason: _leftHeader.reason || '' },
+                                { side: 'right', headerText: _rightHeader.headerText || '', hasMemberHeader: !!_rightHeader.hasMemberHeader, reason: _rightHeader.reason || '' },
+                            ];
+                            _candidateHeaders.forEach(h => {
+                                if (!h.hasMemberHeader) {
+                                    _rejectedSourceReasons.push(h.side + ':header_not_member:' + (h.headerText || h.reason || 'empty'));
+                                }
+                            });
+                            const _headerSides = _candidateHeaders.filter(h => h.hasMemberHeader);
+                            let _headerSelected = null;
+                            if (_headerSides.length === 1) {
+                                _headerSelected = _headerSides[0];
+                                _selectedSourceReason = 'member_header_' + _headerSelected.side;
+                            } else if (_headerSides.length > 1) {
+                                _headerSelected = _headerSides.find(h => h.side === _cropUrlSide) || _headerSides[0];
+                                _selectedSourceReason = 'member_header_multiple_using_' + _headerSelected.side;
+                            }
+                            if (_headerSelected) {
+                                _memberHeaderFound = true;
+                                _selectedSourceHeader = _headerSelected.headerText || 'Член группы';
+                                memberSide = _headerSelected.side;
+                                _effectiveCrop = memberSide === 'left' ? _cropLeft : _cropRight;
+                                _geometrySource = 'member_header';
+                                _cropUrlSide = memberSide;
+                                _previewCropSide = memberSide;
+                                _parsedRowsSourceSide = memberSide;
+                                _sideDecisionSource = _selectedSourceReason;
+                                rejectedCandidateReason = _rejectedSourceReasons.join(';') || null;
+                                wrongTableCandidate = false;
+                                wrongTableReason = null;
+                                forcedLeftFallback = memberSide === 'left' ? forcedLeftFallback : false;
+                                _selectedCropBox = {
+                                    x: _effectiveCrop.geometry.x,
+                                    y: _effectiveCrop.geometry.y,
+                                    w: _effectiveCrop.geometry.w,
+                                    h: _effectiveCrop.geometry.h,
+                                };
+                                _selectedHeaderGuess = _selectedSourceHeader;
+                            } else {
+                                _selectedSourceReason = 'member_header_not_found';
+                            }
+                        } catch (e) {
+                            _selectedSourceReason = 'member_header_verify_failed';
+                            _rejectedSourceReasons.push('member_header_verify_failed:' + String(e && e.message ? e.message : e || 'unknown').slice(0, 120));
+                            console.warn('[member-header] failed pack=' + packName, e);
+                        }
                         // cropSyncOk REQUIRES image-positional evidence. Model-internal
                         // consistency (e.g. parsed rows match `right_panel_nicks` AND we
                         // picked _cropRight) is NOT proof when the model has inverted its
@@ -10589,6 +10738,15 @@ function getClass2IconByClass3(c3) {
                             _cropDesyncReason = 'insufficient_evidence_for_sync_decision=' + (_sideDecisionSource || 'none');
                         }
                         if (_cropSyncOk) _cropSyncOkSource = _visualConfirmsPreview ? 'visual_rows' : (_overlapConfirmsPreview ? 'model_overlap' : 'unknown');
+                        if (_memberHeaderFound) {
+                            _cropSyncOk = true;
+                            _cropSyncOkSource = 'member_header';
+                            _cropDesyncReason = null;
+                        } else {
+                            _cropSyncOk = false;
+                            _cropSyncOkSource = 'member_header';
+                            _cropDesyncReason = 'MEMBER_HEADER_NOT_FOUND';
+                        }
                         let _sideVerifyRan = false;
                         let _leftVerifyNicks = [];
                         let _rightVerifyNicks = [];
@@ -10606,7 +10764,7 @@ function getClass2IconByClass3(c3) {
                             return hit;
                         };
                         const _hasTwoVisibleSideCrops = !!(_cropLeftUrl && _cropRightUrl && _rowCount > 0 && _leftVisualRows > 0 && _rightVisualRows > 0);
-                        const _decisionNeedsSideVerify = !!(_hasTwoVisibleSideCrops && (
+                        const _decisionNeedsSideVerify = false && !!(_hasTwoVisibleSideCrops && (
                             _visualDecidedSide ||
                             memberSideRaw !== 'unknown' ||
                             !_cropSyncOk ||
@@ -10670,14 +10828,20 @@ function getClass2IconByClass3(c3) {
                             + ' decision=' + (_sideDecisionSource || 'none')
                             + ' syncOk=' + _cropSyncOk
                             + ' syncSource=' + (_cropSyncOkSource || 'none')
+                            + ' memberHeader=' + (_memberHeaderFound ? 'yes:' + _previewCropSide + ':' + _selectedSourceHeader : 'no')
                             + ' sideVerify=' + (_sideVerifyRan ? (_leftParsedOverlap + 'L/' + _rightParsedOverlap + 'R selected=' + (_sideVerifySelectedSide || 'none')) : 'no')
                             + ' reason=' + (_cropDesyncReason || 'ok'));
                         packTableInfo[packName] = {
                             tableType: tableType,
                             memberSide: memberSide,
                             memberSideRaw: memberSideRaw,
-                            memberSideVerified: _sideVerifySelectedSide || null,
+                            memberSideVerified: _memberHeaderFound ? memberSide : (_sideVerifySelectedSide || null),
                             cropSyncOkSource: _cropSyncOkSource,
+                            candidateHeaders: _candidateHeaders,
+                            selectedSourceHeader: _selectedSourceHeader,
+                            selectedSourceReason: _selectedSourceReason,
+                            rejectedSourceReasons: _rejectedSourceReasons,
+                            memberHeaderFound: _memberHeaderFound,
                             ignoredLeaderTable: tableType === 'both' || /both/.test(_lhNotes),
                             wrongTableCandidate: wrongTableCandidate,
                             wrongTableReason: wrongTableReason,
@@ -10714,6 +10878,11 @@ function getClass2IconByClass3(c3) {
                             cropSyncOk: _cropSyncOk,
                             cropSyncOkSource: _cropSyncOkSource,
                             cropDesyncReason: _cropDesyncReason,
+                            candidateHeaders: _candidateHeaders,
+                            selectedSourceHeader: _selectedSourceHeader,
+                            selectedSourceReason: _selectedSourceReason,
+                            rejectedSourceReasons: _rejectedSourceReasons,
+                            memberHeaderFound: _memberHeaderFound,
                             sideVerifyRan: _sideVerifyRan,
                             leftVerifyNicks: _leftVerifyNicks.slice(0, 16),
                             rightVerifyNicks: _rightVerifyNicks.slice(0, 16),
@@ -11856,7 +12025,8 @@ ${playerList}
                                        : /LEFT/i.test(geo.preset || '') ? 'left'
                                        : /RIGHT/i.test(geo.preset || '') ? 'right'
                                        : 'unknown';
-                    if (_prevGeom.cropSyncOkSource === 'side_verify_overlap' && (_prevGeom.previewCropSide === 'left' || _prevGeom.previewCropSide === 'right')) {
+                    if ((_prevGeom.cropSyncOkSource === 'side_verify_overlap' || _prevGeom.cropSyncOkSource === 'member_header' || _prevGeom.cropSyncOkSource === 'user_crop_override')
+                        && (_prevGeom.previewCropSide === 'left' || _prevGeom.previewCropSide === 'right')) {
                         _matcherSide = _prevGeom.previewCropSide;
                     }
                     // Re-evaluate cropSyncOk now that matcher side is known.
@@ -12212,6 +12382,11 @@ ${playerList}
                                 cropSyncOk: !!(dayPackGeometry[packName] && dayPackGeometry[packName].cropSyncOk),
                                 cropSyncOkSource: (dayPackGeometry[packName] && dayPackGeometry[packName].cropSyncOkSource) || null,
                                 cropDesyncReason: (dayPackGeometry[packName] && dayPackGeometry[packName].cropDesyncReason) || null,
+                                candidateHeaders: (dayPackGeometry[packName] && dayPackGeometry[packName].candidateHeaders) || [],
+                                selectedSourceHeader: (dayPackGeometry[packName] && dayPackGeometry[packName].selectedSourceHeader) || '',
+                                selectedSourceReason: (dayPackGeometry[packName] && dayPackGeometry[packName].selectedSourceReason) || null,
+                                rejectedSourceReasons: (dayPackGeometry[packName] && dayPackGeometry[packName].rejectedSourceReasons) || [],
+                                memberHeaderFound: !!(dayPackGeometry[packName] && dayPackGeometry[packName].memberHeaderFound),
                                 sideVerifyRan: !!(dayPackGeometry[packName] && dayPackGeometry[packName].sideVerifyRan),
                                 leftVerifyNicks: (dayPackGeometry[packName] && dayPackGeometry[packName].leftVerifyNicks) || [],
                                 rightVerifyNicks: (dayPackGeometry[packName] && dayPackGeometry[packName].rightVerifyNicks) || [],
@@ -14750,35 +14925,101 @@ ${playerList}
 
         function kmRwPrev() { if (_kmRw.idx > 0) { if (typeof kmRwCloseProfaPicker === 'function') kmRwCloseProfaPicker(); _kmRw.idx--; kmRwRender(); } }
         function kmRwNext() { if (_kmRw.idx < _kmRw.parties.length - 1) { if (typeof kmRwCloseProfaPicker === 'function') kmRwCloseProfaPicker(); _kmRw.idx++; kmRwRender(); } }
-        // Flip preview between stored left/right crop candidates. Both URLs are kept on
-        // dayPackGeometry[packName] by the OCR pipeline. Re-OCR does NOT happen — this is
-        // a visual override for cases where model's `member_side` hint pointed at the wrong
-        // panel. Persisted on dayPackGeometry.cropUrl so any subsequent render sees the new
-        // side; also updates wizard preview cache + side audit fields.
-        window.kmRwFlipCropSide = function(packName) {
-            if (!packName) return;
+        function _kmRwClearMatcherFieldsForPack(packName) {
+            const packRows = (dayScreenPlayersMap || {})[packName] || [];
+            const clearOne = (row) => {
+                if (!row) return;
+                const keepManual = row.profaSource === 'manual_review';
+                [
+                    'matcher_top1','matcher_sim','matcher_margin','matcher_top3','matcher_source',
+                    'matcher_wouldTrigger','matcher_trigger','matcher_autoTrained','matcher_wrongTableCandidate',
+                    'matcher_wrongTableReason','matcher_cropSyncOk','matcher_cropDesyncReason','matcher_originalStatus',
+                    'matcher_finalReason','matcher_rowUnstable','matcher_unstableReason','matcher_yDrift',
+                    'matcher_distToPrev','matcher_distToNext','matcher_pack','matcher_row','matcher_cx','matcher_cy',
+                    'matcher_expectedCY','matcher_prevRowCY','matcher_nextRowCY','matcher_crop','matcher_cropUrl',
+                    'matcher_locHit','matcher_locConf','matcher_locInvalid','matcher_cropQuality','matcher_geoPreset',
+                    'matcher_profaWarning','matcher_profaWarningReason'
+                ].forEach(k => { try { delete row[k]; } catch (_) {} });
+                if (!keepManual) {
+                    try { delete row.class2; } catch (_) {}
+                    try { delete row.profa; } catch (_) {}
+                    try { delete row.profaSource; } catch (_) {}
+                }
+            };
+            packRows.forEach(row => {
+                clearOne(row);
+                const parsed = _kmRwFindParsed(row && row.name);
+                if (parsed && parsed !== row) clearOne(parsed);
+            });
+        }
+
+        async function _kmRwRerunMatcherAfterCropOverride(packName) {
+            _kmRwClearMatcherFieldsForPack(packName);
+            if (typeof runLocalIconMatcher !== 'function') {
+                throw new Error('runLocalIconMatcher unavailable');
+            }
+            await runLocalIconMatcher(activeDayDate || null);
+            if (_kmRw && Array.isArray(_kmRw.parties)) {
+                const idx = _kmRw.parties.findIndex(p => p && p.packName === packName);
+                if (idx >= 0) _kmRw.parties[idx].players = (dayScreenPlayersMap || {})[packName] || _kmRw.parties[idx].players;
+            }
+        }
+
+        // Manual crop source override. Re-OCR does NOT happen; local icon matcher is
+        // rerun against current parsed rows so profa hints follow the selected crop.
+        window.kmRwSetCropSide = async function(packName, newSide) {
+            if (!packName || (newSide !== 'left' && newSide !== 'right')) return;
             const g = (typeof dayPackGeometry === 'object' && dayPackGeometry) ? dayPackGeometry[packName] : null;
             if (!g || !g.cropUrlLeft || !g.cropUrlRight) {
-                console.warn('[kmRw flip] both candidate crops not available for', packName);
+                console.warn('[kmRw crop override] both candidate crops not available for', packName);
                 return;
             }
             if (!_kmRw.cropSideOverride) _kmRw.cropSideOverride = {};
-            const currentSide = _kmRw.cropSideOverride[packName] || g.cropUrlSide || 'right';
-            const newSide = currentSide === 'left' ? 'right' : 'left';
             _kmRw.cropSideOverride[packName] = newSide;
-            // Persist to dayPackGeometry so debug dumps + subsequent renders see the choice.
             g.cropUrl = newSide === 'left' ? g.cropUrlLeft : g.cropUrlRight;
             g.cropUrlSide = newSide;
             g.previewCropSide = newSide;
+            g.matcherCropSide = newSide;
+            g.iconMatcherSide = newSide;
+            g.memberSide = newSide;
+            g.cropSyncOk = true;
+            g.cropSyncOkSource = 'user_crop_override';
+            g.cropDesyncReason = null;
+            g.selectedSourceReason = 'user_crop_override';
+            g.selectedSourceHeader = g.selectedSourceHeader || 'manual override';
+            g.userCropOverride = true;
+            g.userCropOverrideSide = newSide;
             g.userFlippedSide = true;
-            g.cropSyncOk = (g.parsedRowsSourceSide === newSide) || (g.parsedRowsSourceSide === 'unknown');
-            g.cropDesyncReason = g.cropSyncOk ? null : ('user_flipped_to_' + newSide + '_but_parsed_' + g.parsedRowsSourceSide);
-            console.info('[kmRw flip] pack=' + packName + ' newSide=' + newSide + ' syncOk=' + g.cropSyncOk);
-            // Invalidate cached entries for this pack so the new side renders.
+            const info = (dayPackTableInfo || {})[packName];
+            if (info) {
+                info.memberSide = newSide;
+                info.memberSideVerified = newSide;
+                info.cropSyncOkSource = 'user_crop_override';
+                info.wrongTableCandidate = false;
+                info.wrongTableReason = null;
+            }
             if (_kmRw.cropCache) {
                 Object.keys(_kmRw.cropCache).forEach(k => { if (k.indexOf(packName + '|') === 0) delete _kmRw.cropCache[k]; });
             }
+            console.info('[kmRw crop override] pack=' + packName + ' side=' + newSide + ' rerunMatcher=true');
+            _kmRwToast('Источник ' + newSide.toUpperCase() + ': пересчитываю профы...');
             kmRwRender();
+            try {
+                await _kmRwRerunMatcherAfterCropOverride(packName);
+                _kmRwToast('Источник ' + newSide.toUpperCase() + ': профы пересчитаны');
+            } catch (e) {
+                console.warn('[kmRw crop override] matcher rerun failed', e);
+                _kmRwToast('Источник выбран, matcher не пересчитался: ' + (e && e.message ? e.message : e));
+            }
+            kmRwRender();
+        };
+
+        window.kmRwFlipCropSide = function(packName) {
+            if (!packName) return;
+            const g = (typeof dayPackGeometry === 'object' && dayPackGeometry) ? dayPackGeometry[packName] : null;
+            const currentSide = (_kmRw.cropSideOverride && _kmRw.cropSideOverride[packName]) || (g && (g.previewCropSide || g.cropUrlSide)) || 'right';
+            const newSide = currentSide === 'left' ? 'right' : 'left';
+            return window.kmRwSetCropSide(packName, newSide);
         };
 
         function _kmRwFindParsed(name) {
@@ -14825,6 +15066,9 @@ ${playerList}
                     syncOk: g.cropSyncOk !== false,
                     syncReason: g.cropDesyncReason || null,
                     overridden: !!_override,
+                    selectedSourceHeader: g.selectedSourceHeader || '',
+                    selectedSourceReason: g.selectedSourceReason || '',
+                    memberHeaderFound: !!g.memberHeaderFound,
                 };
                 _kmRw.cropCache[_cacheKey] = out;
                 return out;
@@ -14951,12 +15195,23 @@ ${playerList}
                     const overrideTxt = out.overridden
                         ? '<span style="color:#a5b4fc" title="ручной выбор стороны">· flipped</span>'
                         : '';
+                    const headerTxt = out.memberHeaderFound
+                        ? '<span title="' + _kmRwEsc(out.selectedSourceReason || 'member_header') + '" style="color:#86efac">· header ' + _kmRwEsc(out.selectedSourceHeader || 'Член группы') + '</span>'
+                        : '<span title="' + _kmRwEsc(out.syncReason || 'MEMBER_HEADER_NOT_FOUND') + '" style="color:#fcd34d">· header ?</span>';
+                    const packArg = _kmRwEsc(party.packName).replace(/'/g, "\\'");
+                    const sideBtn = (side) => {
+                        const active = out.side === side;
+                        return '<button type="button" onclick="kmRwSetCropSide(\'' + packArg + '\',\'' + side + '\')" '
+                            + 'title="Manual/debug override: use ' + side.toUpperCase() + ' crop and rerun local matcher without OCR" '
+                            + 'style="margin-left:4px;background:' + (active ? '#1e3a5f' : '#1a1f29') + ';color:' + (active ? '#bfdbfe' : '#94a3b8') + ';border:1px solid ' + (active ? '#2563eb' : '#2d3748') + ';border-radius:5px;padding:1px 6px;font-size:9px;cursor:pointer;font-weight:700">Источник: ' + side.toUpperCase() + '</button>';
+                    };
                     const flipBtn = (out.hasLeft && out.hasRight)
-                        ? '<button type="button" onclick="kmRwFlipCropSide(\'' + _kmRwEsc(party.packName).replace(/'/g, "\\'") + '\')" '
-                            + 'title="Показать другую сторону скриншота (left↔right). Re-OCR не происходит — это визуальный flip." '
+                        ? sideBtn('left') + sideBtn('right') +
+                            '<button type="button" onclick="kmRwFlipCropSide(\'' + packArg + '\')" '
+                            + 'title="Показать другую сторону скриншота и пересчитать local matcher. OpenRouter OCR не запускается." '
                             + 'style="margin-left:6px;background:#1a1f29;color:#a5b4fc;border:1px solid #2d3748;border-radius:5px;padding:1px 6px;font-size:9px;cursor:pointer;font-weight:700">↔ flip</button>'
                         : '';
-                    cropTag.innerHTML = '🎯 кроп таблицы ' + sideTxt + ' · ' + syncTxt + ' ' + overrideTxt + flipBtn;
+                    cropTag.innerHTML = '🎯 кроп таблицы ' + sideTxt + ' · ' + syncTxt + ' ' + headerTxt + ' ' + overrideTxt + flipBtn;
                 });
             } else {
                 shotImg.removeAttribute('src');
