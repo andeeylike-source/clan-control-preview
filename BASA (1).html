@@ -9693,6 +9693,81 @@ function getClass2IconByClass3(c3) {
             const ocrRetryReports = [];
             const expectedRowsByPack = {};
             let firstError = null;
+            const _ccParseJsonObjectFromText = (text) => {
+                const cleaned = String(text || '').replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+                try { return JSON.parse(cleaned); } catch (_) {}
+                const m = cleaned.match(/\{[\s\S]*\}/);
+                if (m) return JSON.parse(m[0]);
+                throw new Error('Ответ не содержит JSON: ' + cleaned.slice(0, 100));
+            };
+            const _ccOcrVerifyCropNicks = async (cropDataUrl, sideLabel, preferredModel) => {
+                const prompt = 'Read only visible character nick rows in this crop. Return ONLY valid JSON: {"nicks":["..."],"rowCount":0,"notes":""}. Preserve nick spelling exactly. No stats, no headers, no markdown.';
+                const chain = _ccOcrAvailableModels();
+                const models = [];
+                if (preferredModel && chain.indexOf(preferredModel) !== -1) models.push(preferredModel);
+                chain.forEach(m => { if (models.indexOf(m) === -1) models.push(m); });
+                if (!models.length) throw new Error('side verify skipped: no active OCR model');
+                let lastError = null;
+                for (let mi = 0; mi < models.length; mi++) {
+                    const candidateModel = models[mi];
+                    const orProvider = _ccOcrModelOpenRouterProvider(candidateModel);
+                    for (let keyIndex = 0; keyIndex < openRouterKeys.length; keyIndex++) {
+                        try {
+                            const body = {
+                                model: candidateModel,
+                                messages: [{ role: 'user', content: [
+                                    { type: 'text', text: prompt },
+                                    { type: 'image_url', image_url: { url: cropDataUrl } },
+                                ]}],
+                                temperature: 0,
+                                max_tokens: 300,
+                            };
+                            if (orProvider) body.provider = orProvider;
+                            console.info('[side-verify] pre-fetch ' + sideLabel + ' model=' + candidateModel + ' key=' + (keyIndex + 1) + '/' + openRouterKeys.length);
+                            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${openRouterKeys[keyIndex]}`,
+                                    'Content-Type': 'application/json',
+                                    'HTTP-Referer': location.origin,
+                                    'X-Title': 'Clan Control OCR',
+                                },
+                                body: JSON.stringify(body),
+                                signal: AbortSignal.timeout(45000),
+                            });
+                            if (response.status === 429) {
+                                markCurrentKeyExhausted(keyIndex);
+                                lastError = new Error('OpenRouter key rate-limited');
+                                continue;
+                            }
+                            if (!response.ok) {
+                                const errJson = await response.json().catch(() => ({}));
+                                const errMsg = errJson.error?.message || `HTTP ${response.status}`;
+                                lastError = new Error(errMsg);
+                                if (_ccOcrIsEndpointDeadError(response.status, errMsg)) {
+                                    _ccOcrMarkModelUnavailable(candidateModel, response.status + ' ' + errMsg);
+                                    if (_ccOcrReadPreferredModel() === candidateModel) _ccOcrClearPreferredModel();
+                                    break;
+                                }
+                                continue;
+                            }
+                            const json = await response.json();
+                            const parsed = _ccParseJsonObjectFromText(json.choices?.[0]?.message?.content || '');
+                            const nicks = Array.isArray(parsed.nicks) ? parsed.nicks.map(n => String(n || '').trim()).filter(Boolean) : [];
+                            _ccOcrSetPreferredModel(candidateModel);
+                            return {
+                                nicks: nicks,
+                                rowCount: Number.isFinite(Number(parsed.rowCount)) ? Number(parsed.rowCount) : nicks.length,
+                                notes: String(parsed.notes || '').slice(0, 160),
+                                model: candidateModel,
+                            };
+                        } catch (e) {
+                            lastError = e;
+                        }
+                    }
+                }
+                throw lastError || new Error('side verify OCR failed');
+            };
 
             try {
                 for (let i = 0; i < shots.length; i++) {
@@ -10067,6 +10142,7 @@ function getClass2IconByClass3(c3) {
                         let chosenParsed = null;
                         let chosenRows = [];
                         let chosenText = '';
+                        let chosenModel = null;
                         for (let ocrAttempt = 0; ocrAttempt < 2; ocrAttempt++) {
                             if (ocrAttempt > 0) {
                                 setDayStatus('loading', `OCR retry 1/1: скриншот ${i + 1} из ${shots.length}...`);
@@ -10076,6 +10152,7 @@ function getClass2IconByClass3(c3) {
                             let text = '';
                             let players = [];
                             let attemptError = null;
+                            let attemptModel = null;
                             try {
                                 let response = null;
                                 let saw429 = false;
@@ -10216,6 +10293,7 @@ function getClass2IconByClass3(c3) {
                                 // Stored in sessionStorage; cleared automatically if model later 404s.
                                 if (usedModel && Array.isArray(parsed.rows)) {
                                     _ccOcrSetPreferredModel(usedModel);
+                                    attemptModel = usedModel;
                                 }
 
                                 rows.forEach(row => {
@@ -10243,6 +10321,7 @@ function getClass2IconByClass3(c3) {
                                 chosenParsed = parsed;
                                 chosenRows = rows;
                                 chosenText = text;
+                                chosenModel = attemptModel;
                             }
                             if (!_kmOcrNeedsRetry(attemptInfo)) break;
                         }
@@ -10348,10 +10427,9 @@ function getClass2IconByClass3(c3) {
                         const _rightVisualRows = _ccCountTextRowsInCrop(_cropRight.cropCanvas);
                         const _leftRowDiff = Math.abs(_leftVisualRows - _rowCount);
                         const _rightRowDiff = Math.abs(_rightVisualRows - _rowCount);
-                        // Signal A2: median per-row token count in RIGHT 55% of each crop —
-                        // member-group always shows ~4 number columns there, leader-list shows 0-2.
-                        // This is the STRONGEST image-positional signal because it's structural,
-                        // not text-position dependent.
+                        // Signal A2: median per-row token count in RIGHT 55% of each crop.
+                        // Kept as debug only: leader/command tables can also contain numeric
+                        // columns, so column tokens must never decide cropSyncOk by themselves.
                         const _leftColTokens = _ccMedianRightHalfTokens(_cropLeft.cropCanvas, _rowCount || 9);
                         const _rightColTokens = _ccMedianRightHalfTokens(_cropRight.cropCanvas, _rowCount || 9);
                         const _leftHasStatCols = _leftColTokens >= 3;
@@ -10360,14 +10438,10 @@ function getClass2IconByClass3(c3) {
                             ? (_leftHasStatCols ? 'left' : 'right')
                             : null;
                         const _columnConfident = !!_columnDecidedSide;
-                        // Combined visual decision: column-structure beats row-count when they
-                        // disagree (column count of 4 vs 1 is a much stronger fingerprint than
-                        // ±1 row count diff). Row count is only used when columns are equal.
+                        // Combined visual decision: row-count only. Column tokens are debug
+                        // evidence, not a source of truth for side selection.
                         let _visualConfident, _visualDecidedSide;
-                        if (_columnConfident) {
-                            _visualConfident = true;
-                            _visualDecidedSide = _columnDecidedSide;
-                        } else if (_rowCount > 0 && Math.abs(_leftRowDiff - _rightRowDiff) >= 2) {
+                        if (_rowCount > 0 && Math.abs(_leftRowDiff - _rightRowDiff) >= 2) {
                             _visualConfident = true;
                             _visualDecidedSide = _leftRowDiff < _rightRowDiff ? 'left' : 'right';
                         } else {
@@ -10458,21 +10532,21 @@ function getClass2IconByClass3(c3) {
                             _geometrySource = _overlapConfident ? ('overlap_' + _overlapDecidedSide) : ((memberSideRaw === 'right') ? 'member_side_right' : 'fallback_right_default');
                             _cropUrlSide = 'right';
                         }
-                        const _selectedCropBox = {
+                        let _selectedCropBox = {
                             x: _effectiveCrop.geometry.x,
                             y: _effectiveCrop.geometry.y,
                             w: _effectiveCrop.geometry.w,
                             h: _effectiveCrop.geometry.h,
                         };
-                        const _selectedHeaderGuess = memberSide === 'left'
+                        let _selectedHeaderGuess = memberSide === 'left'
                             ? 'left_panel_assumed_member_group'
                             : (memberSideRaw === 'right' ? 'right_panel_model_confirmed_member_group' : 'right_panel_legacy_default');
                         // parsedRowsSourceSide = where OCR believes rows came from, now content-derived.
                         // When overlap is confident, it IS the parsed-side. Otherwise fall back to model hint.
-                        const _parsedRowsSourceSide = _overlapConfident
+                        let _parsedRowsSourceSide = _overlapConfident
                             ? _overlapDecidedSide
                             : (memberSideRaw !== 'unknown' ? memberSideRaw : memberSide);
-                        const _previewCropSide = _cropUrlSide;
+                        let _previewCropSide = _cropUrlSide;
                         // cropSyncOk REQUIRES image-positional evidence. Model-internal
                         // consistency (e.g. parsed rows match `right_panel_nicks` AND we
                         // picked _cropRight) is NOT proof when the model has inverted its
@@ -10482,6 +10556,7 @@ function getClass2IconByClass3(c3) {
                         // same side as preview.
                         let _cropSyncOk = false;
                         let _cropDesyncReason = null;
+                        let _cropSyncOkSource = null;
                         const _visualConfirmsPreview = _visualDecidedSide && _visualDecidedSide === _previewCropSide;
                         const _visualContradictsPreview = _visualDecidedSide && _visualDecidedSide !== _previewCropSide;
                         const _overlapConfirmsPreview = _modelOverlapConfident && _modelOverlapDecidedSide === _previewCropSide;
@@ -10513,6 +10588,77 @@ function getClass2IconByClass3(c3) {
                             _cropSyncOk = false;
                             _cropDesyncReason = 'insufficient_evidence_for_sync_decision=' + (_sideDecisionSource || 'none');
                         }
+                        if (_cropSyncOk) _cropSyncOkSource = _visualConfirmsPreview ? 'visual_rows' : (_overlapConfirmsPreview ? 'model_overlap' : 'unknown');
+                        let _sideVerifyRan = false;
+                        let _leftVerifyNicks = [];
+                        let _rightVerifyNicks = [];
+                        let _leftParsedOverlap = 0;
+                        let _rightParsedOverlap = 0;
+                        let _sideVerifySelectedSide = null;
+                        const _countVerifyOverlap = (nicks) => {
+                            const seen = new Set();
+                            (nicks || []).forEach(n => {
+                                const k = (typeof normalizeNick === 'function') ? normalizeNick(n || '') : String(n || '').toLowerCase();
+                                if (k) seen.add(k);
+                            });
+                            let hit = 0;
+                            _parsedNickKeys.forEach(k => { if (seen.has(k)) hit++; });
+                            return hit;
+                        };
+                        const _hasTwoVisibleSideCrops = !!(_cropLeftUrl && _cropRightUrl && _rowCount > 0 && _leftVisualRows > 0 && _rightVisualRows > 0);
+                        const _decisionNeedsSideVerify = !!(_hasTwoVisibleSideCrops && (
+                            _visualDecidedSide ||
+                            memberSideRaw !== 'unknown' ||
+                            !_cropSyncOk ||
+                            /visual|model|fallback|forced|overlap/.test(_sideDecisionSource || '')
+                        ));
+                        if (_decisionNeedsSideVerify) {
+                            _sideVerifyRan = true;
+                            try {
+                                const _activeVerifyModel = chosenModel || _ccOcrReadPreferredModel() || (_ccOcrAvailableModels()[0] || null);
+                                const _leftVerify = await _ccOcrVerifyCropNicks(_cropLeftUrl, 'left', _activeVerifyModel);
+                                const _rightVerify = await _ccOcrVerifyCropNicks(_cropRightUrl, 'right', _leftVerify.model || _activeVerifyModel);
+                                _leftVerifyNicks = _leftVerify.nicks || [];
+                                _rightVerifyNicks = _rightVerify.nicks || [];
+                                _leftParsedOverlap = _countVerifyOverlap(_leftVerifyNicks);
+                                _rightParsedOverlap = _countVerifyOverlap(_rightVerifyNicks);
+                                if (_leftParsedOverlap > _rightParsedOverlap) _sideVerifySelectedSide = 'left';
+                                else if (_rightParsedOverlap > _leftParsedOverlap) _sideVerifySelectedSide = 'right';
+                                if (_sideVerifySelectedSide) {
+                                    memberSide = _sideVerifySelectedSide;
+                                    _effectiveCrop = _sideVerifySelectedSide === 'left' ? _cropLeft : _cropRight;
+                                    _geometrySource = 'side_verify_overlap';
+                                    _cropUrlSide = _sideVerifySelectedSide;
+                                    _previewCropSide = _sideVerifySelectedSide;
+                                    _parsedRowsSourceSide = _sideVerifySelectedSide;
+                                    _cropSyncOk = true;
+                                    _cropSyncOkSource = 'side_verify_overlap';
+                                    _cropDesyncReason = null;
+                                    _sideDecisionSource = 'side_verify_overlap_' + _sideVerifySelectedSide
+                                        + '_leftOverlap=' + _leftParsedOverlap + '_rightOverlap=' + _rightParsedOverlap;
+                                    rejectedCandidateReason = null;
+                                    wrongTableCandidate = false;
+                                    wrongTableReason = null;
+                                    forcedLeftFallback = _sideVerifySelectedSide === 'left' ? forcedLeftFallback : false;
+                                    _selectedCropBox = {
+                                        x: _effectiveCrop.geometry.x,
+                                        y: _effectiveCrop.geometry.y,
+                                        w: _effectiveCrop.geometry.w,
+                                        h: _effectiveCrop.geometry.h,
+                                    };
+                                    _selectedHeaderGuess = _sideVerifySelectedSide + '_panel_side_verify_member_group';
+                                } else {
+                                    _cropSyncOk = false;
+                                    _cropSyncOkSource = 'side_verify_overlap';
+                                    _cropDesyncReason = 'side_verify_overlap_tie_left=' + _leftParsedOverlap + '_right=' + _rightParsedOverlap;
+                                }
+                            } catch (e) {
+                                _cropSyncOk = false;
+                                _cropSyncOkSource = 'side_verify_overlap';
+                                _cropDesyncReason = 'side_verify_failed_' + String(e && e.message ? e.message : e || 'unknown').slice(0, 120);
+                                console.warn('[side-verify] failed pack=' + packName, e);
+                            }
+                        }
                         console.info('[km-crop-select] pack=' + packName
                             + ' memberSideRaw=' + memberSideRaw + ' chosen=' + memberSide
                             + ' preview=' + _previewCropSide
@@ -10523,11 +10669,15 @@ function getClass2IconByClass3(c3) {
                             + ' roster=' + _leftRosterHit + 'L/' + _rightRosterHit + 'R'
                             + ' decision=' + (_sideDecisionSource || 'none')
                             + ' syncOk=' + _cropSyncOk
+                            + ' syncSource=' + (_cropSyncOkSource || 'none')
+                            + ' sideVerify=' + (_sideVerifyRan ? (_leftParsedOverlap + 'L/' + _rightParsedOverlap + 'R selected=' + (_sideVerifySelectedSide || 'none')) : 'no')
                             + ' reason=' + (_cropDesyncReason || 'ok'));
                         packTableInfo[packName] = {
                             tableType: tableType,
                             memberSide: memberSide,
                             memberSideRaw: memberSideRaw,
+                            memberSideVerified: _sideVerifySelectedSide || null,
+                            cropSyncOkSource: _cropSyncOkSource,
                             ignoredLeaderTable: tableType === 'both' || /both/.test(_lhNotes),
                             wrongTableCandidate: wrongTableCandidate,
                             wrongTableReason: wrongTableReason,
@@ -10560,8 +10710,16 @@ function getClass2IconByClass3(c3) {
                             // ── Sync audit fields (task: member crop ↔ OCR rows sync) ──
                             parsedRowsSourceSide: _parsedRowsSourceSide,
                             previewCropSide: _previewCropSide,
+                            matcherCropSide: _previewCropSide,
                             cropSyncOk: _cropSyncOk,
+                            cropSyncOkSource: _cropSyncOkSource,
                             cropDesyncReason: _cropDesyncReason,
+                            sideVerifyRan: _sideVerifyRan,
+                            leftVerifyNicks: _leftVerifyNicks.slice(0, 16),
+                            rightVerifyNicks: _rightVerifyNicks.slice(0, 16),
+                            leftParsedOverlap: _leftParsedOverlap,
+                            rightParsedOverlap: _rightParsedOverlap,
+                            sideVerifySelectedSide: _sideVerifySelectedSide,
                             // ── Content-overlap evidence (primary side decision driver) ──
                             overlapAvailable: _overlapAvailable,
                             overlapConfident: _overlapConfident,
@@ -11693,11 +11851,14 @@ ${playerList}
                     // Preserve side-aware cropUrl/memberSide/cropUrlSide/geometrySource that the
                     // OCR provider loop stored, so we don't lose left-side wizard preview here.
                     const _prevGeom = dayPackGeometry[packName] || {};
-                    const _matcherSide = _forceSide
+                    let _matcherSide = _forceSide
                                        ? _forceSide
                                        : /LEFT/i.test(geo.preset || '') ? 'left'
                                        : /RIGHT/i.test(geo.preset || '') ? 'right'
                                        : 'unknown';
+                    if (_prevGeom.cropSyncOkSource === 'side_verify_overlap' && (_prevGeom.previewCropSide === 'left' || _prevGeom.previewCropSide === 'right')) {
+                        _matcherSide = _prevGeom.previewCropSide;
+                    }
                     // Re-evaluate cropSyncOk now that matcher side is known.
                     // cropSyncOk = preview side === matcher side === parsedRowsSourceSide (when known).
                     const _prevParsedSide = _prevGeom.parsedRowsSourceSide || _prevGeom.memberSideRaw || 'unknown';
@@ -12049,7 +12210,14 @@ ${playerList}
                                 matcherCropSide: (dayPackGeometry[packName] && dayPackGeometry[packName].matcherCropSide) || _matcherSide || 'unknown',
                                 cropUrlSide: (dayPackGeometry[packName] && dayPackGeometry[packName].cropUrlSide) || 'unknown',
                                 cropSyncOk: !!(dayPackGeometry[packName] && dayPackGeometry[packName].cropSyncOk),
+                                cropSyncOkSource: (dayPackGeometry[packName] && dayPackGeometry[packName].cropSyncOkSource) || null,
                                 cropDesyncReason: (dayPackGeometry[packName] && dayPackGeometry[packName].cropDesyncReason) || null,
+                                sideVerifyRan: !!(dayPackGeometry[packName] && dayPackGeometry[packName].sideVerifyRan),
+                                leftVerifyNicks: (dayPackGeometry[packName] && dayPackGeometry[packName].leftVerifyNicks) || [],
+                                rightVerifyNicks: (dayPackGeometry[packName] && dayPackGeometry[packName].rightVerifyNicks) || [],
+                                leftParsedOverlap: (dayPackGeometry[packName] && dayPackGeometry[packName].leftParsedOverlap) || 0,
+                                rightParsedOverlap: (dayPackGeometry[packName] && dayPackGeometry[packName].rightParsedOverlap) || 0,
+                                sideVerifySelectedSide: (dayPackGeometry[packName] && dayPackGeometry[packName].sideVerifySelectedSide) || null,
                                 forcedLeftFallback: !!(dayPackGeometry[packName] && dayPackGeometry[packName].forcedLeftFallback),
                                 forcedLeftReason: (dayPackGeometry[packName] && dayPackGeometry[packName].forcedLeftReason) || null,
                                 // ── Content-overlap evidence per row (drives sync decision) ──
