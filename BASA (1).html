@@ -19538,10 +19538,43 @@ ${playerList}
 
         var _authInitDone = false;
 
+        // Visibility-based safety net. Independent of _authInitDone — fires whenever
+        // both loginScreen and appLayout are invisible after the bootstrap window.
+        // Why: _safeInitUser sets _authInitDone=true BEFORE awaiting Supabase queries
+        // (profiles / user_app_data). If those queries hang or throw mid-flight, the
+        // flag-based timer was already cleared and neither view ever appears — visually
+        // a black screen with the background art. This check ignores the flag and looks
+        // at what the user actually sees.
+        function _ccBootVisibilityRescue(reason) {
+            try {
+                var ls = document.getElementById('loginScreen');
+                var al = document.getElementById('appLayout');
+                var lsVisible = ls && parseFloat(getComputedStyle(ls).opacity) > 0 && getComputedStyle(ls).display !== 'none';
+                var alVisible = al && !al.classList.contains('hidden') && getComputedStyle(al).display !== 'none';
+                if (!lsVisible && !alVisible) {
+                    console.warn('[auth-rescue] both views invisible — forcing loginScreen. reason=' + reason);
+                    _showLoginScreen();
+                }
+            } catch (e) {
+                console.warn('[auth-rescue] check failed:', e);
+                try { _showLoginScreen(); } catch (_) {}
+            }
+        }
+        setTimeout(function () { _ccBootVisibilityRescue('boot-12s'); }, 12000);
+        setTimeout(function () { _ccBootVisibilityRescue('boot-20s'); }, 20000);
+
         async function _safeInitUser(user) {
             if (_authInitDone) return;
             _authInitDone = true;
-            await _initWithSupabaseUser(user);
+            try {
+                await _initWithSupabaseUser(user);
+            } catch (e) {
+                // Why: previously a sync/async throw from _initWithSupabaseUser left the
+                // page on the black-art background — _authInitDone was already true so
+                // the flag-based timer skipped its fallback. Force login as last resort.
+                console.error('[auth] _initWithSupabaseUser failed, showing login:', e);
+                try { _showLoginScreen(); } catch (_) {}
+            }
         }
 
         async function _initWithSupabaseUser(user) {
@@ -19671,7 +19704,21 @@ ${playerList}
                         clearTimeout(_initialSafetyTimer);
                         if (_authInitDone) return;
                         if (session && session.user) {
-                            _safeInitUser(session.user);
+                            // _safeInitUser is async — guard the call site too so a
+                            // synchronous-throw or unhandled rejection cannot leave the
+                            // page on the black-art background.
+                            try {
+                                var p = _safeInitUser(session.user);
+                                if (p && typeof p.then === 'function') {
+                                    p.catch(function(err) {
+                                        console.error('[auth] _safeInitUser rejected, showing login:', err);
+                                        try { _showLoginScreen(); } catch (_) {}
+                                    });
+                                }
+                            } catch (err) {
+                                console.error('[auth] _safeInitUser threw, showing login:', err);
+                                _showLoginScreen();
+                            }
                         } else {
                             _showLoginScreen();
                         }
