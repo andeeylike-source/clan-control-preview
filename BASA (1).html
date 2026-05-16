@@ -3676,7 +3676,7 @@
             </div>
             <div class="card mb-6 cc-settings-provider">
                 <h2 class="text-lg font-bold mb-2">Провайдер анализа</h2>
-                <p class="text-slate-500 text-sm mb-4">Основной поток: OpenRouter OCR / Vision fallback chain (qwen, openrouter/free, llama, pixtral, baidu). OCR.space использует локальный proxy.</p>
+                <p class="text-slate-500 text-sm mb-4">Основной поток: OpenRouter, primary free chain — nvidia/nemotron-nano-12b-v2-vl:free → openrouter/free. Остальные discovered free vision модели подключаются только как emergency fallback, если оба primary мертвы. OCR.space использует локальный proxy.</p>
                 <div style="display:grid;gap:12px">
                     <label style="display:block">
                         <div style="font-size:11px;color:#64748b;margin-bottom:6px;text-transform:uppercase;font-weight:700">Провайдер</div>
@@ -8265,13 +8265,25 @@ function getClass2IconByClass3(c3) {
             return chain[0] || 'baidu/qianfan-ocr-fast:free';
         }
 
+        // Primary free OCR chain — locked, user-validated. Always tried first when models
+        // are available. Order based on real benchmark on 5.jpg:
+        //   1) nvidia/nemotron-nano-12b-v2-vl:free — fast, 9 rows, correct nick spelling
+        //   2) openrouter/free                     — fast, 9 rows, minor nick mistakes
+        // Heavy nemotron-3-nano-omni-30b-a3b-reasoning was slow + broken JSON, so it MUST NOT
+        // be at the head of the chain even if discovery considers it free.
+        const _CC_OCR_PRIMARY_FREE_CHAIN = [
+            'nvidia/nemotron-nano-12b-v2-vl:free',
+            'openrouter/free'
+        ];
         // OCR model fallback chain. Override via localStorage key 'clanControl_ocrModelChain'
         // (JSON array of OpenRouter model ids). Order = preference; first available is tried first.
-        // Multi-model default so a single dead endpoint cannot block analyze. baidu kept last
-        // because it returns 404 "No endpoints found" on OpenRouter free tier.
+        // Multi-model default so a single dead endpoint cannot block analyze. Primary chain ids
+        // are duplicated here so a hard reset (which drops discovery cache) still picks them up.
+        // baidu kept last because it returns 404 "No endpoints found" on OpenRouter free tier.
         const _CC_OCR_DEFAULT_MODEL_CHAIN = [
-            'qwen/qwen2.5-vl-72b-instruct:free',
+            'nvidia/nemotron-nano-12b-v2-vl:free',
             'openrouter/free',
+            'qwen/qwen2.5-vl-72b-instruct:free',
             'meta-llama/llama-3.2-11b-vision-instruct:free',
             'mistralai/pixtral-12b:free',
             'baidu/qianfan-ocr-fast:free'
@@ -8471,14 +8483,21 @@ function getClass2IconByClass3(c3) {
         window._ccOcrSetPreferredModel = _ccOcrSetPreferredModel;
         window._ccOcrClearPreferredModel = _ccOcrClearPreferredModel;
 
-        // ── Effective chain: FREE ONLY (preferred ∪ user-custom ∪ discoveredFree ∪ hardcoded) ──
-        // CRITICAL: paid models are forbidden. discovery.freeVision is authoritative.
-        // hardcoded chain entries are accepted only when discovery has no data (fallback),
-        // gated by the :free suffix heuristic so we never accidentally hit a paid endpoint.
+        // ── Effective chain: FREE ONLY ──
+        // Order:
+        //   1) _CC_OCR_PRIMARY_FREE_CHAIN — locked, always first when ids are available.
+        //   2) preferred (last-known-working), if not already in primary.
+        //   3) user-custom override (localStorage).
+        //   4) discoveredFree from OpenRouter catalog — these are emergency fallback.
+        //   5) hardcoded default — last-resort when discovery is empty.
+        // CRITICAL: paid models are forbidden. discovery.freeVision is authoritative for
+        // non-primary ids. Primary chain ids are whitelisted regardless of discovery state
+        // (user has validated them on a real screenshot).
         function _ccOcrEffectiveChain() {
             const resolved = _ccOcrResolveChain();
             const cache = _ccOcrReadDiscoveryCache();
             const hasFreshDiscovery = !!(cache && cache.ts && Array.isArray(cache.freeVision));
+            const primary = _CC_OCR_PRIMARY_FREE_CHAIN.slice();
             const userCustom = resolved.source === 'custom' ? resolved.chain.slice() : [];
             const discoveredAll = (cache && Array.isArray(cache.vision)) ? cache.vision.slice() : [];
             const discoveredFree = hasFreshDiscovery ? cache.freeVision.slice() : [];
@@ -8487,6 +8506,8 @@ function getClass2IconByClass3(c3) {
             const isFreeAllowed = (id) => {
                 if (!id) return false;
                 if (_ccIsBlockedModel(id)) return false;
+                // Primary chain ids are vetted — always allowed even if not in catalog.
+                if (primary.indexOf(id) !== -1) return true;
                 if (hasFreshDiscovery) {
                     // Discovery is authoritative — only ids it labelled as free pass.
                     return cache.freeVision.indexOf(id) !== -1;
@@ -8510,12 +8531,17 @@ function getClass2IconByClass3(c3) {
                     merged.push(m);
                 }
             };
+            // Primary FIRST — always. Pinned by benchmark, never displaced by preferred/user/discovery.
+            pushArr(primary);
             if (preferred) pushArr([preferred]);
             pushArr(userCustom);
             pushArr(discoveredFree);
             pushArr(hardcoded);
+            const primaryInChain = primary.filter(m => merged.indexOf(m) !== -1);
+            const emergencyFallback = merged.filter(m => primary.indexOf(m) === -1);
             const parts = [];
-            if (preferred && merged[0] === preferred) parts.push('preferred');
+            if (primaryInChain.length) parts.push('primary(' + primaryInChain.length + ')');
+            if (preferred && merged.indexOf(preferred) !== -1 && primary.indexOf(preferred) === -1) parts.push('preferred');
             if (userCustom.length) parts.push('user');
             if (discoveredFree.length) parts.push('discoveredFree');
             if (!hasFreshDiscovery) parts.push('hardcodedFallback');
@@ -8523,6 +8549,9 @@ function getClass2IconByClass3(c3) {
             return {
                 chain: merged,
                 source: source,
+                primary: primary,
+                primaryInChain: primaryInChain,
+                emergencyFallback: emergencyFallback,
                 userCustom: userCustom,
                 discovered: discoveredAll,
                 freeDiscovered: discoveredFree,
@@ -8734,6 +8763,9 @@ function getClass2IconByClass3(c3) {
             const resolved = _ccOcrResolveChain();
             const unavailableList = Object.keys(_ccOcrUnavailableModels).filter(m => _ccOcrIsModelUnavailable(m));
             const available = effective.chain.filter(m => !_ccOcrIsModelUnavailable(m));
+            const primaryAvailable = (effective.primaryInChain || []).filter(m => !_ccOcrIsModelUnavailable(m));
+            const emergencyFallback = effective.emergencyFallback || [];
+            const emergencyAvailable = emergencyFallback.filter(m => !_ccOcrIsModelUnavailable(m));
             const keys = (typeof getOpenRouterApiKeys === 'function') ? getOpenRouterApiKeys() : [];
             const provider = (typeof getAnalysisProvider === 'function') ? getAnalysisProvider() : null;
             return {
@@ -8753,6 +8785,13 @@ function getClass2IconByClass3(c3) {
                 discoveryError: effective.discoveryError,
                 discoveryTs: effective.discoveryTs,
                 hardcodedChain: effective.hardcoded,
+                primaryChain: effective.primary || [],
+                primaryInChain: effective.primaryInChain || [],
+                primaryAvailable: primaryAvailable,
+                primaryAvailableCount: primaryAvailable.length,
+                emergencyFallback: emergencyFallback,
+                emergencyFallbackCount: emergencyFallback.length,
+                emergencyAvailableCount: emergencyAvailable.length,
                 preferred: effective.preferred,
                 preferredInChain: effective.preferredInChain,
                 droppedPaid: effective.droppedPaid,
@@ -17128,8 +17167,16 @@ ${playerList}
                 const droppedPaidLine = (d.droppedPaid && d.droppedPaid.length)
                     ? '<div style="margin-top:4px;color:#94a3b8;font-size:10px">⛔ Отброшено как paid: ' + d.droppedPaid.slice(0, 4).map(m => esc(m)).join(', ') + (d.droppedPaid.length > 4 ? ' +' + (d.droppedPaid.length - 4) : '') + '</div>'
                     : '';
+                const primaryHtml = (d.primaryChain || []).map(m => badge(m, '#1e1430', '#c4b5fd')).join('');
+                const primaryAvail = d.primaryAvailableCount || 0;
+                const primaryTotal = (d.primaryChain || []).length;
+                const primaryColor = primaryAvail === primaryTotal ? '#86efac' : (primaryAvail > 0 ? '#fcd34d' : '#fca5a5');
+                const emergencyColor = (d.emergencyAvailableCount || 0) > 0 ? '#93c5fd' : '#64748b';
                 chainStatusEl.innerHTML =
-                    '<div><b>OCR model chain</b> <span style="color:#64748b">(source: ' + esc(d.chainSource) + ', free-only)</span></div>' +
+                    '<div><b>Primary free OCR chain</b> <span style="color:#64748b">(locked, всегда первая)</span></div>' +
+                    '<div style="margin-top:4px">' + (primaryHtml || '<span style="color:#ef4444">(пусто)</span>') + '</div>' +
+                    '<div style="margin-top:4px;color:#64748b">Primary доступно: <b style="color:' + primaryColor + '">' + primaryAvail + '/' + primaryTotal + '</b> · Emergency fallback: <b style="color:' + emergencyColor + '">' + (d.emergencyAvailableCount || 0) + '/' + (d.emergencyFallbackCount || 0) + '</b></div>' +
+                    '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #1e2530"><b>OCR model chain</b> <span style="color:#64748b">(source: ' + esc(d.chainSource) + ', free-only)</span></div>' +
                     '<div style="margin-top:4px">' + (chainHtml || '<span style="color:#ef4444">(пусто — нет доступных free vision моделей)</span>') + '</div>' +
                     '<div style="margin-top:6px;color:#64748b">Active OCR model: <b style="color:' + (d.nextModel ? '#86efac' : '#ef4444') + '">' + esc(d.nextModel || '(нет)') + '</b> · Unavailable: <b style="color:' + (d.unavailableCount ? '#fca5a5' : '#94a3b8') + '">' + d.unavailableCount + '</b></div>' +
                     '<div style="margin-top:4px;color:#64748b">Preferred (last working): ' + preferredLine + '</div>' +
