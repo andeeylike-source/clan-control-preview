@@ -9791,7 +9791,7 @@ function getClass2IconByClass3(c3) {
         async function analyzeWithOpenRouterBaiduProvider({ dateStr, shots }) {
             console.info('[openrouter-ocr] provider=baidu-only');
             console.info('[openrouter-ocr] no paid fallback');
-            const BAIDU_OCR_PROMPT = `Extract the "Член группы" (party member) table from this game screenshot.\nReturn ONLY valid JSON:\n{"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"total_count":0,"confidence":0,"notes":"","table_type":"party_members","member_side":"unknown"}\nRules:\n- The screenshot may contain TWO side-by-side panels: a "Лидер"/"Командный канал"/"Глава"/"Состав" leader-list table on one side, and a "Член группы" (party members) table on the other side. The "Член группы" table can be on the LEFT or on the RIGHT.\n- Extract rows ONLY from the table titled "Член группы". IGNORE any "Лидер"/"Командный канал"/"Глава"/"Состав" leader-list table.\n- total_count is the number of real player rows in the extracted "Член группы" table, or the N from "Состав: N чел." inside that same party-member window. Do not count headers, column labels, leader-list rows, chat, background text, or any rows outside the party-member table.\n- table_type values: "party_members" if you extracted Член группы rows; "leader_list" if ONLY a Лидер/Командный канал table is visible (no Член группы); "both" if both tables are visible and you extracted Член группы; "unknown" if unsure.\n- member_side values: "left" if Член группы is on the left side of the screenshot; "right" if on the right; "unknown" if you cannot tell.\n- preserve nick spelling exactly as seen\n- kills, deaths, pvp, pve must be integers\n- if a value is unreadable, use null\n- no markdown\n- no code fences\n- if there is NO "Член группы" table at all, set rows=[], total_count=0, table_type="leader_list", and notes="leader_list"`;
+            const BAIDU_OCR_PROMPT = `Extract the "Член группы" (party member) table from this game screenshot.\nReturn ONLY valid JSON:\n{"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"total_count":0,"confidence":0,"notes":"","table_type":"party_members","member_side":"unknown","left_panel_nicks":[],"right_panel_nicks":[]}\nRules:\n- The screenshot may contain TWO side-by-side panels: a "Лидер"/"Командный канал"/"Глава"/"Состав" leader-list table on one side, and a "Член группы" (party members) table on the other side. The "Член группы" table can be on the LEFT or on the RIGHT.\n- Extract rows ONLY from the table titled "Член группы". IGNORE any "Лидер"/"Командный канал"/"Глава"/"Состав" leader-list table.\n- total_count is the number of real player rows in the extracted "Член группы" table, or the N from "Состав: N чел." inside that same party-member window. Do not count headers, column labels, leader-list rows, chat, background text, or any rows outside the party-member table.\n- table_type values: "party_members" if you extracted Член группы rows; "leader_list" if ONLY a Лидер/Командный канал table is visible (no Член группы); "both" if both tables are visible and you extracted Член группы; "unknown" if unsure.\n- member_side values: "left" if Член группы is on the left side of the screenshot; "right" if on the right; "unknown" if you cannot tell.\n- CRITICAL — side-evidence fields for sync verification:\n  - left_panel_nicks: list ALL nicks visible in the LEFT panel of the screenshot (whatever table that is — party members or leader list). Order = top-to-bottom. Up to 12 nicks. Preserve spelling exactly. Empty array if there is no left panel.\n  - right_panel_nicks: list ALL nicks visible in the RIGHT panel of the screenshot (whatever table that is). Order = top-to-bottom. Up to 12 nicks. Preserve spelling exactly. Empty array if there is no right panel.\n  These two lists are used to verify which panel "rows" actually came from. They must reflect what is visually on each side regardless of which side is "Член группы".\n- preserve nick spelling exactly as seen\n- kills, deaths, pvp, pve must be integers\n- if a value is unreadable, use null\n- no markdown\n- no code fences\n- if there is NO "Член группы" table at all, set rows=[], total_count=0, table_type="leader_list", and notes="leader_list"`;
 
             const openRouterKeys = getOpenRouterApiKeys();
             const exhaustionBefore = getOpenRouterExhaustionSnapshot();
@@ -10151,74 +10151,100 @@ function getClass2IconByClass3(c3) {
                         // Notes-based hints
                         const _notesLeaderHint = /leader.?list|лидер|глава|командный|состав/.test(_lhNotes);
                         const _notesMemberHint = /член.*группы/.test(_lhNotes);
-                        // Resolve final memberSide + record audit fields.
-                        // wrongTableCandidate = TRUE only when we genuinely cannot confirm the rows
-                        // came from a member-group table. Forced-left for ambiguous-but-positive
-                        // signals (e.g. tableType='both', tableType='party_members' + side unknown)
-                        // is NOT a wrong-table situation — model returned member-group rows, we
-                        // just had to pick a side.
+                        // ── PRIMARY side decision: name overlap between parsed rows and the
+                        // model-supplied left_panel_nicks / right_panel_nicks lists. The model
+                        // emits these in the SAME OCR call (no extra request). Side with more
+                        // matches IS the side rows came from — regardless of what member_side
+                        // claimed. Falls through to legacy member_side heuristic only when the
+                        // overlap evidence is missing or ambiguous.
+                        const _leftPanelNicks = Array.isArray(parsed.left_panel_nicks) ? parsed.left_panel_nicks : [];
+                        const _rightPanelNicks = Array.isArray(parsed.right_panel_nicks) ? parsed.right_panel_nicks : [];
+                        const _normSet = (arr) => {
+                            const s = new Set();
+                            (arr || []).forEach(n => {
+                                const t = typeof n === 'string' ? n.trim() : '';
+                                if (!t) return;
+                                const k = (typeof normalizeNick === 'function') ? normalizeNick(t) : t.toLowerCase();
+                                if (k) s.add(k);
+                            });
+                            return s;
+                        };
+                        const _leftSet = _normSet(_leftPanelNicks);
+                        const _rightSet = _normSet(_rightPanelNicks);
+                        const _parsedNickKeys = players.map(p => (typeof normalizeNick === 'function') ? normalizeNick(p.name || '') : String(p.name || '').toLowerCase()).filter(Boolean);
+                        let _leftHit = 0, _rightHit = 0;
+                        _parsedNickKeys.forEach(k => { if (_leftSet.has(k)) _leftHit++; if (_rightSet.has(k)) _rightHit++; });
+                        const _rowCount = _parsedNickKeys.length;
+                        // Confident decision requires (a) majority overlap on one side AND
+                        // (b) strict dominance over the other side. Equal/zero overlap → no decision.
+                        const _majority = _rowCount > 0 ? Math.ceil(_rowCount * 0.5) : 0;
+                        const _overlapMaxHit = Math.max(_leftHit, _rightHit);
+                        const _overlapDecidedSide =
+                            (_overlapMaxHit > 0 && _overlapMaxHit >= _majority && _leftHit !== _rightHit)
+                                ? (_leftHit > _rightHit ? 'left' : 'right')
+                                : null;
+                        const _overlapConfident = !!_overlapDecidedSide;
+                        const _overlapAvailable = (_leftSet.size > 0 || _rightSet.size > 0);
                         let memberSide = memberSideRaw;
                         let wrongTableCandidate = false;
                         let wrongTableReason = null;
                         let rejectedCandidateReason = null;
                         let forcedLeftFallback = false;
                         let forcedLeftReason = null;
-                        if (memberSideRaw === 'left') {
-                            // Model is confident — honor it.
+                        let _sideDecisionSource = null;
+                        if (_overlapConfident) {
+                            // Overlap evidence is authoritative — overrides model's member_side hint.
+                            memberSide = _overlapDecidedSide;
+                            _sideDecisionSource = 'name_overlap_' + _overlapDecidedSide + '_hit=' + _overlapMaxHit + '/' + _rowCount;
+                            if (memberSideRaw !== 'unknown' && memberSideRaw !== _overlapDecidedSide) {
+                                // Model said the wrong side. Audit but trust overlap.
+                                rejectedCandidateReason = 'model_said_' + memberSideRaw + '_but_overlap_says_' + _overlapDecidedSide;
+                            }
+                        } else if (memberSideRaw === 'left') {
+                            memberSide = 'left';
+                            _sideDecisionSource = 'model_member_side_left_no_overlap_evidence';
                         } else if (memberSideRaw === 'right') {
-                            // Honor model, but override to LEFT when right panel contradicts itself:
-                            // model returned rows AND said right, yet notes describe a leader-list
-                            // panel (right is leader, member rows must therefore be on the left).
+                            memberSide = 'right';
+                            _sideDecisionSource = 'model_member_side_right_no_overlap_evidence';
                             if (tableType === 'both' && _notesLeaderHint && !_notesMemberHint) {
                                 forcedLeftFallback = true;
                                 forcedLeftReason = 'model_said_right_but_notes_hint_right_is_leader_list';
                                 rejectedCandidateReason = 'right_panel_likely_leader_list';
                                 memberSide = 'left';
+                                _sideDecisionSource = 'forced_left_notes_hint';
                             }
                         } else {
-                            // memberSideRaw === 'unknown'
-                            if (tableType === 'both') {
-                                // Two tables visible, model didn't tell us which side has members.
-                                // Default to LEFT — matches the most common UI layout.
+                            // memberSideRaw === 'unknown' AND no overlap evidence → fall back to tableType.
+                            if (tableType === 'both' || tableType === 'party_members') {
                                 memberSide = 'left';
                                 forcedLeftFallback = true;
-                                forcedLeftReason = 'side_unknown_both_tables_default_left';
-                                rejectedCandidateReason = 'right_crop_rejected_unknown_side_both_tables';
-                            } else if (tableType === 'party_members') {
-                                // Model says ONE party-member table; side unknown. Default LEFT —
-                                // legacy right-default was the bug that caused the 5.jpg #5 desync.
-                                memberSide = 'left';
-                                forcedLeftFallback = true;
-                                forcedLeftReason = 'side_unknown_party_members_default_left';
-                                rejectedCandidateReason = 'right_crop_rejected_party_members_side_unknown';
+                                forcedLeftReason = 'side_unknown_' + tableType + '_default_left';
+                                _sideDecisionSource = 'fallback_left_' + tableType;
                             } else if (tableType === 'unknown') {
-                                // Both side and table-type unknown — pick LEFT and flag as
-                                // genuinely-uncertain (wrong-table candidate).
                                 memberSide = 'left';
                                 forcedLeftFallback = true;
                                 forcedLeftReason = 'side_and_table_type_unknown_default_left';
                                 wrongTableCandidate = true;
                                 wrongTableReason = 'side_and_table_type_unknown_default_left';
-                                rejectedCandidateReason = 'right_crop_rejected_fully_unknown';
+                                _sideDecisionSource = 'fallback_left_unknown';
                             } else if (tableType === 'leader_list') {
-                                // Pure leader-list view — no member-group crop is correct. Keep right
-                                // crop for visual debugging but flag the pack so rows go to CHECK.
                                 memberSide = 'right';
                                 wrongTableCandidate = true;
                                 wrongTableReason = 'table_type_is_leader_list_no_member_group';
+                                _sideDecisionSource = 'fallback_right_leader_list';
                             } else {
-                                // tableType === something else — legacy right default.
                                 memberSide = 'right';
+                                _sideDecisionSource = 'fallback_right_legacy';
                             }
                         }
                         let _effectiveCrop, _geometrySource, _cropUrlSide;
                         if (memberSide === 'left') {
                             _effectiveCrop = _cropLeft;
-                            _geometrySource = forcedLeftFallback ? ('forced_left_due_to_' + forcedLeftReason) : 'member_side_left';
+                            _geometrySource = _overlapConfident ? ('overlap_' + _overlapDecidedSide) : (forcedLeftFallback ? ('forced_left_due_to_' + forcedLeftReason) : 'member_side_left');
                             _cropUrlSide = 'left';
                         } else {
                             _effectiveCrop = _cropRight;
-                            _geometrySource = (memberSideRaw === 'right') ? 'member_side_right' : 'fallback_right_default';
+                            _geometrySource = _overlapConfident ? ('overlap_' + _overlapDecidedSide) : ((memberSideRaw === 'right') ? 'member_side_right' : 'fallback_right_default');
                             _cropUrlSide = 'right';
                         }
                         const _selectedCropBox = {
@@ -10230,25 +10256,41 @@ function getClass2IconByClass3(c3) {
                         const _selectedHeaderGuess = memberSide === 'left'
                             ? 'left_panel_assumed_member_group'
                             : (memberSideRaw === 'right' ? 'right_panel_model_confirmed_member_group' : 'right_panel_legacy_default');
-                        // parsedRowsSourceSide = where OCR believes rows came from. When model
-                        // didn't tell us, treat as our inferred side but mark uncertainty in sync.
-                        const _parsedRowsSourceSide = memberSideRaw !== 'unknown' ? memberSideRaw : memberSide;
-                        const _previewCropSide = _cropUrlSide; // single source of truth for wizard
-                        let _cropSyncOk = true;
+                        // parsedRowsSourceSide = where OCR believes rows came from, now content-derived.
+                        // When overlap is confident, it IS the parsed-side. Otherwise fall back to model hint.
+                        const _parsedRowsSourceSide = _overlapConfident
+                            ? _overlapDecidedSide
+                            : (memberSideRaw !== 'unknown' ? memberSideRaw : memberSide);
+                        const _previewCropSide = _cropUrlSide;
+                        // cropSyncOk REQUIRES overlap evidence — name-side agreement alone is NOT
+                        // proof. Sync true only when: (a) we have overlap evidence AND it points to
+                        // the chosen side. When overlap is missing or weak, sync stays false so
+                        // matcher_trigger / profa-write is blocked downstream.
+                        let _cropSyncOk = false;
                         let _cropDesyncReason = null;
-                        if (memberSideRaw === 'unknown') {
-                            // Model didn't tell us where rows came from. Preview shows our best
-                            // guess but we cannot guarantee sync until the user confirms (or flips).
+                        if (_overlapConfident && _overlapDecidedSide === _previewCropSide) {
+                            _cropSyncOk = true;
+                            _cropDesyncReason = null;
+                        } else if (_overlapConfident && _overlapDecidedSide !== _previewCropSide) {
                             _cropSyncOk = false;
-                            _cropDesyncReason = 'model_member_side_unknown_inferred_' + memberSide;
-                        } else if (_parsedRowsSourceSide !== _previewCropSide) {
-                            // Override happened (e.g. model said right but we forced left). The
-                            // preview shows our override; rows came from where model said.
+                            _cropDesyncReason = 'overlap_says_' + _overlapDecidedSide + '_but_preview_' + _previewCropSide;
+                        } else if (!_overlapAvailable) {
                             _cropSyncOk = false;
-                            _cropDesyncReason = 'parsed_side_' + _parsedRowsSourceSide + '_but_preview_' + _previewCropSide
-                                + (forcedLeftReason ? '_reason_' + forcedLeftReason : '');
+                            _cropDesyncReason = 'no_panel_nicks_from_model_cannot_verify_overlap';
+                        } else {
+                            // Overlap lists exist but neither side won the majority/dominance test.
+                            _cropSyncOk = false;
+                            _cropDesyncReason = 'ambiguous_overlap_left=' + _leftHit + '_right=' + _rightHit + '_rows=' + _rowCount;
                         }
-                        console.info('[km-crop-select] pack=' + packName + ' memberSideRaw=' + memberSideRaw + ' memberSide=' + memberSide + ' tableType=' + tableType + ' forcedLeft=' + forcedLeftFallback + ' wrongTable=' + wrongTableCandidate + ' syncOk=' + _cropSyncOk + ' reason=' + (forcedLeftReason || wrongTableReason || _cropDesyncReason || 'none'));
+                        console.info('[km-crop-select] pack=' + packName
+                            + ' memberSideRaw=' + memberSideRaw + ' chosen=' + memberSide
+                            + ' tableType=' + tableType
+                            + ' overlap left=' + _leftHit + '/' + _leftSet.size
+                            + ' right=' + _rightHit + '/' + _rightSet.size
+                            + ' rows=' + _rowCount
+                            + ' decision=' + (_sideDecisionSource || 'none')
+                            + ' syncOk=' + _cropSyncOk
+                            + ' reason=' + (_cropDesyncReason || 'ok'));
                         packTableInfo[packName] = {
                             tableType: tableType,
                             memberSide: memberSide,
@@ -10287,6 +10329,18 @@ function getClass2IconByClass3(c3) {
                             previewCropSide: _previewCropSide,
                             cropSyncOk: _cropSyncOk,
                             cropDesyncReason: _cropDesyncReason,
+                            // ── Content-overlap evidence (primary side decision driver) ──
+                            overlapAvailable: _overlapAvailable,
+                            overlapConfident: _overlapConfident,
+                            overlapDecidedSide: _overlapDecidedSide,
+                            overlapLeftHit: _leftHit,
+                            overlapRightHit: _rightHit,
+                            overlapLeftSetSize: _leftSet.size,
+                            overlapRightSetSize: _rightSet.size,
+                            overlapRowCount: _rowCount,
+                            sideDecisionSource: _sideDecisionSource,
+                            leftPanelNicks: _leftPanelNicks.slice(0, 16),
+                            rightPanelNicks: _rightPanelNicks.slice(0, 16),
                         };
                         // Leader-list hints: only when model says leader_list (no Член группы extracted).
                         // If table_type is party_members or both, NEVER mark as leader_list — valid screen.
@@ -11600,7 +11654,27 @@ ${playerList}
                             writeTarget.matcher_autoTrained = false;
                             writeTarget.matcher_originalStatus = 'WRONG_TABLE_CANDIDATE';
                         }
+                        // Crop-desync guard: when content-overlap evidence does NOT confirm
+                        // that the chosen crop side contains the parsed rows, the matcher's
+                        // icon crops are taken from the wrong panel — profa-write would
+                        // silently train on the wrong table. Demote trigger and tag the row
+                        // with CROP_DESYNC so the wizard surfaces it for manual review.
+                        const _packGeomForSync = (dayPackGeometry || {})[packName] || {};
+                        if (_packGeomForSync.cropSyncOk === false) {
+                            writeTarget.matcher_cropSyncOk = false;
+                            writeTarget.matcher_cropDesyncReason = _packGeomForSync.cropDesyncReason || 'crop_desync';
+                            writeTarget.matcher_trigger = false;
+                            writeTarget.matcher_wouldTrigger = false;
+                            writeTarget.matcher_autoTrained = false;
+                            // Don't overwrite WRONG_TABLE_CANDIDATE if it already set originalStatus.
+                            if (!writeTarget.matcher_originalStatus) {
+                                writeTarget.matcher_originalStatus = 'CROP_DESYNC';
+                            }
+                        } else if (_packGeomForSync.cropSyncOk === true) {
+                            writeTarget.matcher_cropSyncOk = true;
+                        }
                         const _finalReason = (writeTarget.matcher_wrongTableCandidate) ? 'wrong_table_candidate'
+                            : (writeTarget.matcher_cropSyncOk === false) ? 'crop_desync'
                             : _trainedStrong ? 'trained_strong'
                             : (!_CC_AUTO_PROFA_WRITE && _baseAutoWouldTrigger) ? 'manual_mode_auto_hint_only'
                             : (!_CC_AUTO_PROFA_WRITE) ? 'manual_mode_hint_only'
@@ -11728,7 +11802,15 @@ ${playerList}
                                 cropSyncOk: !!(dayPackGeometry[packName] && dayPackGeometry[packName].cropSyncOk),
                                 cropDesyncReason: (dayPackGeometry[packName] && dayPackGeometry[packName].cropDesyncReason) || null,
                                 forcedLeftFallback: !!(dayPackGeometry[packName] && dayPackGeometry[packName].forcedLeftFallback),
-                                forcedLeftReason: (dayPackGeometry[packName] && dayPackGeometry[packName].forcedLeftReason) || null
+                                forcedLeftReason: (dayPackGeometry[packName] && dayPackGeometry[packName].forcedLeftReason) || null,
+                                // ── Content-overlap evidence per row (drives sync decision) ──
+                                overlapAvailable: !!(dayPackGeometry[packName] && dayPackGeometry[packName].overlapAvailable),
+                                overlapConfident: !!(dayPackGeometry[packName] && dayPackGeometry[packName].overlapConfident),
+                                overlapDecidedSide: (dayPackGeometry[packName] && dayPackGeometry[packName].overlapDecidedSide) || null,
+                                overlapLeftHit: (dayPackGeometry[packName] && dayPackGeometry[packName].overlapLeftHit) || 0,
+                                overlapRightHit: (dayPackGeometry[packName] && dayPackGeometry[packName].overlapRightHit) || 0,
+                                overlapRowCount: (dayPackGeometry[packName] && dayPackGeometry[packName].overlapRowCount) || 0,
+                                sideDecisionSource: (dayPackGeometry[packName] && dayPackGeometry[packName].sideDecisionSource) || null
                             });
                         } catch(e) { /* ignore */ }
                         window._gtDebug.matcherProcessed = (window._gtDebug.matcherProcessed || 0) + 1;
@@ -14381,6 +14463,10 @@ ${playerList}
                 const _wtReason = parsed.matcher_wrongTableReason || 'wrong_table_candidate';
                 return '<span title="Источник скрина — не та таблица (вероятно правая клан/лидер вместо «Член группы»). Причина: ' + _kmRwEsc(_wtReason) + '" style="font-size:8.5px;color:#fda4af;background:#3f0d1c;border:1px solid #be123c;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">WRONG_TABLE</span>';
             }
+            if (parsed.matcher_cropSyncOk === false) {
+                const _dsReason = parsed.matcher_cropDesyncReason || 'crop_desync';
+                return '<span title="Crop preview не содержит большинство parsed rows — auto-write и training заблокированы. Причина: ' + _kmRwEsc(_dsReason) + '" style="font-size:8.5px;color:#fcd34d;background:#3a2a08;border:1px solid #b45309;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">CROP_DESYNC</span>';
+            }
             if (parsed.matcher_locInvalid) {
                 return '<span title="Плохой кроп иконки — выбери профу вручную" style="font-size:8.5px;color:#f97316;background:#1c0a00;border:1px solid #7c2d12;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">BAD CROP</span>';
             }
@@ -14996,6 +15082,13 @@ ${playerList}
                     const parsed = _kmRwFindParsed(row.name) || row;
                     if (!parsed || parsed.profaSource !== 'manual_review') {
                         // Not manually corrected — skip silently (do not count, user didn't touch it)
+                        continue;
+                    }
+                    // Crop-desync guard: parsed rows came from a different panel than the
+                    // crop the matcher used. matcher_cropUrl is therefore from the wrong
+                    // table and cannot be used as a training exemplar for the player's profa.
+                    if (parsed.matcher_cropSyncOk === false) {
+                        _skip(row.name, parsed.profa, 'crop_desync');
                         continue;
                     }
                     const selectedProfa = parsed.profa;
