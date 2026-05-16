@@ -10141,29 +10141,37 @@ function getClass2IconByClass3(c3) {
                             : ((/leader_list/.test(_lhNotes) && !/член.*группы/.test(_lhNotes)) ? 'leader_list' : 'unknown');
                         const memberSideRaw = (_msRaw === 'left' || _msRaw === 'right') ? _msRaw : 'unknown';
                         // ── KM crop source selection (member-group table) ──
-                        // Build BOTH candidate crops so we can prefer left when model is ambiguous
-                        // and the screen contains two tables side-by-side. The legacy fallback was
-                        // to default unknown→right, which silently picked the clan/leader panel
-                        // when the member-group table was actually on the LEFT.
+                        // Build BOTH candidate crops every time. Storing both lets the wizard flip
+                        // the preview without re-running OCR when the model's `member_side` hint
+                        // disagreed with where rows were actually extracted from.
                         const _cropLeft = _kmComputeSideCrop(img, 'left');
                         const _cropRight = crop; // already computed for right panel
+                        const _cropLeftUrl = _cropLeft.cropCanvas.toDataURL('image/png');
+                        const _cropRightUrl = _cropRight.cropCanvas.toDataURL('image/png');
                         // Notes-based hints
                         const _notesLeaderHint = /leader.?list|лидер|глава|командный|состав/.test(_lhNotes);
                         const _notesMemberHint = /член.*группы/.test(_lhNotes);
-                        // Resolve final memberSide + record audit fields
+                        // Resolve final memberSide + record audit fields.
+                        // wrongTableCandidate = TRUE only when we genuinely cannot confirm the rows
+                        // came from a member-group table. Forced-left for ambiguous-but-positive
+                        // signals (e.g. tableType='both', tableType='party_members' + side unknown)
+                        // is NOT a wrong-table situation — model returned member-group rows, we
+                        // just had to pick a side.
                         let memberSide = memberSideRaw;
                         let wrongTableCandidate = false;
                         let wrongTableReason = null;
                         let rejectedCandidateReason = null;
+                        let forcedLeftFallback = false;
+                        let forcedLeftReason = null;
                         if (memberSideRaw === 'left') {
                             // Model is confident — honor it.
                         } else if (memberSideRaw === 'right') {
-                            // Honor model, but flag when right panel contradicts itself:
-                            // model returned member rows AND said right, yet notes describe a
-                            // leader-list panel (which would mean right is leader, not members).
+                            // Honor model, but override to LEFT when right panel contradicts itself:
+                            // model returned rows AND said right, yet notes describe a leader-list
+                            // panel (right is leader, member rows must therefore be on the left).
                             if (tableType === 'both' && _notesLeaderHint && !_notesMemberHint) {
-                                wrongTableCandidate = true;
-                                wrongTableReason = 'model_said_right_but_notes_hint_right_is_leader_list';
+                                forcedLeftFallback = true;
+                                forcedLeftReason = 'model_said_right_but_notes_hint_right_is_leader_list';
                                 rejectedCandidateReason = 'right_panel_likely_leader_list';
                                 memberSide = 'left';
                             }
@@ -10171,16 +10179,24 @@ function getClass2IconByClass3(c3) {
                             // memberSideRaw === 'unknown'
                             if (tableType === 'both') {
                                 // Two tables visible, model didn't tell us which side has members.
-                                // Default to LEFT (was: right) — matches the most common UI layout
-                                // where the right panel is the clan/leader list.
+                                // Default to LEFT — matches the most common UI layout.
                                 memberSide = 'left';
-                                wrongTableCandidate = true;
-                                wrongTableReason = 'side_unknown_both_tables_default_left';
+                                forcedLeftFallback = true;
+                                forcedLeftReason = 'side_unknown_both_tables_default_left';
                                 rejectedCandidateReason = 'right_crop_rejected_unknown_side_both_tables';
-                            } else if (tableType === 'unknown') {
-                                // Both side and table-type unknown — most defensive choice is LEFT
-                                // because legacy right-default is exactly what produced this defect.
+                            } else if (tableType === 'party_members') {
+                                // Model says ONE party-member table; side unknown. Default LEFT —
+                                // legacy right-default was the bug that caused the 5.jpg #5 desync.
                                 memberSide = 'left';
+                                forcedLeftFallback = true;
+                                forcedLeftReason = 'side_unknown_party_members_default_left';
+                                rejectedCandidateReason = 'right_crop_rejected_party_members_side_unknown';
+                            } else if (tableType === 'unknown') {
+                                // Both side and table-type unknown — pick LEFT and flag as
+                                // genuinely-uncertain (wrong-table candidate).
+                                memberSide = 'left';
+                                forcedLeftFallback = true;
+                                forcedLeftReason = 'side_and_table_type_unknown_default_left';
                                 wrongTableCandidate = true;
                                 wrongTableReason = 'side_and_table_type_unknown_default_left';
                                 rejectedCandidateReason = 'right_crop_rejected_fully_unknown';
@@ -10191,14 +10207,14 @@ function getClass2IconByClass3(c3) {
                                 wrongTableCandidate = true;
                                 wrongTableReason = 'table_type_is_leader_list_no_member_group';
                             } else {
-                                // tableType === 'party_members' single-panel — legacy right default.
+                                // tableType === something else — legacy right default.
                                 memberSide = 'right';
                             }
                         }
                         let _effectiveCrop, _geometrySource, _cropUrlSide;
                         if (memberSide === 'left') {
                             _effectiveCrop = _cropLeft;
-                            _geometrySource = wrongTableCandidate ? ('forced_left_due_to_' + wrongTableReason) : 'member_side_left';
+                            _geometrySource = forcedLeftFallback ? ('forced_left_due_to_' + forcedLeftReason) : 'member_side_left';
                             _cropUrlSide = 'left';
                         } else {
                             _effectiveCrop = _cropRight;
@@ -10214,7 +10230,25 @@ function getClass2IconByClass3(c3) {
                         const _selectedHeaderGuess = memberSide === 'left'
                             ? 'left_panel_assumed_member_group'
                             : (memberSideRaw === 'right' ? 'right_panel_model_confirmed_member_group' : 'right_panel_legacy_default');
-                        console.info('[km-crop-select] pack=' + packName + ' memberSideRaw=' + memberSideRaw + ' memberSide=' + memberSide + ' tableType=' + tableType + ' wrongTableCandidate=' + wrongTableCandidate + ' reason=' + (wrongTableReason || 'none'));
+                        // parsedRowsSourceSide = where OCR believes rows came from. When model
+                        // didn't tell us, treat as our inferred side but mark uncertainty in sync.
+                        const _parsedRowsSourceSide = memberSideRaw !== 'unknown' ? memberSideRaw : memberSide;
+                        const _previewCropSide = _cropUrlSide; // single source of truth for wizard
+                        let _cropSyncOk = true;
+                        let _cropDesyncReason = null;
+                        if (memberSideRaw === 'unknown') {
+                            // Model didn't tell us where rows came from. Preview shows our best
+                            // guess but we cannot guarantee sync until the user confirms (or flips).
+                            _cropSyncOk = false;
+                            _cropDesyncReason = 'model_member_side_unknown_inferred_' + memberSide;
+                        } else if (_parsedRowsSourceSide !== _previewCropSide) {
+                            // Override happened (e.g. model said right but we forced left). The
+                            // preview shows our override; rows came from where model said.
+                            _cropSyncOk = false;
+                            _cropDesyncReason = 'parsed_side_' + _parsedRowsSourceSide + '_but_preview_' + _previewCropSide
+                                + (forcedLeftReason ? '_reason_' + forcedLeftReason : '');
+                        }
+                        console.info('[km-crop-select] pack=' + packName + ' memberSideRaw=' + memberSideRaw + ' memberSide=' + memberSide + ' tableType=' + tableType + ' forcedLeft=' + forcedLeftFallback + ' wrongTable=' + wrongTableCandidate + ' syncOk=' + _cropSyncOk + ' reason=' + (forcedLeftReason || wrongTableReason || _cropDesyncReason || 'none'));
                         packTableInfo[packName] = {
                             tableType: tableType,
                             memberSide: memberSide,
@@ -10222,16 +10256,25 @@ function getClass2IconByClass3(c3) {
                             ignoredLeaderTable: tableType === 'both' || /both/.test(_lhNotes),
                             wrongTableCandidate: wrongTableCandidate,
                             wrongTableReason: wrongTableReason,
+                            forcedLeftFallback: forcedLeftFallback,
+                            forcedLeftReason: forcedLeftReason,
                         };
                         geometryMap[packName] = {
                             ..._effectiveCrop.geometry,
                             cropUrl: _effectiveCrop.cropCanvas.toDataURL('image/png'),
+                            // Both candidate crops kept for wizard flip (no re-OCR needed).
+                            cropUrlLeft: _cropLeftUrl,
+                            cropUrlRight: _cropRightUrl,
+                            cropLeftGeometry: { x: _cropLeft.geometry.x, y: _cropLeft.geometry.y, w: _cropLeft.geometry.w, h: _cropLeft.geometry.h },
+                            cropRightGeometry: { x: _cropRight.geometry.x, y: _cropRight.geometry.y, w: _cropRight.geometry.w, h: _cropRight.geometry.h },
                             memberSide: memberSide,
                             memberSideRaw: memberSideRaw,
                             cropUrlSide: _cropUrlSide,
                             geometrySource: _geometrySource,
-                            geometrySideFallbackReason: wrongTableReason,
-                            // Debug fields per crop-source audit
+                            geometrySideFallbackReason: forcedLeftReason || wrongTableReason,
+                            forcedLeftFallback: forcedLeftFallback,
+                            forcedLeftReason: forcedLeftReason,
+                            // Debug fields per crop-source audit (consumed by wizard + debug dump)
                             selectedTableSide: memberSide,
                             cropCandidateCount: 2,
                             rejectedCandidateReason: rejectedCandidateReason,
@@ -10239,6 +10282,11 @@ function getClass2IconByClass3(c3) {
                             selectedHeaderGuess: _selectedHeaderGuess,
                             wrongTableCandidate: wrongTableCandidate,
                             wrongTableReason: wrongTableReason,
+                            // ── Sync audit fields (task: member crop ↔ OCR rows sync) ──
+                            parsedRowsSourceSide: _parsedRowsSourceSide,
+                            previewCropSide: _previewCropSide,
+                            cropSyncOk: _cropSyncOk,
+                            cropDesyncReason: _cropDesyncReason,
                         };
                         // Leader-list hints: only when model says leader_list (no Член группы extracted).
                         // If table_type is party_members or both, NEVER mark as leader_list — valid screen.
@@ -11347,15 +11395,31 @@ ${playerList}
                                        : /LEFT/i.test(geo.preset || '') ? 'left'
                                        : /RIGHT/i.test(geo.preset || '') ? 'right'
                                        : 'unknown';
+                    // Re-evaluate cropSyncOk now that matcher side is known.
+                    // cropSyncOk = preview side === matcher side === parsedRowsSourceSide (when known).
+                    const _prevParsedSide = _prevGeom.parsedRowsSourceSide || _prevGeom.memberSideRaw || 'unknown';
+                    const _prevPreviewSide = _prevGeom.previewCropSide || _prevGeom.cropUrlSide || 'unknown';
+                    let _matcherSyncOk = (_prevGeom.cropSyncOk !== false);
+                    let _matcherDesyncReason = _prevGeom.cropDesyncReason || null;
+                    if (_matcherSide !== 'unknown' && _prevPreviewSide !== 'unknown' && _matcherSide !== _prevPreviewSide) {
+                        _matcherSyncOk = false;
+                        _matcherDesyncReason = 'matcher_side_' + _matcherSide + '_but_preview_' + _prevPreviewSide;
+                    } else if (_matcherSide !== 'unknown' && _prevParsedSide !== 'unknown' && _matcherSide !== _prevParsedSide) {
+                        _matcherSyncOk = false;
+                        _matcherDesyncReason = 'matcher_side_' + _matcherSide + '_but_parsed_' + _prevParsedSide;
+                    }
                     dayPackGeometry[packName] = {
                         ..._prevGeom,
                         x: geo.x, y: geo.y, rowH: geo.rowH, iconW: geo.iconW, iconH: geo.iconH,
                         packLen: packPlayers.length, imgW: sc.width, imgH: sc.height, preset: geo.preset,
                         iconMatcherSide: _matcherSide,
+                        matcherCropSide: _matcherSide,
                         geometryMemberSide: _prevGeom.memberSide || 'unknown',
                         forcedMemberSide: _forceSide || null,
                         forcedSideReason: _forceSideReason,
                         selectedGeoPreset: geo.preset,
+                        cropSyncOk: _matcherSyncOk,
+                        cropDesyncReason: _matcherDesyncReason,
                     };
 
                     for (let rowIdx = 0; rowIdx < packPlayers.length; rowIdx++) {
@@ -11655,7 +11719,16 @@ ${playerList}
                                 selectedCropBox: (dayPackGeometry[packName] && dayPackGeometry[packName].selectedCropBox) || null,
                                 selectedHeaderGuess: (dayPackGeometry[packName] && dayPackGeometry[packName].selectedHeaderGuess) || null,
                                 wrongTableCandidate: !!writeTarget.matcher_wrongTableCandidate,
-                                wrongTableReason: writeTarget.matcher_wrongTableReason || null
+                                wrongTableReason: writeTarget.matcher_wrongTableReason || null,
+                                // ── Sync audit (member-group crop ↔ OCR rows) ──
+                                parsedRowsSourceSide: (dayPackGeometry[packName] && dayPackGeometry[packName].parsedRowsSourceSide) || _tableInfo.memberSideRaw || 'unknown',
+                                previewCropSide: (dayPackGeometry[packName] && dayPackGeometry[packName].previewCropSide) || (dayPackGeometry[packName] && dayPackGeometry[packName].cropUrlSide) || 'unknown',
+                                matcherCropSide: (dayPackGeometry[packName] && dayPackGeometry[packName].matcherCropSide) || _matcherSide || 'unknown',
+                                cropUrlSide: (dayPackGeometry[packName] && dayPackGeometry[packName].cropUrlSide) || 'unknown',
+                                cropSyncOk: !!(dayPackGeometry[packName] && dayPackGeometry[packName].cropSyncOk),
+                                cropDesyncReason: (dayPackGeometry[packName] && dayPackGeometry[packName].cropDesyncReason) || null,
+                                forcedLeftFallback: !!(dayPackGeometry[packName] && dayPackGeometry[packName].forcedLeftFallback),
+                                forcedLeftReason: (dayPackGeometry[packName] && dayPackGeometry[packName].forcedLeftReason) || null
                             });
                         } catch(e) { /* ignore */ }
                         window._gtDebug.matcherProcessed = (window._gtDebug.matcherProcessed || 0) + 1;
@@ -14171,6 +14244,36 @@ ${playerList}
 
         function kmRwPrev() { if (_kmRw.idx > 0) { if (typeof kmRwCloseProfaPicker === 'function') kmRwCloseProfaPicker(); _kmRw.idx--; kmRwRender(); } }
         function kmRwNext() { if (_kmRw.idx < _kmRw.parties.length - 1) { if (typeof kmRwCloseProfaPicker === 'function') kmRwCloseProfaPicker(); _kmRw.idx++; kmRwRender(); } }
+        // Flip preview between stored left/right crop candidates. Both URLs are kept on
+        // dayPackGeometry[packName] by the OCR pipeline. Re-OCR does NOT happen — this is
+        // a visual override for cases where model's `member_side` hint pointed at the wrong
+        // panel. Persisted on dayPackGeometry.cropUrl so any subsequent render sees the new
+        // side; also updates wizard preview cache + side audit fields.
+        window.kmRwFlipCropSide = function(packName) {
+            if (!packName) return;
+            const g = (typeof dayPackGeometry === 'object' && dayPackGeometry) ? dayPackGeometry[packName] : null;
+            if (!g || !g.cropUrlLeft || !g.cropUrlRight) {
+                console.warn('[kmRw flip] both candidate crops not available for', packName);
+                return;
+            }
+            if (!_kmRw.cropSideOverride) _kmRw.cropSideOverride = {};
+            const currentSide = _kmRw.cropSideOverride[packName] || g.cropUrlSide || 'right';
+            const newSide = currentSide === 'left' ? 'right' : 'left';
+            _kmRw.cropSideOverride[packName] = newSide;
+            // Persist to dayPackGeometry so debug dumps + subsequent renders see the choice.
+            g.cropUrl = newSide === 'left' ? g.cropUrlLeft : g.cropUrlRight;
+            g.cropUrlSide = newSide;
+            g.previewCropSide = newSide;
+            g.userFlippedSide = true;
+            g.cropSyncOk = (g.parsedRowsSourceSide === newSide) || (g.parsedRowsSourceSide === 'unknown');
+            g.cropDesyncReason = g.cropSyncOk ? null : ('user_flipped_to_' + newSide + '_but_parsed_' + g.parsedRowsSourceSide);
+            console.info('[kmRw flip] pack=' + packName + ' newSide=' + newSide + ' syncOk=' + g.cropSyncOk);
+            // Invalidate cached entries for this pack so the new side renders.
+            if (_kmRw.cropCache) {
+                Object.keys(_kmRw.cropCache).forEach(k => { if (k.indexOf(packName + '|') === 0) delete _kmRw.cropCache[k]; });
+            }
+            kmRwRender();
+        };
 
         function _kmRwFindParsed(name) {
             if (!name) return null;
@@ -14183,15 +14286,41 @@ ${playerList}
             if (!fullUrl) return { url:'', cropped:false };
             const g = (dayPackGeometry || {})[packName];
             if (!_kmRw.cropCache) _kmRw.cropCache = {};
-            if (_kmRw.cropCache[packName]) return _kmRw.cropCache[packName];
+            if (!_kmRw.cropSideOverride) _kmRw.cropSideOverride = {};
+            // User-toggled side override has priority — clears cached crop so flip is reflected.
+            const _override = _kmRw.cropSideOverride[packName] || null;
+            const _cacheKey = packName + '|' + (_override || 'default');
+            if (_kmRw.cropCache[_cacheKey]) return _kmRw.cropCache[_cacheKey];
             if (!g) {
                 const fallback = { url: fullUrl, cropped: false };
-                _kmRw.cropCache[packName] = fallback;
+                _kmRw.cropCache[_cacheKey] = fallback;
                 return fallback;
             }
-            if (g.cropUrl) {
-                const out = { url: g.cropUrl, cropped: true, w: g.w || null, h: g.h || null, source: g.source || 'geometry_crop_url' };
-                _kmRw.cropCache[packName] = out;
+            // Resolve cropUrl based on override / geometry-stored sides.
+            let _resolvedUrl = g.cropUrl || '';
+            let _resolvedSide = g.cropUrlSide || 'unknown';
+            if (_override === 'left' && g.cropUrlLeft) {
+                _resolvedUrl = g.cropUrlLeft;
+                _resolvedSide = 'left';
+            } else if (_override === 'right' && g.cropUrlRight) {
+                _resolvedUrl = g.cropUrlRight;
+                _resolvedSide = 'right';
+            }
+            if (_resolvedUrl) {
+                const out = {
+                    url: _resolvedUrl,
+                    cropped: true,
+                    w: g.w || null,
+                    h: g.h || null,
+                    source: g.source || 'geometry_crop_url',
+                    side: _resolvedSide,
+                    hasLeft: !!g.cropUrlLeft,
+                    hasRight: !!g.cropUrlRight,
+                    syncOk: g.cropSyncOk !== false,
+                    syncReason: g.cropDesyncReason || null,
+                    overridden: !!_override,
+                };
+                _kmRw.cropCache[_cacheKey] = out;
                 return out;
             }
             try {
@@ -14289,7 +14418,7 @@ ${playerList}
             const shotImg = document.getElementById('kmRwShot');
             const shotEmpty = document.getElementById('kmRwShotEmpty');
             const cropTag = document.getElementById('kmRwCropTag');
-            if (cropTag) cropTag.textContent = '';
+            if (cropTag) cropTag.innerHTML = '';
             if (party.shotUrl) {
                 shotEmpty.style.display = 'none';
                 shotImg.style.display = '';
@@ -14300,7 +14429,24 @@ ${playerList}
                 _kmRwGetCropUrl(party.packName).then(out => {
                     if (myReq !== _kmRw.shotReq || _kmRw.idx !== idx) return; // user navigated away
                     if (out && out.url) shotImg.src = out.url;
-                    if (cropTag) cropTag.textContent = out && out.cropped ? '🎯 кроп таблицы' : '⚠️ нет геометрии — полный скрин';
+                    if (!cropTag) return;
+                    if (!out || !out.cropped) {
+                        cropTag.textContent = '⚠️ нет геометрии — полный скрин';
+                        return;
+                    }
+                    const sideTxt = out.side ? ('· ' + out.side) : '';
+                    const syncTxt = out.syncOk
+                        ? '<span title="rows и crop с одной стороны" style="color:#86efac">sync ✓</span>'
+                        : '<span title="' + _kmRwEsc(out.syncReason || 'неизвестно') + '" style="color:#fcd34d">sync ?</span>';
+                    const overrideTxt = out.overridden
+                        ? '<span style="color:#a5b4fc" title="ручной выбор стороны">· flipped</span>'
+                        : '';
+                    const flipBtn = (out.hasLeft && out.hasRight)
+                        ? '<button type="button" onclick="kmRwFlipCropSide(\'' + _kmRwEsc(party.packName).replace(/'/g, "\\'") + '\')" '
+                            + 'title="Показать другую сторону скриншота (left↔right). Re-OCR не происходит — это визуальный flip." '
+                            + 'style="margin-left:6px;background:#1a1f29;color:#a5b4fc;border:1px solid #2d3748;border-radius:5px;padding:1px 6px;font-size:9px;cursor:pointer;font-weight:700">↔ flip</button>'
+                        : '';
+                    cropTag.innerHTML = '🎯 кроп таблицы ' + sideTxt + ' · ' + syncTxt + ' ' + overrideTxt + flipBtn;
                 });
             } else {
                 shotImg.removeAttribute('src');
