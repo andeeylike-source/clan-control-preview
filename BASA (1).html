@@ -9374,143 +9374,6 @@ function getClass2IconByClass3(c3) {
             });
         }
 
-        // ── Pixel-based text-row counter (model-independent content evidence) ──
-        // Counts horizontal text bands by per-row light-pixel fraction (game UI is dark,
-        // text/icons are light). Used to compare each candidate crop's row count against
-        // parsed.rows.length when the model's left/right labels are unreliable. Crude but
-        // cheap and runs locally — no extra OCR call.
-        function _ccCountTextRowsInCrop(cropCanvas) {
-            try {
-                if (!cropCanvas || !cropCanvas.width || !cropCanvas.height) return 0;
-                const sW = cropCanvas.width, sH = cropCanvas.height;
-                if (sW < 20 || sH < 20) return 0;
-                // Downsample for speed; preserve aspect roughly.
-                const tw = Math.min(120, sW);
-                const th = Math.min(400, sH);
-                const tc = document.createElement('canvas');
-                tc.width = tw; tc.height = th;
-                const ctx = tc.getContext('2d', { willReadFrequently: true });
-                ctx.drawImage(cropCanvas, 0, 0, tw, th);
-                const data = ctx.getImageData(0, 0, tw, th).data;
-                // Per-row fraction of "light" pixels (luminance > 140 on dark game UI).
-                const rowFill = new Array(th).fill(0);
-                for (let y = 0; y < th; y++) {
-                    let count = 0;
-                    for (let x = 0; x < tw; x++) {
-                        const i = (y * tw + x) * 4;
-                        const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                        if (lum > 140) count++;
-                    }
-                    rowFill[y] = count / tw;
-                }
-                // 5-row moving average to smooth jitter.
-                const smoothed = new Array(th).fill(0);
-                for (let y = 0; y < th; y++) {
-                    let sum = 0, cnt = 0;
-                    for (let dy = -2; dy <= 2; dy++) {
-                        const yy = y + dy;
-                        if (yy >= 0 && yy < th) { sum += rowFill[yy]; cnt++; }
-                    }
-                    smoothed[y] = sum / cnt;
-                }
-                const mean = smoothed.reduce((a, b) => a + b, 0) / th;
-                // Adaptive threshold: above mean × 1.3, but never below 5% to avoid empty crops.
-                const threshold = Math.max(0.05, mean * 1.3);
-                // Contiguous bands of height ≥ 6 px = one text row.
-                let bands = 0, inBand = false, bandStart = 0;
-                for (let y = 0; y < th; y++) {
-                    const high = smoothed[y] > threshold;
-                    if (high && !inBand) { inBand = true; bandStart = y; }
-                    else if (!high && inBand) {
-                        inBand = false;
-                        if (y - bandStart >= 6) bands++;
-                    }
-                }
-                if (inBand && th - bandStart >= 6) bands++;
-                return bands;
-            } catch (e) {
-                console.warn('[ccCountTextRowsInCrop] failed', e);
-                return 0;
-            }
-        }
-
-        // ── Numeric-column density per row (image-positional signal) ──
-        // Member-group rows always have 4 right-aligned number columns (kills, deaths,
-        // pvp_dmg, pve_dmg). Leader-list rows have 0-2 columns. Counting the median
-        // number of contiguous text tokens in the right ~55% of each expected row is
-        // a strong image-coordinate signal that does NOT depend on the model's left/right
-        // labeling. The crop whose median per-row token count ≥ 3 is overwhelmingly
-        // likely to be the member-group panel.
-        function _ccMedianRightHalfTokens(cropCanvas, expectedRows) {
-            try {
-                if (!cropCanvas || !cropCanvas.width || !cropCanvas.height || expectedRows < 1) return 0;
-                const W = cropCanvas.width, H = cropCanvas.height;
-                if (W < 40 || H < 40) return 0;
-                const ctx = cropCanvas.getContext('2d', { willReadFrequently: true });
-                const data = ctx.getImageData(0, 0, W, H).data;
-                const xStart = Math.round(W * 0.45);
-                const xEnd = W;
-                const colsW = xEnd - xStart;
-                if (colsW < 30) return 0;
-                const rowStep = H / (expectedRows + 1);
-                const tokensPerRow = [];
-                for (let r = 0; r < expectedRows; r++) {
-                    const yCenter = Math.round(rowStep * (r + 1));
-                    const yStart = Math.max(0, Math.round(yCenter - rowStep * 0.3));
-                    const yEnd = Math.min(H, Math.round(yCenter + rowStep * 0.3));
-                    if (yEnd <= yStart) continue;
-                    const colFill = new Array(colsW).fill(0);
-                    for (let y = yStart; y < yEnd; y++) {
-                        for (let x = xStart; x < xEnd; x++) {
-                            const i = (y * W + x) * 4;
-                            const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                            if (lum > 140) colFill[x - xStart]++;
-                        }
-                    }
-                    const meanCol = colFill.reduce((a, b) => a + b, 0) / colsW;
-                    const threshold = Math.max(2, meanCol * 1.35);
-                    let tokens = 0, inTok = false, tokStart = 0;
-                    for (let x = 0; x < colsW; x++) {
-                        const high = colFill[x] > threshold;
-                        if (high && !inTok) { inTok = true; tokStart = x; }
-                        else if (!high && inTok) {
-                            inTok = false;
-                            if (x - tokStart >= 3) tokens++;
-                        }
-                    }
-                    if (inTok && colsW - tokStart >= 3) tokens++;
-                    tokensPerRow.push(tokens);
-                }
-                if (!tokensPerRow.length) return 0;
-                tokensPerRow.sort((a, b) => a - b);
-                return tokensPerRow[Math.floor(tokensPerRow.length / 2)];
-            } catch (e) {
-                console.warn('[ccMedianRightHalfTokens] failed', e);
-                return 0;
-            }
-        }
-
-        // ── Roster-membership overlap (model-independent content evidence) ──
-        // For each candidate side, count how many parsed nicks resolve to roster members
-        // vs how many DON'T. The member-group table contains the user's actual party — the
-        // roster. The leader/clan table on the other side contains leaders/external clan
-        // names that typically aren't all in the roster. High roster-match ratio on a side
-        // is weak evidence the rows came from there. Stored as ancillary signal.
-        function _ccRosterOverlapCount(parsedNicks) {
-            if (typeof roster === 'undefined' || !Array.isArray(roster) || !roster.length) return 0;
-            if (!Array.isArray(parsedNicks) || !parsedNicks.length) return 0;
-            const rosterKeys = new Set(
-                roster.map(r => (typeof normalizeNick === 'function') ? normalizeNick(r.name || '') : String(r.name || '').toLowerCase())
-                      .filter(Boolean)
-            );
-            let hit = 0;
-            parsedNicks.forEach(n => {
-                const k = (typeof normalizeNick === 'function') ? normalizeNick(n || '') : String(n || '').toLowerCase();
-                if (k && rosterKeys.has(k)) hit++;
-            });
-            return hit;
-        }
-
         function _ccOcrNormalizeRow(row) {
             const name = String(row?.nick || row?.name || '').trim();
             if (!name) return null;
@@ -9693,81 +9556,6 @@ function getClass2IconByClass3(c3) {
             const ocrRetryReports = [];
             const expectedRowsByPack = {};
             let firstError = null;
-            const _ccParseJsonObjectFromText = (text) => {
-                const cleaned = String(text || '').replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
-                try { return JSON.parse(cleaned); } catch (_) {}
-                const m = cleaned.match(/\{[\s\S]*\}/);
-                if (m) return JSON.parse(m[0]);
-                throw new Error('Ответ не содержит JSON: ' + cleaned.slice(0, 100));
-            };
-            const _ccOcrVerifyCropNicks = async (cropDataUrl, sideLabel, preferredModel) => {
-                const prompt = 'Read only visible character nick rows in this crop. Return ONLY valid JSON: {"nicks":["..."],"rowCount":0,"notes":""}. Preserve nick spelling exactly. No stats, no headers, no markdown.';
-                const chain = _ccOcrAvailableModels();
-                const models = [];
-                if (preferredModel && chain.indexOf(preferredModel) !== -1) models.push(preferredModel);
-                chain.forEach(m => { if (models.indexOf(m) === -1) models.push(m); });
-                if (!models.length) throw new Error('side verify skipped: no active OCR model');
-                let lastError = null;
-                for (let mi = 0; mi < models.length; mi++) {
-                    const candidateModel = models[mi];
-                    const orProvider = _ccOcrModelOpenRouterProvider(candidateModel);
-                    for (let keyIndex = 0; keyIndex < openRouterKeys.length; keyIndex++) {
-                        try {
-                            const body = {
-                                model: candidateModel,
-                                messages: [{ role: 'user', content: [
-                                    { type: 'text', text: prompt },
-                                    { type: 'image_url', image_url: { url: cropDataUrl } },
-                                ]}],
-                                temperature: 0,
-                                max_tokens: 300,
-                            };
-                            if (orProvider) body.provider = orProvider;
-                            console.info('[side-verify] pre-fetch ' + sideLabel + ' model=' + candidateModel + ' key=' + (keyIndex + 1) + '/' + openRouterKeys.length);
-                            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                                method: 'POST',
-                                headers: {
-                                    'Authorization': `Bearer ${openRouterKeys[keyIndex]}`,
-                                    'Content-Type': 'application/json',
-                                    'HTTP-Referer': location.origin,
-                                    'X-Title': 'Clan Control OCR',
-                                },
-                                body: JSON.stringify(body),
-                                signal: AbortSignal.timeout(45000),
-                            });
-                            if (response.status === 429) {
-                                markCurrentKeyExhausted(keyIndex);
-                                lastError = new Error('OpenRouter key rate-limited');
-                                continue;
-                            }
-                            if (!response.ok) {
-                                const errJson = await response.json().catch(() => ({}));
-                                const errMsg = errJson.error?.message || `HTTP ${response.status}`;
-                                lastError = new Error(errMsg);
-                                if (_ccOcrIsEndpointDeadError(response.status, errMsg)) {
-                                    _ccOcrMarkModelUnavailable(candidateModel, response.status + ' ' + errMsg);
-                                    if (_ccOcrReadPreferredModel() === candidateModel) _ccOcrClearPreferredModel();
-                                    break;
-                                }
-                                continue;
-                            }
-                            const json = await response.json();
-                            const parsed = _ccParseJsonObjectFromText(json.choices?.[0]?.message?.content || '');
-                            const nicks = Array.isArray(parsed.nicks) ? parsed.nicks.map(n => String(n || '').trim()).filter(Boolean) : [];
-                            _ccOcrSetPreferredModel(candidateModel);
-                            return {
-                                nicks: nicks,
-                                rowCount: Number.isFinite(Number(parsed.rowCount)) ? Number(parsed.rowCount) : nicks.length,
-                                notes: String(parsed.notes || '').slice(0, 160),
-                                model: candidateModel,
-                            };
-                        } catch (e) {
-                            lastError = e;
-                        }
-                    }
-                }
-                throw lastError || new Error('side verify OCR failed');
-            };
 
             try {
                 for (let i = 0; i < shots.length; i++) {
@@ -10003,102 +9791,9 @@ function getClass2IconByClass3(c3) {
         async function analyzeWithOpenRouterBaiduProvider({ dateStr, shots }) {
             console.info('[openrouter-ocr] provider=baidu-only');
             console.info('[openrouter-ocr] no paid fallback');
-            const BAIDU_OCR_PROMPT = `Extract the "Член группы" (party member) table from this game screenshot.\nReturn ONLY valid JSON:\n{"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"total_count":0,"confidence":0,"notes":"","table_type":"party_members","member_side":"unknown","left_panel_nicks":[],"right_panel_nicks":[]}\nRules:\n- The screenshot may contain TWO side-by-side panels: a "Лидер"/"Командный канал"/"Глава"/"Состав" leader-list table on one side, and a "Член группы" (party members) table on the other side. The "Член группы" table can be on the LEFT or on the RIGHT.\n- Extract rows ONLY from the table titled "Член группы". IGNORE any "Лидер"/"Командный канал"/"Глава"/"Состав" leader-list table.\n- total_count is the number of real player rows in the extracted "Член группы" table, or the N from "Состав: N чел." inside that same party-member window. Do not count headers, column labels, leader-list rows, chat, background text, or any rows outside the party-member table.\n- table_type values: "party_members" if you extracted Член группы rows; "leader_list" if ONLY a Лидер/Командный канал table is visible (no Член группы); "both" if both tables are visible and you extracted Член группы; "unknown" if unsure.\n- member_side values: "left" if Член группы is on the left side of the screenshot; "right" if on the right; "unknown" if you cannot tell.\n- CRITICAL — side-evidence fields for sync verification:\n  - left_panel_nicks: list ALL nicks visible in the LEFT panel of the screenshot (whatever table that is — party members or leader list). Order = top-to-bottom. Up to 12 nicks. Preserve spelling exactly. Empty array if there is no left panel.\n  - right_panel_nicks: list ALL nicks visible in the RIGHT panel of the screenshot (whatever table that is). Order = top-to-bottom. Up to 12 nicks. Preserve spelling exactly. Empty array if there is no right panel.\n  These two lists are used to verify which panel "rows" actually came from. They must reflect what is visually on each side regardless of which side is "Член группы".\n- preserve nick spelling exactly as seen\n- kills, deaths, pvp, pve must be integers\n- if a value is unreadable, use null\n- no markdown\n- no code fences\n- if there is NO "Член группы" table at all, set rows=[], total_count=0, table_type="leader_list", and notes="leader_list"`;
+            const BAIDU_OCR_PROMPT = `Extract the "Член группы" (party member) table from this game screenshot.\nReturn ONLY valid JSON:\n{"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"total_count":0,"confidence":0,"notes":"","table_type":"party_members","member_side":"unknown"}\nRules:\n- The screenshot may contain TWO side-by-side panels: a "Лидер"/"Командный канал"/"Глава"/"Состав" leader-list table on one side, and a "Член группы" (party members) table on the other side. The "Член группы" table can be on the LEFT or on the RIGHT.\n- Extract rows ONLY from the table titled "Член группы". IGNORE any "Лидер"/"Командный канал"/"Глава"/"Состав" leader-list table.\n- total_count is the number of real player rows in the extracted "Член группы" table, or the N from "Состав: N чел." inside that same party-member window. Do not count headers, column labels, leader-list rows, chat, background text, or any rows outside the party-member table.\n- table_type values: "party_members" if you extracted Член группы rows; "leader_list" if ONLY a Лидер/Командный канал table is visible (no Член группы); "both" if both tables are visible and you extracted Член группы; "unknown" if unsure.\n- member_side values: "left" if Член группы is on the left side of the screenshot; "right" if on the right; "unknown" if you cannot tell.\n- preserve nick spelling exactly as seen\n- kills, deaths, pvp, pve must be integers\n- if a value is unreadable, use null\n- no markdown\n- no code fences\n- if there is NO "Член группы" table at all, set rows=[], total_count=0, table_type="leader_list", and notes="leader_list"`;
 
             const openRouterKeys = getOpenRouterApiKeys();
-            const _ccParseJsonObjectFromText = (text) => {
-                const cleaned = String(text || '').replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
-                try { return JSON.parse(cleaned); } catch (_) {}
-                const m = cleaned.match(/\{[\s\S]*\}/);
-                if (m) return JSON.parse(m[0]);
-                throw new Error('Ответ не содержит JSON: ' + cleaned.slice(0, 100));
-            };
-            const _ccHeaderZoneDataUrl = (canvas) => {
-                const h = Math.max(80, Math.min(canvas.height, Math.round(canvas.height * 0.42)));
-                const c = document.createElement('canvas');
-                c.width = canvas.width;
-                c.height = h;
-                c.getContext('2d', { willReadFrequently: true }).drawImage(canvas, 0, 0, canvas.width, h, 0, 0, canvas.width, h);
-                return c.toDataURL('image/png');
-            };
-            const _ccFuzzyMemberHeader = (text) => {
-                const s = String(text || '').toLowerCase()
-                    .replace(/ё/g, 'е')
-                    .replace(/[^a-zа-я0-9]+/g, '');
-                const hasMember = s.includes('член') || s.includes('4лен') || s.includes('илен');
-                const hasGroup = s.includes('групп') || s.includes('групы') || s.includes('rpynn') || s.includes('rpyn');
-                const leaderOnly = /^(лидер|глава|состав|стата|командныйканал)/.test(s);
-                return hasMember && hasGroup && !leaderOnly;
-            };
-            const _ccOcrVerifyCropHeader = async (headerDataUrl, sideLabel, preferredModel) => {
-                const prompt = 'Check only the table header/title in this image crop. Return ONLY valid JSON: {"hasMemberHeader":true,"headerText":"","reason":""}. hasMemberHeader is true only for the party member table header "Член группы" (allow minor OCR typo like "Член групы"). It is false for leader/clan/channel/stat tables such as "Лидер", "Глава", "Состав", "Стата", unless "Член группы" is also visible. No markdown.';
-                const chain = _ccOcrAvailableModels();
-                const models = [];
-                if (preferredModel && chain.indexOf(preferredModel) !== -1) models.push(preferredModel);
-                chain.forEach(m => { if (models.indexOf(m) === -1) models.push(m); });
-                if (!models.length) throw new Error('member header verify skipped: no active OCR model');
-                let lastError = null;
-                for (let mi = 0; mi < models.length; mi++) {
-                    const candidateModel = models[mi];
-                    const orProvider = _ccOcrModelOpenRouterProvider(candidateModel);
-                    for (let keyIndex = 0; keyIndex < openRouterKeys.length; keyIndex++) {
-                        try {
-                            const body = {
-                                model: candidateModel,
-                                messages: [{ role: 'user', content: [
-                                    { type: 'text', text: prompt },
-                                    { type: 'image_url', image_url: { url: headerDataUrl } },
-                                ]}],
-                                temperature: 0,
-                                max_tokens: 180,
-                            };
-                            if (orProvider) body.provider = orProvider;
-                            console.info('[member-header] pre-fetch ' + sideLabel + ' model=' + candidateModel + ' key=' + (keyIndex + 1) + '/' + openRouterKeys.length);
-                            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                                method: 'POST',
-                                headers: {
-                                    'Authorization': `Bearer ${openRouterKeys[keyIndex]}`,
-                                    'Content-Type': 'application/json',
-                                    'HTTP-Referer': location.origin,
-                                    'X-Title': 'Clan Control OCR',
-                                },
-                                body: JSON.stringify(body),
-                                signal: AbortSignal.timeout(45000),
-                            });
-                            if (response.status === 429) {
-                                markCurrentKeyExhausted(keyIndex);
-                                lastError = new Error('OpenRouter key rate-limited');
-                                continue;
-                            }
-                            if (!response.ok) {
-                                const errJson = await response.json().catch(() => ({}));
-                                const errMsg = errJson.error?.message || `HTTP ${response.status}`;
-                                lastError = new Error(errMsg);
-                                if (_ccOcrIsEndpointDeadError(response.status, errMsg)) {
-                                    _ccOcrMarkModelUnavailable(candidateModel, response.status + ' ' + errMsg);
-                                    if (_ccOcrReadPreferredModel() === candidateModel) _ccOcrClearPreferredModel();
-                                    break;
-                                }
-                                continue;
-                            }
-                            const json = await response.json();
-                            const parsed = _ccParseJsonObjectFromText(json.choices?.[0]?.message?.content || '');
-                            const headerText = String(parsed.headerText || '').trim();
-                            const hasMemberHeader = parsed.hasMemberHeader === true || _ccFuzzyMemberHeader(headerText);
-                            _ccOcrSetPreferredModel(candidateModel);
-                            return {
-                                hasMemberHeader,
-                                headerText,
-                                reason: String(parsed.reason || '').slice(0, 160),
-                                model: candidateModel,
-                            };
-                        } catch (e) {
-                            lastError = e;
-                        }
-                    }
-                }
-                throw lastError || new Error('member header verify failed');
-            };
             const exhaustionBefore = getOpenRouterExhaustionSnapshot();
             console.info(`[provider] selected=${getAnalysisProvider()}`);
             console.info(`[provider] openrouter keys count=${openRouterKeys.length}`);
@@ -10235,7 +9930,6 @@ function getClass2IconByClass3(c3) {
                         let chosenParsed = null;
                         let chosenRows = [];
                         let chosenText = '';
-                        let chosenModel = null;
                         for (let ocrAttempt = 0; ocrAttempt < 2; ocrAttempt++) {
                             if (ocrAttempt > 0) {
                                 setDayStatus('loading', `OCR retry 1/1: скриншот ${i + 1} из ${shots.length}...`);
@@ -10245,7 +9939,6 @@ function getClass2IconByClass3(c3) {
                             let text = '';
                             let players = [];
                             let attemptError = null;
-                            let attemptModel = null;
                             try {
                                 let response = null;
                                 let saw429 = false;
@@ -10386,7 +10079,6 @@ function getClass2IconByClass3(c3) {
                                 // Stored in sessionStorage; cleared automatically if model later 404s.
                                 if (usedModel && Array.isArray(parsed.rows)) {
                                     _ccOcrSetPreferredModel(usedModel);
-                                    attemptModel = usedModel;
                                 }
 
                                 rows.forEach(row => {
@@ -10414,7 +10106,6 @@ function getClass2IconByClass3(c3) {
                                 chosenParsed = parsed;
                                 chosenRows = rows;
                                 chosenText = text;
-                                chosenModel = attemptModel;
                             }
                             if (!_kmOcrNeedsRetry(attemptInfo)) break;
                         }
@@ -10450,420 +10141,97 @@ function getClass2IconByClass3(c3) {
                             : ((/leader_list/.test(_lhNotes) && !/член.*группы/.test(_lhNotes)) ? 'leader_list' : 'unknown');
                         const memberSideRaw = (_msRaw === 'left' || _msRaw === 'right') ? _msRaw : 'unknown';
                         // ── KM crop source selection (member-group table) ──
-                        // Build BOTH candidate crops every time. Storing both lets the wizard flip
-                        // the preview without re-running OCR when the model's `member_side` hint
-                        // disagreed with where rows were actually extracted from.
+                        // Build BOTH candidate crops so we can prefer left when model is ambiguous
+                        // and the screen contains two tables side-by-side. The legacy fallback was
+                        // to default unknown→right, which silently picked the clan/leader panel
+                        // when the member-group table was actually on the LEFT.
                         const _cropLeft = _kmComputeSideCrop(img, 'left');
                         const _cropRight = crop; // already computed for right panel
-                        const _cropLeftUrl = _cropLeft.cropCanvas.toDataURL('image/png');
-                        const _cropRightUrl = _cropRight.cropCanvas.toDataURL('image/png');
                         // Notes-based hints
                         const _notesLeaderHint = /leader.?list|лидер|глава|командный|состав/.test(_lhNotes);
                         const _notesMemberHint = /член.*группы/.test(_lhNotes);
-                        // ── Multi-signal side decision (model-independent of left/right labels) ──
-                        // Free vision models often invert left/right or mis-label panels. We
-                        // therefore COMBINE three signals — and only when at least one of them
-                        // gives strong, image-positional evidence is sync trusted. The chosen
-                        // crop is `_cropLeft` (image x<mid) or `_cropRight` (image x>mid), so
-                        // the decision MUST be in image coordinates regardless of what the model
-                        // calls "left" or "right".
-                        //
-                        // Signal A — visual row count per IMAGE side. We count text bands in
-                        //   each candidate crop and compare to players.length. The crop whose
-                        //   visual row count is closer to the parsed-row count is the more
-                        //   likely member-group panel. Confident only when one side is clearly
-                        //   closer (Δdiff ≥ 2 rows).
-                        // Signal B — model name overlap. Compare parsed nicks to model-supplied
-                        //   left_panel_nicks / right_panel_nicks. Authoritative only when the
-                        //   matching list also corresponds to a real text-row count on that
-                        //   image side (i.e. visual A doesn't contradict). When the model
-                        //   inverts left/right, signal B alone is misleading — visual A
-                        //   acts as the tie-breaker.
-                        // Signal C — roster overlap on EACH panel's nicks list. Member-group
-                        //   rows usually map heavily to the user's roster; leader/clan list
-                        //   does not. Used as ancillary evidence.
-                        //
-                        // cropSyncOk = true ONLY when:
-                        //   - signal A points to side X AND chosen preview side = X, OR
-                        //   - signal A is inconclusive AND signal B confidently points to side X
-                        //     AND signal C does NOT contradict A on the same side.
-                        //   Anything else → cropSyncOk = false (matcher_trigger blocked, badge
-                        //   shown, training save skipped).
-                        const _leftPanelNicks = Array.isArray(parsed.left_panel_nicks) ? parsed.left_panel_nicks : [];
-                        const _rightPanelNicks = Array.isArray(parsed.right_panel_nicks) ? parsed.right_panel_nicks : [];
-                        const _normSet = (arr) => {
-                            const s = new Set();
-                            (arr || []).forEach(n => {
-                                const t = typeof n === 'string' ? n.trim() : '';
-                                if (!t) return;
-                                const k = (typeof normalizeNick === 'function') ? normalizeNick(t) : t.toLowerCase();
-                                if (k) s.add(k);
-                            });
-                            return s;
-                        };
-                        const _leftSet = _normSet(_leftPanelNicks);
-                        const _rightSet = _normSet(_rightPanelNicks);
-                        const _parsedNickKeys = players.map(p => (typeof normalizeNick === 'function') ? normalizeNick(p.name || '') : String(p.name || '').toLowerCase()).filter(Boolean);
-                        let _leftHit = 0, _rightHit = 0;
-                        _parsedNickKeys.forEach(k => { if (_leftSet.has(k)) _leftHit++; if (_rightSet.has(k)) _rightHit++; });
-                        const _rowCount = _parsedNickKeys.length;
-                        const _majority = _rowCount > 0 ? Math.ceil(_rowCount * 0.5) : 0;
-                        const _overlapMaxHit = Math.max(_leftHit, _rightHit);
-                        const _modelOverlapDecidedSide =
-                            (_overlapMaxHit > 0 && _overlapMaxHit >= _majority && _leftHit !== _rightHit)
-                                ? (_leftHit > _rightHit ? 'left' : 'right')
-                                : null;
-                        const _modelOverlapConfident = !!_modelOverlapDecidedSide;
-                        const _overlapAvailable = (_leftSet.size > 0 || _rightSet.size > 0);
-                        // Signal A1: visual row count per IMAGE side (independent of model labels).
-                        const _leftVisualRows = _ccCountTextRowsInCrop(_cropLeft.cropCanvas);
-                        const _rightVisualRows = _ccCountTextRowsInCrop(_cropRight.cropCanvas);
-                        const _leftRowDiff = Math.abs(_leftVisualRows - _rowCount);
-                        const _rightRowDiff = Math.abs(_rightVisualRows - _rowCount);
-                        // Signal A2: median per-row token count in RIGHT 55% of each crop.
-                        // Kept as debug only: leader/command tables can also contain numeric
-                        // columns, so column tokens must never decide cropSyncOk by themselves.
-                        const _leftColTokens = _ccMedianRightHalfTokens(_cropLeft.cropCanvas, _rowCount || 9);
-                        const _rightColTokens = _ccMedianRightHalfTokens(_cropRight.cropCanvas, _rowCount || 9);
-                        const _leftHasStatCols = _leftColTokens >= 3;
-                        const _rightHasStatCols = _rightColTokens >= 3;
-                        const _columnDecidedSide = (_leftHasStatCols !== _rightHasStatCols)
-                            ? (_leftHasStatCols ? 'left' : 'right')
-                            : null;
-                        const _columnConfident = !!_columnDecidedSide;
-                        // Combined visual decision: row-count only. Column tokens are debug
-                        // evidence, not a source of truth for side selection.
-                        let _visualConfident, _visualDecidedSide;
-                        if (_rowCount > 0 && Math.abs(_leftRowDiff - _rightRowDiff) >= 2) {
-                            _visualConfident = true;
-                            _visualDecidedSide = _leftRowDiff < _rightRowDiff ? 'left' : 'right';
-                        } else {
-                            _visualConfident = false;
-                            _visualDecidedSide = null;
-                        }
-                        // Signal C: roster overlap on each panel's nick list (advisory).
-                        const _leftRosterHit = _ccRosterOverlapCount(_leftPanelNicks);
-                        const _rightRosterHit = _ccRosterOverlapCount(_rightPanelNicks);
-                        const _rosterConfident = (_leftRosterHit + _rightRosterHit) >= Math.max(2, Math.floor(_rowCount * 0.4)) && _leftRosterHit !== _rightRosterHit;
-                        const _rosterDecidedSide = _rosterConfident
-                            ? (_leftRosterHit > _rightRosterHit ? 'left' : 'right')
-                            : null;
+                        // Resolve final memberSide + record audit fields
                         let memberSide = memberSideRaw;
                         let wrongTableCandidate = false;
                         let wrongTableReason = null;
                         let rejectedCandidateReason = null;
-                        let forcedLeftFallback = false;
-                        let forcedLeftReason = null;
-                        let _sideDecisionSource = null;
-                        // Decision precedence: visual (image-coords, model-independent) > model
-                        // overlap corroborated by roster > model overlap alone > fallback heuristic.
-                        if (_visualDecidedSide && _modelOverlapDecidedSide && _visualDecidedSide === _modelOverlapDecidedSide) {
-                            memberSide = _visualDecidedSide;
-                            _sideDecisionSource = 'visual+overlap_agree_' + _visualDecidedSide
-                                + '_visualRows=' + _leftVisualRows + 'L/' + _rightVisualRows + 'R_target=' + _rowCount
-                                + '_overlapHit=' + _leftHit + 'L/' + _rightHit + 'R';
-                        } else if (_visualDecidedSide) {
-                            // Visual evidence is image-positional — overrides everything else
-                            // because it doesn't depend on model's notion of left/right.
-                            memberSide = _visualDecidedSide;
-                            _sideDecisionSource = 'visual_only_' + _visualDecidedSide
-                                + '_visualRows=' + _leftVisualRows + 'L/' + _rightVisualRows + 'R_target=' + _rowCount;
-                            if (_modelOverlapDecidedSide && _modelOverlapDecidedSide !== _visualDecidedSide) {
-                                rejectedCandidateReason = 'model_overlap_said_' + _modelOverlapDecidedSide + '_but_visual_says_' + _visualDecidedSide;
-                            }
-                        } else if (_modelOverlapConfident && _rosterDecidedSide === _modelOverlapDecidedSide) {
-                            memberSide = _modelOverlapDecidedSide;
-                            _sideDecisionSource = 'overlap+roster_agree_' + _modelOverlapDecidedSide
-                                + '_hit=' + _overlapMaxHit + '/' + _rowCount + '_rosterHit=' + _leftRosterHit + 'L/' + _rightRosterHit + 'R';
-                        } else if (memberSideRaw === 'left') {
-                            memberSide = 'left';
-                            _sideDecisionSource = 'model_member_side_left_no_visual_evidence';
+                        if (memberSideRaw === 'left') {
+                            // Model is confident — honor it.
                         } else if (memberSideRaw === 'right') {
-                            memberSide = 'right';
-                            _sideDecisionSource = 'model_member_side_right_no_visual_evidence';
+                            // Honor model, but flag when right panel contradicts itself:
+                            // model returned member rows AND said right, yet notes describe a
+                            // leader-list panel (which would mean right is leader, not members).
                             if (tableType === 'both' && _notesLeaderHint && !_notesMemberHint) {
-                                forcedLeftFallback = true;
-                                forcedLeftReason = 'model_said_right_but_notes_hint_right_is_leader_list';
+                                wrongTableCandidate = true;
+                                wrongTableReason = 'model_said_right_but_notes_hint_right_is_leader_list';
                                 rejectedCandidateReason = 'right_panel_likely_leader_list';
                                 memberSide = 'left';
-                                _sideDecisionSource = 'forced_left_notes_hint';
                             }
                         } else {
-                            // memberSideRaw === 'unknown' AND no visual evidence → fall back to tableType.
-                            if (tableType === 'both' || tableType === 'party_members') {
+                            // memberSideRaw === 'unknown'
+                            if (tableType === 'both') {
+                                // Two tables visible, model didn't tell us which side has members.
+                                // Default to LEFT (was: right) — matches the most common UI layout
+                                // where the right panel is the clan/leader list.
                                 memberSide = 'left';
-                                forcedLeftFallback = true;
-                                forcedLeftReason = 'side_unknown_' + tableType + '_default_left';
-                                _sideDecisionSource = 'fallback_left_' + tableType;
+                                wrongTableCandidate = true;
+                                wrongTableReason = 'side_unknown_both_tables_default_left';
+                                rejectedCandidateReason = 'right_crop_rejected_unknown_side_both_tables';
                             } else if (tableType === 'unknown') {
+                                // Both side and table-type unknown — most defensive choice is LEFT
+                                // because legacy right-default is exactly what produced this defect.
                                 memberSide = 'left';
-                                forcedLeftFallback = true;
-                                forcedLeftReason = 'side_and_table_type_unknown_default_left';
                                 wrongTableCandidate = true;
                                 wrongTableReason = 'side_and_table_type_unknown_default_left';
-                                _sideDecisionSource = 'fallback_left_unknown';
+                                rejectedCandidateReason = 'right_crop_rejected_fully_unknown';
                             } else if (tableType === 'leader_list') {
+                                // Pure leader-list view — no member-group crop is correct. Keep right
+                                // crop for visual debugging but flag the pack so rows go to CHECK.
                                 memberSide = 'right';
                                 wrongTableCandidate = true;
                                 wrongTableReason = 'table_type_is_leader_list_no_member_group';
-                                _sideDecisionSource = 'fallback_right_leader_list';
                             } else {
+                                // tableType === 'party_members' single-panel — legacy right default.
                                 memberSide = 'right';
-                                _sideDecisionSource = 'fallback_right_legacy';
                             }
                         }
-                        // Aliases for downstream code that referenced the old single-source overlap.
-                        const _overlapConfident = _modelOverlapConfident;
-                        const _overlapDecidedSide = _modelOverlapDecidedSide;
                         let _effectiveCrop, _geometrySource, _cropUrlSide;
                         if (memberSide === 'left') {
                             _effectiveCrop = _cropLeft;
-                            _geometrySource = _overlapConfident ? ('overlap_' + _overlapDecidedSide) : (forcedLeftFallback ? ('forced_left_due_to_' + forcedLeftReason) : 'member_side_left');
+                            _geometrySource = wrongTableCandidate ? ('forced_left_due_to_' + wrongTableReason) : 'member_side_left';
                             _cropUrlSide = 'left';
                         } else {
                             _effectiveCrop = _cropRight;
-                            _geometrySource = _overlapConfident ? ('overlap_' + _overlapDecidedSide) : ((memberSideRaw === 'right') ? 'member_side_right' : 'fallback_right_default');
+                            _geometrySource = (memberSideRaw === 'right') ? 'member_side_right' : 'fallback_right_default';
                             _cropUrlSide = 'right';
                         }
-                        let _selectedCropBox = {
+                        const _selectedCropBox = {
                             x: _effectiveCrop.geometry.x,
                             y: _effectiveCrop.geometry.y,
                             w: _effectiveCrop.geometry.w,
                             h: _effectiveCrop.geometry.h,
                         };
-                        let _selectedHeaderGuess = memberSide === 'left'
+                        const _selectedHeaderGuess = memberSide === 'left'
                             ? 'left_panel_assumed_member_group'
                             : (memberSideRaw === 'right' ? 'right_panel_model_confirmed_member_group' : 'right_panel_legacy_default');
-                        // parsedRowsSourceSide = where OCR believes rows came from, now content-derived.
-                        // When overlap is confident, it IS the parsed-side. Otherwise fall back to model hint.
-                        let _parsedRowsSourceSide = _overlapConfident
-                            ? _overlapDecidedSide
-                            : (memberSideRaw !== 'unknown' ? memberSideRaw : memberSide);
-                        let _previewCropSide = _cropUrlSide;
-                        let _candidateHeaders = [];
-                        let _selectedSourceHeader = '';
-                        let _selectedSourceReason = null;
-                        let _rejectedSourceReasons = [];
-                        let _memberHeaderFound = false;
-                        try {
-                            const _activeHeaderModel = chosenModel || _ccOcrReadPreferredModel() || (_ccOcrAvailableModels()[0] || null);
-                            const _leftHeader = await _ccOcrVerifyCropHeader(_ccHeaderZoneDataUrl(_cropLeft.cropCanvas), 'left', _activeHeaderModel);
-                            const _rightHeader = await _ccOcrVerifyCropHeader(_ccHeaderZoneDataUrl(_cropRight.cropCanvas), 'right', _leftHeader.model || _activeHeaderModel);
-                            _candidateHeaders = [
-                                { side: 'left', headerText: _leftHeader.headerText || '', hasMemberHeader: !!_leftHeader.hasMemberHeader, reason: _leftHeader.reason || '' },
-                                { side: 'right', headerText: _rightHeader.headerText || '', hasMemberHeader: !!_rightHeader.hasMemberHeader, reason: _rightHeader.reason || '' },
-                            ];
-                            _candidateHeaders.forEach(h => {
-                                if (!h.hasMemberHeader) {
-                                    _rejectedSourceReasons.push(h.side + ':header_not_member:' + (h.headerText || h.reason || 'empty'));
-                                }
-                            });
-                            const _headerSides = _candidateHeaders.filter(h => h.hasMemberHeader);
-                            let _headerSelected = null;
-                            if (_headerSides.length === 1) {
-                                _headerSelected = _headerSides[0];
-                                _selectedSourceReason = 'member_header_' + _headerSelected.side;
-                            } else if (_headerSides.length > 1) {
-                                _headerSelected = _headerSides.find(h => h.side === _cropUrlSide) || _headerSides[0];
-                                _selectedSourceReason = 'member_header_multiple_using_' + _headerSelected.side;
-                            }
-                            if (_headerSelected) {
-                                _memberHeaderFound = true;
-                                _selectedSourceHeader = _headerSelected.headerText || 'Член группы';
-                                memberSide = _headerSelected.side;
-                                _effectiveCrop = memberSide === 'left' ? _cropLeft : _cropRight;
-                                _geometrySource = 'member_header';
-                                _cropUrlSide = memberSide;
-                                _previewCropSide = memberSide;
-                                _parsedRowsSourceSide = memberSide;
-                                _sideDecisionSource = _selectedSourceReason;
-                                rejectedCandidateReason = _rejectedSourceReasons.join(';') || null;
-                                wrongTableCandidate = false;
-                                wrongTableReason = null;
-                                forcedLeftFallback = memberSide === 'left' ? forcedLeftFallback : false;
-                                _selectedCropBox = {
-                                    x: _effectiveCrop.geometry.x,
-                                    y: _effectiveCrop.geometry.y,
-                                    w: _effectiveCrop.geometry.w,
-                                    h: _effectiveCrop.geometry.h,
-                                };
-                                _selectedHeaderGuess = _selectedSourceHeader;
-                            } else {
-                                _selectedSourceReason = 'member_header_not_found';
-                            }
-                        } catch (e) {
-                            _selectedSourceReason = 'member_header_verify_failed';
-                            _rejectedSourceReasons.push('member_header_verify_failed:' + String(e && e.message ? e.message : e || 'unknown').slice(0, 120));
-                            console.warn('[member-header] failed pack=' + packName, e);
-                        }
-                        // cropSyncOk REQUIRES image-positional evidence. Model-internal
-                        // consistency (e.g. parsed rows match `right_panel_nicks` AND we
-                        // picked _cropRight) is NOT proof when the model has inverted its
-                        // own left/right labels. The visual row-count signal is independent
-                        // of model labels and breaks ties; when it confirms the chosen side
-                        // we trust sync, otherwise we require BOTH overlap + roster on the
-                        // same side as preview.
-                        let _cropSyncOk = false;
-                        let _cropDesyncReason = null;
-                        let _cropSyncOkSource = null;
-                        const _visualConfirmsPreview = _visualDecidedSide && _visualDecidedSide === _previewCropSide;
-                        const _visualContradictsPreview = _visualDecidedSide && _visualDecidedSide !== _previewCropSide;
-                        const _overlapConfirmsPreview = _modelOverlapConfident && _modelOverlapDecidedSide === _previewCropSide;
-                        const _rosterConfirmsPreview = _rosterDecidedSide && _rosterDecidedSide === _previewCropSide;
-                        if (_visualConfirmsPreview) {
-                            _cropSyncOk = true;
-                        } else if (_visualContradictsPreview) {
-                            _cropSyncOk = false;
-                            _cropDesyncReason = 'visual_rows_say_' + _visualDecidedSide + '_but_preview_' + _previewCropSide
-                                + '_leftRows=' + _leftVisualRows + '_rightRows=' + _rightVisualRows + '_target=' + _rowCount;
-                        } else if (_overlapConfirmsPreview && _rosterConfirmsPreview) {
-                            // No visual proof, but two independent model-based signals agree
-                            // with preview — accept with audit.
-                            _cropSyncOk = true;
-                        } else if (_overlapConfirmsPreview && !_rosterDecidedSide && _rowCount > 0 && (_leftRosterHit + _rightRosterHit) === 0) {
-                            // No roster data at all (e.g. brand-new clan), no visual edge —
-                            // accept overlap alone since it's the only positive signal we have.
-                            _cropSyncOk = true;
-                        } else if (!_overlapAvailable && !_visualDecidedSide) {
-                            _cropSyncOk = false;
-                            _cropDesyncReason = 'no_evidence_panel_nicks_missing_and_visual_inconclusive_leftRows=' + _leftVisualRows + '_rightRows=' + _rightVisualRows;
-                        } else if (_modelOverlapDecidedSide && _modelOverlapDecidedSide !== _previewCropSide) {
-                            _cropSyncOk = false;
-                            _cropDesyncReason = 'overlap_says_' + _modelOverlapDecidedSide + '_but_preview_' + _previewCropSide;
-                        } else if (!_modelOverlapConfident && _overlapAvailable) {
-                            _cropSyncOk = false;
-                            _cropDesyncReason = 'ambiguous_overlap_left=' + _leftHit + '_right=' + _rightHit + '_rows=' + _rowCount + '_no_visual_tiebreak';
-                        } else {
-                            _cropSyncOk = false;
-                            _cropDesyncReason = 'insufficient_evidence_for_sync_decision=' + (_sideDecisionSource || 'none');
-                        }
-                        if (_cropSyncOk) _cropSyncOkSource = _visualConfirmsPreview ? 'visual_rows' : (_overlapConfirmsPreview ? 'model_overlap' : 'unknown');
-                        if (_memberHeaderFound) {
-                            _cropSyncOk = true;
-                            _cropSyncOkSource = 'member_header';
-                            _cropDesyncReason = null;
-                        } else {
-                            _cropSyncOk = false;
-                            _cropSyncOkSource = 'member_header';
-                            _cropDesyncReason = 'MEMBER_HEADER_NOT_FOUND';
-                        }
-                        let _sideVerifyRan = false;
-                        let _leftVerifyNicks = [];
-                        let _rightVerifyNicks = [];
-                        let _leftParsedOverlap = 0;
-                        let _rightParsedOverlap = 0;
-                        let _sideVerifySelectedSide = null;
-                        const _countVerifyOverlap = (nicks) => {
-                            const seen = new Set();
-                            (nicks || []).forEach(n => {
-                                const k = (typeof normalizeNick === 'function') ? normalizeNick(n || '') : String(n || '').toLowerCase();
-                                if (k) seen.add(k);
-                            });
-                            let hit = 0;
-                            _parsedNickKeys.forEach(k => { if (seen.has(k)) hit++; });
-                            return hit;
-                        };
-                        const _hasTwoVisibleSideCrops = !!(_cropLeftUrl && _cropRightUrl && _rowCount > 0 && _leftVisualRows > 0 && _rightVisualRows > 0);
-                        const _decisionNeedsSideVerify = false && !!(_hasTwoVisibleSideCrops && (
-                            _visualDecidedSide ||
-                            memberSideRaw !== 'unknown' ||
-                            !_cropSyncOk ||
-                            /visual|model|fallback|forced|overlap/.test(_sideDecisionSource || '')
-                        ));
-                        if (_decisionNeedsSideVerify) {
-                            _sideVerifyRan = true;
-                            try {
-                                const _activeVerifyModel = chosenModel || _ccOcrReadPreferredModel() || (_ccOcrAvailableModels()[0] || null);
-                                const _leftVerify = await _ccOcrVerifyCropNicks(_cropLeftUrl, 'left', _activeVerifyModel);
-                                const _rightVerify = await _ccOcrVerifyCropNicks(_cropRightUrl, 'right', _leftVerify.model || _activeVerifyModel);
-                                _leftVerifyNicks = _leftVerify.nicks || [];
-                                _rightVerifyNicks = _rightVerify.nicks || [];
-                                _leftParsedOverlap = _countVerifyOverlap(_leftVerifyNicks);
-                                _rightParsedOverlap = _countVerifyOverlap(_rightVerifyNicks);
-                                if (_leftParsedOverlap > _rightParsedOverlap) _sideVerifySelectedSide = 'left';
-                                else if (_rightParsedOverlap > _leftParsedOverlap) _sideVerifySelectedSide = 'right';
-                                if (_sideVerifySelectedSide) {
-                                    memberSide = _sideVerifySelectedSide;
-                                    _effectiveCrop = _sideVerifySelectedSide === 'left' ? _cropLeft : _cropRight;
-                                    _geometrySource = 'side_verify_overlap';
-                                    _cropUrlSide = _sideVerifySelectedSide;
-                                    _previewCropSide = _sideVerifySelectedSide;
-                                    _parsedRowsSourceSide = _sideVerifySelectedSide;
-                                    _cropSyncOk = true;
-                                    _cropSyncOkSource = 'side_verify_overlap';
-                                    _cropDesyncReason = null;
-                                    _sideDecisionSource = 'side_verify_overlap_' + _sideVerifySelectedSide
-                                        + '_leftOverlap=' + _leftParsedOverlap + '_rightOverlap=' + _rightParsedOverlap;
-                                    rejectedCandidateReason = null;
-                                    wrongTableCandidate = false;
-                                    wrongTableReason = null;
-                                    forcedLeftFallback = _sideVerifySelectedSide === 'left' ? forcedLeftFallback : false;
-                                    _selectedCropBox = {
-                                        x: _effectiveCrop.geometry.x,
-                                        y: _effectiveCrop.geometry.y,
-                                        w: _effectiveCrop.geometry.w,
-                                        h: _effectiveCrop.geometry.h,
-                                    };
-                                    _selectedHeaderGuess = _sideVerifySelectedSide + '_panel_side_verify_member_group';
-                                } else {
-                                    _cropSyncOk = false;
-                                    _cropSyncOkSource = 'side_verify_overlap';
-                                    _cropDesyncReason = 'side_verify_overlap_tie_left=' + _leftParsedOverlap + '_right=' + _rightParsedOverlap;
-                                }
-                            } catch (e) {
-                                _cropSyncOk = false;
-                                _cropSyncOkSource = 'side_verify_overlap';
-                                _cropDesyncReason = 'side_verify_failed_' + String(e && e.message ? e.message : e || 'unknown').slice(0, 120);
-                                console.warn('[side-verify] failed pack=' + packName, e);
-                            }
-                        }
-                        console.info('[km-crop-select] pack=' + packName
-                            + ' memberSideRaw=' + memberSideRaw + ' chosen=' + memberSide
-                            + ' preview=' + _previewCropSide
-                            + ' tableType=' + tableType
-                            + ' visualRows=' + _leftVisualRows + 'L/' + _rightVisualRows + 'R(target=' + _rowCount + ')'
-                            + ' columns=' + _leftColTokens + 'L/' + _rightColTokens + 'R'
-                            + ' overlap=' + _leftHit + 'L/' + _rightHit + 'R'
-                            + ' roster=' + _leftRosterHit + 'L/' + _rightRosterHit + 'R'
-                            + ' decision=' + (_sideDecisionSource || 'none')
-                            + ' syncOk=' + _cropSyncOk
-                            + ' syncSource=' + (_cropSyncOkSource || 'none')
-                            + ' memberHeader=' + (_memberHeaderFound ? 'yes:' + _previewCropSide + ':' + _selectedSourceHeader : 'no')
-                            + ' sideVerify=' + (_sideVerifyRan ? (_leftParsedOverlap + 'L/' + _rightParsedOverlap + 'R selected=' + (_sideVerifySelectedSide || 'none')) : 'no')
-                            + ' reason=' + (_cropDesyncReason || 'ok'));
+                        console.info('[km-crop-select] pack=' + packName + ' memberSideRaw=' + memberSideRaw + ' memberSide=' + memberSide + ' tableType=' + tableType + ' wrongTableCandidate=' + wrongTableCandidate + ' reason=' + (wrongTableReason || 'none'));
                         packTableInfo[packName] = {
                             tableType: tableType,
                             memberSide: memberSide,
                             memberSideRaw: memberSideRaw,
-                            memberSideVerified: _memberHeaderFound ? memberSide : (_sideVerifySelectedSide || null),
-                            cropSyncOkSource: _cropSyncOkSource,
-                            candidateHeaders: _candidateHeaders,
-                            selectedSourceHeader: _selectedSourceHeader,
-                            selectedSourceReason: _selectedSourceReason,
-                            rejectedSourceReasons: _rejectedSourceReasons,
-                            memberHeaderFound: _memberHeaderFound,
                             ignoredLeaderTable: tableType === 'both' || /both/.test(_lhNotes),
                             wrongTableCandidate: wrongTableCandidate,
                             wrongTableReason: wrongTableReason,
-                            forcedLeftFallback: forcedLeftFallback,
-                            forcedLeftReason: forcedLeftReason,
                         };
                         geometryMap[packName] = {
                             ..._effectiveCrop.geometry,
                             cropUrl: _effectiveCrop.cropCanvas.toDataURL('image/png'),
-                            // Both candidate crops kept for wizard flip (no re-OCR needed).
-                            cropUrlLeft: _cropLeftUrl,
-                            cropUrlRight: _cropRightUrl,
-                            cropLeftGeometry: { x: _cropLeft.geometry.x, y: _cropLeft.geometry.y, w: _cropLeft.geometry.w, h: _cropLeft.geometry.h },
-                            cropRightGeometry: { x: _cropRight.geometry.x, y: _cropRight.geometry.y, w: _cropRight.geometry.w, h: _cropRight.geometry.h },
                             memberSide: memberSide,
                             memberSideRaw: memberSideRaw,
                             cropUrlSide: _cropUrlSide,
                             geometrySource: _geometrySource,
-                            geometrySideFallbackReason: forcedLeftReason || wrongTableReason,
-                            forcedLeftFallback: forcedLeftFallback,
-                            forcedLeftReason: forcedLeftReason,
-                            // Debug fields per crop-source audit (consumed by wizard + debug dump)
+                            geometrySideFallbackReason: wrongTableReason,
+                            // Debug fields per crop-source audit
                             selectedTableSide: memberSide,
                             cropCandidateCount: 2,
                             rejectedCandidateReason: rejectedCandidateReason,
@@ -10871,52 +10239,6 @@ function getClass2IconByClass3(c3) {
                             selectedHeaderGuess: _selectedHeaderGuess,
                             wrongTableCandidate: wrongTableCandidate,
                             wrongTableReason: wrongTableReason,
-                            // ── Sync audit fields (task: member crop ↔ OCR rows sync) ──
-                            parsedRowsSourceSide: _parsedRowsSourceSide,
-                            previewCropSide: _previewCropSide,
-                            matcherCropSide: _previewCropSide,
-                            cropSyncOk: _cropSyncOk,
-                            cropSyncOkSource: _cropSyncOkSource,
-                            cropDesyncReason: _cropDesyncReason,
-                            candidateHeaders: _candidateHeaders,
-                            selectedSourceHeader: _selectedSourceHeader,
-                            selectedSourceReason: _selectedSourceReason,
-                            rejectedSourceReasons: _rejectedSourceReasons,
-                            memberHeaderFound: _memberHeaderFound,
-                            sideVerifyRan: _sideVerifyRan,
-                            leftVerifyNicks: _leftVerifyNicks.slice(0, 16),
-                            rightVerifyNicks: _rightVerifyNicks.slice(0, 16),
-                            leftParsedOverlap: _leftParsedOverlap,
-                            rightParsedOverlap: _rightParsedOverlap,
-                            sideVerifySelectedSide: _sideVerifySelectedSide,
-                            // ── Content-overlap evidence (primary side decision driver) ──
-                            overlapAvailable: _overlapAvailable,
-                            overlapConfident: _overlapConfident,
-                            overlapDecidedSide: _overlapDecidedSide,
-                            overlapLeftHit: _leftHit,
-                            overlapRightHit: _rightHit,
-                            overlapLeftSetSize: _leftSet.size,
-                            overlapRightSetSize: _rightSet.size,
-                            overlapRowCount: _rowCount,
-                            sideDecisionSource: _sideDecisionSource,
-                            leftPanelNicks: _leftPanelNicks.slice(0, 16),
-                            rightPanelNicks: _rightPanelNicks.slice(0, 16),
-                            // Visual signals (image-positional, model-independent)
-                            visualLeftRows: _leftVisualRows,
-                            visualRightRows: _rightVisualRows,
-                            visualLeftColTokens: _leftColTokens,
-                            visualRightColTokens: _rightColTokens,
-                            visualLeftHasStatCols: _leftHasStatCols,
-                            visualRightHasStatCols: _rightHasStatCols,
-                            visualColumnConfident: _columnConfident,
-                            visualColumnDecidedSide: _columnDecidedSide,
-                            visualConfident: !!_visualConfident,
-                            visualDecidedSide: _visualDecidedSide,
-                            // Roster-overlap signal per panel (advisory)
-                            rosterLeftHit: _leftRosterHit,
-                            rosterRightHit: _rightRosterHit,
-                            rosterConfident: !!_rosterConfident,
-                            rosterDecidedSide: _rosterDecidedSide,
                         };
                         // Leader-list hints: only when model says leader_list (no Член группы extracted).
                         // If table_type is party_members or both, NEVER mark as leader_list — valid screen.
@@ -12020,40 +11342,20 @@ ${playerList}
                     // Preserve side-aware cropUrl/memberSide/cropUrlSide/geometrySource that the
                     // OCR provider loop stored, so we don't lose left-side wizard preview here.
                     const _prevGeom = dayPackGeometry[packName] || {};
-                    let _matcherSide = _forceSide
+                    const _matcherSide = _forceSide
                                        ? _forceSide
                                        : /LEFT/i.test(geo.preset || '') ? 'left'
                                        : /RIGHT/i.test(geo.preset || '') ? 'right'
                                        : 'unknown';
-                    if ((_prevGeom.cropSyncOkSource === 'side_verify_overlap' || _prevGeom.cropSyncOkSource === 'member_header' || _prevGeom.cropSyncOkSource === 'user_crop_override')
-                        && (_prevGeom.previewCropSide === 'left' || _prevGeom.previewCropSide === 'right')) {
-                        _matcherSide = _prevGeom.previewCropSide;
-                    }
-                    // Re-evaluate cropSyncOk now that matcher side is known.
-                    // cropSyncOk = preview side === matcher side === parsedRowsSourceSide (when known).
-                    const _prevParsedSide = _prevGeom.parsedRowsSourceSide || _prevGeom.memberSideRaw || 'unknown';
-                    const _prevPreviewSide = _prevGeom.previewCropSide || _prevGeom.cropUrlSide || 'unknown';
-                    let _matcherSyncOk = (_prevGeom.cropSyncOk !== false);
-                    let _matcherDesyncReason = _prevGeom.cropDesyncReason || null;
-                    if (_matcherSide !== 'unknown' && _prevPreviewSide !== 'unknown' && _matcherSide !== _prevPreviewSide) {
-                        _matcherSyncOk = false;
-                        _matcherDesyncReason = 'matcher_side_' + _matcherSide + '_but_preview_' + _prevPreviewSide;
-                    } else if (_matcherSide !== 'unknown' && _prevParsedSide !== 'unknown' && _matcherSide !== _prevParsedSide) {
-                        _matcherSyncOk = false;
-                        _matcherDesyncReason = 'matcher_side_' + _matcherSide + '_but_parsed_' + _prevParsedSide;
-                    }
                     dayPackGeometry[packName] = {
                         ..._prevGeom,
                         x: geo.x, y: geo.y, rowH: geo.rowH, iconW: geo.iconW, iconH: geo.iconH,
                         packLen: packPlayers.length, imgW: sc.width, imgH: sc.height, preset: geo.preset,
                         iconMatcherSide: _matcherSide,
-                        matcherCropSide: _matcherSide,
                         geometryMemberSide: _prevGeom.memberSide || 'unknown',
                         forcedMemberSide: _forceSide || null,
                         forcedSideReason: _forceSideReason,
                         selectedGeoPreset: geo.preset,
-                        cropSyncOk: _matcherSyncOk,
-                        cropDesyncReason: _matcherDesyncReason,
                     };
 
                     for (let rowIdx = 0; rowIdx < packPlayers.length; rowIdx++) {
@@ -12234,27 +11536,7 @@ ${playerList}
                             writeTarget.matcher_autoTrained = false;
                             writeTarget.matcher_originalStatus = 'WRONG_TABLE_CANDIDATE';
                         }
-                        // Crop-desync guard: when content-overlap evidence does NOT confirm
-                        // that the chosen crop side contains the parsed rows, the matcher's
-                        // icon crops are taken from the wrong panel — profa-write would
-                        // silently train on the wrong table. Demote trigger and tag the row
-                        // with CROP_DESYNC so the wizard surfaces it for manual review.
-                        const _packGeomForSync = (dayPackGeometry || {})[packName] || {};
-                        if (_packGeomForSync.cropSyncOk === false) {
-                            writeTarget.matcher_cropSyncOk = false;
-                            writeTarget.matcher_cropDesyncReason = _packGeomForSync.cropDesyncReason || 'crop_desync';
-                            writeTarget.matcher_trigger = false;
-                            writeTarget.matcher_wouldTrigger = false;
-                            writeTarget.matcher_autoTrained = false;
-                            // Don't overwrite WRONG_TABLE_CANDIDATE if it already set originalStatus.
-                            if (!writeTarget.matcher_originalStatus) {
-                                writeTarget.matcher_originalStatus = 'CROP_DESYNC';
-                            }
-                        } else if (_packGeomForSync.cropSyncOk === true) {
-                            writeTarget.matcher_cropSyncOk = true;
-                        }
                         const _finalReason = (writeTarget.matcher_wrongTableCandidate) ? 'wrong_table_candidate'
-                            : (writeTarget.matcher_cropSyncOk === false) ? 'crop_desync'
                             : _trainedStrong ? 'trained_strong'
                             : (!_CC_AUTO_PROFA_WRITE && _baseAutoWouldTrigger) ? 'manual_mode_auto_hint_only'
                             : (!_CC_AUTO_PROFA_WRITE) ? 'manual_mode_hint_only'
@@ -12373,43 +11655,7 @@ ${playerList}
                                 selectedCropBox: (dayPackGeometry[packName] && dayPackGeometry[packName].selectedCropBox) || null,
                                 selectedHeaderGuess: (dayPackGeometry[packName] && dayPackGeometry[packName].selectedHeaderGuess) || null,
                                 wrongTableCandidate: !!writeTarget.matcher_wrongTableCandidate,
-                                wrongTableReason: writeTarget.matcher_wrongTableReason || null,
-                                // ── Sync audit (member-group crop ↔ OCR rows) ──
-                                parsedRowsSourceSide: (dayPackGeometry[packName] && dayPackGeometry[packName].parsedRowsSourceSide) || _tableInfo.memberSideRaw || 'unknown',
-                                previewCropSide: (dayPackGeometry[packName] && dayPackGeometry[packName].previewCropSide) || (dayPackGeometry[packName] && dayPackGeometry[packName].cropUrlSide) || 'unknown',
-                                matcherCropSide: (dayPackGeometry[packName] && dayPackGeometry[packName].matcherCropSide) || _matcherSide || 'unknown',
-                                cropUrlSide: (dayPackGeometry[packName] && dayPackGeometry[packName].cropUrlSide) || 'unknown',
-                                cropSyncOk: !!(dayPackGeometry[packName] && dayPackGeometry[packName].cropSyncOk),
-                                cropSyncOkSource: (dayPackGeometry[packName] && dayPackGeometry[packName].cropSyncOkSource) || null,
-                                cropDesyncReason: (dayPackGeometry[packName] && dayPackGeometry[packName].cropDesyncReason) || null,
-                                candidateHeaders: (dayPackGeometry[packName] && dayPackGeometry[packName].candidateHeaders) || [],
-                                selectedSourceHeader: (dayPackGeometry[packName] && dayPackGeometry[packName].selectedSourceHeader) || '',
-                                selectedSourceReason: (dayPackGeometry[packName] && dayPackGeometry[packName].selectedSourceReason) || null,
-                                rejectedSourceReasons: (dayPackGeometry[packName] && dayPackGeometry[packName].rejectedSourceReasons) || [],
-                                memberHeaderFound: !!(dayPackGeometry[packName] && dayPackGeometry[packName].memberHeaderFound),
-                                sideVerifyRan: !!(dayPackGeometry[packName] && dayPackGeometry[packName].sideVerifyRan),
-                                leftVerifyNicks: (dayPackGeometry[packName] && dayPackGeometry[packName].leftVerifyNicks) || [],
-                                rightVerifyNicks: (dayPackGeometry[packName] && dayPackGeometry[packName].rightVerifyNicks) || [],
-                                leftParsedOverlap: (dayPackGeometry[packName] && dayPackGeometry[packName].leftParsedOverlap) || 0,
-                                rightParsedOverlap: (dayPackGeometry[packName] && dayPackGeometry[packName].rightParsedOverlap) || 0,
-                                sideVerifySelectedSide: (dayPackGeometry[packName] && dayPackGeometry[packName].sideVerifySelectedSide) || null,
-                                forcedLeftFallback: !!(dayPackGeometry[packName] && dayPackGeometry[packName].forcedLeftFallback),
-                                forcedLeftReason: (dayPackGeometry[packName] && dayPackGeometry[packName].forcedLeftReason) || null,
-                                // ── Content-overlap evidence per row (drives sync decision) ──
-                                overlapAvailable: !!(dayPackGeometry[packName] && dayPackGeometry[packName].overlapAvailable),
-                                overlapConfident: !!(dayPackGeometry[packName] && dayPackGeometry[packName].overlapConfident),
-                                overlapDecidedSide: (dayPackGeometry[packName] && dayPackGeometry[packName].overlapDecidedSide) || null,
-                                overlapLeftHit: (dayPackGeometry[packName] && dayPackGeometry[packName].overlapLeftHit) || 0,
-                                overlapRightHit: (dayPackGeometry[packName] && dayPackGeometry[packName].overlapRightHit) || 0,
-                                overlapRowCount: (dayPackGeometry[packName] && dayPackGeometry[packName].overlapRowCount) || 0,
-                                sideDecisionSource: (dayPackGeometry[packName] && dayPackGeometry[packName].sideDecisionSource) || null,
-                                // Visual + roster signals per row (independent evidence)
-                                visualLeftRows: (dayPackGeometry[packName] && dayPackGeometry[packName].visualLeftRows) || 0,
-                                visualRightRows: (dayPackGeometry[packName] && dayPackGeometry[packName].visualRightRows) || 0,
-                                visualConfident: !!(dayPackGeometry[packName] && dayPackGeometry[packName].visualConfident),
-                                visualDecidedSide: (dayPackGeometry[packName] && dayPackGeometry[packName].visualDecidedSide) || null,
-                                rosterLeftHit: (dayPackGeometry[packName] && dayPackGeometry[packName].rosterLeftHit) || 0,
-                                rosterRightHit: (dayPackGeometry[packName] && dayPackGeometry[packName].rosterRightHit) || 0
+                                wrongTableReason: writeTarget.matcher_wrongTableReason || null
                             });
                         } catch(e) { /* ignore */ }
                         window._gtDebug.matcherProcessed = (window._gtDebug.matcherProcessed || 0) + 1;
@@ -14925,102 +14171,6 @@ ${playerList}
 
         function kmRwPrev() { if (_kmRw.idx > 0) { if (typeof kmRwCloseProfaPicker === 'function') kmRwCloseProfaPicker(); _kmRw.idx--; kmRwRender(); } }
         function kmRwNext() { if (_kmRw.idx < _kmRw.parties.length - 1) { if (typeof kmRwCloseProfaPicker === 'function') kmRwCloseProfaPicker(); _kmRw.idx++; kmRwRender(); } }
-        function _kmRwClearMatcherFieldsForPack(packName) {
-            const packRows = (dayScreenPlayersMap || {})[packName] || [];
-            const clearOne = (row) => {
-                if (!row) return;
-                const keepManual = row.profaSource === 'manual_review';
-                [
-                    'matcher_top1','matcher_sim','matcher_margin','matcher_top3','matcher_source',
-                    'matcher_wouldTrigger','matcher_trigger','matcher_autoTrained','matcher_wrongTableCandidate',
-                    'matcher_wrongTableReason','matcher_cropSyncOk','matcher_cropDesyncReason','matcher_originalStatus',
-                    'matcher_finalReason','matcher_rowUnstable','matcher_unstableReason','matcher_yDrift',
-                    'matcher_distToPrev','matcher_distToNext','matcher_pack','matcher_row','matcher_cx','matcher_cy',
-                    'matcher_expectedCY','matcher_prevRowCY','matcher_nextRowCY','matcher_crop','matcher_cropUrl',
-                    'matcher_locHit','matcher_locConf','matcher_locInvalid','matcher_cropQuality','matcher_geoPreset',
-                    'matcher_profaWarning','matcher_profaWarningReason'
-                ].forEach(k => { try { delete row[k]; } catch (_) {} });
-                if (!keepManual) {
-                    try { delete row.class2; } catch (_) {}
-                    try { delete row.profa; } catch (_) {}
-                    try { delete row.profaSource; } catch (_) {}
-                }
-            };
-            packRows.forEach(row => {
-                clearOne(row);
-                const parsed = _kmRwFindParsed(row && row.name);
-                if (parsed && parsed !== row) clearOne(parsed);
-            });
-        }
-
-        async function _kmRwRerunMatcherAfterCropOverride(packName) {
-            _kmRwClearMatcherFieldsForPack(packName);
-            if (typeof runLocalIconMatcher !== 'function') {
-                throw new Error('runLocalIconMatcher unavailable');
-            }
-            await runLocalIconMatcher(activeDayDate || null);
-            if (_kmRw && Array.isArray(_kmRw.parties)) {
-                const idx = _kmRw.parties.findIndex(p => p && p.packName === packName);
-                if (idx >= 0) _kmRw.parties[idx].players = (dayScreenPlayersMap || {})[packName] || _kmRw.parties[idx].players;
-            }
-        }
-
-        // Manual crop source override. Re-OCR does NOT happen; local icon matcher is
-        // rerun against current parsed rows so profa hints follow the selected crop.
-        window.kmRwSetCropSide = async function(packName, newSide) {
-            if (!packName || (newSide !== 'left' && newSide !== 'right')) return;
-            const g = (typeof dayPackGeometry === 'object' && dayPackGeometry) ? dayPackGeometry[packName] : null;
-            if (!g || !g.cropUrlLeft || !g.cropUrlRight) {
-                console.warn('[kmRw crop override] both candidate crops not available for', packName);
-                return;
-            }
-            if (!_kmRw.cropSideOverride) _kmRw.cropSideOverride = {};
-            _kmRw.cropSideOverride[packName] = newSide;
-            g.cropUrl = newSide === 'left' ? g.cropUrlLeft : g.cropUrlRight;
-            g.cropUrlSide = newSide;
-            g.previewCropSide = newSide;
-            g.matcherCropSide = newSide;
-            g.iconMatcherSide = newSide;
-            g.memberSide = newSide;
-            g.cropSyncOk = true;
-            g.cropSyncOkSource = 'user_crop_override';
-            g.cropDesyncReason = null;
-            g.selectedSourceReason = 'user_crop_override';
-            g.selectedSourceHeader = g.selectedSourceHeader || 'manual override';
-            g.userCropOverride = true;
-            g.userCropOverrideSide = newSide;
-            g.userFlippedSide = true;
-            const info = (dayPackTableInfo || {})[packName];
-            if (info) {
-                info.memberSide = newSide;
-                info.memberSideVerified = newSide;
-                info.cropSyncOkSource = 'user_crop_override';
-                info.wrongTableCandidate = false;
-                info.wrongTableReason = null;
-            }
-            if (_kmRw.cropCache) {
-                Object.keys(_kmRw.cropCache).forEach(k => { if (k.indexOf(packName + '|') === 0) delete _kmRw.cropCache[k]; });
-            }
-            console.info('[kmRw crop override] pack=' + packName + ' side=' + newSide + ' rerunMatcher=true');
-            _kmRwToast('Источник ' + newSide.toUpperCase() + ': пересчитываю профы...');
-            kmRwRender();
-            try {
-                await _kmRwRerunMatcherAfterCropOverride(packName);
-                _kmRwToast('Источник ' + newSide.toUpperCase() + ': профы пересчитаны');
-            } catch (e) {
-                console.warn('[kmRw crop override] matcher rerun failed', e);
-                _kmRwToast('Источник выбран, matcher не пересчитался: ' + (e && e.message ? e.message : e));
-            }
-            kmRwRender();
-        };
-
-        window.kmRwFlipCropSide = function(packName) {
-            if (!packName) return;
-            const g = (typeof dayPackGeometry === 'object' && dayPackGeometry) ? dayPackGeometry[packName] : null;
-            const currentSide = (_kmRw.cropSideOverride && _kmRw.cropSideOverride[packName]) || (g && (g.previewCropSide || g.cropUrlSide)) || 'right';
-            const newSide = currentSide === 'left' ? 'right' : 'left';
-            return window.kmRwSetCropSide(packName, newSide);
-        };
 
         function _kmRwFindParsed(name) {
             if (!name) return null;
@@ -15033,44 +14183,15 @@ ${playerList}
             if (!fullUrl) return { url:'', cropped:false };
             const g = (dayPackGeometry || {})[packName];
             if (!_kmRw.cropCache) _kmRw.cropCache = {};
-            if (!_kmRw.cropSideOverride) _kmRw.cropSideOverride = {};
-            // User-toggled side override has priority — clears cached crop so flip is reflected.
-            const _override = _kmRw.cropSideOverride[packName] || null;
-            const _cacheKey = packName + '|' + (_override || 'default');
-            if (_kmRw.cropCache[_cacheKey]) return _kmRw.cropCache[_cacheKey];
+            if (_kmRw.cropCache[packName]) return _kmRw.cropCache[packName];
             if (!g) {
                 const fallback = { url: fullUrl, cropped: false };
-                _kmRw.cropCache[_cacheKey] = fallback;
+                _kmRw.cropCache[packName] = fallback;
                 return fallback;
             }
-            // Resolve cropUrl based on override / geometry-stored sides.
-            let _resolvedUrl = g.cropUrl || '';
-            let _resolvedSide = g.cropUrlSide || 'unknown';
-            if (_override === 'left' && g.cropUrlLeft) {
-                _resolvedUrl = g.cropUrlLeft;
-                _resolvedSide = 'left';
-            } else if (_override === 'right' && g.cropUrlRight) {
-                _resolvedUrl = g.cropUrlRight;
-                _resolvedSide = 'right';
-            }
-            if (_resolvedUrl) {
-                const out = {
-                    url: _resolvedUrl,
-                    cropped: true,
-                    w: g.w || null,
-                    h: g.h || null,
-                    source: g.source || 'geometry_crop_url',
-                    side: _resolvedSide,
-                    hasLeft: !!g.cropUrlLeft,
-                    hasRight: !!g.cropUrlRight,
-                    syncOk: g.cropSyncOk !== false,
-                    syncReason: g.cropDesyncReason || null,
-                    overridden: !!_override,
-                    selectedSourceHeader: g.selectedSourceHeader || '',
-                    selectedSourceReason: g.selectedSourceReason || '',
-                    memberHeaderFound: !!g.memberHeaderFound,
-                };
-                _kmRw.cropCache[_cacheKey] = out;
+            if (g.cropUrl) {
+                const out = { url: g.cropUrl, cropped: true, w: g.w || null, h: g.h || null, source: g.source || 'geometry_crop_url' };
+                _kmRw.cropCache[packName] = out;
                 return out;
             }
             try {
@@ -15131,10 +14252,6 @@ ${playerList}
                 const _wtReason = parsed.matcher_wrongTableReason || 'wrong_table_candidate';
                 return '<span title="Источник скрина — не та таблица (вероятно правая клан/лидер вместо «Член группы»). Причина: ' + _kmRwEsc(_wtReason) + '" style="font-size:8.5px;color:#fda4af;background:#3f0d1c;border:1px solid #be123c;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">WRONG_TABLE</span>';
             }
-            if (parsed.matcher_cropSyncOk === false) {
-                const _dsReason = parsed.matcher_cropDesyncReason || 'crop_desync';
-                return '<span title="Crop preview не содержит большинство parsed rows — auto-write и training заблокированы. Причина: ' + _kmRwEsc(_dsReason) + '" style="font-size:8.5px;color:#fcd34d;background:#3a2a08;border:1px solid #b45309;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">CROP_DESYNC</span>';
-            }
             if (parsed.matcher_locInvalid) {
                 return '<span title="Плохой кроп иконки — выбери профу вручную" style="font-size:8.5px;color:#f97316;background:#1c0a00;border:1px solid #7c2d12;border-radius:3px;padding:1px 4px;font-weight:700;flex-shrink:0">BAD CROP</span>';
             }
@@ -15172,7 +14289,7 @@ ${playerList}
             const shotImg = document.getElementById('kmRwShot');
             const shotEmpty = document.getElementById('kmRwShotEmpty');
             const cropTag = document.getElementById('kmRwCropTag');
-            if (cropTag) cropTag.innerHTML = '';
+            if (cropTag) cropTag.textContent = '';
             if (party.shotUrl) {
                 shotEmpty.style.display = 'none';
                 shotImg.style.display = '';
@@ -15183,35 +14300,7 @@ ${playerList}
                 _kmRwGetCropUrl(party.packName).then(out => {
                     if (myReq !== _kmRw.shotReq || _kmRw.idx !== idx) return; // user navigated away
                     if (out && out.url) shotImg.src = out.url;
-                    if (!cropTag) return;
-                    if (!out || !out.cropped) {
-                        cropTag.textContent = '⚠️ нет геометрии — полный скрин';
-                        return;
-                    }
-                    const sideTxt = out.side ? ('· ' + out.side) : '';
-                    const syncTxt = out.syncOk
-                        ? '<span title="rows и crop с одной стороны" style="color:#86efac">sync ✓</span>'
-                        : '<span title="' + _kmRwEsc(out.syncReason || 'неизвестно') + '" style="color:#fcd34d">sync ?</span>';
-                    const overrideTxt = out.overridden
-                        ? '<span style="color:#a5b4fc" title="ручной выбор стороны">· flipped</span>'
-                        : '';
-                    const headerTxt = out.memberHeaderFound
-                        ? '<span title="' + _kmRwEsc(out.selectedSourceReason || 'member_header') + '" style="color:#86efac">· header ' + _kmRwEsc(out.selectedSourceHeader || 'Член группы') + '</span>'
-                        : '<span title="' + _kmRwEsc(out.syncReason || 'MEMBER_HEADER_NOT_FOUND') + '" style="color:#fcd34d">· header ?</span>';
-                    const packArg = _kmRwEsc(party.packName).replace(/'/g, "\\'");
-                    const sideBtn = (side) => {
-                        const active = out.side === side;
-                        return '<button type="button" onclick="kmRwSetCropSide(\'' + packArg + '\',\'' + side + '\')" '
-                            + 'title="Manual/debug override: use ' + side.toUpperCase() + ' crop and rerun local matcher without OCR" '
-                            + 'style="margin-left:4px;background:' + (active ? '#1e3a5f' : '#1a1f29') + ';color:' + (active ? '#bfdbfe' : '#94a3b8') + ';border:1px solid ' + (active ? '#2563eb' : '#2d3748') + ';border-radius:5px;padding:1px 6px;font-size:9px;cursor:pointer;font-weight:700">Источник: ' + side.toUpperCase() + '</button>';
-                    };
-                    const flipBtn = (out.hasLeft && out.hasRight)
-                        ? sideBtn('left') + sideBtn('right') +
-                            '<button type="button" onclick="kmRwFlipCropSide(\'' + packArg + '\')" '
-                            + 'title="Показать другую сторону скриншота и пересчитать local matcher. OpenRouter OCR не запускается." '
-                            + 'style="margin-left:6px;background:#1a1f29;color:#a5b4fc;border:1px solid #2d3748;border-radius:5px;padding:1px 6px;font-size:9px;cursor:pointer;font-weight:700">↔ flip</button>'
-                        : '';
-                    cropTag.innerHTML = '🎯 кроп таблицы ' + sideTxt + ' · ' + syncTxt + ' ' + headerTxt + ' ' + overrideTxt + flipBtn;
+                    if (cropTag) cropTag.textContent = out && out.cropped ? '🎯 кроп таблицы' : '⚠️ нет геометрии — полный скрин';
                 });
             } else {
                 shotImg.removeAttribute('src');
@@ -15761,13 +14850,6 @@ ${playerList}
                     const parsed = _kmRwFindParsed(row.name) || row;
                     if (!parsed || parsed.profaSource !== 'manual_review') {
                         // Not manually corrected — skip silently (do not count, user didn't touch it)
-                        continue;
-                    }
-                    // Crop-desync guard: parsed rows came from a different panel than the
-                    // crop the matcher used. matcher_cropUrl is therefore from the wrong
-                    // table and cannot be used as a training exemplar for the player's profa.
-                    if (parsed.matcher_cropSyncOk === false) {
-                        _skip(row.name, parsed.profa, 'crop_desync');
                         continue;
                     }
                     const selectedProfa = parsed.profa;
