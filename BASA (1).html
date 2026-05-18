@@ -10141,69 +10141,50 @@ function getClass2IconByClass3(c3) {
                             : ((/leader_list/.test(_lhNotes) && !/член.*группы/.test(_lhNotes)) ? 'leader_list' : 'unknown');
                         const memberSideRaw = (_msRaw === 'left' || _msRaw === 'right') ? _msRaw : 'unknown';
                         // ── KM crop source selection (member-group table) ──
-                        // Build BOTH candidate crops so we can prefer left when model is ambiguous
-                        // and the screen contains two tables side-by-side. The legacy fallback was
-                        // to default unknown→right, which silently picked the clan/leader panel
-                        // when the member-group table was actually on the LEFT.
-                        const _cropLeft = _kmComputeSideCrop(img, 'left');
-                        const _cropRight = crop; // already computed for right panel
-                        // Notes-based hints
+                        // OCR ran on the FULL screenshot (cropDataUrl = shot.dataUrl above), so the
+                        // hardcoded right-panel crop from _ccOcrPreprocessCrop has NOT been verified
+                        // by OCR. Trust it as wizard/matcher source ONLY when the model explicitly
+                        // confirms member_side. Any ambiguity falls back to the full screenshot and
+                        // marks the pack so profas don't auto-write and the AUTO ✓ badge is hidden.
                         const _notesLeaderHint = /leader.?list|лидер|глава|командный|состав/.test(_lhNotes);
                         const _notesMemberHint = /член.*группы/.test(_lhNotes);
-                        // Resolve final memberSide + record audit fields
-                        let memberSide = memberSideRaw;
+                        const _hasContradictionRight = (tableType === 'both' && _notesLeaderHint && !_notesMemberHint);
+                        let memberSide;
+                        let _effectiveCrop;
+                        let _geometrySource;
+                        let _cropUrlSide;
                         let wrongTableCandidate = false;
                         let wrongTableReason = null;
                         let rejectedCandidateReason = null;
                         if (memberSideRaw === 'left') {
-                            // Model is confident — honor it.
-                        } else if (memberSideRaw === 'right') {
-                            // Honor model, but flag when right panel contradicts itself:
-                            // model returned member rows AND said right, yet notes describe a
-                            // leader-list panel (which would mean right is leader, not members).
-                            if (tableType === 'both' && _notesLeaderHint && !_notesMemberHint) {
-                                wrongTableCandidate = true;
-                                wrongTableReason = 'model_said_right_but_notes_hint_right_is_leader_list';
-                                rejectedCandidateReason = 'right_panel_likely_leader_list';
-                                memberSide = 'left';
-                            }
-                        } else {
-                            // memberSideRaw === 'unknown'
-                            if (tableType === 'both') {
-                                // Two tables visible, model didn't tell us which side has members.
-                                // Default to LEFT (was: right) — matches the most common UI layout
-                                // where the right panel is the clan/leader list.
-                                memberSide = 'left';
-                                wrongTableCandidate = true;
-                                wrongTableReason = 'side_unknown_both_tables_default_left';
-                                rejectedCandidateReason = 'right_crop_rejected_unknown_side_both_tables';
-                            } else if (tableType === 'unknown') {
-                                // Both side and table-type unknown — most defensive choice is LEFT
-                                // because legacy right-default is exactly what produced this defect.
-                                memberSide = 'left';
-                                wrongTableCandidate = true;
-                                wrongTableReason = 'side_and_table_type_unknown_default_left';
-                                rejectedCandidateReason = 'right_crop_rejected_fully_unknown';
-                            } else if (tableType === 'leader_list') {
-                                // Pure leader-list view — no member-group crop is correct. Keep right
-                                // crop for visual debugging but flag the pack so rows go to CHECK.
-                                memberSide = 'right';
-                                wrongTableCandidate = true;
-                                wrongTableReason = 'table_type_is_leader_list_no_member_group';
-                            } else {
-                                // tableType === 'party_members' single-panel — legacy right default.
-                                memberSide = 'right';
-                            }
-                        }
-                        let _effectiveCrop, _geometrySource, _cropUrlSide;
-                        if (memberSide === 'left') {
-                            _effectiveCrop = _cropLeft;
-                            _geometrySource = wrongTableCandidate ? ('forced_left_due_to_' + wrongTableReason) : 'member_side_left';
+                            memberSide = 'left';
+                            _effectiveCrop = _kmComputeSideCrop(img, 'left');
+                            _geometrySource = 'member_side_left';
                             _cropUrlSide = 'left';
-                        } else {
-                            _effectiveCrop = _cropRight;
-                            _geometrySource = (memberSideRaw === 'right') ? 'member_side_right' : 'fallback_right_default';
+                        } else if (memberSideRaw === 'right' && !_hasContradictionRight) {
+                            memberSide = 'right';
+                            _effectiveCrop = crop;
+                            _geometrySource = 'member_side_right';
                             _cropUrlSide = 'right';
+                        } else {
+                            memberSide = 'unknown';
+                            wrongTableCandidate = true;
+                            wrongTableReason = _hasContradictionRight
+                                ? 'model_said_right_but_notes_hint_right_is_leader_list'
+                                : (tableType === 'leader_list'
+                                    ? 'table_type_is_leader_list_no_member_group'
+                                    : 'side_unconfirmed_no_hardcoded_default');
+                            rejectedCandidateReason = 'right_panel_crop_unverified';
+                            const fullCanvas = document.createElement('canvas');
+                            fullCanvas.width = img.naturalWidth;
+                            fullCanvas.height = img.naturalHeight;
+                            fullCanvas.getContext('2d', { willReadFrequently: true }).drawImage(img, 0, 0);
+                            _effectiveCrop = {
+                                cropCanvas: fullCanvas,
+                                geometry: { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight, source: 'full_image_unconfirmed_side' }
+                            };
+                            _geometrySource = 'full_image_unconfirmed_side';
+                            _cropUrlSide = 'unknown';
                         }
                         const _selectedCropBox = {
                             x: _effectiveCrop.geometry.x,
@@ -10212,8 +10193,10 @@ function getClass2IconByClass3(c3) {
                             h: _effectiveCrop.geometry.h,
                         };
                         const _selectedHeaderGuess = memberSide === 'left'
-                            ? 'left_panel_assumed_member_group'
-                            : (memberSideRaw === 'right' ? 'right_panel_model_confirmed_member_group' : 'right_panel_legacy_default');
+                            ? 'left_panel_model_confirmed_member_group'
+                            : memberSide === 'right'
+                                ? 'right_panel_model_confirmed_member_group'
+                                : 'full_image_side_unconfirmed';
                         console.info('[km-crop-select] pack=' + packName + ' memberSideRaw=' + memberSideRaw + ' memberSide=' + memberSide + ' tableType=' + tableType + ' wrongTableCandidate=' + wrongTableCandidate + ' reason=' + (wrongTableReason || 'none'));
                         packTableInfo[packName] = {
                             tableType: tableType,
@@ -10233,7 +10216,7 @@ function getClass2IconByClass3(c3) {
                             geometrySideFallbackReason: wrongTableReason,
                             // Debug fields per crop-source audit
                             selectedTableSide: memberSide,
-                            cropCandidateCount: 2,
+                            cropCandidateCount: memberSide === 'unknown' ? 0 : 1,
                             rejectedCandidateReason: rejectedCandidateReason,
                             selectedCropBox: _selectedCropBox,
                             selectedHeaderGuess: _selectedHeaderGuess,
