@@ -3705,6 +3705,54 @@
                     </div>
                 </div>
             </div>
+            <div id="ccOcrModelManagerCard" class="card mb-6 cc-settings-ocrmodelmgr" style="display:none;border:1px solid #2d1f4d">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                    <h2 class="text-lg font-bold">🛠️ OCR Model Manager</h2>
+                    <span style="font-size:10px;font-weight:800;letter-spacing:.05em;padding:2px 8px;border-radius:6px;background:rgba(201,168,76,0.15);color:#e8c97a;border:1px solid rgba(201,168,76,0.4)">ADMIN ONLY</span>
+                </div>
+                <p class="text-slate-500 text-sm mb-4">Free vision/OCR модели OpenRouter. Manual chain имеет приоритет над авто-discovered fallback в реальном анализе. Платные модели запрещены.</p>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+                    <button type="button" onclick="ocrManagerScan(this)" style="background:#1e2530;color:#6366f1;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🔎 Scan free OCR models</button>
+                    <button type="button" onclick="ocrManagerTestSelected(this)" style="background:#1e2530;color:#22d3ee;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🧪 Test selected on 1 screenshot</button>
+                    <button type="button" onclick="ocrManagerSetPrimary()" style="background:#1e2530;color:#fcd34d;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">⭐ Set as primary</button>
+                    <button type="button" onclick="ocrManagerSetFallback()" style="background:#1e2530;color:#86efac;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🛟 Set as fallback</button>
+                    <button type="button" onclick="ocrManagerSaveChain()" style="background:#1e3a5f;color:#60a5fa;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">💾 Save OCR chain</button>
+                    <button type="button" onclick="ocrManagerResetDefault()" style="background:#1e2530;color:#f59e0b;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">↩ Reset to safe default</button>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+                    <input id="ocrMgrManualAddInput" type="text" placeholder="Add model id (must end with :free or be in discovery)" class="input-dark" style="flex:1;min-width:260px">
+                    <button type="button" onclick="ocrManagerAddManualModel()" style="background:#1e2530;color:#a5b4fc;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">+ Add to table</button>
+                    <button type="button" onclick="ocrManagerExport()" style="background:#1e3a5f;color:#60a5fa;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">📤 Export JSON</button>
+                    <label style="background:#1a3a1a;color:#4ade80;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px">
+                        📥 Import JSON
+                        <input type="file" accept=".json,application/json" onchange="ocrManagerImport(event)" style="display:none">
+                    </label>
+                </div>
+                <div id="ocrMgrActiveChain" style="font-size:11px;color:#94a3b8;padding:10px;border:1px solid #1e2530;border-radius:8px;background:#0b1018;line-height:1.6;margin-bottom:12px"></div>
+                <div id="ocrMgrStatus" style="display:none;font-size:13px;padding:10px;border-radius:8px;margin-bottom:12px"></div>
+                <div style="overflow-x:auto">
+                    <table id="ocrMgrTable" style="width:100%;border-collapse:collapse;font-size:11px;font-family:monospace">
+                        <thead>
+                            <tr style="text-align:left;color:#64748b;border-bottom:1px solid #1e2530">
+                                <th style="padding:6px 8px;width:24px"></th>
+                                <th style="padding:6px 8px">model id</th>
+                                <th style="padding:6px 8px">provider/name</th>
+                                <th style="padding:6px 8px">input</th>
+                                <th style="padding:6px 8px">context</th>
+                                <th style="padding:6px 8px">free</th>
+                                <th style="padding:6px 8px">last test</th>
+                                <th style="padding:6px 8px">latency ms</th>
+                                <th style="padding:6px 8px">rows</th>
+                                <th style="padding:6px 8px">parse error</th>
+                                <th style="padding:6px 8px">notes/error</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ocrMgrTableBody">
+                            <tr><td colspan="11" style="padding:14px;color:#64748b;text-align:center">Нажми «🔎 Scan free OCR models» чтобы загрузить каталог OpenRouter.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
             <div class="card mb-6 cc-settings-aliases">
                 <div onclick="(function(el){var b=document.getElementById('aliasesBody');var open=b.style.display!=='none';b.style.display=open?'none':'block';el.querySelector('.aliases-arr').textContent=open?'▼':'▲'})(this)" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none">
                     <h2 class="text-lg font-bold">🔗 Алиасы ников</h2>
@@ -5349,7 +5397,7 @@
             if(pageId === 'archive') renderArchive();
             if(pageId === 'stats') renderStats();
             if(pageId === 'screenshots') renderScreenshotArchive();
-            if(pageId === 'settings') { renderApiKeys(); renderAnalysisProviderSettings(); renderAliases(); renderValueWeightsUI(); }
+            if(pageId === 'settings') { renderApiKeys(); renderAnalysisProviderSettings(); renderAliases(); renderValueWeightsUI(); if (typeof renderOcrModelManager === 'function') renderOcrModelManager(); }
             if(pageId === 'users') renderUsersPage();
             // Обновляем hash в URL (кроме профиля — у него свой hash)
             if (pageId !== 'profile') {
@@ -8275,6 +8323,34 @@ function getClass2IconByClass3(c3) {
             'nvidia/nemotron-nano-12b-v2-vl:free',
             'openrouter/free'
         ];
+        // Admin-curated chain. localStorage key 'clanControl_ocrManualPrimaryChain'.
+        // Format: ["<primary id>", "<fallback id>"]. Tried BEFORE primary/discovered.
+        // Validated at save-time to be free-only (:free suffix or in discovery.freeVision).
+        const _CC_OCR_MANUAL_CHAIN_KEY = 'clanControl_ocrManualPrimaryChain';
+        const _CC_OCR_MANUAL_SAFE_DEFAULT = [
+            'nvidia/nemotron-nano-12b-v2-vl:free',
+            'openrouter/free'
+        ];
+        function _ccOcrReadManualChain() {
+            try {
+                const raw = localStorage.getItem(_CC_OCR_MANUAL_CHAIN_KEY);
+                if (!raw) return [];
+                const arr = JSON.parse(raw);
+                if (!Array.isArray(arr)) return [];
+                return arr.filter(m => typeof m === 'string' && m && !_ccIsBlockedModel(m));
+            } catch (_) { return []; }
+        }
+        function _ccOcrSaveManualChain(arr) {
+            const cleaned = (Array.isArray(arr) ? arr : []).filter(m => typeof m === 'string' && m && !_ccIsBlockedModel(m));
+            try { localStorage.setItem(_CC_OCR_MANUAL_CHAIN_KEY, JSON.stringify(cleaned)); } catch (_) {}
+            return cleaned;
+        }
+        function _ccOcrClearManualChain() {
+            try { localStorage.removeItem(_CC_OCR_MANUAL_CHAIN_KEY); } catch (_) {}
+        }
+        window._ccOcrReadManualChain = _ccOcrReadManualChain;
+        window._ccOcrSaveManualChain = _ccOcrSaveManualChain;
+        window._ccOcrClearManualChain = _ccOcrClearManualChain;
         // OCR model fallback chain. Override via localStorage key 'clanControl_ocrModelChain'
         // (JSON array of OpenRouter model ids). Order = preference; first available is tried first.
         // Multi-model default so a single dead endpoint cannot block analyze. Primary chain ids
@@ -8497,6 +8573,7 @@ function getClass2IconByClass3(c3) {
             const resolved = _ccOcrResolveChain();
             const cache = _ccOcrReadDiscoveryCache();
             const hasFreshDiscovery = !!(cache && cache.ts && Array.isArray(cache.freeVision));
+            const manualChain = _ccOcrReadManualChain();
             const primary = _CC_OCR_PRIMARY_FREE_CHAIN.slice();
             const userCustom = resolved.source === 'custom' ? resolved.chain.slice() : [];
             const discoveredAll = (cache && Array.isArray(cache.vision)) ? cache.vision.slice() : [];
@@ -8506,6 +8583,8 @@ function getClass2IconByClass3(c3) {
             const isFreeAllowed = (id) => {
                 if (!id) return false;
                 if (_ccIsBlockedModel(id)) return false;
+                // Manual chain ids are vetted at save-time — always allowed.
+                if (manualChain.indexOf(id) !== -1) return true;
                 // Primary chain ids are vetted — always allowed even if not in catalog.
                 if (primary.indexOf(id) !== -1) return true;
                 if (hasFreshDiscovery) {
@@ -8531,17 +8610,21 @@ function getClass2IconByClass3(c3) {
                     merged.push(m);
                 }
             };
-            // Primary FIRST — always. Pinned by benchmark, never displaced by preferred/user/discovery.
+            // Manual admin chain FIRST — overrides everything (primary + discovered).
+            pushArr(manualChain);
+            // Primary next — pinned by benchmark, fallback when manual chain dies.
             pushArr(primary);
             if (preferred) pushArr([preferred]);
             pushArr(userCustom);
             pushArr(discoveredFree);
             pushArr(hardcoded);
+            const manualInChain = manualChain.filter(m => merged.indexOf(m) !== -1);
             const primaryInChain = primary.filter(m => merged.indexOf(m) !== -1);
-            const emergencyFallback = merged.filter(m => primary.indexOf(m) === -1);
+            const emergencyFallback = merged.filter(m => primary.indexOf(m) === -1 && manualChain.indexOf(m) === -1);
             const parts = [];
+            if (manualInChain.length) parts.push('manual(' + manualInChain.length + ')');
             if (primaryInChain.length) parts.push('primary(' + primaryInChain.length + ')');
-            if (preferred && merged.indexOf(preferred) !== -1 && primary.indexOf(preferred) === -1) parts.push('preferred');
+            if (preferred && merged.indexOf(preferred) !== -1 && primary.indexOf(preferred) === -1 && manualChain.indexOf(preferred) === -1) parts.push('preferred');
             if (userCustom.length) parts.push('user');
             if (discoveredFree.length) parts.push('discoveredFree');
             if (!hasFreshDiscovery) parts.push('hardcodedFallback');
@@ -8549,6 +8632,8 @@ function getClass2IconByClass3(c3) {
             return {
                 chain: merged,
                 source: source,
+                manual: manualChain,
+                manualInChain: manualInChain,
                 primary: primary,
                 primaryInChain: primaryInChain,
                 emergencyFallback: emergencyFallback,
@@ -8766,6 +8851,9 @@ function getClass2IconByClass3(c3) {
             const primaryAvailable = (effective.primaryInChain || []).filter(m => !_ccOcrIsModelUnavailable(m));
             const emergencyFallback = effective.emergencyFallback || [];
             const emergencyAvailable = emergencyFallback.filter(m => !_ccOcrIsModelUnavailable(m));
+            const manualChain = effective.manual || [];
+            const manualInChain = effective.manualInChain || [];
+            const manualAvailable = manualInChain.filter(m => !_ccOcrIsModelUnavailable(m));
             const keys = (typeof getOpenRouterApiKeys === 'function') ? getOpenRouterApiKeys() : [];
             const provider = (typeof getAnalysisProvider === 'function') ? getAnalysisProvider() : null;
             return {
@@ -8785,6 +8873,10 @@ function getClass2IconByClass3(c3) {
                 discoveryError: effective.discoveryError,
                 discoveryTs: effective.discoveryTs,
                 hardcodedChain: effective.hardcoded,
+                manualChain: manualChain,
+                manualInChain: manualInChain,
+                manualAvailable: manualAvailable,
+                manualAvailableCount: manualAvailable.length,
                 primaryChain: effective.primary || [],
                 primaryInChain: effective.primaryInChain || [],
                 primaryAvailable: primaryAvailable,
@@ -9830,6 +9922,14 @@ function getClass2IconByClass3(c3) {
                 freeVisionCount: Array.isArray(_discovery.freeVision) ? _discovery.freeVision.length : 0,
                 error: _discovery.error,
             }));
+            // If discovery timed out/errored but a manual admin chain is saved — surface a
+            // soft notice instead of bailing. Manual chain ids are whitelisted in the
+            // effective chain regardless of discovery freshness.
+            const _ccManualChainSaved = _ccOcrReadManualChain();
+            if (_discovery && _discovery.error && _ccManualChainSaved.length) {
+                console.warn('[ocr-flow] Discovery timeout, using saved primary chain: ' + _ccManualChainSaved.join(','));
+                setDayStatus('loading', 'Discovery timeout, using saved primary chain: ' + _ccManualChainSaved.join(' → '));
+            }
             let _prep = _ccOcrPrepareChainForAnalyze('analyze-day');
             let _diag = _prep.diag;
             if (_diag.discoveredModelsCount === 0 && !_diag.userCustomChain.length) {
@@ -17253,6 +17353,454 @@ ${playerList}
         }
         window.benchmarkOcrFreeModelsClick = benchmarkOcrFreeModelsClick;
 
+        // ── OCR Model Manager (admin-only Settings block) ──
+        const _CC_OCR_MGR_STATE = {
+            catalog: [],       // [{id, name, modalities, context, free, paid, raw}]
+            tests: {},         // model id → { status, latencyMs, rows, parseError, error, sampledAt }
+            selectedId: null,  // currently radio-selected model id
+            draftPrimary: null,
+            draftFallback: null,
+            paidIgnoredCount: 0,
+        };
+        function _ccOcrMgrIsAdminVisible() {
+            return window._userRole === 'admin';
+        }
+        function _ccOcrMgrSyncVisibility() {
+            const card = document.getElementById('ccOcrModelManagerCard');
+            if (!card) return;
+            card.style.display = _ccOcrMgrIsAdminVisible() ? '' : 'none';
+        }
+        window._ccOcrMgrSyncVisibility = _ccOcrMgrSyncVisibility;
+        function _ccOcrMgrStatus(msg, kind) {
+            const st = document.getElementById('ocrMgrStatus');
+            if (!st) return;
+            if (!msg) { st.style.display = 'none'; return; }
+            const palette = {
+                ok:    'background:#14532d22;border:1px solid #22c55e44;color:#4ade80',
+                warn:  'background:#7c2d1222;border:1px solid #f59e0b44;color:#fcd34d',
+                err:   'background:#7f1d1d22;border:1px solid #ef444444;color:#f87171',
+                info:  'background:#0e1a2e;border:1px solid #1e3a8a44;color:#93c5fd',
+            };
+            st.style.cssText = 'display:block;font-size:13px;padding:10px;border-radius:8px;' + (palette[kind] || palette.info);
+            st.innerText = msg;
+        }
+        function _ccOcrMgrEscape(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+        function _ccOcrMgrInputModalitiesLabel(m) {
+            const arch = m && m.architecture || {};
+            const list = Array.isArray(arch.input_modalities) ? arch.input_modalities
+                       : Array.isArray(arch.modalities) ? arch.modalities
+                       : (arch.modality ? [String(arch.modality)] : []);
+            return list.join(',') || '?';
+        }
+        function _ccOcrMgrProviderNameLabel(id, m) {
+            const parts = String(id || '').split('/');
+            const provider = parts[0] || '';
+            const name = (m && m.name) ? m.name : (parts.slice(1).join('/') || id);
+            return { provider, name };
+        }
+        function _ccOcrMgrContextLabel(m) {
+            const c = m && (m.context_length || m.top_provider && m.top_provider.context_length);
+            return c ? String(c) : '?';
+        }
+        function _ccOcrMgrRenderActiveChain() {
+            const el = document.getElementById('ocrMgrActiveChain');
+            if (!el) return;
+            const saved = _ccOcrReadManualChain();
+            const eff = (typeof _ccOcrEffectiveChain === 'function') ? _ccOcrEffectiveChain() : null;
+            const esc = _ccOcrMgrEscape;
+            const fmtPair = (label, primary, fallback) => {
+                const pri = primary ? '<b style="color:#fcd34d">' + esc(primary) + '</b>' : '<span style="color:#64748b">—</span>';
+                const fb  = fallback ? '<b style="color:#86efac">' + esc(fallback) + '</b>' : '<span style="color:#64748b">—</span>';
+                return '<div style="margin-top:4px"><span style="color:#64748b">' + label + ':</span> primary=' + pri + ' · fallback=' + fb + '</div>';
+            };
+            const draftPri = _CC_OCR_MGR_STATE.draftPrimary;
+            const draftFb  = _CC_OCR_MGR_STATE.draftFallback;
+            const savedPri = saved[0] || null;
+            const savedFb  = saved[1] || null;
+            const effChain = (eff && Array.isArray(eff.chain)) ? eff.chain.slice(0, 6) : [];
+            const effHtml = effChain.length ? effChain.map(m => '<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 6px;border-radius:4px;background:#0f2a18;color:#86efac;font-family:monospace;font-size:10px">' + esc(m) + '</span>').join('') : '<span style="color:#64748b">(пусто)</span>';
+            el.innerHTML =
+                '<div><b>Active OCR chain (effective)</b> <span style="color:#64748b">manual → primary → discovered</span></div>' +
+                '<div style="margin-top:4px">' + effHtml + (effChain.length === 6 ? '<span style="color:#64748b;font-size:10px"> …</span>' : '') + '</div>' +
+                fmtPair('Saved manual', savedPri, savedFb) +
+                fmtPair('Draft (unsaved)', draftPri, draftFb);
+        }
+        function _ccOcrMgrRenderTable() {
+            const tb = document.getElementById('ocrMgrTableBody');
+            if (!tb) return;
+            const rows = _CC_OCR_MGR_STATE.catalog;
+            if (!rows.length) {
+                tb.innerHTML = '<tr><td colspan="11" style="padding:14px;color:#64748b;text-align:center">Нажми «🔎 Scan free OCR models» чтобы загрузить каталог OpenRouter.</td></tr>';
+                _ccOcrMgrRenderActiveChain();
+                return;
+            }
+            const esc = _ccOcrMgrEscape;
+            const draftPri = _CC_OCR_MGR_STATE.draftPrimary;
+            const draftFb = _CC_OCR_MGR_STATE.draftFallback;
+            const html = rows.map(r => {
+                const t = _CC_OCR_MGR_STATE.tests[r.id] || {};
+                const checked = (_CC_OCR_MGR_STATE.selectedId === r.id) ? ' checked' : '';
+                const free = r.free;
+                const disabledRow = !free;
+                const rowStyle = disabledRow ? 'opacity:0.45' : '';
+                const freeLbl = free ? '<span style="color:#86efac">yes</span>' : '<span style="color:#f87171">no (paid)</span>';
+                let badges = '';
+                if (draftPri === r.id) badges += ' <span style="color:#fcd34d">⭐</span>';
+                if (draftFb === r.id) badges += ' <span style="color:#86efac">🛟</span>';
+                const radioAttrs = disabledRow ? ' disabled' : '';
+                return '<tr style="border-bottom:1px solid #1e2530;' + rowStyle + '">'
+                    + '<td style="padding:5px 6px"><input type="radio" name="ocrMgrRowSel" value="' + esc(r.id) + '" onchange="ocrManagerSelectRow(this)"' + radioAttrs + checked + '></td>'
+                    + '<td style="padding:5px 8px;color:' + (free ? '#e2e8f0' : '#64748b') + '">' + esc(r.id) + badges + '</td>'
+                    + '<td style="padding:5px 8px;color:#94a3b8">' + esc(r.provider) + ' / ' + esc(r.name) + '</td>'
+                    + '<td style="padding:5px 8px;color:#94a3b8">' + esc(r.inputModalities) + '</td>'
+                    + '<td style="padding:5px 8px;color:#94a3b8">' + esc(r.context) + '</td>'
+                    + '<td style="padding:5px 8px">' + freeLbl + '</td>'
+                    + '<td style="padding:5px 8px;color:' + (t.kind === 'ok' ? '#86efac' : t.kind === 'err' ? '#f87171' : '#94a3b8') + '">' + esc(t.statusText || '—') + '</td>'
+                    + '<td style="padding:5px 8px;color:#94a3b8">' + (t.latencyMs != null ? esc(t.latencyMs) : '—') + '</td>'
+                    + '<td style="padding:5px 8px;color:#94a3b8">' + (t.rows != null ? esc(t.rows) : '—') + '</td>'
+                    + '<td style="padding:5px 8px;color:' + (t.parseError ? '#f87171' : '#94a3b8') + '">' + esc(t.parseError || '—') + '</td>'
+                    + '<td style="padding:5px 8px;color:' + (t.error ? '#f87171' : '#64748b') + '">' + esc(t.error || (r.notes || '')) + '</td>'
+                    + '</tr>';
+            }).join('');
+            tb.innerHTML = html;
+            _ccOcrMgrRenderActiveChain();
+        }
+        function _ccOcrMgrLoadCatalogFromCache() {
+            const cache = (typeof _ccOcrReadDiscoveryCache === 'function') ? _ccOcrReadDiscoveryCache() : null;
+            if (!cache) return false;
+            // The discovery cache only stores ids; refetch raw list for richer fields when scanning.
+            return true;
+        }
+        async function _ccOcrMgrFetchCatalogRaw(apiKey) {
+            const headers = { 'Content-Type': 'application/json' };
+            if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
+            const resp = await fetch('https://openrouter.ai/api/v1/models', { method: 'GET', headers, signal: AbortSignal.timeout(20000) });
+            if (!resp.ok) {
+                let bodyTxt = '';
+                try { bodyTxt = (await resp.text()).slice(0, 200); } catch (_) {}
+                throw new Error('HTTP ' + resp.status + ' ' + bodyTxt);
+            }
+            const json = await resp.json();
+            return Array.isArray(json && json.data) ? json.data : [];
+        }
+        async function ocrManagerScan(btnEl) {
+            const orig = btnEl ? btnEl.innerText : null;
+            if (btnEl) { btnEl.disabled = true; btnEl.innerText = '⏳ Scanning…'; }
+            _ccOcrMgrStatus('🔎 Scanning OpenRouter /api/v1/models…', 'info');
+            try {
+                const keys = (typeof getOpenRouterApiKeys === 'function') ? getOpenRouterApiKeys() : [];
+                const apiKey = keys[0] || null;
+                if (!apiKey) {
+                    _ccOcrMgrStatus('❌ Нет API ключей OpenRouter. Добавь ключ в блоке «API ключи».', 'err');
+                    return;
+                }
+                const raw = await _ccOcrMgrFetchCatalogRaw(apiKey);
+                // Also refresh discovery cache so analyze + diagnostics see fresh data.
+                try { await _ccOcrDiscoverModels(apiKey, { force: true }); } catch (_) {}
+                const visionMetas = raw.filter(_ccOcrModelMetaIsVision);
+                const rows = [];
+                let paidIgnored = 0;
+                for (let i = 0; i < visionMetas.length; i++) {
+                    const m = visionMetas[i];
+                    const isFree = _ccOcrModelMetaIsFree(m);
+                    if (!isFree) paidIgnored++;
+                    const pn = _ccOcrMgrProviderNameLabel(m.id, m);
+                    rows.push({
+                        id: m.id,
+                        provider: pn.provider,
+                        name: pn.name,
+                        inputModalities: _ccOcrMgrInputModalitiesLabel(m),
+                        context: _ccOcrMgrContextLabel(m),
+                        free: isFree,
+                        notes: m.description ? String(m.description).slice(0, 80) : '',
+                    });
+                }
+                // free first, paid after — paid disabled visually.
+                rows.sort((a, b) => (a.free === b.free) ? a.id.localeCompare(b.id) : (a.free ? -1 : 1));
+                _CC_OCR_MGR_STATE.catalog = rows;
+                _CC_OCR_MGR_STATE.paidIgnoredCount = paidIgnored;
+                _ccOcrMgrRenderTable();
+                const freeCount = rows.filter(r => r.free).length;
+                _ccOcrMgrStatus('✅ Найдено free vision: ' + freeCount + ' · paid ignored: ' + paidIgnored + ' · catalog total: ' + raw.length, 'ok');
+                if (typeof renderAnalysisProviderSettings === 'function') {
+                    try { renderAnalysisProviderSettings(); } catch (_) {}
+                }
+            } catch (e) {
+                console.warn('[ocr-mgr] scan failed', e);
+                _ccOcrMgrStatus('❌ Scan failed: ' + (e && e.message ? e.message : String(e)), 'err');
+            } finally {
+                if (btnEl && orig != null) { btnEl.disabled = false; btnEl.innerText = orig; }
+            }
+        }
+        window.ocrManagerScan = ocrManagerScan;
+        function ocrManagerSelectRow(inputEl) {
+            if (!inputEl) return;
+            _CC_OCR_MGR_STATE.selectedId = inputEl.value;
+        }
+        window.ocrManagerSelectRow = ocrManagerSelectRow;
+        function _ccOcrMgrPickScreenshotDataUrl() {
+            try {
+                if (typeof activeDayDate === 'string' && activeDayDate && typeof dayScreenshots === 'object' && dayScreenshots) {
+                    const arr = dayScreenshots[activeDayDate];
+                    if (Array.isArray(arr) && arr.length) return arr[arr.length - 1].dataUrl;
+                }
+            } catch (_) {}
+            try {
+                if (typeof dayScreenShotMap === 'object' && dayScreenShotMap) {
+                    const ks = Object.keys(dayScreenShotMap);
+                    if (ks.length) return dayScreenShotMap[ks[0]];
+                }
+            } catch (_) {}
+            return null;
+        }
+        async function ocrManagerTestSelected(btnEl) {
+            const model = _CC_OCR_MGR_STATE.selectedId;
+            if (!model) { _ccOcrMgrStatus('⚠️ Сначала выбери модель в таблице (radio).', 'warn'); return; }
+            const row = _CC_OCR_MGR_STATE.catalog.find(r => r.id === model);
+            if (row && !row.free) { _ccOcrMgrStatus('❌ Paid модели нельзя тестировать.', 'err'); return; }
+            const dataUrl = _ccOcrMgrPickScreenshotDataUrl();
+            if (!dataUrl) { _ccOcrMgrStatus('❌ Нет загруженного скриншота. Открой дневную модалку и загрузи скрин.', 'err'); return; }
+            const keys = (typeof getOpenRouterApiKeys === 'function') ? getOpenRouterApiKeys() : [];
+            const apiKey = keys[0] || null;
+            if (!apiKey) { _ccOcrMgrStatus('❌ Нет API ключей OpenRouter.', 'err'); return; }
+            const orig = btnEl ? btnEl.innerText : null;
+            if (btnEl) { btnEl.disabled = true; btnEl.innerText = '⏳ Testing…'; }
+            _ccOcrMgrStatus('🧪 Тестирую ' + model + '…', 'info');
+            const test = { kind: 'pending', statusText: '⏳', latencyMs: null, rows: null, parseError: null, error: null, sampledAt: Date.now() };
+            _CC_OCR_MGR_STATE.tests[model] = test;
+            _ccOcrMgrRenderTable();
+            const prompt = 'Extract the "Член группы" (party member) table from this game screenshot.\nReturn ONLY valid JSON: {"rows":[{"nick":"","kills":0,"deaths":0,"pvp":0,"pve":0}],"total_count":0,"confidence":0,"notes":"","table_type":"party_members","member_side":"unknown"}\nPreserve nick spelling exactly. kills/deaths/pvp/pve integers or null. No markdown. No code fences.';
+            const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+            try {
+                const body = {
+                    model: model,
+                    messages: [{ role: 'user', content: [
+                        { type: 'text', text: prompt },
+                        { type: 'image_url', image_url: { url: dataUrl } },
+                    ]}],
+                    temperature: 0,
+                    max_tokens: 1200,
+                };
+                const orProvider = (typeof _ccOcrModelOpenRouterProvider === 'function') ? _ccOcrModelOpenRouterProvider(model) : null;
+                if (orProvider) body.provider = orProvider;
+                const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + apiKey,
+                        'Content-Type': 'application/json',
+                        'HTTP-Referer': location.origin,
+                        'X-Title': 'Clan Control OCR Model Manager',
+                    },
+                    body: JSON.stringify(body),
+                    signal: AbortSignal.timeout(60000),
+                });
+                test.latencyMs = Math.round(((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0));
+                if (!resp.ok) {
+                    let errMsg = 'HTTP ' + resp.status;
+                    try { const j = await resp.json(); errMsg = (j.error && j.error.message) || errMsg; } catch (_) {}
+                    test.kind = 'err';
+                    test.statusText = 'HTTP ' + resp.status;
+                    test.error = errMsg;
+                    _ccOcrMgrStatus('❌ ' + model + ' → ' + errMsg, 'err');
+                } else {
+                    const json = await resp.json();
+                    const text = (json && json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content) || '';
+                    let parsed = null;
+                    try {
+                        const cleaned = text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+                        parsed = JSON.parse(cleaned);
+                    } catch (_) {
+                        const m = text.match(/\{[\s\S]*\}/);
+                        if (m) { try { parsed = JSON.parse(m[0]); } catch (e2) { test.parseError = e2 && e2.message || 'parse fail'; } }
+                        else { test.parseError = 'no JSON object'; }
+                    }
+                    if (parsed && Array.isArray(parsed.rows)) {
+                        test.rows = parsed.rows.length;
+                        test.kind = 'ok';
+                        test.statusText = '✅ ok';
+                        _ccOcrMgrStatus('✅ ' + model + ' → rows=' + test.rows + ' · ' + test.latencyMs + ' ms', 'ok');
+                    } else {
+                        test.kind = 'err';
+                        test.statusText = 'no rows';
+                        test.error = test.parseError || 'empty rows';
+                        _ccOcrMgrStatus('⚠️ ' + model + ' → ' + (test.error || 'empty rows'), 'warn');
+                    }
+                }
+            } catch (e) {
+                test.latencyMs = Math.round(((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0));
+                test.kind = 'err';
+                test.statusText = 'error';
+                test.error = e && e.message ? e.message : String(e);
+                _ccOcrMgrStatus('❌ ' + model + ' → ' + test.error, 'err');
+            } finally {
+                _ccOcrMgrRenderTable();
+                if (btnEl && orig != null) { btnEl.disabled = false; btnEl.innerText = orig; }
+            }
+        }
+        window.ocrManagerTestSelected = ocrManagerTestSelected;
+        function _ccOcrMgrIsFreeAllowedById(id) {
+            if (!id || typeof id !== 'string') return false;
+            if (typeof _ccIsBlockedModel === 'function' && _ccIsBlockedModel(id)) return false;
+            if (id.toLowerCase().endsWith(':free')) return true;
+            const cache = (typeof _ccOcrReadDiscoveryCache === 'function') ? _ccOcrReadDiscoveryCache() : null;
+            if (cache && Array.isArray(cache.freeVision) && cache.freeVision.indexOf(id) !== -1) return true;
+            const row = _CC_OCR_MGR_STATE.catalog.find(r => r.id === id);
+            if (row && row.free) return true;
+            return false;
+        }
+        function ocrManagerSetPrimary() {
+            const id = _CC_OCR_MGR_STATE.selectedId;
+            if (!id) { _ccOcrMgrStatus('⚠️ Выбери модель (radio).', 'warn'); return; }
+            if (!_ccOcrMgrIsFreeAllowedById(id)) { _ccOcrMgrStatus('❌ Модель не free: ' + id, 'err'); return; }
+            _CC_OCR_MGR_STATE.draftPrimary = id;
+            if (_CC_OCR_MGR_STATE.draftFallback === id) _CC_OCR_MGR_STATE.draftFallback = null;
+            _ccOcrMgrStatus('⭐ Draft primary = ' + id + ' (не забудь Save OCR chain).', 'info');
+            _ccOcrMgrRenderTable();
+        }
+        window.ocrManagerSetPrimary = ocrManagerSetPrimary;
+        function ocrManagerSetFallback() {
+            const id = _CC_OCR_MGR_STATE.selectedId;
+            if (!id) { _ccOcrMgrStatus('⚠️ Выбери модель (radio).', 'warn'); return; }
+            if (!_ccOcrMgrIsFreeAllowedById(id)) { _ccOcrMgrStatus('❌ Модель не free: ' + id, 'err'); return; }
+            _CC_OCR_MGR_STATE.draftFallback = id;
+            if (_CC_OCR_MGR_STATE.draftPrimary === id) _CC_OCR_MGR_STATE.draftPrimary = null;
+            _ccOcrMgrStatus('🛟 Draft fallback = ' + id + ' (не забудь Save OCR chain).', 'info');
+            _ccOcrMgrRenderTable();
+        }
+        window.ocrManagerSetFallback = ocrManagerSetFallback;
+        function ocrManagerSaveChain() {
+            const pri = _CC_OCR_MGR_STATE.draftPrimary;
+            const fb = _CC_OCR_MGR_STATE.draftFallback;
+            if (!pri && !fb) { _ccOcrMgrStatus('⚠️ Нечего сохранять: задай primary и/или fallback.', 'warn'); return; }
+            if (pri && !_ccOcrMgrIsFreeAllowedById(pri)) { _ccOcrMgrStatus('❌ Primary не free: ' + pri, 'err'); return; }
+            if (fb && !_ccOcrMgrIsFreeAllowedById(fb)) { _ccOcrMgrStatus('❌ Fallback не free: ' + fb, 'err'); return; }
+            const chain = [];
+            if (pri) chain.push(pri);
+            if (fb && fb !== pri) chain.push(fb);
+            const saved = _ccOcrSaveManualChain(chain);
+            // Reset model unavailable cache so a previously dead id can be retried immediately.
+            try { if (typeof _ccOcrResetUnavailableModels === 'function') _ccOcrResetUnavailableModels(); } catch (_) {}
+            _ccOcrMgrStatus('💾 Сохранено: ' + saved.join(' → '), 'ok');
+            _ccOcrMgrRenderTable();
+            if (typeof renderAnalysisProviderSettings === 'function') {
+                try { renderAnalysisProviderSettings(); } catch (_) {}
+            }
+        }
+        window.ocrManagerSaveChain = ocrManagerSaveChain;
+        function ocrManagerResetDefault() {
+            _ccOcrSaveManualChain(_CC_OCR_MANUAL_SAFE_DEFAULT.slice());
+            _CC_OCR_MGR_STATE.draftPrimary = _CC_OCR_MANUAL_SAFE_DEFAULT[0] || null;
+            _CC_OCR_MGR_STATE.draftFallback = _CC_OCR_MANUAL_SAFE_DEFAULT[1] || null;
+            try { if (typeof _ccOcrResetUnavailableModels === 'function') _ccOcrResetUnavailableModels(); } catch (_) {}
+            _ccOcrMgrStatus('↩ Восстановлен safe default: ' + _CC_OCR_MANUAL_SAFE_DEFAULT.join(' → '), 'ok');
+            _ccOcrMgrRenderTable();
+            if (typeof renderAnalysisProviderSettings === 'function') {
+                try { renderAnalysisProviderSettings(); } catch (_) {}
+            }
+        }
+        window.ocrManagerResetDefault = ocrManagerResetDefault;
+        function ocrManagerAddManualModel() {
+            const input = document.getElementById('ocrMgrManualAddInput');
+            const id = input ? input.value.trim() : '';
+            if (!id) { _ccOcrMgrStatus('⚠️ Введи model id.', 'warn'); return; }
+            if (!_ccOcrMgrIsFreeAllowedById(id)) {
+                _ccOcrMgrStatus('❌ Запрещено: id "' + id + '" не free (нет :free суффикса и не в discovery).', 'err');
+                return;
+            }
+            const exists = _CC_OCR_MGR_STATE.catalog.find(r => r.id === id);
+            if (!exists) {
+                const parts = id.split('/');
+                _CC_OCR_MGR_STATE.catalog.unshift({
+                    id: id,
+                    provider: parts[0] || '',
+                    name: parts.slice(1).join('/') || id,
+                    inputModalities: 'image?',
+                    context: '?',
+                    free: true,
+                    notes: 'manual',
+                });
+            }
+            _CC_OCR_MGR_STATE.selectedId = id;
+            if (input) input.value = '';
+            _ccOcrMgrStatus('✅ Добавлен в таблицу: ' + id, 'ok');
+            _ccOcrMgrRenderTable();
+        }
+        window.ocrManagerAddManualModel = ocrManagerAddManualModel;
+        function ocrManagerExport() {
+            const payload = {
+                kind: 'clan-control-ocr-config',
+                version: 1,
+                exportedAt: new Date().toISOString(),
+                manualChain: _ccOcrReadManualChain(),
+                draftPrimary: _CC_OCR_MGR_STATE.draftPrimary,
+                draftFallback: _CC_OCR_MGR_STATE.draftFallback,
+                lastBenchmarkReport: (typeof window._ccOcrBenchmarkReport !== 'undefined') ? window._ccOcrBenchmarkReport : null,
+                lastModelTests: _CC_OCR_MGR_STATE.tests,
+                catalogSnapshotCount: _CC_OCR_MGR_STATE.catalog.length,
+            };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ocr-model-config-' + Date.now() + '.json';
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            _ccOcrMgrStatus('📤 Экспортировано.', 'ok');
+        }
+        window.ocrManagerExport = ocrManagerExport;
+        function ocrManagerImport(event) {
+            const f = event && event.target && event.target.files && event.target.files[0];
+            if (!f) return;
+            const reader = new FileReader();
+            reader.onload = function() {
+                try {
+                    const obj = JSON.parse(String(reader.result || '{}'));
+                    if (!obj || obj.kind !== 'clan-control-ocr-config') {
+                        _ccOcrMgrStatus('❌ Неверный формат файла (kind mismatch).', 'err'); return;
+                    }
+                    const chain = Array.isArray(obj.manualChain) ? obj.manualChain : [];
+                    const rejected = [];
+                    const accepted = chain.filter(id => {
+                        if (_ccOcrMgrIsFreeAllowedById(id)) return true;
+                        rejected.push(id);
+                        return false;
+                    });
+                    if (!accepted.length) {
+                        _ccOcrMgrStatus('❌ Импорт отклонён: ни один id не прошёл free-check. Rejected: ' + rejected.join(','), 'err');
+                        return;
+                    }
+                    _ccOcrSaveManualChain(accepted);
+                    _CC_OCR_MGR_STATE.draftPrimary = accepted[0] || null;
+                    _CC_OCR_MGR_STATE.draftFallback = accepted[1] || null;
+                    try { if (typeof _ccOcrResetUnavailableModels === 'function') _ccOcrResetUnavailableModels(); } catch (_) {}
+                    const msg = '📥 Импортирован manual chain: ' + accepted.join(' → ') + (rejected.length ? ' (отклонены paid/blocked: ' + rejected.join(',') + ')' : '');
+                    _ccOcrMgrStatus(msg, rejected.length ? 'warn' : 'ok');
+                    _ccOcrMgrRenderTable();
+                    if (typeof renderAnalysisProviderSettings === 'function') {
+                        try { renderAnalysisProviderSettings(); } catch (_) {}
+                    }
+                } catch (e) {
+                    _ccOcrMgrStatus('❌ Ошибка импорта: ' + (e && e.message ? e.message : String(e)), 'err');
+                } finally {
+                    if (event.target) event.target.value = '';
+                }
+            };
+            reader.readAsText(f);
+        }
+        window.ocrManagerImport = ocrManagerImport;
+        function renderOcrModelManager() {
+            _ccOcrMgrSyncVisibility();
+            if (!_ccOcrMgrIsAdminVisible()) return;
+            // Seed draft from saved chain so the UI reflects current persisted state.
+            const saved = _ccOcrReadManualChain();
+            if (_CC_OCR_MGR_STATE.draftPrimary == null && saved[0]) _CC_OCR_MGR_STATE.draftPrimary = saved[0];
+            if (_CC_OCR_MGR_STATE.draftFallback == null && saved[1]) _CC_OCR_MGR_STATE.draftFallback = saved[1];
+            _ccOcrMgrRenderTable();
+        }
+        window.renderOcrModelManager = renderOcrModelManager;
+
         function saveAnalysisProviderSettings() {
             const providerEl = document.getElementById('analysisProviderSelect');
             const proxyEl = document.getElementById('ocrSpaceProxyUrlInput');
@@ -19101,6 +19649,7 @@ ${playerList}
             var navUsers = document.getElementById('nav-users');
             if (navUsers) navUsers.style.display = cap.canManageRoles ? '' : 'none';
             if (typeof window._updateRoleBadge === 'function') window._updateRoleBadge();
+            if (typeof window._ccOcrMgrSyncVisibility === 'function') window._ccOcrMgrSyncVisibility();
         };
 
         var EYE_ON  = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
@@ -19461,6 +20010,7 @@ ${playerList}
             var _db = document.getElementById('dev-inspect-toggle');
             if (_db) _db.style.display = 'none';
             if (typeof window._devStop === 'function') window._devStop();
+            if (typeof window._ccOcrMgrSyncVisibility === 'function') window._ccOcrMgrSyncVisibility();
         };
 
         window.shellToggle = function() {
@@ -19501,6 +20051,7 @@ ${playerList}
             if (_db) _db.style.display = _isAdmin ? '' : 'none';
             if (!_isAdmin && typeof window._devStop === 'function') window._devStop();
             if (typeof window._applyCapabilityGates === 'function') window._applyCapabilityGates();
+            if (typeof window._ccOcrMgrSyncVisibility === 'function') window._ccOcrMgrSyncVisibility();
             if (_isAdmin && typeof window._probeProfilesForAdmin === 'function') window._probeProfilesForAdmin();
         }
 
