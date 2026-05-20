@@ -3728,6 +3728,13 @@
                         <input type="file" accept=".json,application/json" onchange="ocrManagerImport(event)" style="display:none">
                     </label>
                 </div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:8px 10px;border:1px solid #1e2530;border-radius:8px;background:#0b1018">
+                    <label style="font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:6px;font-weight:600">
+                        Per-model timeout (sec):
+                        <input id="ocrMgrPerModelTimeoutInput" type="number" min="3" max="120" step="1" class="input-dark" style="width:80px" onchange="ocrManagerSavePerModelTimeout(this.value)">
+                    </label>
+                    <span style="font-size:10px;color:#475569">default 12 — после таймаута модель помечается slow и analyze сразу переходит к следующей в chain</span>
+                </div>
                 <div id="ocrMgrActiveChain" style="font-size:11px;color:#94a3b8;padding:10px;border:1px solid #1e2530;border-radius:8px;background:#0b1018;line-height:1.6;margin-bottom:12px"></div>
                 <div id="ocrMgrStatus" style="display:none;font-size:13px;padding:10px;border-radius:8px;margin-bottom:12px"></div>
                 <div style="overflow-x:auto">
@@ -8443,6 +8450,29 @@ function getClass2IconByClass3(c3) {
             console.info('[ocr-model] unavailable list cleared');
         }
         window._ccOcrResetUnavailableModels = _ccOcrResetUnavailableModels;
+        // Per-model timeout for analyze fetch (AbortController). Default 12s — manual chain
+        // fast-fail: if a model doesn't respond within this window, abort and move to next.
+        const _CC_OCR_PER_MODEL_TIMEOUT_KEY = 'clanControl_ocrPerModelTimeoutSec';
+        const _CC_OCR_PER_MODEL_TIMEOUT_DEFAULT = 12;
+        function _ccOcrReadPerModelTimeoutSec() {
+            try {
+                const raw = localStorage.getItem(_CC_OCR_PER_MODEL_TIMEOUT_KEY);
+                if (raw == null) return _CC_OCR_PER_MODEL_TIMEOUT_DEFAULT;
+                const n = Number(raw);
+                if (Number.isFinite(n) && n >= 3 && n <= 120) return Math.round(n);
+            } catch (_) {}
+            return _CC_OCR_PER_MODEL_TIMEOUT_DEFAULT;
+        }
+        function _ccOcrReadPerModelTimeoutMs() { return _ccOcrReadPerModelTimeoutSec() * 1000; }
+        function _ccOcrSavePerModelTimeoutSec(sec) {
+            const n = Number(sec);
+            if (!Number.isFinite(n) || n < 3 || n > 120) return false;
+            try { localStorage.setItem(_CC_OCR_PER_MODEL_TIMEOUT_KEY, String(Math.round(n))); } catch (_) {}
+            return true;
+        }
+        window._ccOcrReadPerModelTimeoutSec = _ccOcrReadPerModelTimeoutSec;
+        window._ccOcrReadPerModelTimeoutMs  = _ccOcrReadPerModelTimeoutMs;
+        window._ccOcrSavePerModelTimeoutSec = _ccOcrSavePerModelTimeoutSec;
         function _ccOcrAvailableModels() {
             return _ccOcrModelChain().filter(m => !_ccOcrIsModelUnavailable(m));
         }
@@ -9914,7 +9944,24 @@ function getClass2IconByClass3(c3) {
                 }
                 return true;
             };
-            const _discovery = await _ccOcrEnsureDiscovery(openRouterKeys[0]);
+            const _ccManualChainSaved = _ccOcrReadManualChain();
+            let _discovery;
+            if (_ccManualChainSaved.length) {
+                // Manual chain saved — do NOT block analyze on discovery. Use cached catalog
+                // (if any) and refresh discovery in the background. Manual chain ids are
+                // whitelisted in the effective chain regardless of discovery freshness.
+                const _cachedDisc = _ccOcrReadDiscoveryCache();
+                _discovery = _cachedDisc
+                    ? Object.assign({ fromCache: true }, _cachedDisc)
+                    : { fromCache: false, ts: null, error: null, vision: [], freeVision: [], rawCount: 0 };
+                console.info('[ocr-flow] OCR using manual chain: ' + _ccManualChainSaved.join(' → ') + ' (discovery refresh in background)');
+                setDayStatus('loading', 'OCR using manual chain: ' + _ccManualChainSaved.join(' → '));
+                Promise.resolve()
+                    .then(() => _ccOcrEnsureDiscovery(openRouterKeys[0]))
+                    .catch(e => console.warn('[ocr-flow] background discovery refresh failed', e));
+            } else {
+                _discovery = await _ccOcrEnsureDiscovery(openRouterKeys[0]);
+            }
             console.info('[ocr-discovery] ' + JSON.stringify({
                 fromCache: _discovery.fromCache,
                 rawCount: _discovery.rawCount,
@@ -9922,13 +9969,8 @@ function getClass2IconByClass3(c3) {
                 freeVisionCount: Array.isArray(_discovery.freeVision) ? _discovery.freeVision.length : 0,
                 error: _discovery.error,
             }));
-            // If discovery timed out/errored but a manual admin chain is saved — surface a
-            // soft notice instead of bailing. Manual chain ids are whitelisted in the
-            // effective chain regardless of discovery freshness.
-            const _ccManualChainSaved = _ccOcrReadManualChain();
             if (_discovery && _discovery.error && _ccManualChainSaved.length) {
-                console.warn('[ocr-flow] Discovery timeout, using saved primary chain: ' + _ccManualChainSaved.join(','));
-                setDayStatus('loading', 'Discovery timeout, using saved primary chain: ' + _ccManualChainSaved.join(' → '));
+                console.warn('[ocr-flow] Discovery error, using saved manual chain: ' + _ccManualChainSaved.join(','));
             }
             let _prep = _ccOcrPrepareChainForAnalyze('analyze-day');
             let _diag = _prep.diag;
@@ -10030,6 +10072,7 @@ function getClass2IconByClass3(c3) {
                         let chosenParsed = null;
                         let chosenRows = [];
                         let chosenText = '';
+                        let _attemptHadTimeout = false;
                         for (let ocrAttempt = 0; ocrAttempt < 2; ocrAttempt++) {
                             if (ocrAttempt > 0) {
                                 setDayStatus('loading', `OCR retry 1/1: скриншот ${i + 1} из ${shots.length}...`);
@@ -10087,19 +10130,44 @@ function getClass2IconByClass3(c3) {
                                                 temperature: _bodyParsed && _bodyParsed.temperature,
                                                 max_tokens: _bodyParsed && _bodyParsed.max_tokens,
                                             }));
+                                            const _perModelTimeoutMs = _ccOcrReadPerModelTimeoutMs();
+                                            const _modelAbort = new AbortController();
+                                            const _modelTimeoutId = setTimeout(() => {
+                                                try { _modelAbort.abort(new DOMException('per-model timeout ' + _perModelTimeoutMs + 'ms', 'TimeoutError')); }
+                                                catch (_) { _modelAbort.abort(); }
+                                            }, _perModelTimeoutMs);
                                             try {
                                                 response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                                                     method: 'POST',
                                                     headers: _baiduReqHeaders(fetchKey),
                                                     body: _bodyStr,
-                                                    signal: AbortSignal.timeout(60000),
+                                                    signal: _modelAbort.signal,
                                                 });
                                                 console.info(`[openrouter-ocr] response status=${response.status} model=${candidateModel}`);
                                             } catch (e) {
                                                 response = null;
+                                                const _isTimeout = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
+                                                if (_isTimeout) {
+                                                    _attemptHadTimeout = true;
+                                                    _ccOcrMarkModelUnavailable(candidateModel, 'timeout >' + Math.round(_perModelTimeoutMs / 1000) + 's');
+                                                    if (_ccOcrReadPreferredModel() === candidateModel) _ccOcrClearPreferredModel();
+                                                    const restAvail = _chainAvail.slice(mi + 1).filter(m => !_ccOcrIsModelUnavailable(m));
+                                                    const nextCandidate = restAvail[0] || null;
+                                                    const _toSec = Math.round(_perModelTimeoutMs / 1000);
+                                                    const msg = nextCandidate
+                                                        ? 'OCR model timeout: ' + candidateModel + ' (>' + _toSec + 's) → trying ' + nextCandidate
+                                                        : 'OCR model timeout: ' + candidateModel + ' (>' + _toSec + 's) → нет следующей модели в chain';
+                                                    console.warn('[ocr-flow] ' + msg);
+                                                    setDayStatus('loading', msg);
+                                                    lastNon429Error = { status: 'TIMEOUT', message: 'per-model timeout >' + _toSec + 's' };
+                                                    modelDead = true;
+                                                    break;
+                                                }
                                                 lastNon429Error = { status: 'NETWORK', message: e?.message || String(e) };
                                                 console.info('[openrouter-ocr] response status=network-error');
                                                 continue;
+                                            } finally {
+                                                clearTimeout(_modelTimeoutId);
                                             }
                                             if (response.status === 429) {
                                                 saw429 = true;
@@ -10133,6 +10201,10 @@ function getClass2IconByClass3(c3) {
                                         break;
                                     }
                                     if (response && response.ok) break;
+                                    // Skip rediscovery when this round was killed by per-model timeouts —
+                                    // rediscovery clears the timeout-unavailable flags, which would just
+                                    // re-run the same slow models and double the wait per screenshot.
+                                    if (_attemptHadTimeout) break;
                                     // model loop exhausted without success — try rediscovery once
                                     const _justRediscovered2 = await _ccForceRediscover('all chain models 404 in single shot');
                                     if (!_justRediscovered2) break;
@@ -10206,6 +10278,13 @@ function getClass2IconByClass3(c3) {
                                 chosenParsed = parsed;
                                 chosenRows = rows;
                                 chosenText = text;
+                            }
+                            // Skip retry when the first attempt was a per-model timeout — the slow
+                            // model is already marked unavailable, repeating wastes another timeout
+                            // window. Retry only on fast parse-error / empty-rows responses.
+                            if (_attemptHadTimeout) {
+                                console.info('[ocr-retry] skipped: first attempt hit per-model timeout');
+                                break;
                             }
                             if (!_kmOcrNeedsRetry(attemptInfo)) break;
                         }
@@ -17790,6 +17869,19 @@ ${playerList}
             reader.readAsText(f);
         }
         window.ocrManagerImport = ocrManagerImport;
+        function ocrManagerSavePerModelTimeout(val) {
+            const ok = window._ccOcrSavePerModelTimeoutSec(val);
+            const el = document.getElementById('ocrMgrPerModelTimeoutInput');
+            const current = window._ccOcrReadPerModelTimeoutSec();
+            if (el) el.value = current;
+            if (ok) {
+                _ccOcrMgrStatus('✅ Per-model timeout: ' + current + 's', 'ok');
+                console.info('[ocr-mgr] per-model timeout saved = ' + current + 's');
+            } else {
+                _ccOcrMgrStatus('❌ Timeout должен быть числом 3..120 sec (текущее: ' + current + 's)', 'err');
+            }
+        }
+        window.ocrManagerSavePerModelTimeout = ocrManagerSavePerModelTimeout;
         function renderOcrModelManager() {
             _ccOcrMgrSyncVisibility();
             if (!_ccOcrMgrIsAdminVisible()) return;
@@ -17797,6 +17889,10 @@ ${playerList}
             const saved = _ccOcrReadManualChain();
             if (_CC_OCR_MGR_STATE.draftPrimary == null && saved[0]) _CC_OCR_MGR_STATE.draftPrimary = saved[0];
             if (_CC_OCR_MGR_STATE.draftFallback == null && saved[1]) _CC_OCR_MGR_STATE.draftFallback = saved[1];
+            const _toEl = document.getElementById('ocrMgrPerModelTimeoutInput');
+            if (_toEl && typeof window._ccOcrReadPerModelTimeoutSec === 'function') {
+                _toEl.value = window._ccOcrReadPerModelTimeoutSec();
+            }
             _ccOcrMgrRenderTable();
         }
         window.renderOcrModelManager = renderOcrModelManager;
